@@ -15,9 +15,9 @@ public static class DbSeeder
         if (!await db.Set<Currency>().AnyAsync())
         {
             db.Set<Currency>().AddRange(
-                Currency.Create("ريال يمني", "YER", "﷼", 1.0m, isBaseCurrency: true, fractionName: "فلس"),
-                Currency.Create("دولار أمريكي", "USD", "$", 550m, fractionName: "سنت"),
-                Currency.Create("ريال سعودي", "SAR", "﷼", 71.4m, fractionName: "هللة")
+                Currency.Create("ريال يمني", "YER", "﷼", isBaseCurrency: true, fractionName: "فلس"),
+                Currency.Create("دولار أمريكي", "USD", "$", fractionName: "سنت"),
+                Currency.Create("ريال سعودي", "SAR", "﷼", fractionName: "هللة")
             );
             logger?.LogInformation("Seeded {Count} currencies.", 3);
         }
@@ -37,14 +37,13 @@ public static class DbSeeder
                 .FirstAsync(a => a.AccountCode == "1131");
             var cashCustomerParty = Party.Create(
                 name: "عميل نقدي",
-                partyType: PartyType.Customer,
-                accountId: cashCustomerAccount.Id,
                 createdByUserId: null
             );
             db.Set<Party>().Add(cashCustomerParty);
             await db.SaveChangesAsync();
             db.Customers.Add(Customer.Create(
                 partyId: cashCustomerParty.Id,
+                accountId: cashCustomerAccount.Id,
                 createdByUserId: null
             ));
             logger?.LogInformation("Seeded default customer.");
@@ -56,14 +55,13 @@ public static class DbSeeder
                 .FirstAsync(a => a.AccountCode == "1321");
             var cashSupplierParty = Party.Create(
                 name: "المورد الافتراضي في النظام",
-                partyType: PartyType.Supplier,
-                accountId: cashSupplierAccount.Id,
                 createdByUserId: null
             );
             db.Set<Party>().Add(cashSupplierParty);
             await db.SaveChangesAsync();
             db.Suppliers.Add(Supplier.Create(
                 partyId: cashSupplierParty.Id,
+                accountId: cashSupplierAccount.Id,
                 createdByUserId: null
             ));
             logger?.LogInformation("Seeded default supplier.");
@@ -73,38 +71,38 @@ public static class DbSeeder
         {
             var settings = new List<SystemSetting>
             {
-                SystemSetting.Create("CostingMethod", "1", "int", "Inventory", "طريقة تقييم المخزون", "1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice"),
-                SystemSetting.Create("AllowNegativeStock", "false", "bool", "Inventory", "السماح بالمخزون السالب", "السماح بجعل كمية المخزون أقل من صفر"),
-                SystemSetting.Create("EnableFefo", "false", "bool", "Inventory", "استخدام FEFO", "استخدام طريقة الصادر أولاً حسب تاريخ الانتهاء"),
-                SystemSetting.Create("StockAlertDays", "5", "int", "Inventory", "تحذير المخزون (أيام)", "عدد الأيام للتحذير قبل نفاد المخزون"),
-                SystemSetting.Create("AutoPostInvoices", "true", "bool", "Sales", "الترحيل التلقائي", "ترحيل فاتورة البيع مباشرة عند الحفظ"),
-                SystemSetting.Create("AllowDrafts", "true", "bool", "Sales", "السماح بالمسودات", "السماح بحفظ فاتورة البيع كمسودة"),
-                SystemSetting.Create("ShowProfitInInvoice", "true", "bool", "Sales", "إظهار الربح", "إظهار هامش الربح في شاشة البيع"),
-                SystemSetting.Create("PreventBelowRetailPrice", "false", "bool", "Sales", "منع البيع أقل من السعر", "منع البيع بسعر أقل من السعر الرسمي"),
-                SystemSetting.Create("AllowBelowCostSale", "true", "bool", "Sales", "البيع أقل من التكلفة", "السماح بالبيع بسعر أقل من التكلفة مع تحذير"),
-                SystemSetting.Create("DefaultCashCustomerId", "1", "int", "Sales", "العميل النقدي", "العميل الافتراضي لمبيعات النقد"),
-                SystemSetting.Create("PurchaseAutoPost", "true", "bool", "Purchases", "ترحيل المشتريات تلقائياً", "ترحيل فاتورة الشراء مباشرة عند الحفظ"),
-                SystemSetting.Create("DefaultCashSupplierId", "1", "int", "Purchases", "المورد النقدي", "المورد الافتراضي لمشتريات النقد"),
-                SystemSetting.Create("EnableBarcode", "true", "bool", "Barcode", "تفعيل الباركود", "تفعيل الباركود في النظام بالكامل"),
-                SystemSetting.Create("BarcodeInputType", "Scanner", "string", "Barcode", "نوع إدخال الباركود", "Scanner أو Camera"),
-                SystemSetting.Create("AutoGenerateBarcode", "true", "bool", "Barcode", "توليد باركود تلقائي", "توليد باركود تلقائي للمنتجات الجديدة"),
-                SystemSetting.Create("AutoCreateJournalEntry", "true", "bool", "Accounting", "إنشاء قيود محاسبية", "إنشاء قيد محاسبي عند ترحيل كل فاتورة"),
-                SystemSetting.Create("DecimalPlaces", "2", "int", "General", "الكسور العشرية", "عدد الخانات العشرية للأسعار والمبالغ"),
-                SystemSetting.Create("Language", "ar", "string", "General", "لغة النظام", "اللغة الافتراضية للنظام"),
-                SystemSetting.Create("DateFormat", "dd/MM/yyyy", "string", "General", "تنسيق التاريخ", "تنسيق عرض التواريخ في النظام"),
-                SystemSetting.Create("PaperSize", "A4", "string", "Print", "حجم الورق", "حجم الورق الافتراضي للطباعة"),
-                SystemSetting.Create("PrintCopies", "1", "int", "Print", "عدد النسخ", "عدد نسخ الطباعة الافتراضية"),
-                SystemSetting.Create("ShowBalanceOnPrint", "true", "bool", "Print", "إظهار الرصيد", "إظهار رصيد الحساب في الفاتورة المطبوعة"),
-                SystemSetting.Create("PrintSignature", "false", "bool", "Print", "طباعة التوقيع", "طباعة التوقيع في أسفل الفاتورة"),
-                SystemSetting.Create("HideTaxInSales", "false", "bool", "Sales", "إخفاء الضريبة في المبيعات", "إخفاء حقل الضريبة في شاشة فاتورة البيع"),
-                SystemSetting.Create("ShowExpiryInInvoices", "false", "bool", "Sales", "إظهار تاريخ الانتهاء", "إظهار تاريخ انتهاء الصلاحية في الفاتورة"),
-                SystemSetting.Create("HideTaxInPurchases", "false", "bool", "Purchases", "إخفاء الضريبة في المشتريات", "إخفاء حقل الضريبة في شاشة فاتورة الشراء"),
-                SystemSetting.Create("ShowLogo", "true", "bool", "Print", "إظهار الشعار", "إظهار شعار المتجر في الفواتير المطبوعة"),
-                SystemSetting.Create("FooterNote", "", "string", "Print", "ملاحظة في التذييل", "نص يظهر في تذييل جميع الفواتير المطبوعة"),
-                SystemSetting.Create("LowStockAlert", "true", "bool", "Notifications", "تنبيه المخزون المنخفض", "تفعيل التنبيه عند انخفاض المخزون عن الحد الأدنى"),
-                SystemSetting.Create("ExpiryAlert", "true", "bool", "Notifications", "تنبيه تواريخ الانتهاء", "تفعيل التنبيه عند اقتراب تاريخ انتهاء المنتجات"),
-                SystemSetting.Create("ExpiryAlertDays", "30", "int", "Notifications", "أيام تنبيه الانتهاء", "عدد الأيام قبل تاريخ الانتهاء لإرسال التنبيه"),
-                SystemSetting.Create("CreditLimitAlert", "true", "bool", "Notifications", "تنبيه الحد الائتماني", "تفعيل التنبيه عند تجاوز الحد الائتماني للعميل"),
+                SystemSetting.Create("CostingMethod", "1", settingType: 2, category: "Inventory", displayName: "طريقة تقييم المخزون", description: "1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice"),
+                SystemSetting.Create("AllowNegativeStock", "false", settingType: 4, category: "Inventory", displayName: "السماح بالمخزون السالب", description: "السماح بجعل كمية المخزون أقل من صفر"),
+                SystemSetting.Create("EnableFefo", "false", settingType: 4, category: "Inventory", displayName: "استخدام FEFO", description: "استخدام طريقة الصادر أولاً حسب تاريخ الانتهاء"),
+                SystemSetting.Create("StockAlertDays", "5", settingType: 2, category: "Inventory", displayName: "تحذير المخزون (أيام)", description: "عدد الأيام للتحذير قبل نفاد المخزون"),
+                SystemSetting.Create("AutoPostInvoices", "true", settingType: 4, category: "Sales", displayName: "الترحيل التلقائي", description: "ترحيل فاتورة البيع مباشرة عند الحفظ"),
+                SystemSetting.Create("AllowDrafts", "true", settingType: 4, category: "Sales", displayName: "السماح بالمسودات", description: "السماح بحفظ فاتورة البيع كمسودة"),
+                SystemSetting.Create("ShowProfitInInvoice", "true", settingType: 4, category: "Sales", displayName: "إظهار الربح", description: "إظهار هامش الربح في شاشة البيع"),
+                SystemSetting.Create("PreventBelowRetailPrice", "false", settingType: 4, category: "Sales", displayName: "منع البيع أقل من السعر", description: "منع البيع بسعر أقل من السعر الرسمي"),
+                SystemSetting.Create("AllowBelowCostSale", "true", settingType: 4, category: "Sales", displayName: "البيع أقل من التكلفة", description: "السماح بالبيع بسعر أقل من التكلفة مع تحذير"),
+                SystemSetting.Create("DefaultCashCustomerId", "1", settingType: 2, category: "Sales", displayName: "العميل النقدي", description: "العميل الافتراضي لمبيعات النقد"),
+                SystemSetting.Create("PurchaseAutoPost", "true", settingType: 4, category: "Purchases", displayName: "ترحيل المشتريات تلقائياً", description: "ترحيل فاتورة الشراء مباشرة عند الحفظ"),
+                SystemSetting.Create("DefaultCashSupplierId", "1", settingType: 2, category: "Purchases", displayName: "المورد النقدي", description: "المورد الافتراضي لمشتريات النقد"),
+                SystemSetting.Create("EnableBarcode", "true", settingType: 4, category: "Barcode", displayName: "تفعيل الباركود", description: "تفعيل الباركود في النظام بالكامل"),
+                SystemSetting.Create("BarcodeInputType", "Scanner", settingType: 1, category: "Barcode", displayName: "نوع إدخال الباركود", description: "Scanner أو Camera"),
+                SystemSetting.Create("AutoGenerateBarcode", "true", settingType: 4, category: "Barcode", displayName: "توليد باركود تلقائي", description: "توليد باركود تلقائي للمنتجات الجديدة"),
+                SystemSetting.Create("AutoCreateJournalEntry", "true", settingType: 4, category: "Accounting", displayName: "إنشاء قيود محاسبية", description: "إنشاء قيد محاسبي عند ترحيل كل فاتورة"),
+                SystemSetting.Create("DecimalPlaces", "2", settingType: 2, category: "General", displayName: "الكسور العشرية", description: "عدد الخانات العشرية للأسعار والمبالغ"),
+                SystemSetting.Create("Language", "ar", settingType: 1, category: "General", displayName: "لغة النظام", description: "اللغة الافتراضية للنظام"),
+                SystemSetting.Create("DateFormat", "dd/MM/yyyy", settingType: 1, category: "General", displayName: "تنسيق التاريخ", description: "تنسيق عرض التواريخ في النظام"),
+                SystemSetting.Create("PaperSize", "A4", settingType: 1, category: "Print", displayName: "حجم الورق", description: "حجم الورق الافتراضي للطباعة"),
+                SystemSetting.Create("PrintCopies", "1", settingType: 2, category: "Print", displayName: "عدد النسخ", description: "عدد نسخ الطباعة الافتراضية"),
+                SystemSetting.Create("ShowBalanceOnPrint", "true", settingType: 4, category: "Print", displayName: "إظهار الرصيد", description: "إظهار رصيد الحساب في الفاتورة المطبوعة"),
+                SystemSetting.Create("PrintSignature", "false", settingType: 4, category: "Print", displayName: "طباعة التوقيع", description: "طباعة التوقيع في أسفل الفاتورة"),
+                SystemSetting.Create("HideTaxInSales", "false", settingType: 4, category: "Sales", displayName: "إخفاء الضريبة في المبيعات", description: "إخفاء حقل الضريبة في شاشة فاتورة البيع"),
+                SystemSetting.Create("ShowExpiryInInvoices", "false", settingType: 4, category: "Sales", displayName: "إظهار تاريخ الانتهاء", description: "إظهار تاريخ انتهاء الصلاحية في الفاتورة"),
+                SystemSetting.Create("HideTaxInPurchases", "false", settingType: 4, category: "Purchases", displayName: "إخفاء الضريبة في المشتريات", description: "إخفاء حقل الضريبة في شاشة فاتورة الشراء"),
+                SystemSetting.Create("ShowLogo", "true", settingType: 4, category: "Print", displayName: "إظهار الشعار", description: "إظهار شعار المتجر في الفواتير المطبوعة"),
+                SystemSetting.Create("FooterNote", "", settingType: 1, category: "Print", displayName: "ملاحظة في التذييل", description: "نص يظهر في تذييل جميع الفواتير المطبوعة"),
+                SystemSetting.Create("LowStockAlert", "true", settingType: 4, category: "Notifications", displayName: "تنبيه المخزون المنخفض", description: "تفعيل التنبيه عند انخفاض المخزون عن الحد الأدنى"),
+                SystemSetting.Create("ExpiryAlert", "true", settingType: 4, category: "Notifications", displayName: "تنبيه تواريخ الانتهاء", description: "تفعيل التنبيه عند اقتراب تاريخ انتهاء المنتجات"),
+                SystemSetting.Create("ExpiryAlertDays", "30", settingType: 2, category: "Notifications", displayName: "أيام تنبيه الانتهاء", description: "عدد الأيام قبل تاريخ الانتهاء لإرسال التنبيه"),
+                SystemSetting.Create("CreditLimitAlert", "true", settingType: 4, category: "Notifications", displayName: "تنبيه الحد الائتماني", description: "تفعيل التنبيه عند تجاوز الحد الائتماني للعميل"),
             };
             db.SystemSettings.AddRange(settings);
             logger?.LogInformation("Seeded {Count} SystemSettings key-value pairs.", settings.Count);
@@ -126,17 +124,17 @@ public static class DbSeeder
         {
             var storeSettings = new List<SystemSetting>
             {
-                SystemSetting.Create("Store.Name", "متجري", "string", "Store"),
-                SystemSetting.Create("Store.Phone", "", "string", "Store"),
-                SystemSetting.Create("Store.Address", "", "string", "Store"),
-                SystemSetting.Create("Store.LogoPath", "", "string", "Store"),
-                SystemSetting.Create("Store.Email", "", "string", "Store"),
-                SystemSetting.Create("Store.CurrencyCode", "SAR", "string", "Store"),
-                SystemSetting.Create("Store.TaxNumber", "", "string", "Store"),
-                SystemSetting.Create("Store.EnableStockAlerts", "true", "bool", "Store"),
-                SystemSetting.Create("Store.AllowNegativeStock", "false", "bool", "Store"),
-                SystemSetting.Create("Store.AutoUpdatePrices", "true", "bool", "Store"),
-                SystemSetting.Create("Store.SignaturePath", "", "string", "Store"),
+                SystemSetting.Create("Store.Name", "متجري", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.Phone", "", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.Address", "", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.LogoPath", "", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.Email", "", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.CurrencyCode", "SAR", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.TaxNumber", "", settingType: 1, category: "Store"),
+                SystemSetting.Create("Store.EnableStockAlerts", "true", settingType: 4, category: "Store"),
+                SystemSetting.Create("Store.AllowNegativeStock", "false", settingType: 4, category: "Store"),
+                SystemSetting.Create("Store.AutoUpdatePrices", "true", settingType: 4, category: "Store"),
+                SystemSetting.Create("Store.SignaturePath", "", settingType: 1, category: "Store"),
             };
             db.Set<SystemSetting>().AddRange(storeSettings);
             logger?.LogInformation("Seeded Store settings into SystemSettings.");
@@ -276,7 +274,7 @@ public static class DbSeeder
         if (!await db.Departments.AnyAsync())
         {
             var branch = await db.Branches.FirstAsync();
-            db.Departments.Add(Department.Create(branch.Id, "الإدارة العامة"));
+            db.Departments.Add(Department.Create("الإدارة العامة"));
             await db.SaveChangesAsync();
             logger?.LogInformation("Seeded default department 'الإدارة العامة'.");
         }
@@ -315,9 +313,6 @@ public static class DbSeeder
         var warehouse = Warehouse.Create(
             branchId: 1,
             name: "المخزن الرئيسي",
-            code: "WH-MAIN",
-            type: WarehouseType.Main,
-            location: null,
             createdByUserId: null
         );
         db.Warehouses.Add(warehouse);

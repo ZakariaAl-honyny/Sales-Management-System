@@ -13,6 +13,7 @@ using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
+using SalesSystem.DesktopPWF.Common;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Sales;
 
@@ -736,18 +737,10 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                     var lineVm = new InvoiceLineViewModel(Products);
                     lineVm.ProductId = item.ProductId;
                     lineVm.Quantity = item.Quantity;
-                    lineVm.Mode = item.Mode;
                     lineVm.UnitPrice = item.UnitPrice;
-                    lineVm.DiscountAmount = item.DiscountAmount;
                     lineVm.SelectedProduct = Products.FirstOrDefault(p => p.Id == item.ProductId);
-                    
-                    // Set cost from the invoice item's loaded cost for profit display
-                    var product = Products.FirstOrDefault(p => p.Id == item.ProductId);
-                    if (product != null)
-                    {
-                        lineVm.CostInBaseCurrency = item.CostInBaseCurrency;
-                    }
-                    
+                    lineVm.ProductUnitId = item.ProductUnitId;
+
                     lineVm.PropertyChanged += (s, e) =>
                     {
                         if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
@@ -1063,31 +1056,26 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         var items = Items
             .Where(i => i.SelectedProduct != null && i.Quantity > 0)
-            .Select(i => new CreateSalesInvoiceItemRequest(
+            .Select(i => new CreateSalesInvoiceLineRequest(
                 i.SelectedProduct!.Id,
                 i.Quantity,
                 i.UnitPrice,
-                i.DiscountAmount,
-                (SaleMode)i.Mode,
-                null,
-                ProductUnitId: i.ProductUnitId,
-                IsPriceOverridden: i.IsPriceOverridden))
+                i.ProductUnitId ?? 0))
             .ToList();
 
         return new CreateSalesInvoiceRequest(
             SelectedWarehouseId,
             InvoiceNo > 0 ? InvoiceNo : null,
-            SelectedCustomerId,
+            SelectedCustomerId ?? 0,
             SelectedCashBox?.Id,
             InvoiceDate,
-            null,
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
             OtherCharges,
             PaidAmount,
             Notes,
-            SelectedCurrencyId,
+            (short?)SelectedCurrencyId,
             ExchangeRate,
             null,        // TaxId
             items);
@@ -1097,22 +1085,17 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         var items = Items
             .Where(i => i.SelectedProduct != null && i.Quantity > 0)
-            .Select(i => new CreateSalesInvoiceItemRequest(
+            .Select(i => new CreateSalesInvoiceLineRequest(
                 i.SelectedProduct!.Id,
                 i.Quantity,
                 i.UnitPrice,
-                i.DiscountAmount,
-                (SaleMode)i.Mode,
-                null,
-                ProductUnitId: i.ProductUnitId,
-                IsPriceOverridden: i.IsPriceOverridden))
+                i.ProductUnitId ?? 0))
             .ToList();
 
         return new UpdateSalesInvoiceRequest(
             SelectedWarehouseId,
-            SelectedCustomerId,
+            SelectedCustomerId ?? 0,
             InvoiceDate,
-            null,
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
@@ -1120,7 +1103,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             PaidAmount,
             SelectedCashBox?.Id,
             Notes,
-            SelectedCurrencyId,
+            (short?)SelectedCurrencyId,
             ExchangeRate,
             null,        // TaxId
             items);
@@ -1608,7 +1591,7 @@ public class InvoiceLineViewModel : ViewModelBase
                 CostInBaseCurrency = null;
 
                 // Set ProductUnitId from product's default sales unit (or 0 for service auto-determination)
-                ProductUnitId = value.DefaultSalesUnitId ?? 0;
+                ProductUnitId = 0; // 0 = service auto-determines
 
                 // Reset price override flag
                 IsPriceOverridden = false;
@@ -1636,7 +1619,7 @@ public class InvoiceLineViewModel : ViewModelBase
                 if (SelectedProduct != null)
                 {
                     UnitPrice = GetDefaultPrice(SelectedProduct);
-                    ProductUnitId = SelectedProduct.DefaultSalesUnitId ?? 0; // From product's default sales unit
+                    ProductUnitId = 0; // 0 = service auto-determines
                     IsPriceOverridden = false;
                 }
                 OnPropertyChanged(nameof(LineTotal));
@@ -1724,7 +1707,7 @@ public class InvoiceLineViewModel : ViewModelBase
         if (product != null)
         {
             UnitPrice = GetDefaultPrice(product);
-            ProductUnitId = product.DefaultSalesUnitId ?? 0; // From product's default sales unit
+            ProductUnitId = 0; // 0 = service auto-determines
             CostInBaseCurrency = null;
             IsPriceOverridden = false;
         }
@@ -1848,8 +1831,4 @@ public class PaymentTypeItem
     public string Display { get; set; } = string.Empty;
 }
 
-public class EnumDisplayItem
-{
-    public byte Value { get; set; }
-    public string Display { get; set; } = string.Empty;
-}
+

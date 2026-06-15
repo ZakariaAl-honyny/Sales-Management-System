@@ -1,11 +1,12 @@
 namespace SalesSystem.Domain.Enums;
 
 /// <summary>
-/// أنواع تسوية المخزون: إضافة, خصم, تصحيح.
+/// أنواع تسوية المخزون حسب schema: 1=Opening, 2=Increase, 3=Shortage, 4=Damage.
 /// </summary>
 public enum InventoryAdjustmentType : byte
 {
-    Addition = 1,
-    Deduction = 2,
-    Correction = 3
+    Opening = 1,
+    Increase = 2,
+    Shortage = 3,
+    Damage = 4
 }

@@ -49,8 +49,6 @@ public class PaymentVoucherService : IPaymentVoucherService
                 request.AccountId,
                 request.TotalAmount,
                 request.Notes,
-                request.SourceDocumentId,
-                request.SourceDocumentType,
                 userId);
 
             await _uow.PaymentVouchers.AddAsync(voucher, ct);
@@ -142,8 +140,6 @@ public class PaymentVoucherService : IPaymentVoucherService
             voucher.Update(
                 request.VoucherDate,
                 request.Notes,
-                request.SourceDocumentId,
-                request.SourceDocumentType,
                 userId);
 
             await _uow.SaveChangesAsync(ct);
@@ -209,7 +205,7 @@ public class PaymentVoucherService : IPaymentVoucherService
             var defaultCashAccountId = cashResult.Value.AccountId;
 
             var journalRequest = new CreateJournalEntryRequest(
-                TransactionDate: voucher.VoucherDate,
+                EntryDate: voucher.VoucherDate,
                 Description: $"قيد سند صرف رقم {voucher.VoucherNo}",
                 EntryType: JournalEntryType.SupplierPayment,
                 ReferenceType: "PaymentVoucher",
@@ -273,7 +269,7 @@ public class PaymentVoucherService : IPaymentVoucherService
                 var defaultCashAccountId = cashResult.Value.AccountId;
 
                 var reverseRequest = new CreateJournalEntryRequest(
-                    TransactionDate: DateTime.UtcNow,
+                    EntryDate: DateTime.UtcNow,
                     Description: $"قيد عكس سند صرف رقم {voucher.VoucherNo}",
                     EntryType: JournalEntryType.Manual,
                     ReferenceType: "PaymentVoucher",
@@ -333,14 +329,12 @@ public class PaymentVoucherService : IPaymentVoucherService
             voucher.Currency?.Name,
             voucher.Currency?.Code,
             voucher.CashBoxId,
-            voucher.CashBox?.BoxName,
+            voucher.CashBox?.Name,
             voucher.AccountId,
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
             voucher.Status,
-            voucher.SourceDocumentId,
-            voucher.SourceDocumentType,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt

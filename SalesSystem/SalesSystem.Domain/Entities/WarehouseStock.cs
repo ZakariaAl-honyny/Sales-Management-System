@@ -7,6 +7,7 @@ namespace SalesSystem.Domain.Entities;
 /// Tracks stock quantity per product per warehouse.
 /// Inherits <see cref="AuditableEntity"/> for audit trail.
 /// Maps to "WarehouseStocks" table.
+/// UK: UNIQUE(WarehouseId, ProductId).
 /// </summary>
 public class WarehouseStock : AuditableEntity
 {
@@ -19,12 +20,6 @@ public class WarehouseStock : AuditableEntity
     /// </summary>
     public decimal Quantity { get; private set; }
 
-    /// <summary>
-    /// Weighted average cost per base unit. decimal(18,2).
-    /// Updated on each purchase/receipt via costing method.
-    /// </summary>
-    public decimal AvgCost { get; private set; }
-
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual Product? Product { get; private set; }
 
@@ -34,7 +29,6 @@ public class WarehouseStock : AuditableEntity
         short warehouseId,
         int productId,
         decimal quantity = 0,
-        decimal avgCost = 0,
         int? createdByUserId = null)
     {
         if (warehouseId <= 0)
@@ -43,15 +37,12 @@ public class WarehouseStock : AuditableEntity
             throw new DomainException("المنتج مطلوب.");
         if (quantity < 0)
             throw new DomainException("الكمية لا يمكن أن تكون سالبة.");
-        if (avgCost < 0)
-            throw new DomainException("متوسط التكلفة لا يمكن أن يكون سالباً.");
 
         var stock = new WarehouseStock
         {
             WarehouseId = warehouseId,
             ProductId = productId,
-            Quantity = quantity,
-            AvgCost = avgCost
+            Quantity = quantity
         };
         stock.SetCreatedBy(createdByUserId);
         return stock;
@@ -80,61 +71,6 @@ public class WarehouseStock : AuditableEntity
         if (quantity < 0)
             throw new DomainException("الكمية لا يمكن أن تكون سالبة.");
         Quantity = quantity;
-        UpdateTimestamp();
-    }
-
-    /// <summary>
-    /// Updates the weighted average cost.
-    /// Formula: (OldQuantity * OldAvgCost + NewQuantity * NewUnitCost) / (OldQuantity + NewQuantity)
-    /// When OldQuantity = 0, AvgCost = NewUnitCost.
-    /// </summary>
-    public void UpdateAvgCost(decimal newQuantity, decimal newUnitCost)
-    {
-        if (newQuantity < 0)
-            throw new DomainException("الكمية الجديدة لا يمكن أن تكون سالبة.");
-        if (newUnitCost < 0)
-            throw new DomainException("تكلفة الوحدة الجديدة لا يمكن أن تكون سالبة.");
-
-        if (Quantity + newQuantity == 0)
-        {
-            AvgCost = 0;
-        }
-        else
-        {
-            var totalOldValue = Quantity * AvgCost;
-            var totalNewValue = newQuantity * newUnitCost;
-            AvgCost = Math.Round((totalOldValue + totalNewValue) / (Quantity + newQuantity), 2);
-        }
-
-        // Also update the quantity to reflect the new stock level
-        Quantity += newQuantity;
-        UpdateTimestamp();
-    }
-
-    public void DeductStock(decimal quantity, SalesSystem.Domain.Enums.UnitType unitType, decimal conversionFactor)
-    {
-        if (quantity <= 0)
-            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-        var quantityInPieces = unitType == SalesSystem.Domain.Enums.UnitType.Wholesale
-            ? quantity * conversionFactor
-            : quantity;
-
-        if (Quantity < quantityInPieces)
-            throw new DomainException($"المخزون غير كافٍ. المتاح: {Quantity}, المطلوب: {quantityInPieces}");
-
-        Quantity -= quantityInPieces;
-        UpdateTimestamp();
-    }
-
-    public void AddStock(decimal quantity, SalesSystem.Domain.Enums.UnitType unitType, decimal conversionFactor)
-    {
-        if (quantity <= 0)
-            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-        var quantityInPieces = unitType == SalesSystem.Domain.Enums.UnitType.Wholesale
-            ? quantity * conversionFactor
-            : quantity;
-
-        Quantity += quantityInPieces;
         UpdateTimestamp();
     }
 }

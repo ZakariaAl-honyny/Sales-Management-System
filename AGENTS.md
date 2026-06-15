@@ -64,10 +64,10 @@ public int Quantity { get; private set; }           // int = WRONG
 ### 2.2 Financial Formulas (Compute in Domain ONLY)
 
 ```csharp
-// Sales LineTotal — compute inside SalesInvoiceItem entity
+// Sales LineTotal — compute inside SalesInvoiceLine entity
 LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 
-// Purchase LineTotal — compute inside PurchaseInvoiceItem entity
+// Purchase LineTotal — compute inside PurchaseInvoiceLine entity
 LineTotal = (Quantity * UnitCost) - DiscountAmount;
 
 // Invoice totals — compute inside Invoice entity
@@ -383,7 +383,7 @@ if (quantity <= 0)
     throw new DomainException("الكمية يجب أن تكون أكبر من الصفر");
 ```
 
-**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryMovement, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem
+**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryMovement, CustomerPayment, SupplierPayment, SalesInvoiceLine, PurchaseInvoiceLine, SalesReturnItem, PurchaseReturnItem, StockTransferItem
 
 ### 2.21 WPF Dialog Service (v4.2)
 

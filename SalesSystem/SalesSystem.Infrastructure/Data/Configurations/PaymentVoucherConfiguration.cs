@@ -12,13 +12,12 @@ public class PaymentVoucherConfiguration : IEntityTypeConfiguration<PaymentVouch
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.VoucherNo).IsRequired();
-        builder.HasIndex(x => x.VoucherNo).IsUnique().HasFilter("[IsActive] = 1");
+        builder.HasIndex(x => x.VoucherNo).IsUnique();
 
-        builder.Property(x => x.VoucherDate).IsRequired();
+        builder.Property(x => x.VoucherDate).IsRequired().HasColumnType("date");
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(500).IsRequired(false);
         builder.Property(x => x.Status).IsRequired().HasDefaultValue((byte)1);
-        builder.Property(x => x.SourceDocumentType).HasMaxLength(50).IsRequired(false);
 
         // FK to Currency
         builder.Property(x => x.CurrencyId).IsRequired();

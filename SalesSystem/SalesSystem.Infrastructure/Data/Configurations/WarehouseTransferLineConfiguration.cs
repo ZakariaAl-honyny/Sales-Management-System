@@ -51,16 +51,11 @@ public class WarehouseTransferLineConfiguration : IEntityTypeConfiguration<Wareh
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.ProductUnit)
-            .WithMany()
-            .HasForeignKey(x => x.ProductUnitId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(x => x.Batch)
             .WithMany()
             .HasForeignKey(x => x.BatchId)
             .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
+            .IsRequired();
 
         // Indexes
         builder.HasIndex(x => x.WarehouseTransferId)

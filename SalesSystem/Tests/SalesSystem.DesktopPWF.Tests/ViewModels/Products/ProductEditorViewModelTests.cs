@@ -115,9 +115,6 @@ public class ProductEditorViewModelTests : IDisposable
             Description: null,
             TrackExpiry: false,
             ImagePath: null,
-            Notes: null,
-            DefaultPurchaseUnitId: null,
-            DefaultSalesUnitId: null,
             IsActive: true);
 
         // Act - Use the constructor that accepts ProductDto and services
@@ -166,9 +163,6 @@ public class ProductEditorViewModelTests : IDisposable
             Description: null,
             TrackExpiry: false,
             ImagePath: null,
-            Notes: null,
-            DefaultPurchaseUnitId: null,
-            DefaultSalesUnitId: null,
             IsActive: true);
 
         var viewModel = CreateViewModel(product);
@@ -289,7 +283,7 @@ public class ProductEditorViewModelTests : IDisposable
     {
         // Arrange
         var viewModel = CreateViewModel();
-        var category = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
+        var category = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
 
         // Act
         viewModel.SelectedCategory = category;
@@ -303,7 +297,7 @@ public class ProductEditorViewModelTests : IDisposable
     {
         // Arrange
         var viewModel = CreateViewModel();
-        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
+        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
 
         // Act
         viewModel.SelectedCategory = null;
@@ -321,7 +315,7 @@ public class ProductEditorViewModelTests : IDisposable
         viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
         // Act
-        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", ParentId: null, ParentName: null, IsActive: true);
+        viewModel.SelectedCategory = new ProductCategoryDto(Id: 1, Name: "فئة تجريبية", Description: null, IsActive: true);
 
         // Assert
         propertyChangedEvents.Should().Contain("SelectedCategory");
@@ -345,11 +339,11 @@ public class ProductEditorViewModelTests : IDisposable
             Description: null,
             TrackExpiry: false,
             ImagePath: null,
-            Notes: null,
-            DefaultPurchaseUnitId: null,
-            DefaultSalesUnitId: null,
             IsActive: true);
     }
 
     #endregion
 }
+
+
+

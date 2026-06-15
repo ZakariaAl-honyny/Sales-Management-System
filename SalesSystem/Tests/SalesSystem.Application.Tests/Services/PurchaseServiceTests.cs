@@ -129,7 +129,7 @@ public class PurchaseServiceTests : IDisposable
             AdditionalCharges = null,
             PONumber = null,
             Notes = "Inventory restock",
-            Items = new List<CreatePurchaseInvoiceItemRequest>
+            Items = new List<CreatePurchaseInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 10m, UnitCost = 25m, DiscountAmount = 0m, ExpiryDate = null, BatchNo = null }
             }
@@ -164,7 +164,7 @@ public class PurchaseServiceTests : IDisposable
             AdditionalCharges = null,
             PONumber = null,
             Notes = null,
-            Items = new List<CreatePurchaseInvoiceItemRequest>
+            Items = new List<CreatePurchaseInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 10m, UnitCost = 25m, DiscountAmount = 0m, ExpiryDate = null, BatchNo = null }
             }
@@ -194,7 +194,7 @@ public class PurchaseServiceTests : IDisposable
             DueDate = DateOnly.FromDateTime(DateTime.Now.AddDays(30)),
             DiscountAmount = 0m,
             Notes = null,
-            Items = new List<CreatePurchaseInvoiceItemRequest>
+            Items = new List<CreatePurchaseInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 0m, UnitCost = 25m, DiscountAmount = 0m, ExpiryDate = null, BatchNo = null }
             }
@@ -226,7 +226,7 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1, invoiceDate: DateTime.Now, dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)), discountAmount: 0m, notes: null);
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 25m));
+        invoice.AddItem(PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 25m));
         _dbContext.PurchaseInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
 
@@ -285,7 +285,7 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1, invoiceDate: DateTime.Now, dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)), discountAmount: 0m, notes: null);
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 25m));
+        invoice.AddItem(PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10m, unitCost: 25m));
         invoice.Post();
         _dbContext.PurchaseInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
@@ -323,7 +323,7 @@ public class PurchaseServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1, invoiceDate: DateTime.Now, dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)), discountAmount: 0m, notes: null);
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 50m));
+        invoice.AddItem(PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 50m));
         _dbContext.PurchaseInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
 
@@ -380,7 +380,7 @@ public class PurchaseServiceTests : IDisposable
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
         public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
-        public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
+        public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Product> Products => Set<Product>();

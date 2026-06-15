@@ -3,11 +3,10 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateSalesReturnRequest(
     int? SalesInvoiceId,
     int? CustomerId,
-    int WarehouseId,
+    short WarehouseId,
     DateTime? ReturnDate,
+    short? CurrencyId,
     string? Notes,
-    int? CashBoxId,
-    decimal? RefundAmount,
     List<ReturnItemRequest> Items
 );
 
@@ -28,17 +27,21 @@ public record CreatePurchaseReturnRequest(
 /// طلب إنشاء بند في مرتجع الشراء.
 /// </summary>
 public record CreatePurchaseReturnItemRequest(
+    int PurchaseInvoiceLineId,
     int ProductId,
     int ProductUnitId,
     decimal Quantity,
-    decimal UnitCost);
+    decimal UnitCost,
+    decimal Amount);
 
 public record ReturnItemRequest(
+    int SalesInvoiceLineId,
     int ProductId,
-    int ProductUnitId,                           // NEW
+    int ProductUnitId,
     decimal Quantity,
     decimal UnitPrice,
-    decimal DiscountAmount,
+    decimal Amount,
+    decimal DiscountAmount = 0,
     byte Mode = 1,
     string? Notes = null
 );

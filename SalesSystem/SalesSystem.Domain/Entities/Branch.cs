@@ -11,7 +11,6 @@ public class Branch : ActivatableEntity
     public new short Id { get; private set; }
 
     public string Name { get; private set; } = string.Empty;
-    public string? Code { get; private set; }
     public string? Phone { get; private set; }
     public string? Address { get; private set; }
     public string? ManagerName { get; private set; }
@@ -19,7 +18,7 @@ public class Branch : ActivatableEntity
 
     private Branch() { }
 
-    public static Branch Create(string name, string? code = null, string? phone = null, string? address = null, string? managerName = null, string? notes = null, int? createdByUserId = null)
+    public static Branch Create(string name, string? phone = null, string? address = null, string? managerName = null, string? notes = null, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الفرع مطلوب.");
@@ -27,7 +26,6 @@ public class Branch : ActivatableEntity
         var branch = new Branch
         {
             Name = name,
-            Code = code?.Trim(),
             Phone = phone?.Trim(),
             Address = address?.Trim(),
             ManagerName = managerName?.Trim(),
@@ -37,13 +35,12 @@ public class Branch : ActivatableEntity
         return branch;
     }
 
-    public void Update(string name, string? code = null, string? phone = null, string? address = null, string? managerName = null, string? notes = null, int? updatedByUserId = null)
+    public void Update(string name, string? phone = null, string? address = null, string? managerName = null, string? notes = null, int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الفرع مطلوب.");
 
         Name = name;
-        Code = code?.Trim();
         Phone = phone?.Trim();
         Address = address?.Trim();
         ManagerName = managerName?.Trim();

@@ -9,6 +9,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
@@ -36,52 +37,26 @@ public class AccountingIntegrationServiceTests : IDisposable
 
     private readonly AccountingIntegrationService _sut;
 
-    // Reusable system account mappings DTO with valid account IDs
-    private static readonly SystemAccountMappingsDto DefaultMappings = new(
-        Id: 1,
-        DefaultCashAccountId: 10,
-        DefaultCashAccountName: "الصندوق",
-        DefaultCashAccountCode: "110101",
-        DefaultBankAccountId: 11,
-        DefaultBankAccountName: "البنك",
-        DefaultBankAccountCode: "110201",
-        InventoryAssetAccountId: 20,
-        InventoryAssetAccountName: "المخزون",
-        InventoryAssetAccountCode: "1201",
-        AccountsReceivableAccountId: 30,
-        AccountsReceivableAccountName: "الذمم المدينة",
-        AccountsReceivableAccountCode: "1301",
-        AccountsPayableAccountId: 40,
-        AccountsPayableAccountName: "الذمم الدائنة",
-        AccountsPayableAccountCode: "2101",
-        VatOutputAccountId: 50,
-        VatOutputAccountName: "ضريبة المخرجات",
-        VatOutputAccountCode: "2201",
-        VatInputAccountId: 60,
-        VatInputAccountName: "ضريبة المدخلات",
-        VatInputAccountCode: "2202",
-        CapitalAccountId: 70,
-        CapitalAccountName: "رأس المال",
-        CapitalAccountCode: "3101",
-        SalesRevenueAccountId: 80,
-        SalesRevenueAccountName: "إيرادات المبيعات",
-        SalesRevenueAccountCode: "4101",
-        SalesReturnAccountId: 81,
-        SalesReturnAccountName: "مردودات المبيعات",
-        SalesReturnAccountCode: "4102",
-        CogsAccountId: 90,
-        CogsAccountName: "تكلفة البضاعة المباعة",
-        CogsAccountCode: "5101",
-        GeneralExpenseAccountId: 100,
-        GeneralExpenseAccountName: "مصروفات عمومية",
-        GeneralExpenseAccountCode: "5201",
-        SpoilageLossAccountId: 110,
-        SpoilageLossAccountName: "التوالف",
-        SpoilageLossAccountCode: "5301",
-        OpeningBalanceEquityAccountId: 120,
-        OpeningBalanceEquityAccountName: "أرباح مبقاة",
-        OpeningBalanceEquityAccountCode: "3201",
-        BranchId: null);
+    // Reusable system account ID dictionary (maps SystemAccountKey → AccountId)
+    private static readonly Dictionary<SystemAccountKey, int> _accountIds = new()
+    {
+        [SystemAccountKey.DefaultCash] = 10,
+        [SystemAccountKey.DefaultBank] = 11,
+        [SystemAccountKey.Inventory] = 20,
+        [SystemAccountKey.AccountsReceivable] = 30,
+        [SystemAccountKey.AccountsPayable] = 40,
+        [SystemAccountKey.VatOutput] = 50,
+        [SystemAccountKey.VatInput] = 60,
+        [SystemAccountKey.Capital] = 70,
+        [SystemAccountKey.SalesRevenue] = 80,
+        [SystemAccountKey.SalesReturns] = 81,
+        [SystemAccountKey.CostOfGoodsSold] = 90,
+        [SystemAccountKey.GeneralExpense] = 100,
+        [SystemAccountKey.SpoilageLoss] = 110,
+        [SystemAccountKey.OpeningBalanceEquity] = 120,
+        [SystemAccountKey.DeliveryChargesRevenue] = 130,
+        [SystemAccountKey.PurchaseReturns] = 140,
+    };
 
     public AccountingIntegrationServiceTests(ITestOutputHelper output)
     {
@@ -111,9 +86,8 @@ public class AccountingIntegrationServiceTests : IDisposable
                 return 1;
             });
 
-        // Default: system account service returns valid mappings
-        _mockSystemAccountService.Setup(s => s.GetMappingsAsync(It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<SystemAccountMappingsDto>.Success(DefaultMappings));
+        // Default: system account service returns valid mappings for all required keys
+        SetupDefaultMappings();
 
         // Default: journal entry service returns success with ID = 1
         _mockJournalEntryService.Setup(s => s.CreateJournalEntryAsync(
@@ -121,6 +95,13 @@ public class AccountingIntegrationServiceTests : IDisposable
                 It.IsAny<int>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<int>.Success(1));
+
+        // Default: post journal entry returns success
+        _mockJournalEntryService.Setup(s => s.PostJournalEntryAsync(
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<JournalEntryDetailDto>.Success(new JournalEntryDetailDto(1, "JE-1", DateTime.UtcNow, "Test", "Manual", null, null, null, 2, "Posted", null, DateTime.UtcNow, null, new List<JournalEntryLineDetailDto>())));
 
         _sut = new AccountingIntegrationService(
             _mockJournalEntryService.Object,
@@ -132,6 +113,39 @@ public class AccountingIntegrationServiceTests : IDisposable
     public void Dispose()
     {
         _dbContext?.Dispose();
+    }
+
+    /// <summary>
+    /// Sets up GetMappingAsync for all keys in _accountIds to return the mapped account IDs.
+    /// </summary>
+    private void SetupDefaultMappings()
+    {
+        foreach (var kvp in _accountIds)
+        {
+            var key = kvp.Key;
+            var accountId = kvp.Value;
+            _mockSystemAccountService
+                .Setup(s => s.GetMappingAsync(key, It.IsAny<short?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(Result<SystemAccountMappingDto>.Success(new SystemAccountMappingDto(
+                    Id: accountId,
+                    MappingKey: key,
+                    MappingKeyName: key.ToString(),
+                    AccountId: accountId,
+                    AccountName: $"Account {key}",
+                    AccountCode: accountId.ToString(),
+                    BranchId: (short)0
+                )));
+        }
+    }
+
+    /// <summary>
+    /// Overrides the default mappings so that all GetMappingAsync calls return failure.
+    /// </summary>
+    private void SetupDefaultMappingsFailure()
+    {
+        _mockSystemAccountService
+            .Setup(s => s.GetMappingAsync(It.IsAny<SystemAccountKey>(), It.IsAny<short?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<SystemAccountMappingDto>.Failure("لم يتم إعداد الحسابات النظامية"));
     }
 
     // ────────────────────────────────────────────────────────────────
@@ -146,6 +160,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         var result = await _sut.CreateCustomerOpeningEntryAsync(
             customerId: 1,
             customerName: "عميل تجربة",
+            customerAccountId: _accountIds[SystemAccountKey.AccountsReceivable],
             openingBalance: 500m,
             createdByUserId: 1,
             transactionDate: new DateTime(2026, 1, 15),
@@ -161,10 +176,10 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "Customer" &&
                 r.ReferenceId == 1 &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.AccountsReceivableAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.AccountsReceivable] &&
                 r.Lines[0].Debit == 500m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.OpeningBalanceEquityAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.OpeningBalanceEquity] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 500m),
             It.Is<int>(u => u == 1),
@@ -182,6 +197,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         var result = await _sut.CreateCustomerOpeningEntryAsync(
             customerId: 2,
             customerName: "عميل بدون رصيد",
+            customerAccountId: _accountIds[SystemAccountKey.AccountsReceivable],
             openingBalance: 0m,
             createdByUserId: 1,
             transactionDate: new DateTime(2026, 1, 15),
@@ -213,6 +229,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         var result = await _sut.CreateSupplierOpeningEntryAsync(
             supplierId: 1,
             supplierName: "مورد تجربة",
+            supplierAccountId: _accountIds[SystemAccountKey.AccountsPayable],
             openingBalance: 1000m,
             createdByUserId: 1,
             transactionDate: new DateTime(2026, 1, 15),
@@ -228,10 +245,10 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "Supplier" &&
                 r.ReferenceId == 1 &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.OpeningBalanceEquityAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.OpeningBalanceEquity] &&
                 r.Lines[0].Debit == 1000m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.AccountsPayableAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.AccountsPayable] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 1000m),
             It.Is<int>(u => u == 1),
@@ -256,8 +273,9 @@ public class AccountingIntegrationServiceTests : IDisposable
             invoiceNo: 1001,
             customerId: 1,
             paymentType: PaymentType.Cash);
-        invoice.AddItem(SalesInvoiceItem.Create(
+        invoice.AddItem(SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -287,23 +305,23 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceId == invoice.Id &&
                 r.Lines.Count == 5 &&
                 // Cash line (Dr)
-                r.Lines[0].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[0].Debit == 1150m &&
                 r.Lines[0].Credit == 0m &&
                 // Revenue line (Cr)
-                r.Lines[1].AccountId == DefaultMappings.SalesRevenueAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.SalesRevenue] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 1000m &&
                 // VAT line (Cr)
-                r.Lines[2].AccountId == DefaultMappings.VatOutputAccountId &&
+                r.Lines[2].AccountId == _accountIds[SystemAccountKey.VatOutput] &&
                 r.Lines[2].Debit == 0m &&
                 r.Lines[2].Credit == 150m &&
                 // COGS line (Dr)
-                r.Lines[3].AccountId == DefaultMappings.CogsAccountId &&
+                r.Lines[3].AccountId == _accountIds[SystemAccountKey.CostOfGoodsSold] &&
                 r.Lines[3].Debit == 700m &&
                 r.Lines[3].Credit == 0m &&
                 // Inventory line (Cr)
-                r.Lines[4].AccountId == DefaultMappings.InventoryAssetAccountId &&
+                r.Lines[4].AccountId == _accountIds[SystemAccountKey.Inventory] &&
                 r.Lines[4].Debit == 0m &&
                 r.Lines[4].Credit == 700m),
             It.Is<int>(u => u == 1),
@@ -324,8 +342,9 @@ public class AccountingIntegrationServiceTests : IDisposable
             invoiceNo: 1002,
             customerId: 1,
             paymentType: PaymentType.Credit);
-        invoice.AddItem(SalesInvoiceItem.Create(
+        invoice.AddItem(SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5m,
             unitPrice: 200m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -353,19 +372,19 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.EntryType == JournalEntryType.Sales &&
                 r.Lines.Count == 4 &&
                 // AR line (Dr, not Cash since it's credit sale)
-                r.Lines[0].AccountId == DefaultMappings.AccountsReceivableAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.AccountsReceivable] &&
                 r.Lines[0].Debit == 1000m &&
                 r.Lines[0].Credit == 0m &&
                 // Revenue line (Cr)
-                r.Lines[1].AccountId == DefaultMappings.SalesRevenueAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.SalesRevenue] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 1000m &&
                 // COGS line (Dr)
-                r.Lines[2].AccountId == DefaultMappings.CogsAccountId &&
+                r.Lines[2].AccountId == _accountIds[SystemAccountKey.CostOfGoodsSold] &&
                 r.Lines[2].Debit == 400m &&
                 r.Lines[2].Credit == 0m &&
                 // Inventory line (Cr)
-                r.Lines[3].AccountId == DefaultMappings.InventoryAssetAccountId &&
+                r.Lines[3].AccountId == _accountIds[SystemAccountKey.Inventory] &&
                 r.Lines[3].Debit == 0m &&
                 r.Lines[3].Credit == 400m),
             It.IsAny<int>(),
@@ -381,15 +400,14 @@ public class AccountingIntegrationServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateSalesPostEntry_WhenMappingsMissing_ReturnsFailure");
 
         // Arrange: system account service returns failure
-        _mockSystemAccountService.Setup(s => s.GetMappingsAsync(It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<SystemAccountMappingsDto>.Failure("لم يتم إعداد الحسابات النظامية"));
+        SetupDefaultMappingsFailure();
 
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
             invoiceNo: 1003,
             customerId: 1,
             paymentType: PaymentType.Cash);
-        invoice.AddItem(SalesInvoiceItem.Create(productId: 1, quantity: 1m, unitPrice: 10m));
+        invoice.AddItem(SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1m, unitPrice: 10m));
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(10m);
 
@@ -400,7 +418,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("الحسابات النظامية");
+        result.Error.Should().Contain("الحساب النظامي");
 
         _output.WriteLine("[PASS] Missing mappings returns failure");
     }
@@ -424,8 +442,9 @@ public class AccountingIntegrationServiceTests : IDisposable
             invoiceNo: 1001,
             customerId: 1,
             paymentType: PaymentType.Cash);
-        invoice.AddItem(SalesInvoiceItem.Create(
+        invoice.AddItem(SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -454,11 +473,11 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "SalesInvoice" &&
                 r.ReferenceId == invoice.Id &&
                 r.Description.Contains("عكس") &&
-                r.Lines.Any(l => l.AccountId == DefaultMappings.SalesRevenueAccountId
+                r.Lines.Any(l => l.AccountId == _accountIds[SystemAccountKey.SalesRevenue]
                               && l.Debit == 1000m && l.Credit == 0m) &&
-                r.Lines.Any(l => l.AccountId == DefaultMappings.VatOutputAccountId
+                r.Lines.Any(l => l.AccountId == _accountIds[SystemAccountKey.VatOutput]
                               && l.Debit == 150m && l.Credit == 0m) &&
-                r.Lines.Any(l => l.AccountId == DefaultMappings.DefaultCashAccountId
+                r.Lines.Any(l => l.AccountId == _accountIds[SystemAccountKey.DefaultCash]
                               && l.Debit == 0m && l.Credit == 1150m)),
             It.Is<int>(u => u == 1),
             It.IsAny<CancellationToken>()),
@@ -482,11 +501,11 @@ public class AccountingIntegrationServiceTests : IDisposable
             warehouseId: 1,
             invoiceNo: 2001,
             paymentType: PaymentType.Cash);
-        invoice.AddItem(PurchaseInvoiceItem.Create(
+        invoice.AddItem(PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 20m,
-            unitCost: 50m)); // LineTotal = 1000
+            unitPrice: 50m)); // LineTotal = 1000
         invoice.RecalculateTotals();
         invoice.SetTaxAmount(150m); // VAT Input
         invoice.SetPaidAmount(1150m);
@@ -507,15 +526,15 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "PurchaseInvoice" &&
                 r.Lines.Count == 3 &&
                 // Inventory line
-                r.Lines[0].AccountId == DefaultMappings.InventoryAssetAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.Inventory] &&
                 r.Lines[0].Debit == 1000m &&
                 r.Lines[0].Credit == 0m &&
                 // VAT Input line
-                r.Lines[1].AccountId == DefaultMappings.VatInputAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.VatInput] &&
                 r.Lines[1].Debit == 150m &&
                 r.Lines[1].Credit == 0m &&
                 // Cash line (Cr)
-                r.Lines[2].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[2].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[2].Debit == 0m &&
                 r.Lines[2].Credit == 1150m),
             It.Is<int>(u => u == 1),
@@ -540,11 +559,11 @@ public class AccountingIntegrationServiceTests : IDisposable
             warehouseId: 1,
             invoiceNo: 2002,
             paymentType: PaymentType.Cash);
-        invoice.AddItem(PurchaseInvoiceItem.Create(
+        invoice.AddItem(PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 10m,
-            unitCost: 100m)); // LineTotal = 1000
+            unitPrice: 100m)); // LineTotal = 1000
         invoice.RecalculateTotals();
         invoice.SetPaidAmount(1000m);
 
@@ -559,30 +578,30 @@ public class AccountingIntegrationServiceTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(1);
 
-        // Verify: Cr Inventory (1000), Dr Cash (1000)
+        // Verify: Cr PurchaseReturn (1000), Dr Cash (1000)
         _mockJournalEntryService.Verify(s => s.CreateJournalEntryAsync(
             It.Is<CreateJournalEntryRequest>(r =>
                 r.EntryType == JournalEntryType.PurchaseReturn &&
                 r.ReferenceType == "PurchaseInvoice" &&
                 r.ReferenceId == invoice.Id &&
                 r.Lines.Count == 2 &&
-                // Inventory line (Cr)
-                r.Lines[0].AccountId == DefaultMappings.InventoryAssetAccountId &&
+                // PurchaseReturn line (Cr)
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.PurchaseReturns] &&
                 r.Lines[0].Debit == 0m &&
                 r.Lines[0].Credit == 1000m &&
                 // Cash line (Dr)
-                r.Lines[1].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[1].Debit == 1000m &&
                 r.Lines[1].Credit == 0m),
             It.Is<int>(u => u == 1),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
-        _output.WriteLine("[PASS] Purchase reversal entry created with Cr Inventory / Dr Cash");
+        _output.WriteLine("[PASS] Purchase reversal entry created with Cr PurchaseReturn / Dr Cash");
     }
 
     // ────────────────────────────────────────────────────────────────
-    //  G. Customer Payment Entry
+    //  G. Customer Payment Entry (Receipt)
     // ────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -590,15 +609,19 @@ public class AccountingIntegrationServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateCustomerPaymentEntry_CreatesCashAndAr");
 
-        // Arrange
-        var payment = CustomerPayment.Create(
-            paymentNo: "CP-20260601-0001",
+        // Arrange: use CustomerReceipt (was CustomerPayment)
+        var receipt = CustomerReceipt.Create(
+            receiptNo: 1,
+            receiptDate: new DateTime(2026, 6, 1),
             customerId: 1,
+            cashBoxId: 1,
+            currencyId: (short)1,
             amount: 500m,
-            paymentMethod: 1); // Cash
+            notes: null,
+            createdByUserId: 1);
 
         var result = await _sut.CreateCustomerPaymentEntryAsync(
-            payment,
+            receipt,
             customerName: "عميل تجربة",
             createdByUserId: 1,
             CancellationToken.None);
@@ -610,13 +633,13 @@ public class AccountingIntegrationServiceTests : IDisposable
         _mockJournalEntryService.Verify(s => s.CreateJournalEntryAsync(
             It.Is<CreateJournalEntryRequest>(r =>
                 r.EntryType == JournalEntryType.CustomerReceipt &&
-                r.ReferenceType == "CustomerPayment" &&
-                r.ReferenceId == payment.Id &&
+                r.ReferenceType == "CustomerReceipt" &&
+                r.ReferenceId == receipt.Id &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[0].Debit == 500m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.AccountsReceivableAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.AccountsReceivable] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 500m),
             It.Is<int>(u => u == 1),
@@ -637,10 +660,12 @@ public class AccountingIntegrationServiceTests : IDisposable
 
         // Arrange
         var payment = SupplierPayment.Create(
-            paymentNo: "SP-20260601-0001",
+            paymentNo: 1,
             supplierId: 1,
+            cashBoxId: 1,
+            currencyId: (short)1,
             amount: 800m,
-            paymentMethod: 1); // Cash
+            paymentMethod: PaymentMethod.Cash);
 
         var result = await _sut.CreateSupplierPaymentEntryAsync(
             payment,
@@ -658,10 +683,10 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "SupplierPayment" &&
                 r.ReferenceId == payment.Id &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.AccountsPayableAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.AccountsPayable] &&
                 r.Lines[0].Debit == 800m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 800m),
             It.Is<int>(u => u == 1),
@@ -681,9 +706,10 @@ public class AccountingIntegrationServiceTests : IDisposable
         _output.WriteLine("[TEST] ReverseCustomerPaymentEntry_CreatesReversal");
 
         var result = await _sut.ReverseCustomerPaymentEntryAsync(
-            paymentId: 1,
+            receiptId: 1,
             amount: 500m,
             customerName: "عميل تجربة",
+            customerAccountId: _accountIds[SystemAccountKey.AccountsReceivable],
             reversedByUserId: 1,
             CancellationToken.None);
 
@@ -694,13 +720,13 @@ public class AccountingIntegrationServiceTests : IDisposable
         _mockJournalEntryService.Verify(s => s.CreateJournalEntryAsync(
             It.Is<CreateJournalEntryRequest>(r =>
                 r.EntryType == JournalEntryType.Manual &&
-                r.ReferenceType == "CustomerPayment" &&
+                r.ReferenceType == "CustomerReceipt" &&
                 r.ReferenceId == 1 &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.AccountsReceivableAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.AccountsReceivable] &&
                 r.Lines[0].Debit == 500m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 500m),
             It.Is<int>(u => u == 1),
@@ -723,6 +749,7 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentId: 1,
             amount: 800m,
             supplierName: "مورد تجربة",
+            supplierAccountId: _accountIds[SystemAccountKey.AccountsPayable],
             reversedByUserId: 1,
             CancellationToken.None);
 
@@ -736,10 +763,10 @@ public class AccountingIntegrationServiceTests : IDisposable
                 r.ReferenceType == "SupplierPayment" &&
                 r.ReferenceId == 1 &&
                 r.Lines.Count == 2 &&
-                r.Lines[0].AccountId == DefaultMappings.DefaultCashAccountId &&
+                r.Lines[0].AccountId == _accountIds[SystemAccountKey.DefaultCash] &&
                 r.Lines[0].Debit == 800m &&
                 r.Lines[0].Credit == 0m &&
-                r.Lines[1].AccountId == DefaultMappings.AccountsPayableAccountId &&
+                r.Lines[1].AccountId == _accountIds[SystemAccountKey.AccountsPayable] &&
                 r.Lines[1].Debit == 0m &&
                 r.Lines[1].Credit == 800m),
             It.Is<int>(u => u == 1),
@@ -765,8 +792,9 @@ public class AccountingIntegrationServiceTests : IDisposable
             customerId: 1,
             paymentType: PaymentType.Cash,
             discountAmount: 100m);
-        invoice.AddItem(SalesInvoiceItem.Create(
+        invoice.AddItem(SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m)); // LineTotal = 1000
         invoice.RecalculateTotals();
@@ -784,7 +812,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         // Net revenue = SubTotal - Discount = 1000 - 100 = 900
         _mockJournalEntryService.Verify(s => s.CreateJournalEntryAsync(
             It.Is<CreateJournalEntryRequest>(r =>
-                r.Lines.Any(l => l.AccountId == DefaultMappings.SalesRevenueAccountId
+                r.Lines.Any(l => l.AccountId == _accountIds[SystemAccountKey.SalesRevenue]
                               && l.Credit == 900m)),
             It.IsAny<int>(),
             It.IsAny<CancellationToken>()),
@@ -805,11 +833,11 @@ public class AccountingIntegrationServiceTests : IDisposable
             invoiceNo: 2003,
             paymentType: PaymentType.Cash,
             discountAmount: 200m);
-        invoice.AddItem(PurchaseInvoiceItem.Create(
+        invoice.AddItem(PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 50m,
-            unitCost: 20m)); // LineTotal = 1000
+            unitPrice: 20m)); // LineTotal = 1000
         invoice.RecalculateTotals();
         // SubTotal = 1000, Discount = 200, Net = 800, Tax = 0, Total = 800
         invoice.SetPaidAmount(800m);
@@ -824,7 +852,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         // Net inventory cost = SubTotal - Discount = 1000 - 200 = 800
         _mockJournalEntryService.Verify(s => s.CreateJournalEntryAsync(
             It.Is<CreateJournalEntryRequest>(r =>
-                r.Lines.Any(l => l.AccountId == DefaultMappings.InventoryAssetAccountId
+                r.Lines.Any(l => l.AccountId == _accountIds[SystemAccountKey.Inventory]
                               && l.Debit == 800m)),
             It.IsAny<int>(),
             It.IsAny<CancellationToken>()),
@@ -838,19 +866,19 @@ public class AccountingIntegrationServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateCustomerOpeningEntry_WhenMappingsMissing_ReturnsFailure");
 
-        _mockSystemAccountService.Setup(s => s.GetMappingsAsync(It.IsAny<int?>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<SystemAccountMappingsDto>.Failure("لم يتم إعداد الحسابات النظامية"));
+        SetupDefaultMappingsFailure();
 
         var result = await _sut.CreateCustomerOpeningEntryAsync(
             customerId: 1,
             customerName: "عميل",
+            customerAccountId: _accountIds[SystemAccountKey.AccountsReceivable],
             openingBalance: 500m,
             createdByUserId: 1,
             transactionDate: new DateTime(2026, 1, 15),
             CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
-        result.Error.Should().Contain("الحسابات النظامية");
+        result.Error.Should().Contain("الحساب النظامي");
 
         _output.WriteLine("[PASS] Missing customer opening entry mappings returns failure");
     }
@@ -866,20 +894,20 @@ public class AccountingIntegrationServiceTests : IDisposable
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
-        public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+        public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
         public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
-        public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
-        public DbSet<CustomerPayment> CustomerPayments => Set<CustomerPayment>();
+        public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+        public DbSet<CustomerReceipt> CustomerPayments => Set<CustomerReceipt>();
         public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
         public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
         public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
         public DbSet<Account> Accounts => Set<Account>();
-        public DbSet<SystemAccountMappings> SystemAccountMappings => Set<SystemAccountMappings>();
+        public DbSet<SystemAccountMapping> SystemAccountMappings => Set<SystemAccountMapping>();
         public DbSet<Product> Products => Set<Product>();
         public DbSet<ProductUnit> ProductUnits => Set<ProductUnit>();
     }
 
-    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : BaseEntity
+    private class InMemoryEfCoreRepository<T> : IGenericRepository<T> where T : Entity
     {
         private readonly DbContext _context;
 
@@ -910,9 +938,9 @@ public class AccountingIntegrationServiceTests : IDisposable
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
             var entity = await _context.Set<T>().FindAsync(new object[] { id }, ct);
-            if (entity != null)
+            if (entity is ActivatableEntity activatable)
             {
-                entity.MarkAsDeleted();
+                activatable.MarkAsDeleted();
                 _context.Set<T>().Update(entity);
                 await _context.SaveChangesAsync(ct);
             }

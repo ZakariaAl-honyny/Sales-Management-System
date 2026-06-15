@@ -30,9 +30,5 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
         RuleFor(x => x.ImagePath)
             .MaximumLength(500).WithMessage("مسار الصورة لا يمكن أن يتجاوز 500 حرف")
             .When(x => !string.IsNullOrEmpty(x.ImagePath));
-
-        RuleFor(x => x.Notes)
-            .MaximumLength(1000).WithMessage("الملاحظات لا يمكن أن تتجاوز 1000 حرف")
-            .When(x => !string.IsNullOrEmpty(x.Notes));
     }
 }

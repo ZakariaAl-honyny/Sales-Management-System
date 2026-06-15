@@ -12,16 +12,13 @@ public class ProductCategoryConfiguration : IEntityTypeConfiguration<ProductCate
         builder.HasKey(pc => pc.Id);
 
         builder.Property(pc => pc.Name).IsRequired().HasMaxLength(100);
-        builder.Property(pc => pc.NameEn).HasMaxLength(100);
         builder.Property(pc => pc.Description).HasMaxLength(500);
-        builder.Property(pc => pc.SortOrder).HasDefaultValue(0);
 
-        // Self-referencing parent relationship
-        builder.HasOne(pc => pc.Parent)
-            .WithMany(pc => pc.Children)
-            .HasForeignKey(pc => pc.ParentId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
+        // Unique filtered index on Name — allows soft-deleted records to coexist with active ones
+        builder.HasIndex(pc => pc.Name)
+            .IsUnique()
+            .HasFilter("[IsActive] = 1")
+            .HasDatabaseName("IX_ProductCategories_Name");
 
         builder.HasQueryFilter(pc => pc.IsActive);
     }

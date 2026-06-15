@@ -498,9 +498,53 @@ For each file, report: `✅ PASS` or `❌ FAIL: [specific violation]`
 
 ---
 
+## Deep Review — Entity Config & Schema Alignment (v4.10.4)
+
+These checks ARE REQUIRED for any code touching Domain entities or EF configurations. They MUST catch ALL mismatches between the code and `docs/database-schema.md`.
+
+### Base Class Correctness
+- [ ] SalesReturn extends `DocumentEntity` (NOT `AuditableEntity`) — has Status lifecycle (Draft=1/Posted=2/Cancelled=3) with `PostedAt`/`CancelledAt` timestamps?
+- [ ] PurchaseReturn extends `DocumentEntity` (NOT `AuditableEntity`) — same lifecycle as SalesReturn?
+- [ ] UserSession extends `ActivatableEntity` (NOT `AuditableEntity`) — session revocation via `IsActive`?
+- [ ] ReceiptVoucher/PaymentVoucher extend `DocumentEntity` — UNIQUE index on VoucherNo has NO `[IsActive]` filter (no IsActive column)?
+- [ ] ProductUnit/ProductPrice extend `AuditableEntity` (no IsActive) — pricing/batch history tables (hard-deleted)?
+- [ ] Attachment extends `AuditableEntity` (hard-deleted, no soft-delete)?
+- [ ] Junction tables (UserRole, RolePermission, InventoryTransactionLine, etc.) extend bare `Entity` (no audit columns)?
+- [ ] `CompanySettings` has `byte` PK (tinyint), no `IsActive`, no `CreatedByUserId`/`UpdatedByUserId` — singleton pattern?
+- [ ] Account extends `BaseEntity`/`ActivatableEntity` (whichever provides `IsActive`) — soft-delete with `HasQueryFilter`?
+
+### Column Type Integrity (MUST match schema)
+- [ ] ALL enum Status/Types use `HasConversion<byte>()` + `.HasColumnType("tinyint")` — NOT `HasConversion<int>()`?
+  - Check: InvoiceStatus, PaymentType, MovementType, AdjustmentType, AccountType, UserRole, JournalEntryType, CashTransactionType, ChequeStatus, POStatus, QuotationStatus, etc.
+- [ ] ALL date columns use `.HasColumnType("date")` — NOT default `datetime2`?
+  - Check: InvoiceDate, CreatedAt, UpdatedAt, EntryDate, BirthDate, HireDate, EffectiveFrom/To, ExpiryDate, etc.
+- [ ] SortOrder columns use `short` (smallint) — NOT `int`?
+- [ ] Description/Notes lengths match schema exactly (e.g., `HasMaxLength(300)` for JournalEntryLine.Description, `HasMaxLength(500)` for Account.Description)?
+- [ ] `Decimal(18,2)` for ALL money fields, `decimal(18,3)` for ALL quantity fields?
+- [ ] `nvarchar` for all text, `varchar` for barcodes only?
+
+### Index Filter Correctness
+- [ ] NO `[IsActive]` filter on DocumentEntity indexes — DocumentEntity has NO `IsActive` column, filter causes SQL runtime error?
+  - Check: ReceiptVoucher.VoucherNo, PaymentVoucher.VoucherNo, SalesInvoice.InvoiceNo, PurchaseInvoice.InvoiceNo
+- [ ] ALL filtered unique indexes on ActivatableEntity include `AND [IsActive] = 1`?
+- [ ] AuditLog index direction: `(UserId ASC, CreatedAt DESC)` — NOT `(UserId, CreatedAt)` (implicit ASC)?
+- [ ] Missing composite indexes: `SystemLog(Level, CreatedAt DESC)`, `JournalEntryLine(JournalEntryId, AccountId)`?
+- [ ] Notification index: `(UserId, IsRead, CreatedAt DESC)` composite — NOT three separate indexes?
+
+### Navigation Property Mapping
+- [ ] ALL `.WithMany()` calls specify the navigation property — e.g., `.WithMany(p => p.Applications)` NOT bare `.WithMany()`?
+  - Particularly critical: SupplierPaymentApplication, Product where collection = `_prices` / `_units`
+- [ ] ALL `.HasOne()` calls specify the navigation property — e.g., `.HasOne(x => x.Account)` NOT `.HasOne<Account>()`?
+- [ ] FK relationships use navigation properties recursively — parent references use proper lambdas?
+
+### BranchId FK Integrity
+- [ ] WarehouseConfiguration HAS explicit `BranchId` FK with `DeleteBehavior.Restrict`? (Was missing — runtime error hazard.)
+- [ ] CashBoxConfiguration HAS explicit `BranchId` FK with `DeleteBehavior.Restrict`?
+- [ ] `SystemAccountMappingConfiguration.BranchId` uses `IsRequired(false)` — NOT `HasDefaultValue((short)0)` (causes FK violation)?
+
 ## 📋 Phase Awareness (Phases 18-31)
 
-The system is currently at **v4.10.3 with Phases 18-25 completed and Phases 26-31 planned**. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third). Inventory Operations (Phase 26) completed: all 3 BLOCKER bugs fixed, Desktop ViewModels rewritten, 0 build errors.
+The system is currently at **v4.10.4 with Phases 18-25 completed and Phases 26-31 planned**. A comprehensive deep review of all 8 modules (Core, Organization, Products, Accounting, Inventory, Sales, Purchases, Infrastructure) was completed — 42+ structural mismatches fixed against `docs/database-schema.md`, old database dropped, fresh `InitialCreate_v2` migration generated and applied, build: 0 errors/0 warnings, 1,574 tests passing. Phase 27 (Purchases) and Phase 28 (Sales) analysis gaps have been implemented: OtherCharges landed cost for purchases, delivery charges revenue separation, price enforcement in sales, purchase return standalone mode, and flexible input (any 2 of qty/price/total calculates the third). Inventory Operations (Phase 26) completed: all 3 BLOCKER bugs fixed, Desktop ViewModels rewritten, 0 build errors.
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -645,3 +689,25 @@ When you encounter any code related to these areas, apply fixes automatically:
 46. `SalesReturnService` not injecting `IAccountingIntegrationService` → ADD DI injection, call `CreateSalesReturnEntryAsync()` on Post, call `ReverseSalesReturnEntryAsync()` on Cancel.
 47. `ProductUnitId` hardcoded to `1` in Desktop ViewModels → REPLACE with `product.DefaultPurchaseUnitId` (purchase/inventory screens) or `product.DefaultSalesUnitId` (sales screens). Fallback to `0` (service auto-determines).
 48. `AllocateAdditionalCharges` inline in `PurchaseService.PostAsync()` → EXTRACT to standalone `AdditionalChargeAllocator` static helper class in `Helpers/` for DRY compliance + unit testability.
+
+### Deep Review Items ??? Entity Config & Schema Alignment (v4.10.4)
+
+49. Wrong base class (SalesReturn/PurchaseReturn extending `AuditableEntity` instead of `DocumentEntity`) ??? CHANGE to `DocumentEntity`. DocumentEntity has Status (Draft/Posted/Cancelled) + PostedAt/CancelledAt timestamps. AuditableEntity is audit-only, no Status lifecycle.
+50. Wrong base class (UserSession extending `AuditableEntity` instead of `ActivatableEntity`) ??? CHANGE to `ActivatableEntity` ??? session revocation tracked via `IsActive`.
+51. Missing `[IsActive]` filter removal on DocumentEntity indexes ??? REMOVE `.HasFilter("[IsActive] = 1")` from DocumentEntity index configs (ReceiptVoucher, PaymentVoucher, SalesInvoice, PurchaseInvoice). DocumentEntity has NO IsActive column ??? filter causes SQL runtime crash.
+52. Missing BranchId FK on Warehouse/CashBox ??? ADD `.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict)` to configuration. (Was absent on Warehouse ??? runtime FK error hazard.)
+53. `HasConversion<int>()` on enum properties ??? CHANGE to `HasConversion<byte>()` + `.HasColumnType("tinyint")` for ALL enum Status/Types (InvoiceStatus, PaymentType, AccountType, JournalEntryType, etc.).
+54. Missing `.HasColumnType("date")` on date columns ??? ADD `.HasColumnType("date")` to: InvoiceDate, EntryDate, BirthDate, HireDate, EffectiveFrom, EffectiveTo, ExpiryDate, ReturnDate, VoucherDate.
+55. `SortOrder` as `int` ??? CHANGE to `short` with `.HasColumnType("smallint")` (e.g., JournalEntryLine.SortOrder).
+56. Bare `.WithMany()` without navigation property ??? CHANGE to `.WithMany(p => p.Applications)` or appropriate nav property. CRITICAL: bare `.WithMany()` creates shadow FK `SupplierPaymentId1` (SupplierPaymentApplicationConfiguration).
+57. Description/Notes `MaxLength` mismatch ??? Align with schema: JournalEntryLine.Description=300, Account.Description=500, Employee.Notes=1000, Permission.DisplayName=150.
+58. AuditLog index direction incorrect ??? FIX to `(UserId ASC, CreatedAt DESC)`. Add missing `SystemLog(Level, CreatedAt DESC)` composite index.
+59. `SalesReturn.Post()`/`Cancel()` without `PostedAt`/`CancelledAt` ??? ADD `PostedAt = DateTime.UtcNow` / `CancelledAt = DateTime.UtcNow` ??? mandatory for DocumentEntity lifecycle.
+60. `SalesReturnService` without `IAccountingIntegrationService` ??? ADD DI injection, call `CreateSalesReturnEntryAsync()` on Post, `ReverseSalesReturnEntryAsync()` on Cancel.
+61. `User.PasswordHash` nullable ??? Schema says `nvarchar(256) NOT NULL`. CHANGE to `string.Empty` default. Update tests.
+62. `BranchId` with `.HasDefaultValue((short)0)` ??? CHANGE to `.IsRequired(false)` (FK constraint fails with default 0 when BranchId optional). Apply to SystemAccountMappingConfiguration.
+63. `ProductUnitId` on domain requests (AddInventoryCountLineRequest, etc.) ??? REMOVE from line-level DTOs ??? ProductUnitId is not needed for adjustments/counts.
+64. `SystemSetting.DataType` as string ??? CHANGE to `SettingType` (byte enum). Remove `Note`/`UpdatedBy`. Update DbSeeder.
+65. `Notification.Category` as string ??? CHANGE to `NotificationCategory` (byte enum). Remove duplicate Category column.
+66. `SalesReturnLines`/`PurchaseReturnLines` referencing `ProductId` ??? MUST reference original `SalesInvoiceLineId`/`PurchaseInvoiceLineId` per schema (FK links to invoice line, not product).
+67. Customer.CategoryId/Supplier.CategoryId (`int?`) without FK to AccountCategory ??? ADD explicit FK or document as loose property (int vs smallint mismatch).

@@ -55,7 +55,7 @@ public class AnnualClosingService : IAnnualClosingService
 
             // ─── Step 3: Verify ALL journal entries for the year are posted ──
             var unpostedEntries = await _uow.JournalEntries.CountAsync(
-                je => je.TransactionDate.Year == fiscalYear && je.Status == JournalEntryStatus.Draft, ct);
+                je => je.EntryDate.Year == fiscalYear && je.Status == JournalEntryStatus.Draft, ct);
 
             if (unpostedEntries > 0)
                 return Result<int>.Failure(
@@ -65,7 +65,7 @@ public class AnnualClosingService : IAnnualClosingService
             var allLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.JournalEntry != null
                     && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate.Year == fiscalYear,
+                    && jel.JournalEntry.EntryDate.Year == fiscalYear,
                 null, ct, false, "JournalEntry");
 
             // Group by account for faster lookup
@@ -79,10 +79,10 @@ public class AnnualClosingService : IAnnualClosingService
 
             // ─── Step 5: Get Revenue and Expense accounts ─────────────────
             var revenueAccounts = await _uow.Accounts.ToListAsync(
-                a => a.AccountType == AccountType.Revenue && a.IsActive, ct: ct);
+                a => a.GetAccountType() == AccountType.Revenue && a.IsActive, ct: ct);
 
             var expenseAccounts = await _uow.Accounts.ToListAsync(
-                a => a.AccountType == AccountType.Expense && a.IsActive, ct: ct);
+                a => a.GetAccountType() == AccountType.Expense && a.IsActive, ct: ct);
 
             if (revenueAccounts.Count == 0 && expenseAccounts.Count == 0)
                 return Result<int>.Failure(
@@ -155,16 +155,16 @@ public class AnnualClosingService : IAnnualClosingService
                 referenceNumber: fiscalYear.ToString());
 
             // Debit each Revenue account to zero
-            foreach (var (accountId, accountCode, nameAr, amount) in revenueClosingLines)
+            foreach (var (accountId, _, nameAr, amount) in revenueClosingLines)
             {
-                closingEntry.AddDebitLine(accountId, accountCode, nameAr, amount,
+                closingEntry.AddDebitLine(accountId, amount,
                     $"إقفال حساب الأرباح — {nameAr}");
             }
 
             // Credit each Expense account to zero
-            foreach (var (accountId, accountCode, nameAr, amount) in expenseClosingLines)
+            foreach (var (accountId, _, nameAr, amount) in expenseClosingLines)
             {
-                closingEntry.AddCreditLine(accountId, accountCode, nameAr, amount,
+                closingEntry.AddCreditLine(accountId, amount,
                     $"إقفال حساب المصروفات — {nameAr}");
             }
 
@@ -174,8 +174,6 @@ public class AnnualClosingService : IAnnualClosingService
                 // Profit: Credit Retained Earnings
                 closingEntry.AddCreditLine(
                     retainedEarningsAccount.Id,
-                    retainedEarningsAccount.AccountCode,
-                    retainedEarningsAccount.NameAr,
                     netIncome,
                     $"صافي الربح للسنة المالية {fiscalYear}");
             }
@@ -184,8 +182,6 @@ public class AnnualClosingService : IAnnualClosingService
                 // Loss: Debit Retained Earnings
                 closingEntry.AddDebitLine(
                     retainedEarningsAccount.Id,
-                    retainedEarningsAccount.AccountCode,
-                    retainedEarningsAccount.NameAr,
                     Math.Abs(netIncome),
                     $"صافي الخسارة للسنة المالية {fiscalYear}");
             }

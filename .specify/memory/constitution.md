@@ -166,7 +166,7 @@
   - `Permanent = 2` — Hard delete (physical removal if not referenced)
 - Soft delete preserves entity history for audit trails.
 - Hard delete MUST validate references before removal:
-  - Product → Check SalesInvoiceItems, PurchaseInvoiceItems
+  - Product → Check SalesInvoiceLines, PurchaseInvoiceLines
   - Category → Check Products
   - Unit → Check Products (UnitId, RetailUnitId, WholesaleUnitId)
   - Warehouse → Check WarehouseStocks, StockTransfers

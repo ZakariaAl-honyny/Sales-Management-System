@@ -30,8 +30,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
     private string? _warehouseName;
     private byte _adjustmentType = 1; // Addition
     private DateTime _adjustmentDate = DateTime.Today;
-    private int _accountId;
-    private string? _accountName;
     private string? _notes;
     private string? _errorMessage;
     private byte _status = 1; // Draft
@@ -96,8 +94,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
         _warehouseName = adjustment.WarehouseName;
         _adjustmentType = adjustment.AdjustmentType;
         _adjustmentDate = adjustment.AdjustmentDate;
-        _accountId = adjustment.AccountId;
-        _accountName = adjustment.AccountName;
         _notes = null; // Notes not in DTO yet; kept for future
         _status = adjustment.Status;
 
@@ -109,8 +105,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
                 {
                     ProductId = line.ProductId,
                     ProductName = line.ProductName,
-                    ProductUnitId = line.ProductUnitId,
-                    ProductUnitName = line.ProductUnitName,
                     Quantity = line.Quantity,
                     UnitCost = line.UnitCost
                 });
@@ -158,7 +152,7 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _adjustmentType, value))
             {
-                if (value < 1 || value > 3)
+                if (value < 1 || value > 4)
                     AddError(nameof(AdjustmentType), "نوع التسوية غير صالح");
                 else
                     ClearErrors(nameof(AdjustmentType));
@@ -202,27 +196,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
     {
         get => _adjustmentDate;
         set => SetProperty(ref _adjustmentDate, value);
-    }
-
-    public int AccountId
-    {
-        get => _accountId;
-        set
-        {
-            if (SetProperty(ref _accountId, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(AccountId), "الحساب المحاسبي مطلوب");
-                else
-                    ClearErrors(nameof(AccountId));
-            }
-        }
-    }
-
-    public string? AccountName
-    {
-        get => _accountName;
-        set => SetProperty(ref _accountName, value);
     }
 
     public string? Notes
@@ -307,8 +280,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    ProductUnitId = product.DefaultPurchaseUnitId ?? 0, // Use purchase unit for inventory ops; 0 = service auto
-                    ProductUnitName = "حبة",
                     Quantity = 1,
                     UnitCost = 0m
                 });
@@ -335,9 +306,6 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
 
         if (WarehouseId <= 0)
             AddError(nameof(WarehouseId), "يجب اختيار مستودع");
-
-        if (AccountId <= 0)
-            AddError(nameof(AccountId), "الحساب المحاسبي مطلوب");
 
         if (AdjustmentType < 1 || AdjustmentType > 3)
             AddError(nameof(AdjustmentType), "نوع التسوية غير صالح (1=إضافة, 2=خصم, 3=تصحيح)");
@@ -370,8 +338,7 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
             var request = new CreateInventoryAdjustmentRequest(
                 WarehouseId,
                 AdjustmentDate,
-                AdjustmentType,
-                AccountId);
+                AdjustmentType);
 
             var result = await _adjustmentService.CreateAsync(request);
             if (result.IsSuccess && result.Value != null)
@@ -408,8 +375,7 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
                 var createRequest = new CreateInventoryAdjustmentRequest(
                     WarehouseId,
                     AdjustmentDate,
-                    AdjustmentType,
-                    AccountId);
+                    AdjustmentType);
 
                 var createResult = await _adjustmentService.CreateAsync(createRequest);
                 if (!createResult.IsSuccess || createResult.Value == null)
@@ -455,8 +421,6 @@ public class InventoryAdjustmentLineItem : ViewModelBase
 {
     private int _productId;
     private string? _productName;
-    private int _productUnitId;
-    private string? _productUnitName;
     private decimal _quantity;
     private decimal _unitCost;
 
@@ -470,18 +434,6 @@ public class InventoryAdjustmentLineItem : ViewModelBase
     {
         get => _productName;
         set => SetProperty(ref _productName, value);
-    }
-
-    public int ProductUnitId
-    {
-        get => _productUnitId;
-        set => SetProperty(ref _productUnitId, value);
-    }
-
-    public string? ProductUnitName
-    {
-        get => _productUnitName;
-        set => SetProperty(ref _productUnitName, value);
     }
 
     public decimal Quantity

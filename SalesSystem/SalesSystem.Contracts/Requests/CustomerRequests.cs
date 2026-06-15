@@ -6,8 +6,7 @@ public record CreateCustomerRequest(
     string? Email,
     string? Address,
     string? TaxNumber,
-    decimal CreditLimit = 0,
-    byte? PriceLevel = null
+    decimal CreditLimit = 0
 );
 
 public record UpdateCustomerRequest(
@@ -17,6 +16,5 @@ public record UpdateCustomerRequest(
     string? Address,
     string? TaxNumber,
     decimal CreditLimit,
-    bool IsActive,
-    byte? PriceLevel = null
+    bool IsActive
 );

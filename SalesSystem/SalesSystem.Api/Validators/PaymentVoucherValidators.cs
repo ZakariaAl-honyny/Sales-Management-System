@@ -26,10 +26,6 @@ public class CreatePaymentVoucherRequestValidator : AbstractValidator<CreatePaym
         RuleFor(x => x.Notes)
             .MaximumLength(500).WithMessage("الملاحظات يجب أن لا تتجاوز 500 حرف")
             .When(x => x.Notes != null);
-
-        RuleFor(x => x.SourceDocumentType)
-            .MaximumLength(50).WithMessage("نوع المستند المصدر يجب أن لا يتجاوز 50 حرف")
-            .When(x => x.SourceDocumentType != null);
     }
 }
 
@@ -40,9 +36,5 @@ public class UpdatePaymentVoucherRequestValidator : AbstractValidator<UpdatePaym
         RuleFor(x => x.Notes)
             .MaximumLength(500).WithMessage("الملاحظات يجب أن لا تتجاوز 500 حرف")
             .When(x => x.Notes != null);
-
-        RuleFor(x => x.SourceDocumentType)
-            .MaximumLength(50).WithMessage("نوع المستند المصدر يجب أن لا تتجاوز 50 حرف")
-            .When(x => x.SourceDocumentType != null);
     }
 }

@@ -5,12 +5,18 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Represents a batch/lot of inventory received via a single purchase.
-/// Enables FIFO/FEFO cost allocation per product unit.
-/// Each purchase invoice item creates one InventoryBatch (or more if the item has different lot numbers).
-/// Maps to "InventoryBatches" table with FK to PurchaseInvoice.
+/// Enables FIFO/FEFO cost allocation.
+/// Maps to "InventoryBatches" table.
+/// Schema: BatchNo (int), SupplierBatchNo (varchar 100 nullable), ExpiryDate (date null),
+/// QuantityReceived (decimal 18,3), QuantityRemaining (decimal 18,3), UnitCost (decimal 18,2).
 /// </summary>
-public class InventoryBatch : ActivatableEntity
+public class InventoryBatch : AuditableEntity
 {
+    /// <summary>
+    /// Internal batch number (int).
+    /// </summary>
+    public int BatchNo { get; private set; }
+
     /// <summary>
     /// FK to Product.
     /// </summary>
@@ -27,30 +33,9 @@ public class InventoryBatch : ActivatableEntity
     public int? PurchaseInvoiceId { get; private set; }
 
     /// <summary>
-    /// FK to PurchaseInvoiceItem — identifies which line item this batch came from.
+    /// Supplier's batch/lot reference number. varchar(100).
     /// </summary>
-    public int? PurchaseInvoiceItemId { get; private set; }
-
-    /// <summary>
-    /// Current remaining quantity in stock for this batch. Base units.
-    /// decimal(18,3) in DB.
-    /// </summary>
-    public decimal Quantity { get; private set; }
-
-    /// <summary>
-    /// Unit cost per base unit for this batch. decimal(18,2) in DB.
-    /// </summary>
-    public decimal UnitCost { get; private set; }
-
-    /// <summary>
-    /// Batch/Lot number from the supplier. Max 50 chars.
-    /// </summary>
-    public string? BatchNo { get; private set; }
-
-    /// <summary>
-    /// Date of manufacture (if applicable).
-    /// </summary>
-    public DateTime? ManufactureDate { get; private set; }
+    public string? SupplierBatchNo { get; private set; }
 
     /// <summary>
     /// Expiry date (if applicable). Used for FEFO picking.
@@ -58,18 +43,29 @@ public class InventoryBatch : ActivatableEntity
     public DateTime? ExpiryDate { get; private set; }
 
     /// <summary>
-    /// Indicates whether this batch is active (not fully consumed or deleted).
+    /// Quantity originally received. decimal(18,3).
     /// </summary>
-    public new bool IsActive { get; private set; } = true;
+    public decimal QuantityReceived { get; private set; }
 
     /// <summary>
-    /// Indicates whether this batch is fully consumed (Quantity = 0).
+    /// Quantity remaining in stock. decimal(18,3).
+    /// Decreases on sale/transfer.
     /// </summary>
-    public bool IsFullyConsumed => Math.Abs(Quantity) < 0.0001m;
+    public decimal QuantityRemaining { get; private set; }
+
+    /// <summary>
+    /// Unit cost per base unit for this batch. decimal(18,2).
+    /// </summary>
+    public decimal UnitCost { get; private set; }
+
+    /// <summary>
+    /// Indicates whether this batch is fully consumed (QuantityRemaining = 0).
+    /// </summary>
+    public bool IsFullyConsumed => QuantityRemaining <= 0.0001m;
 
     // Navigation properties
-    public virtual Product Product { get; private set; } = null!;
-    public virtual Warehouse Warehouse { get; private set; } = null!;
+    public virtual Product? Product { get; private set; }
+    public virtual Warehouse? Warehouse { get; private set; }
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
 
     private InventoryBatch() { } // EF Core
@@ -78,68 +74,66 @@ public class InventoryBatch : ActivatableEntity
     /// Creates a new inventory batch record.
     /// </summary>
     public static InventoryBatch Create(
+        int batchNo,
         int productId,
         short warehouseId,
-        decimal quantity,
+        decimal quantityReceived,
         decimal unitCost,
         int? purchaseInvoiceId = null,
-        int? purchaseInvoiceItemId = null,
-        string? batchNo = null,
-        DateTime? manufactureDate = null,
+        string? supplierBatchNo = null,
         DateTime? expiryDate = null,
         int? createdByUserId = null)
     {
+        if (batchNo <= 0)
+            throw new DomainException("رقم الدفعة مطلوب.");
         if (productId <= 0)
             throw new DomainException("معرف المنتج مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("معرف المستودع مطلوب.");
-        if (quantity < 0)
-            throw new DomainException("الكمية لا يمكن أن تكون سالبة.");
+        if (quantityReceived < 0)
+            throw new DomainException("الكمية المستلمة لا يمكن أن تكون سالبة.");
         if (unitCost < 0)
             throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
 
         var batch = new InventoryBatch
         {
+            BatchNo = batchNo,
             ProductId = productId,
             WarehouseId = warehouseId,
-            Quantity = Math.Round(quantity, 3),
-            UnitCost = Math.Round(unitCost, 2),
             PurchaseInvoiceId = purchaseInvoiceId,
-            PurchaseInvoiceItemId = purchaseInvoiceItemId,
-            BatchNo = batchNo?.Trim(),
-            ManufactureDate = manufactureDate,
+            SupplierBatchNo = supplierBatchNo?.Trim(),
             ExpiryDate = expiryDate,
-            IsActive = true
+            QuantityReceived = quantityReceived,
+            QuantityRemaining = quantityReceived,
+            UnitCost = unitCost
         };
         batch.SetCreatedBy(createdByUserId);
         return batch;
     }
 
     /// <summary>
-    /// Reduces the quantity in this batch. Used when selling or transferring stock.
+    /// Reduces the remaining quantity in this batch. Used when selling or transferring stock.
     /// </summary>
-    public void DecreaseQuantity(decimal quantityToRemove)
+    public void Deduct(decimal quantity)
     {
-        if (quantityToRemove <= 0)
+        if (quantity <= 0)
             throw new DomainException("كمية السحب يجب أن تكون أكبر من صفر.");
-
-        if (Quantity - quantityToRemove < -0.0001m)
+        if (quantity > QuantityRemaining + 0.0001m)
             throw new DomainException(
-                $"الكمية المطلوبة ({quantityToRemove:N3}) تتجاوز المتاح في الدفعة ({Quantity:N3}).");
+                $"الكمية المطلوبة ({quantity:N3}) تتجاوز المتاح في الدفعة ({QuantityRemaining:N3}).");
 
-        Quantity = Math.Round(Quantity - quantityToRemove, 3);
+        QuantityRemaining -= quantity;
         UpdateTimestamp();
     }
 
     /// <summary>
-    /// Increases the quantity in this batch. Used for returns or adjustments.
+    /// Increases the remaining quantity. Used for returns or adjustments.
     /// </summary>
-    public void IncreaseQuantity(decimal quantityToAdd)
+    public void IncreaseRemaining(decimal quantity)
     {
-        if (quantityToAdd <= 0)
+        if (quantity <= 0)
             throw new DomainException("كمية الإضافة يجب أن تكون أكبر من صفر.");
-
-        Quantity = Math.Round(Quantity + quantityToAdd, 3);
+        QuantityRemaining += quantity;
         UpdateTimestamp();
     }
 
@@ -153,20 +147,11 @@ public class InventoryBatch : ActivatableEntity
     }
 
     /// <summary>
-    /// Updates the batch/lot number.
+    /// Updates the batch number.
     /// </summary>
     public void UpdateBatchNo(string? newBatchNo)
     {
-        BatchNo = newBatchNo?.Trim();
-        UpdateTimestamp();
-    }
-
-    /// <summary>
-    /// Deactivates the batch (soft delete).
-    /// </summary>
-    public void Deactivate()
-    {
-        IsActive = false;
+        BatchNo = int.TryParse(newBatchNo, out var parsed) ? parsed : 0;
         UpdateTimestamp();
     }
 }

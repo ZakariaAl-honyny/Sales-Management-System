@@ -48,16 +48,17 @@ public class FifoAllocationService : IFifoAllocationService
 
         try
         {
-            var lotNumber = batchNo ?? GenerateLotNumber(isOpeningBatch);
+            var lotNumber = int.TryParse(batchNo, out var parsedLot) ? parsedLot : GenerateLotNumber(isOpeningBatch);
 
             var batch = InventoryBatch.Create(
-                productId: productId,
-                warehouseId: warehouseId,
-                quantity: quantity,
-                unitCost: unitCost,
-                batchNo: lotNumber,
-                purchaseInvoiceId: purchaseInvoiceId,
-                expiryDate: expiryDate);
+                lotNumber,
+                productId,
+                warehouseId,
+                quantity,
+                unitCost,
+                purchaseInvoiceId,
+                null, // supplierBatchNo
+                expiryDate);
 
             await _uow.InventoryBatches.AddAsync(batch, ct);
 
@@ -85,7 +86,7 @@ public class FifoAllocationService : IFifoAllocationService
         int productId,
         short warehouseId,
         decimal quantityNeeded,
-        int? salesInvoiceItemId,
+        int? SalesInvoiceLineId,
         int? createdByUserId,
         CancellationToken ct)
     {
@@ -109,8 +110,7 @@ public class FifoAllocationService : IFifoAllocationService
             var batches = await _uow.InventoryBatches.ToListAsync(
                 b => b.ProductId == productId
                      && b.WarehouseId == warehouseId
-                     && b.Quantity > 0
-                     && b.IsActive,
+                     && b.QuantityRemaining > 0,
                 queryConfig: null,
                 ct: ct);
 
@@ -153,22 +153,22 @@ public class FifoAllocationService : IFifoAllocationService
             {
                 if (remaining <= 0) break;
 
-                var takeQuantity = Math.Min(remaining, batch.Quantity);
+                var takeQuantity = Math.Min(remaining, batch.QuantityRemaining);
 
                 // Domain method validates and deducts
-                batch.DecreaseQuantity(takeQuantity);
+                batch.Deduct(takeQuantity);
 
                 // Record the allocation
                 allocations.Add(new InventoryBatchAllocation(
                     BatchId: batch.Id,
                     Quantity: takeQuantity,
                     UnitCost: batch.UnitCost,
-                    SalesInvoiceItemId: salesInvoiceItemId));
+                    SalesInvoiceLineId: SalesInvoiceLineId));
 
                 _logger.LogInformation(
                     "FIFO allocation: {Quantity} units from Batch {BatchId} ({BatchNo}) " +
                     "for Product {ProductId}, InvoiceItem {InvoiceItemId}",
-                    takeQuantity, batch.Id, batch.BatchNo, productId, salesInvoiceItemId);
+                    takeQuantity, batch.Id, batch.BatchNo, productId, SalesInvoiceLineId);
 
                 remaining -= takeQuantity;
             }
@@ -227,13 +227,15 @@ public class FifoAllocationService : IFifoAllocationService
             var returnBatchNo = GenerateReturnBatchNo();
 
             var newBatch = InventoryBatch.Create(
-                productId: batch.ProductId,
-                warehouseId: batch.WarehouseId,
-                quantity: quantityReturned,
-                unitCost: batch.UnitCost,
-                batchNo: returnBatchNo,
-                expiryDate: batch.ExpiryDate,
-                createdByUserId: createdByUserId);
+                returnBatchNo,
+                batch.ProductId,
+                batch.WarehouseId,
+                quantityReturned,
+                batch.UnitCost,
+                null, // purchaseInvoiceId
+                null, // supplierBatchNo
+                batch.ExpiryDate,
+                createdByUserId);
 
             await _uow.InventoryBatches.AddAsync(newBatch, ct);
 
@@ -272,9 +274,9 @@ public class FifoAllocationService : IFifoAllocationService
 
             var breakdown = batches.Select(b => new BatchStockInfo(
                 BatchId: b.Id,
-                BatchNo: b.BatchNo,
-                RemainingQuantity: b.Quantity,
-                OriginalQuantity: b.Quantity,
+                BatchNo: b.BatchNo.ToString(),
+                RemainingQuantity: b.QuantityRemaining,
+                OriginalQuantity: b.QuantityReceived,
                 UnitCost: b.UnitCost,
                 ExpiryDate: b.ExpiryDate,
                 ReceivedDate: b.CreatedAt,
@@ -301,15 +303,14 @@ public class FifoAllocationService : IFifoAllocationService
             var batches = await _uow.InventoryBatches.ToListAsync(
                 b => b.ProductId == productId
                      && b.WarehouseId == warehouseId
-                     && b.Quantity > 0
-                     && b.IsActive,
+                     && b.QuantityRemaining > 0,
                 ct: ct);
 
             if (batches.Count == 0)
                 return Result<decimal>.Success(0m);
 
-            var totalValue = batches.Sum(b => b.Quantity * b.UnitCost);
-            var totalQuantity = batches.Sum(b => b.Quantity);
+            var totalValue = batches.Sum(b => b.QuantityRemaining * b.UnitCost);
+            var totalQuantity = batches.Sum(b => b.QuantityRemaining);
 
             if (totalQuantity == 0)
                 return Result<decimal>.Success(0m);
@@ -328,16 +329,14 @@ public class FifoAllocationService : IFifoAllocationService
 
     // ─── Private Helpers ──────────────────────────────────────────────
 
-    private static string GenerateLotNumber(bool isOpeningBatch)
+    private static int GenerateLotNumber(bool isOpeningBatch)
     {
-        var prefix = isOpeningBatch ? "OPN" : "PUR";
-        var ticks = DateTime.UtcNow.Ticks % 100000000;
-        return $"{prefix}-{ticks:D8}";
+        var ticks = (int)(DateTime.UtcNow.Ticks % 100000000);
+        return ticks;
     }
 
-    private static string GenerateReturnBatchNo()
+    private static int GenerateReturnBatchNo()
     {
-        var ticks = DateTime.UtcNow.Ticks % 100000000;
-        return $"RET-{ticks:D8}";
+        return (int)(DateTime.UtcNow.Ticks % 100000000);
     }
 }

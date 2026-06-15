@@ -18,9 +18,9 @@
 4113:    public class User : AuditableEntity
 4129:    public class StoreSettings
 4155:    public class PurchaseInvoice : AuditableEntity
-4192:    public class PurchaseInvoiceItem
+4192:    public class PurchaseInvoiceLine
 4219:    public class SalesInvoice : AuditableEntity
-4256:    public class SalesInvoiceItem
+4256:    public class SalesInvoiceLine
 4287:    public class PurchaseReturn : AuditableEntity
 4321:    public class PurchaseReturnItem
 4345:    public class SalesReturn : AuditableEntity
@@ -44,15 +44,15 @@
 5756:    public class ProductLookupDto
 5775:    public class CreateProductRequestDto
 5813:    public class UpdateProductRequestDto
-5897:    public class PurchaseInvoiceItemDto
+5897:    public class PurchaseInvoiceLineDto
 5918:    public class PurchaseInvoiceDto
 5958:    public class PurchaseInvoiceListDto
-5980:    public class CreatePurchaseInvoiceItemRequestDto
+5980:    public class CreatePurchaseInvoiceLineRequestDto
 6006:    public class CreatePurchaseInvoiceRequestDto
-6046:    public class SalesInvoiceItemDto
+6046:    public class SalesInvoiceLineDto
 6067:    public class SalesInvoiceDto
 6107:    public class SalesInvoiceListDto
-6129:    public class CreateSalesInvoiceItemRequestDto
+6129:    public class CreateSalesInvoiceLineRequestDto
 6155:    public class CreateSalesInvoiceRequestDto
 6296:    public class ProductMappingProfile : Profile
 6346:    public class PurchaseInvoiceMappingProfile : Profile
@@ -147,10 +147,10 @@
 18125:    public class SupplierApiService : ApiServiceBase, ISupplierApiService
 18210:    public class SuppliersListControl : UserControl
 18497:    public class SupplierEditorForm : Form
-18879:    public class PurchaseInvoiceItemDto
+18879:    public class PurchaseInvoiceLineDto
 18901:    public class PurchaseInvoiceDto
 18943:    public class PurchaseInvoiceListDto
-18967:    public class CreatePurchaseInvoiceItemRequestDto
+18967:    public class CreatePurchaseInvoiceLineRequestDto
 18995:    public class CreatePurchaseInvoiceRequestDto
 19114:    public class PurchaseSummaryRequestDto
 19129:    public class PurchaseSummaryDto
@@ -162,10 +162,10 @@
 19962:    public class PurchasesListControl : UserControl
 20239:    public class PurchaseEditorForm : Form
 20657:        private sealed class PurchaseItemRowVm
-20773:    public class SalesInvoiceItemDto
+20773:    public class SalesInvoiceLineDto
 20795:    public class SalesInvoiceDto
 20837:    public class SalesInvoiceListDto
-20861:    public class CreateSalesInvoiceItemRequestDto
+20861:    public class CreateSalesInvoiceLineRequestDto
 20889:    public class CreateSalesInvoiceRequestDto
 20925:    public class SalesSummaryRequestDto
 20940:    public class SalesSummaryDto

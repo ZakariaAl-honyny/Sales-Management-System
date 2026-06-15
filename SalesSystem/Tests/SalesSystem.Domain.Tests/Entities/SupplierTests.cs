@@ -11,54 +11,63 @@ public class SupplierTests
     {
         var supplier = Supplier.Create(
             partyId: 1,
+            accountId: 1,
             createdByUserId: 1
         );
 
-        supplier.Id.Should().Be(1);
-        supplier.PaymentTerms.Should().BeNull();
-        supplier.Notes.Should().BeNull();
-    }
-
-    [Fact]
-    public void Create_GivenPaymentTerms_ShouldSetPaymentTerms()
-    {
-        var supplier = Supplier.Create(
-            partyId: 1,
-            paymentTerms: "صافي 30 يوم",
-            createdByUserId: 1
-        );
-
-        supplier.PaymentTerms.Should().Be("صافي 30 يوم");
+        supplier.PartyId.Should().Be(1);
+        supplier.AccountId.Should().Be(1);
+        supplier.IsActive.Should().BeTrue();
     }
 
     [Fact]
     public void Create_GivenInvalidPartyId_ShouldThrowDomainException()
     {
-        var action = () => Supplier.Create(partyId: 0, createdByUserId: 1);
+        var action = () => Supplier.Create(partyId: 0, accountId: 1, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("*معرّف الطرف غير صالح*");
     }
 
     [Fact]
-    public void Update_GivenValidData_ShouldUpdateSupplier()
+    public void Create_GivenInvalidAccountId_ShouldThrowDomainException()
     {
-        var supplier = Supplier.Create(partyId: 1, createdByUserId: 1);
+        var action = () => Supplier.Create(partyId: 1, accountId: 0, createdByUserId: 1);
+
+        action.Should().Throw<DomainException>()
+            .WithMessage("*معرّف الحساب غير صالح*");
+    }
+
+    [Fact]
+    public void Create_WithCategoryId_SetsCategoryId()
+    {
+        var supplier = Supplier.Create(
+            partyId: 1,
+            accountId: 1,
+            categoryId: 2,
+            createdByUserId: 1
+        );
+
+        supplier.CategoryId.Should().Be(2);
+    }
+
+    [Fact]
+    public void Update_WithCategoryId_SetsCategoryId()
+    {
+        var supplier = Supplier.Create(partyId: 1, accountId: 1, createdByUserId: 1);
 
         supplier.Update(
-            paymentTerms: "صافي 60 يوم",
-            notes: "ملاحظات",
+            categoryId: 3,
             updatedByUserId: 1
         );
 
-        supplier.PaymentTerms.Should().Be("صافي 60 يوم");
-        supplier.Notes.Should().Be("ملاحظات");
+        supplier.CategoryId.Should().Be(3);
     }
 
     [Fact]
     public void MarkAsDeleted_ShouldSetIsActiveFalse()
     {
-        var supplier = Supplier.Create(partyId: 1, createdByUserId: 1);
+        var supplier = Supplier.Create(partyId: 1, accountId: 1, createdByUserId: 1);
 
         supplier.MarkAsDeleted();
 

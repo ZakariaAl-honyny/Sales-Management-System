@@ -880,7 +880,7 @@ query = query.Where(p => p.Name.Contains(search) ||
 // NOT: p.Code != null && p.Code.Contains(search)
 
 // CORRECT — DTO without ProductCode
-public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName, ...);
+public record SalesInvoiceLineDto(int Id, int ProductId, string ProductName, ...);
 // NOT: string? ProductCode
 ```
 
@@ -2520,7 +2520,7 @@ if (!entryResult.IsSuccess)
 
 ## 📋 Phase Awareness (Phases 23-31 + Purchases/Sales Analysis Gaps)
 
-The system is currently at **v4.10.2+ with Phases 18-25 + Purchases/Sales Analysis Gaps Implemented: OtherCharges Landed Cost, Price Enforcement, DeliveryChargesRevenue, Purchase Return Standalone, Flexible Input, AllowBelowCostSale Fixed to WARNING, Missing Analysis Doc Review**:
+The system is currently at **v4.10.4 with Phases 18-25 completed. A comprehensive deep review of all 8 modules (Core, Organization, Products, Accounting, Inventory, Sales, Purchases, Infrastructure) was completed ??? 42+ structural mismatches fixed against `docs/database-schema.md`, old database dropped, fresh `InitialCreate_v2` migration generated and applied, build: 0 errors/0 warnings, 1,574 tests passing.**:
 
 | Phase | Status | Description |
 |-------|--------|-------------|
@@ -2697,3 +2697,21 @@ When you encounter any code related to these areas, apply fixes automatically:
 40. `SalesReturnService` not creating journal entries → ADD `IAccountingIntegrationService` to DI constructor, call `CreateSalesReturnEntryAsync()` on Post (after stock increase), call `ReverseSalesReturnEntryAsync()` on Cancel (before stock reversal). Use per-entity `Customer.AccountId` for Dr/Cr routing. Add eager loading of `Customer` navigation property in both queries.
 41. `ProductUnitId` hardcoded to `1` in ViewModel line creation → REPLACE all `ProductUnitId = 1` occurrences with `product.DefaultPurchaseUnitId` (purchase/inventory VMs) or `product.DefaultSalesUnitId` (sales VMs). Fallback `0` when no default is configured (service auto-determines rather than breaking with wrong unit).
 42. `AllocateAdditionalCharges()` inline in `PurchaseService.PostAsync()` → EXTRACT to a standalone `AdditionalChargeAllocator.Allocate()` static method in `Helpers/AdditionalChargeAllocator.cs`. Takes `AllocationLine[]` (Index, LineTotal, Quantity, UnitCost), returns `Dictionary<int, decimal>` keyed by line index (not ProductId — prevents duplicate-product collision).
+43. Wrong base class (SalesReturn/PurchaseReturn extending `AuditableEntity` instead of `DocumentEntity`) ??? CHANGE to `DocumentEntity`. DocumentEntity = has Status (Draft/Posted/Cancelled) lifecycle + PostedAt/CancelledAt timestamps. SalesReturn.Post()/.Cancel() was missing PostedAt/CancelledAt.
+44. Wrong base class (UserSession extending `AuditableEntity` instead of `ActivatableEntity`) ??? CHANGE to `ActivatableEntity` (session revocation via IsActive).
+45. Missing `[IsActive]` filter removal on DocumentEntity indexes ??? REMOVE `.HasFilter("[IsActive] = 1")` from ALL DocumentEntity index configs (ReceiptVoucher, PaymentVoucher, SalesInvoice, PurchaseInvoice). DocumentEntity has NO IsActive column ??? filter causes SQL runtime error. CRITICAL: this is a runtime crash, not a warning.
+46. Missing BranchId FK on Warehouse/CashBox ??? ADD `.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict)` to configuration.
+47. `HasConversion<int>()` on enum properties ??? CHANGE to `HasConversion<byte>()` + `.HasColumnType("tinyint")` for ALL enum columns (InvoiceStatus, PaymentType, AccountType, JournalEntryType, etc.). EF Core defaults to `HasConversion<int>()` which wastes 3 bytes per column and uses `int` SQL type instead of `tinyint`.
+48. Missing `.HasColumnType("date")` on date columns ??? ADD `.HasColumnType("date")` to ALL date properties: InvoiceDate, EntryDate, BirthDate, HireDate, EffectiveFrom, EffectiveTo, ExpiryDate, ReturnDate, VoucherDate, PostedAt, CancelledAt. EF Core defaults to `datetime2(7)` which wastes 7 bytes per row.
+49. `SortOrder` as `int` ??? CHANGE to `short` with `.HasColumnType("smallint")` (e.g., JournalEntryLine.SortOrder and other sort-order columns).
+50. Bare `.WithMany()` without navigation property lambda ??? CHANGE to `.WithMany(p => p.Applications)` or appropriate nav property. Bare `.WithMany()` creates EF shadow FK column named `EntityNameId` (e.g., `SupplierPaymentId1`). CRITICAL for SupplierPaymentApplication, Product collections (`_prices`/`_units`).
+51. Description/Notes `MaxLength` mismatch ??? Align with schema: JournalEntryLine.Description=300, Account.Description=500, Employee.Notes=1000, Permission.DisplayName=150.
+52. AuditLog index direction incorrect ??? FIX from `(UserId, CreatedAt)` (ASC/ASC) to `(UserId ASC, CreatedAt DESC)`. Add missing `SystemLog(Level, CreatedAt DESC)` composite index.
+53. `User.PasswordHash` as nullable (string?) ??? Schema says `nvarchar(256) NOT NULL`. CHANGE to `string.Empty` default. Update all tests that expect null.
+54. `BranchId` with `.HasDefaultValue((short)0)` ??? CHANGE to `.IsRequired(false)` when FK is optional (SystemAccountMapping). Default 0 breaks FK constraint when no Branch record exists with Id=0.
+55. `SalesReturnLines`/`PurchaseReturnLines` referencing `ProductId` ??? MUST reference `SalesInvoiceLineId`/`PurchaseInvoiceLineId` per schema. Return lines link to original invoice line, not product directly.
+56. `SystemSetting.DataType` as string ??? CHANGE to `SettingType` (byte enum). Remove `Note` and `UpdatedBy` fields. Update DbSeeder.
+57. `Notification.Category` as string ??? CHANGE to `NotificationCategory` (byte enum). Remove duplicate Category column.
+58. `Customer.CategoryId`/`Supplier.CategoryId` (`int?`) without FK ??? Document as loose property (int does not match AccountCategory's smallint PK). Consider `HasColumnType("int")` override.
+59. Entity configurations lacking explicit column type for tinyint enums ??? ADD `.HasColumnType("tinyint")` to ALL enum properties. EF Core defaults to `int` SQL type.
+60. Missing HasQueryFilter(IsActive) on ActivatableEntity configurations ??? VERIFY every ActivatableEntity has `.HasQueryFilter(x => x.IsActive)` in its EF configuration. Missing this filter means soft-deleted records appear in queries.

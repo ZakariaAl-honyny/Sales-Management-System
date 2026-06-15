@@ -31,7 +31,7 @@ public class ProductCostService : IProductCostService
                 return Result<decimal>.Failure("معرف المنتج مطلوب");
 
             var batches = await _uow.InventoryBatches.ToListAsync(
-                b => b.ProductId == productId && b.Quantity > 0,
+                b => b.ProductId == productId && b.QuantityRemaining > 0,
                 q => q.OrderBy(b => b.CreatedAt),
                 ct);
 
@@ -41,8 +41,8 @@ public class ProductCostService : IProductCostService
                 return Result<decimal>.Success(0m);
             }
 
-            var totalCost = batches.Sum(b => b.Quantity * b.UnitCost);
-            var totalQuantity = batches.Sum(b => b.Quantity);
+            var totalCost = batches.Sum(b => b.QuantityRemaining * b.UnitCost);
+            var totalQuantity = batches.Sum(b => b.QuantityRemaining);
 
             if (totalQuantity == 0)
                 return Result<decimal>.Success(0m);
@@ -75,7 +75,7 @@ public class ProductCostService : IProductCostService
                 return Result<List<FifoLayerDto>>.Failure("الكمية يجب أن تكون أكبر من الصفر");
 
             var batches = await _uow.InventoryBatches.ToListAsync(
-                b => b.ProductId == productId && b.Quantity > 0,
+                b => b.ProductId == productId && b.QuantityRemaining > 0,
                 q => q.OrderBy(b => b.CreatedAt),
                 ct);
 
@@ -93,12 +93,12 @@ public class ProductCostService : IProductCostService
                 if (remaining <= 0)
                     break;
 
-                var consumed = Math.Min(batch.Quantity, remaining);
+                var consumed = Math.Min(batch.QuantityRemaining, remaining);
                 var totalCost = Math.Round(consumed * batch.UnitCost, 2);
 
                 layers.Add(new FifoLayerDto(
                     BatchId: batch.Id,
-                    BatchNo: batch.BatchNo,
+                    BatchNo: batch.BatchNo.ToString(),
                     QuantityConsumed: consumed,
                     UnitCost: batch.UnitCost,
                     TotalCost: totalCost
@@ -140,7 +140,7 @@ public class ProductCostService : IProductCostService
 
             // Check if we have filtered queries on Id order — use AnyAsync first for fast check
             var hasBatches = await _uow.InventoryBatches.AnyAsync(
-                b => b.ProductId == productId && b.Quantity > 0, ct);
+                b => b.ProductId == productId && b.QuantityRemaining > 0, ct);
 
             if (!hasBatches)
             {
@@ -150,7 +150,7 @@ public class ProductCostService : IProductCostService
 
             // Get the most recent batch (by CreatedAt DESC) with non-zero quantity
             var latestBatches = await _uow.InventoryBatches.ToListAsync(
-                b => b.ProductId == productId && b.Quantity > 0,
+                b => b.ProductId == productId && b.QuantityRemaining > 0,
                 q => q.OrderByDescending(b => b.CreatedAt).Take(1),
                 ct);
 

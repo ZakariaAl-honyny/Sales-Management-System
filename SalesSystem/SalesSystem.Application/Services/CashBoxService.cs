@@ -16,6 +16,7 @@ namespace SalesSystem.Application.Services;
 /// Service for managing cash boxes and their associated receipt/payment vouchers.
 /// Handles CRUD, auto-account creation, voucher lifecycle, transfers, and
 /// invoice payment recording for the cash module.
+/// Schema §4.3 CashBoxes: lightweight register, balance tracked on linked Account.
 /// </summary>
 public class CashBoxService : ICashBoxService
 {
@@ -44,7 +45,7 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            var boxes = await _uow.CashBoxes.ToListAsync(ct, "Currency", "Account");
+            var boxes = await _uow.CashBoxes.ToListAsync(ct, "Account");
             var dtos = boxes.Select(MapToDto).ToList();
             return Result<List<CashBoxDto>>.Success(dtos);
         }
@@ -60,7 +61,7 @@ public class CashBoxService : ICashBoxService
         try
         {
             var box = await _uow.CashBoxes.FirstOrDefaultAsync(
-                b => b.Id == id, ct, "Currency", "Account");
+                b => b.Id == id, ct, "Account");
             if (box == null)
                 return Result<CashBoxDto>.Failure("الصندوق النقدي غير موجود", ErrorCodes.NotFound);
 
@@ -77,48 +78,47 @@ public class CashBoxService : ICashBoxService
     {
         try
         {
-            // Validate required currency
-            if (!request.CurrencyId.HasValue || request.CurrencyId.Value <= 0)
-                return Result<CashBoxDto>.Failure("عملة الصندوق مطلوبة");
+            int accountId;
 
-            var currency = await _uow.Currencies.FirstOrDefaultAsync(
-                c => c.Id == request.CurrencyId.Value, ct);
-            if (currency == null)
-                return Result<CashBoxDto>.Failure("العملة المحددة غير موجودة", ErrorCodes.NotFound);
-
-            // Create the cash box domain entity
-            var box = CashBox.Create(
-                request.BoxName,
-                (short)request.CurrencyId.Value,
-                accountId: request.AccountId,
-                branchId: request.BranchId.HasValue ? (short)request.BranchId.Value : null,
-                categoryId: request.CategoryId,
-                assignedUserId: request.AssignedUserId,
-                phoneNumber: request.PhoneNumber,
-                taxNumber: request.TaxNumber,
-                address: request.Address,
-                notes: request.Notes);
-            box.SetCreatedBy(userId);
-
-            // Auto-create Chart of Accounts sub-account under "1110 — النقدية" if no AccountId provided
-            if (!box.AccountId.HasValue || box.AccountId.Value <= 0)
+            // Resolve the chart-of-accounts account: either use the provided AccountId
+            // or auto-create a Level-4 detail account under parent "1110 — النقدية".
+            if (request.AccountId.HasValue && request.AccountId.Value > 0)
             {
-                var accountResult = await CreateCashBoxAccountAsync(box.BoxName, userId, ct);
+                accountId = request.AccountId.Value;
+
+                var accountExists = await _uow.Accounts.AnyAsync(
+                    a => a.Id == accountId, ct);
+                if (!accountExists)
+                    return Result<CashBoxDto>.Failure(
+                        "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+            }
+            else
+            {
+                var accountResult = await CreateCashBoxAccountAsync(request.Name, userId, ct);
                 if (!accountResult.IsSuccess || accountResult.Value == null)
                     return Result<CashBoxDto>.Failure(
                         accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للصندوق");
-                box.SetAccountId(accountResult.Value.Id);
+
+                accountId = accountResult.Value.Id;
             }
+
+            // Create the cash box domain entity — AccountId is always resolved before this call
+            var box = CashBox.Create(
+                request.Name,
+                request.BranchId,
+                accountId,
+                description: request.Description,
+                createdByUserId: userId);
 
             await _uow.CashBoxes.AddAsync(box, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "CashBox created: {BoxName} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
-                box.BoxName, box.Id, box.AccountId, userId);
+                "CashBox created: {Name} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
+                box.Name, box.Id, box.AccountId, userId);
 
             var created = await _uow.CashBoxes.FirstOrDefaultAsync(
-                b => b.Id == box.Id, ct, "Currency", "Account");
+                b => b.Id == box.Id, ct, "Account");
             return Result<CashBoxDto>.Success(MapToDto(created!));
         }
         catch (DomainException ex)
@@ -138,38 +138,23 @@ public class CashBoxService : ICashBoxService
         try
         {
             var box = await _uow.CashBoxes.FirstOrDefaultAsync(
-                b => b.Id == id, ct, "Currency", "Account");
+                b => b.Id == id, ct, "Account");
             if (box == null)
                 return Result<CashBoxDto>.Failure("الصندوق النقدي غير موجود", ErrorCodes.NotFound);
 
-            if (!request.CurrencyId.HasValue || request.CurrencyId.Value <= 0)
-                return Result<CashBoxDto>.Failure("عملة الصندوق مطلوبة");
-
-            var currency = await _uow.Currencies.FirstOrDefaultAsync(
-                c => c.Id == request.CurrencyId.Value, ct);
-            if (currency == null)
-                return Result<CashBoxDto>.Failure("العملة المحددة غير موجودة", ErrorCodes.NotFound);
-
             box.Update(
-                request.BoxName,
-                request.PhoneNumber,
-                request.TaxNumber,
-                request.Address,
-                request.Notes,
-                request.BranchId.HasValue ? (short)request.BranchId.Value : null,
-                request.AssignedUserId,
-                (short)request.CurrencyId.Value,
-                categoryId: request.CategoryId);
-            box.SetUpdatedBy(userId);
+                request.Name,
+                request.BranchId,
+                description: request.Description);
 
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "CashBox updated: {BoxName} (ID: {Id}) by User {UserId}",
-                box.BoxName, id, userId);
+                "CashBox updated: {Name} (ID: {Id}) by User {UserId}",
+                box.Name, id, userId);
 
             var updated = await _uow.CashBoxes.FirstOrDefaultAsync(
-                b => b.Id == id, ct, "Currency", "Account");
+                b => b.Id == id, ct, "Account");
             return Result<CashBoxDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -195,7 +180,7 @@ public class CashBoxService : ICashBoxService
             box.MarkAsDeleted();
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("CashBox deactivated: {BoxName} (ID: {Id})", box.BoxName, id);
+            _logger.LogInformation("CashBox deactivated: {Name} (ID: {Id})", box.Name, id);
             return Result.Success();
         }
         catch (DomainException ex)
@@ -245,14 +230,14 @@ public class CashBoxService : ICashBoxService
             // Build journal entry: Dr CashBox Account / Cr Credited Account
             var box = await _uow.CashBoxes.FirstOrDefaultAsync(
                 b => b.Id == voucher.CashBoxId, ct, "Account");
-            if (box?.AccountId == null)
+            if (box == null)
                 return Result<ReceiptVoucherDto>.Failure(
-                    "الحساب المحاسبي للصندوق غير مهيأ");
+                    "الصندوق النقدي غير موجود");
 
-            var cashAccountId = box.AccountId.Value;
+            var cashAccountId = box.AccountId;
 
             var journalRequest = new CreateJournalEntryRequest(
-                TransactionDate: voucher.VoucherDate,
+                EntryDate: voucher.VoucherDate,
                 Description: $"قيد سند قبض رقم {voucher.VoucherNo}",
                 EntryType: JournalEntryType.CustomerReceipt,
                 ReferenceType: "ReceiptVoucher",
@@ -319,14 +304,14 @@ public class CashBoxService : ICashBoxService
             {
                 var box = await _uow.CashBoxes.FirstOrDefaultAsync(
                     b => b.Id == voucher.CashBoxId, ct, "Account");
-                if (box?.AccountId == null)
+                if (box == null)
                     return Result<ReceiptVoucherDto>.Failure(
-                        "الحساب المحاسبي للصندوق غير مهيأ");
+                        "الصندوق النقدي غير موجود");
 
-                var cashAccountId = box.AccountId.Value;
+                var cashAccountId = box.AccountId;
 
                 var reverseRequest = new CreateJournalEntryRequest(
-                    TransactionDate: DateTime.UtcNow,
+                    EntryDate: DateTime.UtcNow,
                     Description: $"قيد عكس سند قبض رقم {voucher.VoucherNo}",
                     EntryType: JournalEntryType.Manual,
                     ReferenceType: "ReceiptVoucher",
@@ -418,8 +403,6 @@ public class CashBoxService : ICashBoxService
             request.AccountId,
             request.TotalAmount,
             request.Notes,
-            request.SourceDocumentId,
-            request.SourceDocumentType,
             userId,
             ct);
     }
@@ -440,14 +423,14 @@ public class CashBoxService : ICashBoxService
             // Build journal entry: Dr Debited Account / Cr CashBox Account
             var box = await _uow.CashBoxes.FirstOrDefaultAsync(
                 b => b.Id == voucher.CashBoxId, ct, "Account");
-            if (box?.AccountId == null)
+            if (box == null)
                 return Result<PaymentVoucherDto>.Failure(
-                    "الحساب المحاسبي للصندوق غير مهيأ");
+                    "الصندوق النقدي غير موجود");
 
-            var cashAccountId = box.AccountId.Value;
+            var cashAccountId = box.AccountId;
 
             var journalRequest = new CreateJournalEntryRequest(
-                TransactionDate: voucher.VoucherDate,
+                EntryDate: voucher.VoucherDate,
                 Description: $"قيد سند صرف رقم {voucher.VoucherNo}",
                 EntryType: JournalEntryType.SupplierPayment,
                 ReferenceType: "PaymentVoucher",
@@ -514,14 +497,14 @@ public class CashBoxService : ICashBoxService
             {
                 var box = await _uow.CashBoxes.FirstOrDefaultAsync(
                     b => b.Id == voucher.CashBoxId, ct, "Account");
-                if (box?.AccountId == null)
+                if (box == null)
                     return Result<PaymentVoucherDto>.Failure(
-                        "الحساب المحاسبي للصندوق غير مهيأ");
+                        "الصندوق النقدي غير موجود");
 
-                var cashAccountId = box.AccountId.Value;
+                var cashAccountId = box.AccountId;
 
                 var reverseRequest = new CreateJournalEntryRequest(
-                    TransactionDate: DateTime.UtcNow,
+                    EntryDate: DateTime.UtcNow,
                     Description: $"قيد عكس سند صرف رقم {voucher.VoucherNo}",
                     EntryType: JournalEntryType.Manual,
                     ReferenceType: "PaymentVoucher",
@@ -625,12 +608,6 @@ public class CashBoxService : ICashBoxService
             if (destBox == null)
                 return Result.Failure("صندوق الوجهة غير موجود", ErrorCodes.NotFound);
 
-            if (sourceBox.AccountId == null)
-                return Result.Failure("الحساب المحاسبي لصندوق المصدر غير مهيأ");
-
-            if (destBox.AccountId == null)
-                return Result.Failure("الحساب المحاسبي لصندوق الوجهة غير مهيأ");
-
             // Execute transfer atomically within a single transaction
             await _uow.ExecuteTransactionAsync(async () =>
             {
@@ -638,12 +615,10 @@ public class CashBoxService : ICashBoxService
                 var paymentResult = await CreatePaymentVoucherInternalAsync(
                     request.SourceCashBoxId,
                     request.CurrencyId,
-                    destBox.AccountId!.Value,
+                    destBox.AccountId,
                     request.Amount,
-                    $"تحويل إلى {destBox.BoxName}" +
+                    $"تحويل إلى {destBox.Name}" +
                         (string.IsNullOrWhiteSpace(request.Notes) ? "" : $" - {request.Notes}"),
-                    null,
-                    null,
                     userId,
                     ct);
 
@@ -655,9 +630,9 @@ public class CashBoxService : ICashBoxService
                 var receiptResult = await CreateReceiptVoucherInternalAsync(
                     request.DestinationCashBoxId,
                     request.CurrencyId,
-                    sourceBox.AccountId!.Value,
+                    sourceBox.AccountId,
                     request.Amount,
-                    $"تحويل من {sourceBox.BoxName}" +
+                    $"تحويل من {sourceBox.Name}" +
                         (string.IsNullOrWhiteSpace(request.Notes) ? "" : $" - {request.Notes}"),
                     null,
                     null,
@@ -720,13 +695,12 @@ public class CashBoxService : ICashBoxService
 
     public async Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(
         int cashBoxId, short currencyId, decimal amount, int accountId,
-        string? notes = null, int? sourceDocumentId = null,
-        string? sourceDocumentType = null, int userId = 0,
+        string? notes = null, int userId = 0,
         CancellationToken ct = default)
     {
         return await CreatePaymentVoucherInternalAsync(
             cashBoxId, currencyId, accountId, amount, notes,
-            sourceDocumentId, sourceDocumentType, userId, ct);
+            userId, ct);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -752,7 +726,7 @@ public class CashBoxService : ICashBoxService
 
             // Find max child code under parent to auto-increment
             var children = await _uow.Accounts.ToListAsync(
-                a => a.ParentAccountId == parent.Id,
+                a => a.ParentId == parent.Id,
                 q => q.OrderByDescending(a => a.AccountCode),
                 ct: ct);
 
@@ -765,16 +739,11 @@ public class CashBoxService : ICashBoxService
                 accountCode: newCode,
                 nameAr: $"صندوق {boxName}",
                 nameEn: $"Cash Box {boxName}",
-                accountType: AccountType.Asset,
-                level: 4,
-                parentAccountId: parent.Id,
-                isSystemAccount: false,
-                description: $"حساب الصندوق النقدي: {boxName}",
-                colorCode: "#2196F3",
-                allowTransactions: true,
-                openingBalance: 0,
-                explanation: null,
-                notes: null,
+                nature: (byte)AccountType.Asset,
+                isLeaf: true,
+                parentId: parent.Id,
+                isSystem: false,
+                categoryId: null,
                 createdByUserId: userId);
 
             await _uow.Accounts.AddAsync(account, ct);
@@ -847,8 +816,7 @@ public class CashBoxService : ICashBoxService
 
     private async Task<Result<PaymentVoucherDto>> CreatePaymentVoucherInternalAsync(
         int cashBoxId, short currencyId, int accountId, decimal amount,
-        string? notes, int? sourceDocumentId, string? sourceDocumentType,
-        int userId, CancellationToken ct)
+        string? notes, int userId, CancellationToken ct)
     {
         try
         {
@@ -865,8 +833,6 @@ public class CashBoxService : ICashBoxService
                 accountId,
                 amount,
                 notes,
-                sourceDocumentId,
-                sourceDocumentType,
                 userId);
 
             await _uow.PaymentVouchers.AddAsync(voucher, ct);
@@ -917,20 +883,13 @@ public class CashBoxService : ICashBoxService
     {
         return new CashBoxDto(
             box.Id,
-            box.BoxName,
+            box.Name,
             box.AccountId,
             box.Account?.NameAr,
-            box.CategoryId,
-            null,   // CategoryName
-            box.BranchId.HasValue ? (int)box.BranchId.Value : null,
-            box.CurrencyId,
-            box.Currency?.Name,
-            box.Currency?.Code,
-            box.AssignedUserId,
-            box.PhoneNumber,
-            box.TaxNumber,
-            box.Address,
-            box.Notes,
+            box.Account?.AccountCode,
+            box.BranchId,
+            null,   // BranchName (future: load from Branches table)
+            box.Description,
             box.IsActive
         );
     }
@@ -945,7 +904,7 @@ public class CashBoxService : ICashBoxService
             voucher.Currency?.Name,
             voucher.Currency?.Code,
             voucher.CashBoxId,
-            voucher.CashBox?.BoxName,
+            voucher.CashBox?.Name,
             voucher.AccountId,
             voucher.Account?.NameAr,
             voucher.TotalAmount,
@@ -967,14 +926,12 @@ public class CashBoxService : ICashBoxService
             voucher.Currency?.Name,
             voucher.Currency?.Code,
             voucher.CashBoxId,
-            voucher.CashBox?.BoxName,
+            voucher.CashBox?.Name,
             voucher.AccountId,
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
             voucher.Status,
-            voucher.SourceDocumentId,
-            voucher.SourceDocumentType,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt

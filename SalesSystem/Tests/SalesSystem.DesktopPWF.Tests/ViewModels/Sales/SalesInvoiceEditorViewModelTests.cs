@@ -606,11 +606,11 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         // Setup empty collections to avoid null references
         var customers = new List<CustomerDto>
         {
-            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, CreditLimit: 0, IsActive: true, AccountId: 1)
+            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, CreditLimit: 0, IsActive: true, PartyId: 1, AccountId: 1)
         };
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Code: "", Name: "مستودع 1", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "������ 1", Phone: null, Address: null, Notes: null, IsActive: true)
         };
         var products = SetupProducts();
 
@@ -633,9 +633,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 ReorderLevel: 10,
                 TrackExpiry: false,
                 ImagePath: null,
-                Notes: null,
-                DefaultPurchaseUnitId: null,
-                DefaultSalesUnitId: null,
                 IsActive: true),
             new ProductDto(
                 Id: 2,
@@ -647,12 +644,13 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 ReorderLevel: 5,
                 TrackExpiry: false,
                 ImagePath: null,
-                Notes: null,
-                DefaultPurchaseUnitId: null,
-                DefaultSalesUnitId: null,
                 IsActive: true)
         };
     }
 
     #endregion
 }
+
+
+
+

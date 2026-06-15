@@ -9,40 +9,31 @@ public class CashBoxTests
     [Fact]
     public void Create_ValidInput_SetsProperties()
     {
-        var box = CashBox.Create("Test Box", accountId: 1, currencyId: 1, phoneNumber: "0501234567");
-        Assert.Equal("Test Box", box.BoxName);
+        var box = CashBox.Create("Test Box", branchId: (short)1, accountId: 1, description: "0501234567");
+        Assert.Equal("Test Box", box.Name);
         Assert.Equal(1, box.AccountId);
-        Assert.Equal((short)1, box.CurrencyId);
-        Assert.Equal("0501234567", box.PhoneNumber);
+        Assert.Equal((short)1, box.BranchId);
+        Assert.Equal("0501234567", box.Description);
         Assert.True(box.IsActive);
     }
 
     [Fact]
     public void Create_EmptyName_ShouldThrow()
     {
-        Assert.Throws<DomainException>(() => CashBox.Create("", accountId: 1, currencyId: 1));
+        Assert.Throws<DomainException>(() => CashBox.Create("", branchId: (short)1, accountId: 1));
     }
 
     [Fact]
-    public void Create_AccountIdZero_ShouldSucceed_ValidationDeferredToSetAccountId()
+    public void Create_AccountIdZero_ShouldThrow()
     {
-        // AccountId is nullable during creation — validation happens in SetAccountId
-        var box = CashBox.Create("Test Box", currencyId: 1, accountId: 0);
-        Assert.NotNull(box);
-        Assert.Equal(0, box.AccountId);
+        // AccountId <= 0 is now validated in Create()
+        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", branchId: (short)1, accountId: 0));
     }
 
     [Fact]
-    public void SetAccountId_Zero_ShouldThrow()
+    public void Create_BranchIdZero_ShouldThrow()
     {
-        var box = CashBox.Create("Test Box", currencyId: 1);
-        Assert.Throws<DomainException>(() => box.SetAccountId(0));
-    }
-
-    [Fact]
-    public void Create_CurrencyIdZero_ShouldThrow()
-    {
-        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", accountId: 1, currencyId: 0));
+        Assert.Throws<DomainException>(() => CashBox.Create("Test Box", branchId: (short)0, accountId: 1));
     }
 
     [Fact]
@@ -50,52 +41,36 @@ public class CashBoxTests
     {
         var box = CashBox.Create(
             "Box Name",
-            accountId: 1,
-            currencyId: 1,
             branchId: (short)2,
-            assignedUserId: 3,
-            phoneNumber: "0555000111",
-            taxNumber: "TX12345",
-            address: "Riyadh",
-            notes: "Main cash box");
+            accountId: 1,
+            description: "Main cash box");
 
-        Assert.Equal("Box Name", box.BoxName);
+        Assert.Equal("Box Name", box.Name);
         Assert.Equal(1, box.AccountId);
         Assert.Equal((short)2, box.BranchId);
-        Assert.Equal(3, box.AssignedUserId);
-        Assert.Equal((short)1, box.CurrencyId);
-        Assert.Equal("0555000111", box.PhoneNumber);
-        Assert.Equal("TX12345", box.TaxNumber);
-        Assert.Equal("Riyadh", box.Address);
-        Assert.Equal("Main cash box", box.Notes);
+        Assert.Equal("Main cash box", box.Description);
     }
 
     [Fact]
-    public void ValidateUserAccess_AssignedToDifferentUser_ShouldThrow()
+    public void Update_ValidInput_UpdatesName()
     {
-        var box = CashBox.Create("صندوق المدير", accountId: 1, currencyId: 1, assignedUserId: 1);
-        Assert.Throws<DomainException>(() => box.ValidateUserAccess(2));
+        var box = CashBox.Create("Old Name", branchId: (short)1, accountId: 1);
+        box.Update("New Name", (short)1);
+        Assert.Equal("New Name", box.Name);
     }
 
     [Fact]
-    public void ValidateUserAccess_SharedBox_ShouldAllowAnyone()
+    public void Update_EmptyName_ShouldThrow()
     {
-        var box = CashBox.Create("صندوق مشترك", accountId: 1, currencyId: 1);
-        box.ValidateUserAccess(99); // Should not throw
+        var box = CashBox.Create("Old Name", branchId: (short)1, accountId: 1);
+        Assert.Throws<DomainException>(() => box.Update("", (short)1));
     }
 
     [Fact]
-    public void UpdateName_ValidInput_UpdatesName()
+    public void Update_ValidInput_UpdatesDescription()
     {
-        var box = CashBox.Create("Old Name", accountId: 1, currencyId: 1);
-        box.UpdateName("New Name");
-        Assert.Equal("New Name", box.BoxName);
-    }
-
-    [Fact]
-    public void UpdateName_EmptyName_ShouldThrow()
-    {
-        var box = CashBox.Create("Old Name", accountId: 1, currencyId: 1);
-        Assert.Throws<DomainException>(() => box.UpdateName(""));
+        var box = CashBox.Create("Name", branchId: (short)1, accountId: 1, description: "Old description");
+        box.Update("Name", (short)1, "New description");
+        Assert.Equal("New description", box.Description);
     }
 }

@@ -12,7 +12,7 @@ public class CreateSalesReturnValidator : AbstractValidator<CreateSalesReturnReq
             .WithMessage("رقم فاتورة البيع غير صحيح");
 
         RuleFor(x => x.WarehouseId)
-            .GreaterThan(0).WithMessage("يجب اختيار المستودع");
+            .Must(id => id > 0).WithMessage("يجب اختيار المستودع");
 
         RuleFor(x => x.ReturnDate)
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.ReturnDate.HasValue)

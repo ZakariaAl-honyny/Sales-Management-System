@@ -38,7 +38,7 @@ public class SupplierPaymentService : ISupplierPaymentService
             if (!seqResult.IsSuccess)
                 return Result<SupplierPaymentDto>.Failure(seqResult.Error ?? "فشل في توليد رقم السداد");
 
-            var paymentNo = seqResult.Value.ToString();
+            var paymentNo = seqResult.Value;
 
             // Validate supplier exists
             var supplier = await _uow.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId, ct, "Party");
@@ -48,11 +48,11 @@ public class SupplierPaymentService : ISupplierPaymentService
             var payment = SupplierPayment.Create(
                 paymentNo: paymentNo,
                 supplierId: request.SupplierId,
+                cashBoxId: request.CashBoxId ?? 0,
+                currencyId: request.CurrencyId,
                 amount: request.Amount,
                 paymentMethod: (PaymentMethod)request.PaymentMethod,
-                purchaseInvoiceId: request.PurchaseInvoiceId,
                 notes: request.Notes,
-                cashBoxId: request.CashBoxId,
                 createdByUserId: userId,
                 paymentDate: request.PaymentDate);
 
@@ -82,9 +82,15 @@ public class SupplierPaymentService : ISupplierPaymentService
     {
         try
         {
+            // Pre-parse search for numeric matching (expression trees can't contain out vars)
+            int? searchPaymentNo = null;
+            if (!string.IsNullOrEmpty(search) && int.TryParse(search, out var parsedNo))
+                searchPaymentNo = parsedNo;
+
             var (items, totalCount) = await _uow.SupplierPayments.GetPagedAsync(
                 predicate: p =>
-                    (string.IsNullOrEmpty(search) || p.PaymentNo.Contains(search) ||
+                    (string.IsNullOrEmpty(search) ||
+                     (searchPaymentNo.HasValue && p.PaymentNo == searchPaymentNo.Value) ||
                      (p.Supplier != null && p.Supplier.Party != null && p.Supplier.Party.Name.Contains(search))) &&
                     (!from.HasValue || p.PaymentDate >= from.Value) &&
                     (!to.HasValue || p.PaymentDate <= to.Value),
@@ -141,7 +147,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 var amountChanged = Math.Abs(payment.Amount - request.Amount) > 0.0001m;
                 if (amountChanged)
                 {
-                    var supplierAccountId = payment.Supplier?.Party?.AccountId ?? 0;
+                    var supplierAccountId = payment.Supplier?.AccountId ?? 0;
                     var supplierName = payment.Supplier?.Party?.Name ?? "";
 
                     var oldAmount = payment.Amount;
@@ -267,7 +273,7 @@ public class SupplierPaymentService : ISupplierPaymentService
             // If already posted, reverse the journal entry first
             if (payment.Status == InvoiceStatus.Posted)
             {
-                var supplierAccountId = payment.Supplier?.Party?.AccountId ?? 0;
+                var supplierAccountId = payment.Supplier?.AccountId ?? 0;
                 var supplierName = payment.Supplier?.Party?.Name ?? "";
                 var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
                     payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
@@ -309,7 +315,7 @@ public class SupplierPaymentService : ISupplierPaymentService
             // If already posted, reverse the journal entry first
             if (payment.Status == InvoiceStatus.Posted)
             {
-                var supplierAccountId = payment.Supplier?.Party?.AccountId ?? 0;
+                var supplierAccountId = payment.Supplier?.AccountId ?? 0;
                 var supplierName = payment.Supplier?.Party?.Name ?? "";
                 var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
                     payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
@@ -336,15 +342,15 @@ public class SupplierPaymentService : ISupplierPaymentService
     {
         return new SupplierPaymentDto(
             payment.Id,
-            payment.PaymentNo,
+            payment.PaymentNo.ToString(),
             payment.SupplierId,
             supplier?.Party?.Name ?? string.Empty,
             payment.Amount,
             (byte)payment.PaymentMethod,
-            payment.CurrencyId,
-            payment.ExchangeRate,
+            (int?)payment.CurrencyId,
+            null,  // ExchangeRate not on SupplierPayment entity
             payment.PaymentDate,
-            payment.PurchaseInvoiceId,
+            null,  // PurchaseInvoiceId not on SupplierPayment entity
             payment.Notes);
     }
 }

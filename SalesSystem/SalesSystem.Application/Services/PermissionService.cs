@@ -61,7 +61,7 @@ public class PermissionService : IPermissionService
             foreach (Domain.Enums.UserRole role in Enum.GetValues<Domain.Enums.UserRole>())
             {
                 if (role == 0) continue; // Skip undefined
-                var roleId = (int)role;
+                var roleId = (short)role;
                 result[role] = rolePermissions
                     .Where(rp => rp.RoleId == roleId && rp.Permission.IsActive)
                     .Select(rp => rp.PermissionId)
@@ -84,7 +84,7 @@ public class PermissionService : IPermissionService
         try
         {
             // 1. Get existing role permissions (read — outside transaction)
-            var roleId = (int)role;
+            var roleId = (short)role;
             var existing = await _uow.RolePermissions.ToListAsync(
                 rp => rp.RoleId == roleId,
                 ct: ct);
@@ -103,7 +103,7 @@ public class PermissionService : IPermissionService
 
                 foreach (var permissionId in toAdd)
                 {
-                    var rp = RolePermission.Create((int)role, permissionId);
+                    var rp = RolePermission.Create((short)role, permissionId);
                     await _uow.RolePermissions.AddAsync(rp, ct);
                 }
 

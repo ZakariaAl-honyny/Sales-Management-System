@@ -4,16 +4,12 @@ public record CreateCurrencyRequest(
     string Name,
     string Code,
     string Symbol,
-    decimal ExchangeRateToBase,
-    bool IsBaseCurrency,
-    string? FractionName,
+    bool IsBaseCurrency = false,
+    string? FractionName = null,
     int DecimalPlaces = 2);
 
 public record UpdateCurrencyRequest(
     string Name,
     string Symbol,
-    decimal ExchangeRateToBase,
-    string? FractionName,
+    string? FractionName = null,
     int DecimalPlaces = 2);
-
-public record UpdateExchangeRateRequest(decimal NewRate);

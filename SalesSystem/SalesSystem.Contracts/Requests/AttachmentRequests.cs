@@ -1,7 +1,6 @@
 namespace SalesSystem.Contracts.Requests;
 
 public record CreateAttachmentRequest(
-    int EntityType,
     string ReferenceType,
     int ReferenceId,
     string FileName,

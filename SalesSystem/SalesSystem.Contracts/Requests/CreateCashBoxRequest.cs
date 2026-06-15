@@ -1,13 +1,15 @@
+using System.Text.Json.Serialization;
+
 namespace SalesSystem.Contracts.Requests;
 
+/// <summary>
+/// Request to create a new cash box.
+/// AccountId is nullable — when null or 0, the service auto-creates a linked
+/// chart-of-accounts account before constructing the entity.
+/// </summary>
 public record CreateCashBoxRequest(
-    string BoxName,
-    int? AccountId,          // null = auto-create under Cash & Cash Equivalents (1110)
-    int? CategoryId,
-    int? BranchId,
-    int? AssignedUserId,
-    int? CurrencyId,
-    string? PhoneNumber,
-    string? TaxNumber,
-    string? Address,
-    string? Notes);
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("accountId")] int? AccountId,
+    [property: JsonPropertyName("branchId")] short BranchId,
+    [property: JsonPropertyName("description")] string? Description = null
+);

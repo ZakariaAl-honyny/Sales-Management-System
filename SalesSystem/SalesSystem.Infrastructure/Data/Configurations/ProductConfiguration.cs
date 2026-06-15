@@ -14,7 +14,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasKey(p => p.Id);
 
         // ─── String properties ──────────────────────────────
-        builder.Property(p => p.Name).IsRequired().HasMaxLength(150);
+        builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
         // Barcode is varchar(50) for ASCII-only barcodes — not nvarchar
         builder.Property(p => p.Barcode)
             .HasColumnType("varchar(50)")
@@ -22,23 +22,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .IsRequired(false)
             .HasComment("Primary barcode for quick lookup — ASCII-only, not a unique identifier");
         builder.Property(p => p.Description).HasMaxLength(500);
-        builder.Property(p => p.Notes).HasMaxLength(500);
         builder.Property(p => p.ImagePath).HasMaxLength(500);
-        builder.Property(p => p.DefaultPurchaseUnitId).HasColumnName("DefaultPurchaseUnitId").HasColumnType("smallint");
-        builder.Property(p => p.DefaultSalesUnitId).HasColumnName("DefaultSalesUnitId").HasColumnType("smallint");
-
-        // ─── Default unit FKs ──────────────────────────────────
-        builder.HasOne(p => p.DefaultPurchaseUnit)
-            .WithMany()
-            .HasForeignKey(p => p.DefaultPurchaseUnitId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
-
-        builder.HasOne(p => p.DefaultSalesUnit)
-            .WithMany()
-            .HasForeignKey(p => p.DefaultSalesUnitId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
 
         // ─── Numeric properties ─────────────────────────────
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
@@ -51,7 +35,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         // ─── Relationships ─────────────────────────────────────
         builder.HasOne(p => p.ProductCategory)
-            .WithMany(pc => pc.Products)
+            .WithMany()
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 

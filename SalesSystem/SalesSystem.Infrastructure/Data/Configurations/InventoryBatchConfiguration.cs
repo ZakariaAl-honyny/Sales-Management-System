@@ -6,7 +6,7 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 
 /// <summary>
 /// EF Core configuration for the <see cref="InventoryBatch"/> entity.
-/// WarehouseId is smallint FK; includes navigation to PurchaseInvoiceItem.
+/// WarehouseId is smallint FK; includes navigation to PurchaseInvoice.
 /// </summary>
 public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBatch>
 {
@@ -16,42 +16,43 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
         builder.HasKey(x => x.Id);
 
         // Properties
+        builder.Property(x => x.BatchNo).IsRequired();
         builder.Property(x => x.WarehouseId)
             .HasColumnType("smallint")
             .IsRequired()
             .HasComment("معرف المستودع (smallint FK)");
 
-        builder.Property(x => x.Quantity)
+        builder.Property(x => x.QuantityReceived)
             .HasPrecision(18, 3)
             .IsRequired()
-            .HasComment("الكمية الحالية في الدفعة");
+            .HasComment("الكمية المستلمة في الدفعة");
+
+        builder.Property(x => x.QuantityRemaining)
+            .HasPrecision(18, 3)
+            .IsRequired()
+            .HasComment("الكمية المتبقية في الدفعة");
 
         builder.Property(x => x.UnitCost)
             .HasPrecision(18, 2)
             .IsRequired()
             .HasComment("تكلفة الوحدة عند الشراء");
 
-        builder.Property(x => x.BatchNo)
-            .HasMaxLength(50)
+        builder.Property(x => x.SupplierBatchNo)
+            .HasMaxLength(100)
             .IsRequired(false)
-            .HasComment("رقم الدفعة / رقم التشغيلة");
-
-        builder.Property(x => x.ManufactureDate)
-            .IsRequired(false)
-            .HasComment("تاريخ التصنيع");
+            .HasComment("رقم الدفعة من المورد");
 
         builder.Property(x => x.ExpiryDate)
             .IsRequired(false)
             .HasComment("تاريخ انتهاء الصلاحية");
 
-        builder.Property(x => x.IsActive)
-            .HasDefaultValue(true);
-
         // CHECK constraints
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CHK_InventoryBatches_Quantity_NonNegative",
-                "[Quantity] >= 0");
+            t.HasCheckConstraint("CHK_InventoryBatches_QuantityReceived_NonNegative",
+                "[QuantityReceived] >= 0");
+            t.HasCheckConstraint("CHK_InventoryBatches_QuantityRemaining_NonNegative",
+                "[QuantityRemaining] >= 0");
             t.HasCheckConstraint("CHK_InventoryBatches_UnitCost_NonNegative",
                 "[UnitCost] >= 0");
         });
@@ -84,7 +85,7 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .HasDatabaseName("IX_InventoryBatches_ExpiryDate")
             .HasFilter("[ExpiryDate] IS NOT NULL");
 
-        // Global query filter — soft delete
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.HasIndex(x => x.PurchaseInvoiceId)
+            .HasDatabaseName("IX_InventoryBatches_PurchaseInvoiceId");
     }
 }

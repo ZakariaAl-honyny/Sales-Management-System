@@ -7,25 +7,16 @@ public class UpdateCashBoxRequestValidator : AbstractValidator<UpdateCashBoxRequ
 {
     public UpdateCashBoxRequestValidator()
     {
-        RuleFor(x => x.BoxName)
+        RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم الخزنة مطلوب")
-            .MaximumLength(100).WithMessage("اسم الخزنة لا يمكن أن يتجاوز 100 حرف")
-            .When(x => x.BoxName != null);
+            .MaximumLength(150).WithMessage("اسم الخزنة لا يمكن أن يتجاوز 150 حرف")
+            .When(x => !string.IsNullOrWhiteSpace(x.Name));
 
-        RuleFor(x => x.PhoneNumber)
-            .MaximumLength(20).When(x => x.PhoneNumber != null)
-            .WithMessage("رقم الجوال لا يمكن أن يتجاوز 20 رقم");
+        RuleFor(x => x.BranchId)
+            .GreaterThan((short)0).WithMessage("الفرع مطلوب");
 
-        RuleFor(x => x.TaxNumber)
-            .MaximumLength(50).When(x => x.TaxNumber != null)
-            .WithMessage("الرقم الضريبي لا يمكن أن يتجاوز 50 حرف");
-
-        RuleFor(x => x.Address)
-            .MaximumLength(500).When(x => x.Address != null)
-            .WithMessage("العنوان لا يمكن أن يتجاوز 500 حرف");
-
-        RuleFor(x => x.Notes)
-            .MaximumLength(500).When(x => x.Notes != null)
-            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
+        RuleFor(x => x.Description)
+            .MaximumLength(300).When(x => x.Description != null)
+            .WithMessage("الوصف لا يمكن أن يتجاوز 300 حرف");
     }
 }

@@ -40,11 +40,6 @@ public class Notification : AuditableEntity
     public bool IsRead { get; private set; }
 
     /// <summary>
-    /// Target recipient type: User = 1, Role = 2, Branch = 3.
-    /// </summary>
-    public byte RecipientType { get; private set; }
-
-    /// <summary>
     /// Optional reference to a related entity type (e.g. "SalesInvoice").
     /// </summary>
     public string? ReferenceType { get; private set; }
@@ -53,11 +48,6 @@ public class Notification : AuditableEntity
     /// Optional FK to the related entity.
     /// </summary>
     public int? ReferenceId { get; private set; }
-
-    /// <summary>
-    /// When the user read this notification. Null until read.
-    /// </summary>
-    public DateTime? ReadAt { get; private set; }
 
     private Notification() { } // EF Core
 
@@ -68,7 +58,6 @@ public class Notification : AuditableEntity
     /// <param name="type">Notification type code.</param>
     /// <param name="title">Short notification title (required, non-empty).</param>
     /// <param name="message">Full notification message (required, non-empty).</param>
-    /// <param name="recipientType">Target recipient type: User = 1, Role = 2, Branch = 3. Defaults to User.</param>
     /// <param name="referenceType">Optional reference entity type (e.g. "SalesInvoice").</param>
     /// <param name="referenceId">Optional FK to the referenced entity.</param>
     /// <returns>A new Notification instance.</returns>
@@ -78,7 +67,6 @@ public class Notification : AuditableEntity
         byte type,
         string title,
         string message,
-        byte recipientType = 1,
         string? referenceType = null,
         int? referenceId = null)
     {
@@ -88,8 +76,6 @@ public class Notification : AuditableEntity
             throw new DomainException("عنوان الإشعار مطلوب.");
         if (string.IsNullOrWhiteSpace(message))
             throw new DomainException("نص الإشعار مطلوب.");
-        if (recipientType < 1 || recipientType > 3)
-            throw new DomainException("نوع المستلم غير صالح. القيم المسموحة: User=1, Role=2, Branch=3.");
         if (referenceId.HasValue && string.IsNullOrWhiteSpace(referenceType))
             throw new DomainException("نوع المرجع مطلوب عند تحديد معرّف المرجع.");
 
@@ -100,7 +86,6 @@ public class Notification : AuditableEntity
             Title = title.Trim(),
             Message = message.Trim(),
             IsRead = false,
-            RecipientType = recipientType,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId
         };
@@ -108,28 +93,24 @@ public class Notification : AuditableEntity
 
     /// <summary>
     /// Marks this notification as read. Idempotent — safe to call multiple times.
-    /// Sets ReadAt to the current UTC time on first read.
     /// </summary>
     public void MarkAsRead()
     {
         if (!IsRead)
         {
             IsRead = true;
-            ReadAt = DateTime.UtcNow;
             UpdateTimestamp();
         }
     }
 
     /// <summary>
     /// Marks this notification as unread. Idempotent — safe to call multiple times.
-    /// Clears ReadAt.
     /// </summary>
     public void MarkAsUnread()
     {
         if (IsRead)
         {
             IsRead = false;
-            ReadAt = null;
             UpdateTimestamp();
         }
     }

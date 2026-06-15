@@ -15,7 +15,6 @@ public class PurchaseInvoiceTests
             warehouseId: 1,
             invoiceNo: 1,
             invoiceDate: new DateTime(2027, 1, 1),
-            dueDate: new DateOnly(2027, 1, 31),
             paymentType: PaymentType.Cash,
             discountAmount: 0,
             notes: "Test invoice",
@@ -65,18 +64,18 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item1 = PurchaseInvoiceItem.Create(
+        var item1 = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 2,
-            unitCost: 100m
+            unitPrice: 100m
         );
 
-        var item2 = PurchaseInvoiceItem.Create(
+        var item2 = PurchaseInvoiceLine.Create(
             productId: 2,
             productUnitId: 1,
             quantity: 3,
-            unitCost: 50m
+            unitPrice: 50m
         );
 
         invoice.AddItem(item1);
@@ -96,8 +95,8 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item1 = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 2, unitCost: 100m);
-        var item2 = PurchaseInvoiceItem.Create(productId: 2, productUnitId: 1, quantity: 1, unitCost: 50m);
+        var item1 = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 2, unitPrice: 100m);
+        var item2 = PurchaseInvoiceLine.Create(productId: 2, productUnitId: 1, quantity: 1, unitPrice: 50m);
 
         invoice.AddItem(item1);
         invoice.AddItem(item2);
@@ -117,7 +116,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -137,7 +136,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -158,11 +157,11 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 2,
-            unitCost: 100m
+            unitPrice: 100m
         );
         invoice.AddItem(item);
         invoice.SetTaxAmount(30m);
@@ -183,11 +182,11 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 1,
-            unitCost: 100m
+            unitPrice: 100m
         );
         invoice.AddItem(item);
         invoice.Post();
@@ -208,7 +207,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -228,7 +227,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
         invoice.SetTaxAmount(20m);
@@ -265,7 +264,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
 
         invoice.Post();
@@ -299,7 +298,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -319,7 +318,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -338,7 +337,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
         invoice.Cancel();
@@ -359,7 +358,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
         invoice.SetPaidAmount(100m);
@@ -380,7 +379,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 2, unitCost: 100m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 2, unitPrice: 100m);
         invoice.AddItem(item);
 
         invoice.UpdateTotals(discountAmount: 50m, taxAmount: 30m);
@@ -401,7 +400,7 @@ public class PurchaseInvoiceTests
             createdByUserId: 1
         );
 
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 1, unitCost: 500m);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 1, unitPrice: 500m);
         invoice.AddItem(item);
         invoice.SetTaxAmount(60m);
 

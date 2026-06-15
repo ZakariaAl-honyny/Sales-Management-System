@@ -155,14 +155,14 @@
 
 ---
 
-## GAP-011 🟠 HIGH — SalesInvoiceItemDto missing `SaleMode` and `ProductUnitId`
+## GAP-011 🟠 HIGH — SalesInvoiceLineDto missing `SaleMode` and `ProductUnitId`
 
 | Field | Detail |
 |-------|--------|
 | **Location** | Lines 3121-3128 |
-| **Current Text** | `SalesInvoiceItemDto` has: ProductId, ProductName, Quantity, UnitPrice, DiscountAmount, LineTotal — NO `SaleMode`, NO `ProductUnitId` |
+| **Current Text** | `SalesInvoiceLineDto` has: ProductId, ProductName, Quantity, UnitPrice, DiscountAmount, LineTotal — NO `SaleMode`, NO `ProductUnitId` |
 | **Why** | v4.3 introduced per-unit pricing and SaleMode (Retail/Wholesale). The DTO must carry these to support different pricing strategies. |
-| **Fix** | Add `int? ProductUnitId` and `string SaleMode` (or `int SaleMode`) to `SalesInvoiceItemDto` |
+| **Fix** | Add `int? ProductUnitId` and `string SaleMode` (or `int SaleMode`) to `SalesInvoiceLineDto` |
 | **References** | AGENTS.md RULE-049, RULE-065 |
 
 ---
@@ -400,7 +400,7 @@
 | | - `Product.TrackBatch` field |
 | | - `Product.TrackExpiry` field |
 | | - `InventoryMovements.BatchId` field |
-| | - `SalesInvoiceItem.BatchId` / `PurchaseInvoiceItem.BatchId` fields |
+| | - `SalesInvoiceLine.BatchId` / `PurchaseInvoiceLine.BatchId` fields |
 | **Why** | FEFO/FIFO was discussed in Analysis Part 3 (lines 1748-1784) and EnableFefo is seeded (line 6211) but no batch tracking entities were ever defined in the PRD |
 | **Fix** | Add InventoryBatch entity with fields: Id, ProductId, WarehouseId, BatchNo, ExpiryDate, Quantity, Cost, CreatedAt. Add BatchId FK to inventory movement and invoice item tables. |
 | **References** | Analysis Part 3 lines 1748-1784 |
@@ -669,12 +669,12 @@
 
 ---
 
-## GAP-053 🟡 MEDIUM — `SaleMode` and `ProductUnitId` missing from SalesInvoiceItem
+## GAP-053 🟡 MEDIUM — `SaleMode` and `ProductUnitId` missing from SalesInvoiceLine
 
 | Field | Detail |
 |-------|--------|
 | **Location** | Lines 1271-1280 (schema), 1774-1783 (SQL) |
-| **Current Text** | SalesInvoiceItem has: SalesInvoiceItemId, SalesInvoiceId, ProductId, Quantity, UnitPrice, DiscountAmount, LineTotal — NO `SaleMode`, NO `ProductUnitId` |
+| **Current Text** | SalesInvoiceLine has: SalesInvoiceLineId, SalesInvoiceId, ProductId, Quantity, UnitPrice, DiscountAmount, LineTotal — NO `SaleMode`, NO `ProductUnitId` |
 | **Fix** | Add `SaleMode tinyint not null default 1`, `ProductUnitId int null FK → ProductUnits(Id)` |
 | **References** | AGENTS.md RULE-049 |
 
@@ -706,7 +706,7 @@
 | Field | Detail |
 |-------|--------|
 | **Location** | Lines 3102-3128 |
-| **Current Text** | Only SalesInvoiceDto defined. No PurchaseInvoiceDto, PurchaseInvoiceItemDto, SalesReturnDto, PurchaseReturnDto in the contracts section. |
+| **Current Text** | Only SalesInvoiceDto defined. No PurchaseInvoiceDto, PurchaseInvoiceLineDto, SalesReturnDto, PurchaseReturnDto in the contracts section. |
 | **Fix** | Add all missing DTO definitions |
 
 ---
@@ -773,18 +773,18 @@
 
 ---
 
-## GAP-063 🟡 MEDIUM — `SalesInvoiceItem` missing `Notes` field
+## GAP-063 🟡 MEDIUM — `SalesInvoiceLine` missing `Notes` field
 
 | Field | Detail |
 |-------|--------|
 | **Location** | Lines 1271-1280, 1774-1783 |
-| **Current Text** | SalesInvoiceItem has NO Notes field |
-| **Problem** | PurchaseInvoiceItem has Notes (line 1240), SalesInvoiceItem should have the same |
-| **Fix** | Add `Notes nvarchar(250) null` to SalesInvoiceItem |
+| **Current Text** | SalesInvoiceLine has NO Notes field |
+| **Problem** | PurchaseInvoiceLine has Notes (line 1240), SalesInvoiceLine should have the same |
+| **Fix** | Add `Notes nvarchar(250) null` to SalesInvoiceLine |
 
 ---
 
-## GAP-064 🟡 MEDIUM — Missing `Cost` field in PurchaseInvoiceItem schema
+## GAP-064 🟡 MEDIUM — Missing `Cost` field in PurchaseInvoiceLine schema
 
 | Field | Detail |
 |-------|--------|
@@ -794,25 +794,25 @@
 
 ---
 
-## GAP-065 🟡 MEDIUM — `PurchaseInvoiceItem` missing `ProductUnitId`
+## GAP-065 🟡 MEDIUM — `PurchaseInvoiceLine` missing `ProductUnitId`
 
 | Field | Detail |
 |-------|--------|
 | **Location** | Lines 1232-1241 |
-| **Current Text** | PurchaseInvoiceItem has: PurchaseInvoiceItemId, PurchaseInvoiceId, ProductId, Quantity, UnitCost, DiscountAmount, LineTotal, Notes — NO `ProductUnitId` |
+| **Current Text** | PurchaseInvoiceLine has: PurchaseInvoiceLineId, PurchaseInvoiceId, ProductId, Quantity, UnitCost, DiscountAmount, LineTotal, Notes — NO `ProductUnitId` |
 | **Fix** | Add `ProductUnitId int null FK → ProductUnits(Id)` to link purchase line to specific unit |
 
 ---
 
-## GAP-066 🔵 LOW — `SalesInvoiceItem` SQL table uses `SalesInvoiceItemId` instead of `Id`
+## GAP-066 🔵 LOW — `SalesInvoiceLine` SQL table uses `SalesInvoiceLineId` instead of `Id`
 
 | Field | Detail |
 |-------|--------|
 | **Location** | Line 1776 |
-| **Current Text** | `SalesInvoiceItemId INT IDENTITY(1,1) NOT NULL` |
+| **Current Text** | `SalesInvoiceLineId INT IDENTITY(1,1) NOT NULL` |
 | **Problem** | All other entities use `Id` as PK name. This inconsistency breaks BaseEntity pattern. |
 | **Fix** | Change to `Id INT IDENTITY(1,1) NOT NULL` |
-| **Same issue** | PurchaseInvoiceItem (line 1740), PurchaseReturnItem (line 1851), SalesReturnItem (line 1882), StockTransferItem (line 1910) |
+| **Same issue** | PurchaseInvoiceLine (line 1740), PurchaseReturnItem (line 1851), SalesReturnItem (line 1882), StockTransferItem (line 1910) |
 
 ---
 
@@ -903,7 +903,7 @@
 | **P11** | GAP-018 | Add 20+ missing entities to entity summary |
 | **P12** | GAP-019 | Add missing entity fields (AccountId, TaxId, TrackExpiry, etc.) |
 | **P13** | GAP-010 | Add `InvoiceNo` to SalesInvoiceDto |
-| **P14** | GAP-011 | Add SaleMode + ProductUnitId to SalesInvoiceItemDto |
+| **P14** | GAP-011 | Add SaleMode + ProductUnitId to SalesInvoiceLineDto |
 | **P15** | GAP-012 | Add `int? InvoiceNo` to CreateSalesInvoiceRequest |
 | **P16** | GAP-014 | Remove DocumentSequences table or document limited scope |
 | **P17** | GAP-022 | Replace all decimal(18,4) with decimal(18,2) |
@@ -941,11 +941,11 @@
 | **P44** | GAP-049 | Fix duplicate Phase 18 numbering |
 | **P45** | GAP-050 | Add Phase 14 Product Lifecycle to Section 14 |
 | **P46** | GAP-052 | Add SupplierInvoiceNo to PurchaseInvoice |
-| **P47** | GAP-053 | Add SaleMode + ProductUnitId to SalesInvoiceItem |
+| **P47** | GAP-053 | Add SaleMode + ProductUnitId to SalesInvoiceLine |
 | **P48** | GAP-055 | Define InvoicePrintDto fully |
 | **P49** | GAP-056 | Add missing Purchase/SalesReturn DTOs |
 | **P50** | GAP-057 | Add RATE_LIMIT_EXCEEDED to ErrorCodes |
-| **P51** | GAP-065 | Add ProductUnitId to PurchaseInvoiceItem |
+| **P51** | GAP-065 | Add ProductUnitId to PurchaseInvoiceLine |
 
 ## 🔵 LOW — Fix when convenient (10 items)
 
@@ -953,7 +953,7 @@
 |----------|-----|---------|
 | **P52** | GAP-001 | Fix version header inconsistency |
 | **P53** | GAP-006 | Add PurchaseInvoice C# entity |
-| **P54** | GAP-066 | Fix SQL PK naming consistency (SalesInvoiceItemId → Id) |
+| **P54** | GAP-066 | Fix SQL PK naming consistency (SalesInvoiceLineId → Id) |
 | **P55** | GAP-068 | Add InvoiceTypePrint enum |
 | **P56** | GAP-069 | Add DeleteBehavior.Restrict rule |
 | **P57** | GAP-070 | Add CHECK constraints for PaidAmount |

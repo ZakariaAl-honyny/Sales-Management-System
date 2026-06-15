@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>v4.10.3 — Accounts.md Deep Review Complete: 43 Gaps Found, 8 Critical + 15 Major/Minor Fixed</em>
+  <em>v4.10.4 — Deep Review Complete: 42+ Structural Fixes, 0 Build Errors, 1,574 Passing Tests</em>
 </p>
 
 <p align="center">
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.3%20Accounts.md%20Deep%20Review%20Complete-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.4%20Deep%20Review%20Complete-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10.3%20%7C%20Accounts.md%20Deep%20Review%20Complete-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.4%20%7C%20Deep%20Review%20Complete-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -71,6 +71,7 @@ The API-first architecture is designed to support **future web and mobile client
 - 🐛 **FlexibleInputCalculator Fix (v4.10.2)**: `RecalculateFromFlexibleInput()` no longer calls `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (only for explicit LineTotal edits) — fixes incorrect auto-recalculation
 - 📦 **Inventory Operations Complete (v4.10.3)**: All 3 BLOCKER bugs fixed — TransactionNo auto-generation via DocumentSequenceService, InventoryAdjustment stock updates via IInventoryService (atomic + audit), InventoryCount creates single Adjustment per Post (not per line). Desktop ViewModels rewritten (InventoryAdjustmentEditor, InventoryCountEditor, WarehouseTransferEditor) — full INotifyDataErrorInfo, IDisposable, EventBus cleanup. AdjustmentType validator range fixed (1-3). ReportsController CancellationToken position fixed. **0 build errors across all 11 projects.**
 - 🔍 **Accounts.md Deep Review Complete (v4.10.3)**: Systematic review of `Accounts.md` against the full AGENTS.md constitution — **43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed**. CRITICAL fixes: ReportExportController stub elimination, Permission.cs alignment (21 flags vs Section 6 matrix), CanNavigate() deny-by-default security, IsAdvancedMode guard for org/accounting screens. Major/minor fixes: Keyboard shortcuts (F3/F4/F5/F8), InvoicePrintDto + FooterNote + return print endpoints, ThermalReceiptGenerator code page parameter, JWT `jti` claim + secret length validation, SecurityAudit production endpoint, composite index on JournalEntryLine(JournalEntryId, AccountId), orphaned ViewModel registration cleanup. **0 build errors maintained.**
+- 🏛️ **Complete Deep Review — All 8 Modules Aligned to Schema (v4.10.4)**: Exhaustive structural deep review of all 59 Domain entities + 60+ EF configurations against `docs/database-schema.md` — **42+ mismatches fixed across Core, Organization, Products, Accounting, Inventory, Sales, Purchases, and Infrastructure modules**. CRITICAL fixes: SalesReturn/PurchaseReturn base class corrected from `AuditableEntity` to `DocumentEntity` (missing Status lifecycle + PostedAt/CancelledAt timestamps), `[IsActive]` filter removed from ReceiptVoucher/PaymentVoucher indexes (would have caused SQL runtime crash), missing `BranchId` FK on Warehouse configuration, `HasConversion<byte>()` + `.HasColumnType("tinyint")` for all enum columns (was `int`), `.HasColumnType("date")` for all date columns (was default `datetime2`), bare `.WithMany()` shadow FK (`SupplierPaymentId1`) fixed, `HasConversion<int>()` → `HasConversion<byte>()` for enum properties, `.HasColumnType("tinyint")` for all enum columns, `AuditLog` index direction corrected. **Old database dropped, 3 previous migrations removed, fresh `InitialCreate_v2` migration generated and applied — clean schema with zero pending changes. Build: 0 errors, 0 warnings across all 10 projects. Test suite: 1,574 passed, 0 failed.**
 - 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
@@ -511,8 +512,8 @@ The following features are **not included** in the current MVP but are planned f
 | **Core** | Users, Units, Categories, Products, Warehouses, WarehouseStocks |
 | **Products** | ProductUnits (dynamic UOM), UnitBarcodes (unit-specific barcodes) |
 | **Trading Partners** | Customers, Suppliers |
-| **Purchases** | PurchaseInvoices, PurchaseInvoiceItems |
-| **Sales** | SalesInvoices, SalesInvoiceItems |
+| **Purchases** | PurchaseInvoices, PurchaseInvoiceLines |
+| **Sales** | SalesInvoices, SalesInvoiceLines |
 | **Returns** | PurchaseReturns, PurchaseReturnItems, SalesReturns, SalesReturnItems |
 | **Transfers** | StockTransfers, StockTransferItems |
 | **Payments** | CustomerPayments, SupplierPayments |

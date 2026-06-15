@@ -250,9 +250,7 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
             CashBoxId,
             AccountId,
             TotalAmount,
-            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-            null,  // SourceDocumentId
-            null); // SourceDocumentType
+            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim());
 
         var result = await _voucherService.CreateAsync(request);
 
@@ -275,9 +273,7 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
 
         var request = new UpdatePaymentVoucherRequest(
             VoucherDate,
-            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim(),
-            null,  // SourceDocumentId
-            null); // SourceDocumentType
+            string.IsNullOrWhiteSpace(Notes) ? null : Notes.Trim());
 
         var result = await _voucherService.UpdateAsync(_voucherId.Value, request);
 

@@ -283,7 +283,7 @@ public class JournalEntryEditorViewModel : ViewModelBase
         ErrorMessage = null;
 
         var request = new CreateJournalEntryRequest(
-            TransactionDate: _transactionDate,
+            EntryDate: _transactionDate,
             Description: _description.Trim(),
             EntryType: JournalEntryType.Manual,
             ReferenceType: null,
@@ -294,10 +294,7 @@ public class JournalEntryEditorViewModel : ViewModelBase
                 Debit: l.Debit,
                 Credit: l.Credit,
                 Description: l.Description?.Trim()
-            )).ToList(),
-            CurrencyId: null,
-            ExchangeRate: null,
-            AttachmentPath: null
+            )).ToList()
         );
 
         var result = await _journalEntryService.CreateAsync(request);

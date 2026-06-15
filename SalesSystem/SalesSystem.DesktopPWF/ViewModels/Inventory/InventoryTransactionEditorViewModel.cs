@@ -179,7 +179,7 @@ public class InventoryTransactionEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    ProductUnitId = product.DefaultPurchaseUnitId ?? 0, // Use purchase unit for inventory ops; 0 = service auto
+                    ProductUnitId = 0, // 0 = service auto
                     ProductUnitName = "حبة",
                     Quantity = 1,
                     UnitCost = 0m

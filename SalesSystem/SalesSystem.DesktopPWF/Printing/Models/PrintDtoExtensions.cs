@@ -33,18 +33,18 @@ public static class PrintDtoExtensions
                 index + 1,
                 item.ProductName,
                 item.Quantity,
-                item.Mode == 2 ? "جملة" : "تجزئة",
+                "تجزئة",
                 item.UnitPrice,
-                item.DiscountAmount,
+                0m,
                 item.LineTotal
             )).ToList(),
             new InvoiceTotalsPrintDto(
                 invoice.SubTotal,
                 invoice.DiscountAmount,
                 invoice.TaxAmount,
-                invoice.TotalAmount,
+                invoice.NetTotal,
                 invoice.PaidAmount,
-                invoice.DueAmount
+                invoice.RemainingAmount
             ),
             invoice.Notes,
             taxNumber
@@ -65,7 +65,7 @@ public static class PrintDtoExtensions
                 item.ProductName,
                 item.Quantity,
                 "مشتريات",
-                item.UnitCost,
+                item.UnitPrice,
                 0m,
                 item.LineTotal
             )).ToList(),

@@ -146,11 +146,6 @@
                                             Width="80" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
-                        <DataGridTextColumn Header="سعر الصرف" 
-                                            Binding="{Binding ExchangeRateToBase, StringFormat='{}{0:N2}'}" 
-                                            Width="120" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-
                         <DataGridTemplateColumn Header="أساسية" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

@@ -89,13 +89,10 @@ public class ProductService : IProductService
                 categoryId: request.CategoryId,
                 description: request.Description,
                 barcode: request.Barcode,
-                taxId: (short?)request.TaxId,
+                taxId: request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
-                imagePath: request.ImagePath,
-                notes: request.Notes,
-                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
-                defaultSalesUnitId: request.DefaultSalesUnitId
+                imagePath: request.ImagePath
             );
 
             // ─── Execute everything inside a transaction ───────────────────
@@ -129,13 +126,19 @@ public class ProductService : IProductService
                         ?? throw new InvalidOperationException(
                             "لا توجد مستودعات في النظام. يرجى إضافة مستودع أولاً.");
 
+                    // ── Generate batch number ──────────────────────────
+                    var batchSeqResult = await _documentSequenceService.GetNextIntAsync("InventoryBatch", ct);
+                    if (!batchSeqResult.IsSuccess)
+                        throw new InvalidOperationException(
+                            batchSeqResult.Error ?? "فشل في توليد رقم الدفعة.");
+
                     // ── Create InventoryBatch (OPENING) ────────────────
                     var batch = InventoryBatch.Create(
+                        batchNo: batchSeqResult.Value,
                         productId: product.Id,
                         warehouseId: (short)warehouse.Id,
-                        quantity: openingQuantity,
+                        quantityReceived: openingQuantity,
                         unitCost: openingUnitCost,
-                        batchNo: "OPENING",
                         expiryDate: request.OpeningExpiryDate);
                     await _uow.InventoryBatches.AddAsync(batch, ct);
 
@@ -145,15 +148,14 @@ public class ProductService : IProductService
 
                     if (existingStock != null)
                     {
-                        existingStock.UpdateAvgCost(openingQuantity, openingUnitCost);
+                        existingStock.IncreaseQuantity(openingQuantity);
                     }
                     else
                     {
                         var newStock = WarehouseStock.Create(
                             warehouseId: (short)warehouse.Id,
                             productId: product.Id,
-                            quantity: openingQuantity,
-                            avgCost: openingUnitCost);
+                            quantity: openingQuantity);
                         await _uow.WarehouseStocks.AddAsync(newStock, ct);
                     }
 
@@ -246,13 +248,10 @@ public class ProductService : IProductService
                 categoryId: request.CategoryId,
                 description: request.Description,
                 barcode: request.Barcode,
-                taxId: (short?)request.TaxId,
+                taxId: request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
-                imagePath: request.ImagePath,
-                notes: request.Notes,
-                defaultPurchaseUnitId: request.DefaultPurchaseUnitId,
-                defaultSalesUnitId: request.DefaultSalesUnitId
+                imagePath: request.ImagePath
             );
 
             if (request.IsActive != product.IsActive)
@@ -303,11 +302,11 @@ public class ProductService : IProductService
         if (product == null)
             return Result.Failure("المنتج غير موجود", ErrorCodes.NotFound);
 
-        var hasSalesItems = await _uow.SalesInvoiceItems.AnyAsync(i => i.ProductId == id, ct);
+        var hasSalesItems = await _uow.SalesInvoiceLines.AnyAsync(i => i.ProductId == id, ct);
         if (hasSalesItems)
             return Result.Failure("لا يمكن حذف المنتج نهائياً لأنه مرتبط بعمليات بيع");
 
-        var hasPurchaseItems = await _uow.PurchaseInvoiceItems.AnyAsync(i => i.ProductId == id, ct);
+        var hasPurchaseItems = await _uow.PurchaseInvoiceLines.AnyAsync(i => i.ProductId == id, ct);
         if (hasPurchaseItems)
             return Result.Failure("لا يمكن حذف المنتج نهائياً لأنه مرتبط بعمليات شراء");
 
@@ -365,9 +364,6 @@ public class ProductService : IProductService
             p.ReorderLevel,
             p.TrackExpiry,
             p.ImagePath,
-            p.Notes,
-            p.DefaultPurchaseUnitId,
-            p.DefaultSalesUnitId,
             p.IsActive
         );
     }

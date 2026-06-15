@@ -14,9 +14,8 @@ public class CustomerReceiptConfiguration : IEntityTypeConfiguration<CustomerRec
         builder.Property(r => r.ReceiptNo).IsRequired();
         builder.Property(r => r.ReceiptDate).IsRequired().HasColumnType("date");
         builder.Property(r => r.Amount).HasPrecision(18, 2).IsRequired();
-        builder.Property(r => r.Status).HasConversion<int>().IsRequired();
+        builder.Property(r => r.Status).HasConversion<byte>().IsRequired();
         builder.Property(r => r.Notes).HasMaxLength(500).IsRequired(false);
-        builder.Property(r => r.PostedAt).IsRequired(false);
 
         // FK to Customer
         builder.HasOne(r => r.Customer)

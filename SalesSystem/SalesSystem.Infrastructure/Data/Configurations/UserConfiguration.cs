@@ -32,6 +32,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LoginAttempts).IsRequired().HasDefaultValue(0);
         builder.Property(u => u.LastLoginAt).IsRequired(false);
 
+        // FK to Employee (optional)
+        builder.HasOne<Employee>()
+            .WithMany()
+            .HasForeignKey(u => u.EmployeeId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
         // Navigation: UserRoles (many-to-many via join table)
         builder.HasMany(u => u.UserRoles)
             .WithOne(ur => ur.User)

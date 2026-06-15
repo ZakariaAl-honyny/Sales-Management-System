@@ -876,7 +876,7 @@ All tasks include:
 |------|--------|
 | `Contracts/DTOs/AllDtos.cs` | Add `ProductProfitDto`, `ProductProfitLineDto`, `CustomerProfitDto`, `CustomerProfitLineDto`, `PeriodProfitDto`, `PeriodProfitLineDto` |
 | `Application/Interfaces/Services/IProfitAnalysisService.cs` | New |
-| `Application/Services/ProfitAnalysisService.cs` | Implement (cost from InvoiceItems + SalesInvoiceItems) |
+| `Application/Services/ProfitAnalysisService.cs` | Implement (cost from InvoiceItems + SalesInvoiceLines) |
 | `Api/Controllers/ProfitAnalysisController.cs` | New |
 | `Desktop` | 3 new VM + View pairs |
 

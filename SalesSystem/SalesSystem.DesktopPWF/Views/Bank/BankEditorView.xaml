@@ -35,23 +35,36 @@
                              helpers:FocusHelper.AdvanceOnEnter="True"
                              ToolTip="أدخل اسم البنك — هذا الحقل إلزامي"/>
 
-                    <!-- Account (auto-created if empty) -->
+                    <!-- Account (linked account info) -->
                     <TextBlock Text="الحساب المرتبط" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
-                    <TextBox Text="{Binding AccountName, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBox Text="{Binding AccountId, TargetNullValue='سيتم إنشاؤه تلقائياً'}"
                              Style="{StaticResource ModernTextBox}"
-                             Tag="اسم الحساب المحاسبي — يتم إنشاؤه تلقائياً أسفل البنوك"
+                             Tag="معرف الحساب المحاسبي"
                              TabIndex="2"
                              IsReadOnly="True"
                              ToolTip="الحساب المحاسبي المرتبط — يتم إنشاؤه تلقائياً تحت الحساب 1120 (البنوك) إذا لم يتم تحديده"/>
-                    <TextBlock Text="يتم إنشاء حساب محاسبي تلقائياً تحت الحساب الرئيسي (البنوك)" 
-                               Style="{StaticResource HelperTextStyle}"
-                               Margin="4,2,0,0"/>
+
+                    <!-- Account Number -->
+                    <TextBlock Text="رقم الحساب" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <TextBox Text="{Binding AccountNumber, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="رقم الحساب البنكي"
+                             TabIndex="3"
+                             ToolTip="رقم الحساب البنكي (اختياري)"/>
+
+                    <!-- IBAN -->
+                    <TextBlock Text="الآيبان (IBAN)" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
+                    <TextBox Text="{Binding Iban, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="الرقم الدولي للحساب (IBAN)"
+                             TabIndex="4"
+                             ToolTip="الرقم الدولي للحساب المصرفي — IBAN (اختياري)"/>
 
                     <!-- IsActive -->
                     <CheckBox Content="نشط" 
                               IsChecked="{Binding IsActive}"
                               Margin="4,16,0,0"
-                              TabIndex="3"
+                              TabIndex="5"
                               ToolTip="تفعيل أو إيقاف البنك"/>
                 </StackPanel>
             </Border>
@@ -64,7 +77,7 @@
                         Style="{StaticResource PrimaryButton}"
                         Width="120"
                         IsDefault="True"
-                        TabIndex="4"
+                        TabIndex="6"
                         Margin="0,0,12,0"
                         ToolTip="حفظ بيانات البنك">
                     <TextBlock Text="حفظ" VerticalAlignment="Center"/>
@@ -73,7 +86,7 @@
                         Command="{Binding CancelCommand}"
                         Style="{StaticResource SecondaryButton}"
                         Width="100"
-                        TabIndex="5"
+                        TabIndex="7"
                         ToolTip="إلغاء والعودة"/>
             </StackPanel>
         </Border>

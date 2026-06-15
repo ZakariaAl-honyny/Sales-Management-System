@@ -141,14 +141,13 @@ public class SalesReturnsControllerTests : ControllerTestBase
     private static CreateSalesReturnRequest CreateValidRequest() => new(
         SalesInvoiceId: 10,
         CustomerId: 1,
-        WarehouseId: 1,
+        WarehouseId: (short)1,
         ReturnDate: null,
+        CurrencyId: null,
         Notes: "ملاحظات إرجاع",
-        CashBoxId: null,
-        RefundAmount: null,
         Items: new List<ReturnItemRequest>
         {
-            new(ProductId: 1, ProductUnitId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m)
+            new(SalesInvoiceLineId: 1, ProductId: 1, ProductUnitId: 1, Quantity: 2.000m, UnitPrice: 50.00m, Amount: 100.00m, DiscountAmount: 0.00m)
         });
 }
 
@@ -286,6 +285,6 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         Notes: "ملاحظات إرجاع",
         Items: new List<CreatePurchaseReturnItemRequest>
         {
-            new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m)
+            new(PurchaseInvoiceLineId: 1, ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitCost: 40.00m, Amount: 200.00m)
         });
 }

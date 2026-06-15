@@ -10,26 +10,21 @@ public record CreatePurchaseInvoiceRequest(
     int SupplierId,
     int? InvoiceNo,
     DateTime? InvoiceDate,
-    DateOnly? DueDate,
     PaymentType PaymentType,
     decimal DiscountAmount,
-    byte? DiscountType,                          // NEW
-    decimal? DiscountRate,                       // NEW
     decimal TaxAmount,
     decimal OtherCharges,
     decimal PaidAmount,
-    int? CurrencyId,
+    short? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
-    List<CreatePurchaseInvoiceItemRequest> Items);
+    List<CreatePurchaseInvoiceLineRequest> Items);
 
 /// <summary>
 /// طلب إنشاء بند في فاتورة الشراء.
 /// </summary>
-public record CreatePurchaseInvoiceItemRequest(
+public record CreatePurchaseInvoiceLineRequest(
     int ProductId,
     int ProductUnitId,
     decimal Quantity,
-    decimal UnitCost,
-    byte? DiscountType = null,
-    decimal? DiscountRate = null);
+    decimal UnitPrice);

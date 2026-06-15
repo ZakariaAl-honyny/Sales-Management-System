@@ -209,15 +209,14 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         WarehouseId: 1,
         WarehouseName: "المستودع الرئيسي",
         InvoiceDate: DateTime.UtcNow,
-        DueDate: null,
         PaymentType: 1,
         SubTotal: 100.00m,
-        DiscountAmount: 0.00m,
+        DiscountAmount: 10.00m,
         TaxAmount: 15.00m,
         OtherCharges: 0m,
-        TotalAmount: 115.00m,
+        NetTotal: 105.00m,
         PaidAmount: 50.00m,
-        DueAmount: 65.00m,
+        RemainingAmount: 65.00m,
         Notes: null,
         Status: status,
         TaxId: null,
@@ -227,11 +226,9 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         ExchangeRate: null,
         CashBoxId: null,
         CashBoxName: null,
-        TotalCost: null,
-        TotalProfit: null,
-        Items: new List<SalesInvoiceItemDto>
+        Items: new List<SalesInvoiceLineDto>
         {
-            new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
+            new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 100.00m, 1)
         });
 
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
@@ -240,9 +237,8 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         CustomerId: 1,
         CashBoxId: null,
         InvoiceDate: null,
-        DueDate: null,
         PaymentType: PaymentType.Cash,
-        DiscountAmount: 0.00m,
+        DiscountAmount: 0m,
         TaxAmount: 15.00m,
         OtherCharges: 0m,
         PaidAmount: 50.00m,
@@ -250,8 +246,9 @@ public class SalesInvoicesControllerTests : ControllerTestBase
         CurrencyId: null,
         ExchangeRate: null,
         TaxId: null,
-        Items: new List<CreateSalesInvoiceItemRequest>
+        Items: new List<CreateSalesInvoiceLineRequest>
         {
-            new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, DiscountAmount: 0.00m, Mode: SaleMode.Retail, Notes: null)
+            new(ProductId: 1, Quantity: 2.000m, UnitPrice: 50.00m, ProductUnitId: 1)
         });
 }
+

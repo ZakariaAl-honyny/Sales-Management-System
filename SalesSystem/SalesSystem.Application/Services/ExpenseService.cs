@@ -259,7 +259,7 @@ public class ExpenseService : IExpenseService
             expense.ExpenseAccountId,
             expense.ExpenseAccount?.NameAr,
             expense.CashBoxId,
-            expense.CashBox?.BoxName,
+            expense.CashBox?.Name,
             expense.CurrencyId,
             expense.Currency?.Name,
             expense.Amount,

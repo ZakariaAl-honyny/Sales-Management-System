@@ -37,7 +37,7 @@ public class FinancialReportService : IFinancialReportService
                 si => si.Status == InvoiceStatus.Posted && si.InvoiceDate >= from && si.InvoiceDate <= to,
                 ct: ct);
 
-            var totalSales = salesInvoices.Sum(si => si.TotalAmount);
+            var totalSales = salesInvoices.Sum(si => si.NetTotal);
 
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
@@ -81,8 +81,8 @@ public class FinancialReportService : IFinancialReportService
 
             var entries = await _uow.JournalEntries.ToListAsync(
                 je => je.Status == JournalEntryStatus.Posted
-                   && je.TransactionDate >= from
-                   && je.TransactionDate <= to,
+                   && je.EntryDate >= from
+                   && je.EntryDate <= to,
                 q => q.Include(je => je.Lines),
                 ct);
 
@@ -114,8 +114,8 @@ public class FinancialReportService : IFinancialReportService
             int? cogsAccountId = cogsMapping?.AccountId;
 
             var accounts = await _uow.Accounts.ToListAsync(a => accountIds.Contains(a.Id), ct: ct);
-            var revenueAccounts = accounts.Where(a => a.AccountType == AccountType.Revenue).ToList();
-            var expenseAccounts = accounts.Where(a => a.AccountType == AccountType.Expense).ToList();
+            var revenueAccounts = accounts.Where(a => a.Nature == 4).ToList(); // 4=Revenue
+            var expenseAccounts = accounts.Where(a => a.Nature == 5).ToList(); // 5=Expense
 
             decimal totalRevenue = 0;
             decimal totalCogs = 0;
@@ -203,7 +203,7 @@ public class FinancialReportService : IFinancialReportService
             _logger.LogInformation("Generating balance sheet as of {AsOfDate}", asOfDate);
 
             var entries = await _uow.JournalEntries.ToListAsync(
-                je => je.Status == JournalEntryStatus.Posted && je.TransactionDate <= asOfDate,
+                je => je.Status == JournalEntryStatus.Posted && je.EntryDate <= asOfDate,
                 q => q.Include(je => je.Lines),
                 ct);
 
@@ -229,15 +229,15 @@ public class FinancialReportService : IFinancialReportService
             decimal totalLiabilities = 0;
             decimal totalEquity = 0;
 
-            foreach (var acc in allAccounts.Where(a => a.AllowTransactions))
+            foreach (var acc in allAccounts.Where(a => a.IsLeaf))
             {
                 var bal = accountBalances.GetValueOrDefault(acc.Id, (0, 0));
                 decimal balance;
 
-                switch (acc.AccountType)
+                switch (acc.Nature)
                 {
-                    case AccountType.Asset:
-                        balance = bal.TotalDebit - bal.TotalCredit + (acc.OpeningBalance ?? 0);
+                    case 1: // Asset
+                        balance = bal.TotalDebit - bal.TotalCredit;
                         if (balance != 0)
                         {
                             assetLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
@@ -245,8 +245,8 @@ public class FinancialReportService : IFinancialReportService
                         }
                         break;
 
-                    case AccountType.Liability:
-                        balance = bal.TotalCredit - bal.TotalDebit + (acc.OpeningBalance ?? 0);
+                    case 2: // Liability
+                        balance = bal.TotalCredit - bal.TotalDebit;
                         if (balance != 0)
                         {
                             liabilityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
@@ -254,37 +254,14 @@ public class FinancialReportService : IFinancialReportService
                         }
                         break;
 
-                    case AccountType.Equity:
-                        balance = bal.TotalCredit - bal.TotalDebit + (acc.OpeningBalance ?? 0);
+                    case 3: // Equity
+                        balance = bal.TotalCredit - bal.TotalDebit;
                         if (balance != 0)
                         {
                             equityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, balance, balance.ToString("N2")));
                             totalEquity += balance;
                         }
                         break;
-                }
-            }
-
-            // Fallback: use OpeningBalance from accounts if no journal entries
-            if (assetLines.Count == 0 && liabilityLines.Count == 0 && equityLines.Count == 0)
-            {
-                foreach (var acc in allAccounts.Where(a => a.OpeningBalance.HasValue && a.OpeningBalance.Value != 0))
-                {
-                    switch (acc.AccountType)
-                    {
-                        case AccountType.Asset:
-                            assetLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
-                            totalAssets += acc.OpeningBalance!.Value;
-                            break;
-                        case AccountType.Liability:
-                            liabilityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
-                            totalLiabilities += acc.OpeningBalance!.Value;
-                            break;
-                        case AccountType.Equity:
-                            equityLines.Add(new BalanceSheetLineDto(acc.NameAr, acc.AccountCode, acc.OpeningBalance!.Value, acc.OpeningBalance!.Value.ToString("N2")));
-                            totalEquity += acc.OpeningBalance!.Value;
-                            break;
-                    }
                 }
             }
 
@@ -322,7 +299,7 @@ public class FinancialReportService : IFinancialReportService
             _logger.LogInformation("Generating trial balance as of {AsOfDate}", asOfDate);
 
             var entries = await _uow.JournalEntries.ToListAsync(
-                je => je.Status == JournalEntryStatus.Posted && je.TransactionDate <= asOfDate,
+                je => je.Status == JournalEntryStatus.Posted && je.EntryDate <= asOfDate,
                 q => q.Include(je => je.Lines),
                 ct);
 
@@ -339,7 +316,7 @@ public class FinancialReportService : IFinancialReportService
             }
 
             var accounts = await _uow.Accounts.ToListAsync(
-                a => a.IsActive && a.AllowTransactions,
+                a => a.IsActive && a.IsLeaf,
                 q => q.OrderBy(a => a.AccountCode),
                 ct);
 
@@ -347,40 +324,36 @@ public class FinancialReportService : IFinancialReportService
             foreach (var acc in accounts)
             {
                 var bal = accountBalances.GetValueOrDefault(acc.Id, (0, 0));
-                var openingBal = acc.OpeningBalance ?? 0;
-
-                decimal openingDebit = acc.IsDebitNormal() ? openingBal : 0;
-                decimal openingCredit = acc.IsDebitNormal() ? 0 : openingBal;
 
                 decimal closingDebit, closingCredit;
                 if (acc.IsDebitNormal())
                 {
-                    var netBalance = openingBal + bal.TotalDebit - bal.TotalCredit;
+                    var netBalance = bal.TotalDebit - bal.TotalCredit;
                     closingDebit = netBalance >= 0 ? netBalance : 0;
                     closingCredit = netBalance < 0 ? Math.Abs(netBalance) : 0;
                 }
                 else
                 {
-                    var netBalance = openingBal + bal.TotalCredit - bal.TotalDebit;
+                    var netBalance = bal.TotalCredit - bal.TotalDebit;
                     closingCredit = netBalance >= 0 ? netBalance : 0;
                     closingDebit = netBalance < 0 ? Math.Abs(netBalance) : 0;
                 }
 
-                if (bal.TotalDebit == 0 && bal.TotalCredit == 0 && openingBal == 0)
+                if (bal.TotalDebit == 0 && bal.TotalCredit == 0)
                     continue;
 
                 result.Add(new TrialBalanceDto(
                     acc.AccountCode, acc.NameAr,
-                    openingDebit, openingCredit,
+                    0, 0,
                     bal.TotalDebit, bal.TotalCredit,
                     closingDebit, closingCredit,
-                    acc.AccountType switch
+                    acc.Nature switch
                     {
-                        AccountType.Asset => "أصل",
-                        AccountType.Liability => "خصم",
-                        AccountType.Equity => "حق ملكية",
-                        AccountType.Revenue => "إيراد",
-                        AccountType.Expense => "مصروف",
+                        1 => "أصل",      // Asset
+                        2 => "خصم",      // Liability
+                        3 => "حق ملكية", // Equity
+                        4 => "إيراد",    // Revenue
+                        5 => "مصروف",    // Expense
                         _ => null
                     }
                 ));
@@ -416,7 +389,7 @@ public class FinancialReportService : IFinancialReportService
             var priorLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry!.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry!.TransactionDate < from,
+                    && jel.JournalEntry!.EntryDate < from,
                 q => q.Include(jel => jel.JournalEntry!),
                 ct);
 
@@ -425,16 +398,16 @@ public class FinancialReportService : IFinancialReportService
 
             decimal openingBalance;
             if (account.IsDebitNormal())
-                openingBalance = (account.OpeningBalance ?? 0) + priorDebit - priorCredit;
+                openingBalance = priorDebit - priorCredit;
             else
-                openingBalance = (account.OpeningBalance ?? 0) + priorCredit - priorDebit;
+                openingBalance = priorCredit - priorDebit;
 
             var periodLines = await _uow.JournalEntryLines.ToListAsync(
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry!.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry!.TransactionDate >= from
-                    && jel.JournalEntry!.TransactionDate <= to,
-                q => q.OrderBy(jel => jel.JournalEntry!.TransactionDate)
+                    && jel.JournalEntry!.EntryDate >= from
+                    && jel.JournalEntry!.EntryDate <= to,
+                q => q.OrderBy(jel => jel.JournalEntry!.EntryDate)
                       .ThenBy(jel => jel.Id)
                       .Include(jel => jel.JournalEntry!),
                 ct);
@@ -450,7 +423,7 @@ public class FinancialReportService : IFinancialReportService
                     runningBalance += line.Credit - line.Debit;
 
                 lines.Add(new GeneralLedgerLineDto(
-                    line.JournalEntry!.TransactionDate,
+                    line.JournalEntry!.EntryDate,
                     line.JournalEntry!.EntryNumber,
                     line.JournalEntry!.Description,
                     line.Debit, line.Credit,
@@ -689,7 +662,7 @@ public class FinancialReportService : IFinancialReportService
             foreach (var invoice in invoices)
             {
                 entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة بيع",
-                    invoice.Id.ToString(), invoice.TotalAmount, 0, 0));
+                    invoice.Id.ToString(), invoice.NetTotal, 0, 0));
             }
 
             entries = entries.OrderBy(e => e.Date).ThenByDescending(e => e.Debit > 0 ? 0 : 1).ToList();
@@ -744,7 +717,7 @@ public class FinancialReportService : IFinancialReportService
             foreach (var payment in payments)
             {
                 entries.Add(new AccountStatementDto(payment.PaymentDate, "دفعة مورد",
-                    payment.PaymentNo, payment.Amount, 0, 0));
+                    payment.PaymentNo.ToString(), payment.Amount, 0, 0));
             }
 
             entries = entries.OrderBy(e => e.Date).ThenByDescending(e => e.Credit > 0 ? 0 : 1).ToList();

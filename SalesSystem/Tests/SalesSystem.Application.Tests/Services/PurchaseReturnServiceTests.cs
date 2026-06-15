@@ -231,7 +231,7 @@ public class PurchaseReturnServiceTests : IDisposable
             discountAmount: 0m,
             notes: null
         );
-        invoice.AddItem(PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 50m));
+        invoice.AddItem(PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitCost: 50m));
         invoice.SetPaidAmount(250m);
         invoice.Post();
         _dbContext.PurchaseInvoices.Add(invoice);
@@ -418,7 +418,7 @@ public class PurchaseReturnServiceTests : IDisposable
         public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
         public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
         public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
-        public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
+        public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Product> Products => Set<Product>();

@@ -133,10 +133,10 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
 
         var closureVm = _closureVmFactory.Value;
         closureVm.CashBoxId = SelectedCashBox.Id;
-        closureVm.CashBoxName = SelectedCashBox.BoxName;
+        closureVm.CashBoxName = SelectedCashBox.Name;
         _screenWindowService.OpenScreen(closureVm, new ScreenWindowOptions
         {
-            Title = $"الإغلاق اليومي - {SelectedCashBox.BoxName}",
+            Title = $"الإغلاق اليومي - {SelectedCashBox.Name}",
             Width = 900,
             Height = 700,
             OnClosed = (vm) =>
@@ -174,7 +174,9 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
         }
         else
         {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الصناديق النقدية", "CashBoxesListViewModel.LoadCashBoxesOperationAsync", "[CashBoxesListViewModel.LoadCashBoxesOperationAsync] Failed to load cash boxes from API.");
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الصناديق النقدية",
+                "CashBoxesListViewModel.LoadCashBoxesOperationAsync",
+                "[CashBoxesListViewModel.LoadCashBoxesOperationAsync] Failed to load cash boxes from API.");
             IsEmpty = CashBoxes.Count == 0;
         }
     }
@@ -187,7 +189,7 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
             Title = "إضافة صندوق نقدي جديد",
             OnClosed = (vm) =>
             {
-                if (vm is CashBoxEditorViewModel editor && !string.IsNullOrEmpty(editor.BoxName))
+                if (vm is CashBoxEditorViewModel editor && !string.IsNullOrEmpty(editor.Name))
                 {
                     System.Windows.Application.Current.Dispatcher.InvokeAsync(() => _ = LoadCashBoxesAsync());
                 }
@@ -202,18 +204,11 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
         var editorVm = _editorVmFactory.Value;
         editorVm.LoadForEdit(
             SelectedCashBox.Id,
-            SelectedCashBox.BoxName,
+            SelectedCashBox.Name,
             SelectedCashBox.AccountId,
             SelectedCashBox.AccountName,
-            SelectedCashBox.CategoryId,
-            SelectedCashBox.CategoryName,
             SelectedCashBox.BranchId,
-            SelectedCashBox.AssignedUserId,
-            SelectedCashBox.CurrencyId,
-            SelectedCashBox.PhoneNumber,
-            SelectedCashBox.TaxNumber,
-            SelectedCashBox.Address,
-            SelectedCashBox.Notes);
+            SelectedCashBox.Description);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
             Title = "تعديل الصندوق النقدي",
@@ -228,7 +223,7 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
     {
         if (SelectedCashBox == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الصندوق: {SelectedCashBox.BoxName}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الصندوق: {SelectedCashBox.Name}");
         if (strategy == DeleteStrategy.Cancel) return;
 
         var cashBoxId = SelectedCashBox.Id;
@@ -249,7 +244,9 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
         else
         {
             var error = deleteResult.Error ?? "فشل في إلغاء تنشيط الصندوق";
-            ErrorMessage = HandleFailure(error, "CashBoxesListViewModel.DeactivateCashBoxOperationAsync", "[CashBoxesListViewModel.DeactivateCashBoxOperationAsync] Failed to deactivate cash box.");
+            ErrorMessage = HandleFailure(error,
+                "CashBoxesListViewModel.DeactivateCashBoxOperationAsync",
+                "[CashBoxesListViewModel.DeactivateCashBoxOperationAsync] Failed to deactivate cash box.");
             _toastService.ShowError(ErrorMessage);
         }
     }
@@ -260,10 +257,10 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
 
         var transactionsVm = _transactionsVmFactory.Value;
         transactionsVm.CashBoxId = SelectedCashBox.Id;
-        transactionsVm.CashBoxName = SelectedCashBox.BoxName;
+        transactionsVm.CashBoxName = SelectedCashBox.Name;
         _screenWindowService.OpenScreen(transactionsVm, new ScreenWindowOptions
         {
-            Title = $"حركات الصندوق - {SelectedCashBox.BoxName}",
+            Title = $"حركات الصندوق - {SelectedCashBox.Name}",
             Width = 1000,
             Height = 700,
             OnClosed = (vm) =>

@@ -56,7 +56,7 @@ public class SessionsController : ControllerBase
                     s => !s.IsRevoked, ct: ct);
         }
 
-        var dtos = sessions.Select(MapToDto).OrderByDescending(x => x.LoginAt).ToList();
+        var dtos = sessions.Select(MapToDto).OrderByDescending(x => x.CreatedAt).ToList();
         return Ok(dtos);
     }
 
@@ -89,7 +89,7 @@ public class SessionsController : ControllerBase
             FullName: s.User?.FullName ?? "",
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
-            LoginAt: s.LoginAt,
+            CreatedAt: s.CreatedAt,
             LastActivityAt: s.LastActivityAt,
             ExpiresAt: s.ExpiresAt,
             IsRevoked: s.IsRevoked);

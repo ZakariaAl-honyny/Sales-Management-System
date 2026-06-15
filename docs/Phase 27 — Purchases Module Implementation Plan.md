@@ -98,7 +98,7 @@ FORBIDDEN:
 | `DiscountRate` | `decimal(18,2)?` | **❌ NEW — add** |
 | `AdditionalFeesTotal` | `decimal(18,2)` | **❌ NEW — add** |
 
-**Entity**: `SalesSystem.Domain.Entities.PurchaseInvoiceItem`
+**Entity**: `SalesSystem.Domain.Entities.PurchaseInvoiceLine`
 
 | Field | Type | Status |
 |-------|------|--------|
@@ -117,7 +117,7 @@ FORBIDDEN:
 | `CostInBaseCurrency` | `decimal(18,2)?` | **❌ NEW — add** |
 | `AdditionalFeesAmount` | `decimal(18,2)` | **❌ NEW — add** |
 
-**Configuration**: `PurchaseInvoiceConfiguration.cs` + `PurchaseInvoiceItemConfiguration.cs` — ✅ Exists
+**Configuration**: `PurchaseInvoiceConfiguration.cs` + `PurchaseInvoiceLineConfiguration.cs` — ✅ Exists
 
 **Service**: `PurchaseService` / `IPurchaseService` — ✅ Exists (504 lines)
 - `GetByIdAsync` ✅
@@ -274,15 +274,15 @@ FORBIDDEN:
 
 ---
 
-### 3.4 Blocker 4: ProductUnitId Missing from PurchaseInvoiceItem
+### 3.4 Blocker 4: ProductUnitId Missing from PurchaseInvoiceLine
 
-**Problem**: `PurchaseInvoiceItem` has `ProductId` but no `ProductUnitId`. With Dynamic UOM (RULE-060), the user enters quantity in a purchase unit (e.g., "Carton" with factor 24), but the system stores cost per base unit. Without `ProductUnitId`, there is no way to know which unit was used for the purchase.
+**Problem**: `PurchaseInvoiceLine` has `ProductId` but no `ProductUnitId`. With Dynamic UOM (RULE-060), the user enters quantity in a purchase unit (e.g., "Carton" with factor 24), but the system stores cost per base unit. Without `ProductUnitId`, there is no way to know which unit was used for the purchase.
 
-**Fix**: Add `int ProductUnitId` FK to `PurchaseInvoiceItem`.
+**Fix**: Add `int ProductUnitId` FK to `PurchaseInvoiceLine`.
 
-> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/PurchaseInvoiceItem.cs` for the canonical entity definition.
+> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/PurchaseInvoiceLine.cs` for the canonical entity definition.
 
-**Files changed**: `PurchaseInvoiceItem.cs`, `PurchaseInvoiceItemConfiguration.cs`, DTOs, services, migration
+**Files changed**: `PurchaseInvoiceLine.cs`, `PurchaseInvoiceLineConfiguration.cs`, DTOs, services, migration
 
 ---
 
@@ -328,7 +328,7 @@ FORBIDDEN:
 
 > See `Domain/Enums/DiscountType.cs` for the canonical enum definition.
 
-### 4.2 PurchaseInvoiceItem — Enhanced Entity
+### 4.2 PurchaseInvoiceLine — Enhanced Entity
 
 | # | Field | Type | Default | Required | Notes |
 |---|-------|------|---------|----------|-------|
@@ -349,7 +349,7 @@ FORBIDDEN:
 
 **Updated domain method**:
 
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.2 for financial formulas. See `Domain/Entities/PurchaseInvoiceItem.cs` for the canonical definition.
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.2 for financial formulas. See `Domain/Entities/PurchaseInvoiceLine.cs` for the canonical definition.
 
 ### 4.3 AdditionalFee — NEW Entity
 
@@ -370,7 +370,7 @@ FORBIDDEN:
 |---|-------|------|---------|----------|-------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | |
 | 2 | `AdditionalFeeId` | `int FK` | — | ✅ | Links to fee |
-| 3 | `PurchaseInvoiceItemId` | `int FK` | — | ✅ | Links to invoice item |
+| 3 | `PurchaseInvoiceLineId` | `int FK` | — | ✅ | Links to invoice item |
 | 4 | `AllocatedAmount` | `decimal(18,2)` | — | ✅ | Computed allocation |
 
 > See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/AdditionalFeeAllocation.cs` for the canonical definition.
@@ -462,7 +462,7 @@ FORBIDDEN:
 
 **Updated DTOs**:
 
-> See `SalesSystem.Contracts/` for canonical DTO definitions, including `PurchaseInvoiceDto`, `PurchaseInvoiceItemDto`, and `PurchaseReturnDto`.
+> See `SalesSystem.Contracts/` for canonical DTO definitions, including `PurchaseInvoiceDto`, `PurchaseInvoiceLineDto`, and `PurchaseReturnDto`.
 
 ### 4.10 Requests — New and Updated
 
@@ -484,7 +484,7 @@ FORBIDDEN:
 | `AdditionalFeesTotal` | ❌ MISSING | Add to entity + computed on Post |
 | `AttachmentPath` | ❌ MISSING | Add to entity + file upload endpoint |
 | `DiscountType` + `DiscountRate` | ❌ MISSING | Add to entity + domain methods + recalc |
-| `ProductUnitId` on Item | ❌ MISSING | Add to PurchaseInvoiceItem |
+| `ProductUnitId` on Item | ❌ MISSING | Add to PurchaseInvoiceLine |
 | `CostInBaseCurrency` on Item | ❌ MISSING | Add for multi-currency cost tracking |
 | `AdditionalFeesAmount` on Item | ❌ MISSING | Add for fee distribution per item |
 | `DiscountType` + `DiscountRate` on Item | ❌ MISSING | Add for line-level percentage discount |
@@ -561,7 +561,7 @@ FORBIDDEN:
 
 **Cost allocation on lot creation**:
 ```
-Lot.UnitCost = PurchaseInvoiceItem.UnitCost + (allocated fees / quantity)
+Lot.UnitCost = PurchaseInvoiceLine.UnitCost + (allocated fees / quantity)
 Lot.CostInBaseCurrency = converted using invoice.ExchangeRate
 ```
 
@@ -572,10 +572,10 @@ Lot.CostInBaseCurrency = converted using invoice.ExchangeRate
 
 | Component | Action |
 |-----------|--------|
-| `Domain/Entities/PurchaseLot.cs` | ✅ Already exists (Phase 25) — verify `purchaseInvoiceId`, `purchaseInvoiceItemId` fields exist |
-| `PurchaseLotConfiguration.cs` | Add FK to PurchaseInvoiceItem if missing |
+| `Domain/Entities/PurchaseLot.cs` | ✅ Already exists (Phase 25) — verify `purchaseInvoiceId`, `PurchaseInvoiceLineId` fields exist |
+| `PurchaseLotConfiguration.cs` | Add FK to PurchaseInvoiceLine if missing |
 | `PurchaseService.PostAsync()` | Add lot creation loop after stock update |
-| Migration | Add PurchaseInvoiceItemId FK if missing |
+| Migration | Add PurchaseInvoiceLineId FK if missing |
 
 **Note**: This integrates with Phase 25 `PurchaseLot` entity. Cost is allocated per lot on purchase receipt. The lot record enables FIFO cost allocation on sales returns and provides complete purchase traceability.
 
@@ -629,7 +629,7 @@ Lot.CostInBaseCurrency = converted using invoice.ExchangeRate
 ### 6.6 Discount Model: Line-Level + Invoice-Level
 
 **Decision**: Support both line-level and invoice-level discounts. Each can be either amount or percentage:
-- **Line-level**: `PurchaseInvoiceItem.DiscountType` + `DiscountAmount` or `DiscountRate`
+- **Line-level**: `PurchaseInvoiceLine.DiscountType` + `DiscountAmount` or `DiscountRate`
 - **Invoice-level**: `PurchaseInvoice.DiscountType` + `DiscountAmount` or `DiscountRate`
 - Invoice-level discount applies AFTER line-level discounts are computed
 - Computed as: `TotalAfterLineDiscounts = Sum(LineTotals) -> InvoiceDiscount -> + Tax -> + Fees`
@@ -712,19 +712,19 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 ---
 
-### Task 2 — Add ProductUnitId to PurchaseInvoiceItem + PurchaseReturnItem
+### Task 2 — Add ProductUnitId to PurchaseInvoiceLine + PurchaseReturnItem
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/PurchaseInvoiceItem.cs` | Add `int ProductUnitId` + `ProductUnit? ProductUnit` nav + update `Create()` |
-| `Domain/Entities/PurchaseInvoiceItem.cs` | Update guard clauses — require `productUnitId > 0` |
+| `Domain/Entities/PurchaseInvoiceLine.cs` | Add `int ProductUnitId` + `ProductUnit? ProductUnit` nav + update `Create()` |
+| `Domain/Entities/PurchaseInvoiceLine.cs` | Update guard clauses — require `productUnitId > 0` |
 | `Domain/Entities/PurchaseReturnItem.cs` | Add `int ProductUnitId` + nav |
-| `Infrastructure/Data/Configurations/PurchaseInvoiceItemConfiguration.cs` | Add FK + index config |
+| `Infrastructure/Data/Configurations/PurchaseInvoiceLineConfiguration.cs` | Add FK + index config |
 | `Infrastructure/Data/Configurations/PurchaseReturnItemConfiguration.cs` | Add FK + index config |
 | `Infrastructure/Data/Migrations/` | Migration to add columns + FK |
-| `Contracts/DTOs/AllDtos.cs` | Update `PurchaseInvoiceItemDto`, `PurchaseReturnItemDto` |
+| `Contracts/DTOs/AllDtos.cs` | Update `PurchaseInvoiceLineDto`, `PurchaseReturnItemDto` |
 | `Contracts/Requests/PurchaseRequests.cs` | Update create/update item requests |
 | `Application/Services/PurchaseService.cs` | Map `ProductUnitId` in item creation + DTO mapping |
 | `Application/Services/PurchaseReturnService.cs` | Same |
@@ -772,7 +772,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | `Domain/Enums/DiscountType.cs` | NEW enum: `Amount=0`, `Percentage=1` |
 | `Domain/Entities/PurchaseInvoice.cs` | Add `DiscountType`, `DiscountRate` properties + `SetDiscount()` method |
 | `Domain/Entities/PurchaseInvoice.cs` | Update `RecalculateTotals()` to support percentage discount on invoice |
-| `Domain/Entities/PurchaseInvoiceItem.cs` | Add `DiscountType`, `DiscountRate` + update `RecalculateLineTotal()` |
+| `Domain/Entities/PurchaseInvoiceLine.cs` | Add `DiscountType`, `DiscountRate` + update `RecalculateLineTotal()` |
 | `Domain/Entities/PurchaseReturn.cs` | Add `DiscountType`, `DiscountRate` properties + update totals |
 | `Domain/Entities/PurchaseReturnItem.cs` | Add discount fields + update recalc |
 | `Infrastructure/Data/Configurations/` | Update all configurations with new columns |
@@ -1109,7 +1109,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | PaidAmount > TotalAmount throws DomainException | Throws |
 | DueAmount = TotalAmount - PaidAmount computed correctly | Passes |
 
-**PurchaseInvoiceItemTests.cs**:
+**PurchaseInvoiceLineTests.cs**:
 | Test | Expected |
 |------|----------|
 | Valid item ProductId Quantity UnitCost LineTotal Qty x UnitCost - DiscountAmount | Passes |
@@ -1190,7 +1190,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | Entity | Guard Count | Sample Messages |
 |--------|-------------|-----------------|
 | PurchaseInvoice | 12 | "رقم الفاتورة يجب أن يكون أكبر من صفر", "المورد مطلوب", "الملاحظات تتجاوز 500 حرف" |
-| PurchaseInvoiceItem | 8 | "الكمية يجب أن تكون أكبر من الصفر", "التكلفة لا يمكن أن تكون سالبة", "وحدة القياس مطلوبة" |
+| PurchaseInvoiceLine | 8 | "الكمية يجب أن تكون أكبر من الصفر", "التكلفة لا يمكن أن تكون سالبة", "وحدة القياس مطلوبة" |
 | PurchaseOrder | 8 | "المورد مطلوب", "تاريخ الأمر مطلوب", "يجب إضافة صنف واحد على الأقل" |
 | PurchaseOrderItem | 4 | "الكمية يجب أن تكون أكبر من الصفر", "التكلفة لا يمكن أن تكون سالبة" |
 | AdditionalFee | 6 | "اسم الرسم مطلوب", "المبلغ يجب أن يكون أكبر من صفر", "حساب الرسم الإضافي مطلوب" |
@@ -1330,7 +1330,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | AdditionalFeesTotal HasPrecision(18 2) | Verified |
 | FK on all references uses DeleteBehavior.Restrict | Verified |
 
-**PurchaseInvoiceItemConfigurationTests.cs**:
+**PurchaseInvoiceLineConfigurationTests.cs**:
 | Test | Expected |
 |------|----------|
 | Quantity HasPrecision(18 3) | Verified |
@@ -1407,7 +1407,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | 9 | **AdditionalCharge.AccountId** | Fee linked to valid CoA account | FK constraint satisfied |
 | 10 | **Auto journal entry** | Post invoice Debit Inventory Credit AccountsPayable | Correct double entry |
 | 11 | **Cost cascade WA** | Receive 100 units at 15 SAR old stock 50 at 10 SAR WA = 13.33 | Correct weighted average |
-| 12 | **decimal(18 3) quantity** | PurchaseInvoiceItem.Quantity = 100.500 | Stored with 3 decimal places |
+| 12 | **decimal(18 3) quantity** | PurchaseInvoiceLine.Quantity = 100.500 | Stored with 3 decimal places |
 | 13 | **decimal(18 2) money** | All monetary fields SubTotal=1250.75 TotalAmount=1500.00 | Stored with 2 decimal places |
 | 14 | **decimal(18 6) exchange** | ExchangeRate=3.754321 | Stored with 6 decimal places |
 | 15 | **PurchaseReturn reference** | CreateReturn linked to PurchaseInvoice | Stock returns to original batches |
@@ -1472,7 +1472,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | Rule | Directive | Where Applied | Verdict |
 |------|-----------|---------------|---------|
 | **RULE-001** | `decimal(18,2)` for ALL money | All purchase monetary fields (SubTotal, DiscountAmount, TaxAmount, TotalAmount, PaidAmount, etc.) | ✅ |
-| **RULE-002** | `decimal(18,3)` for ALL quantities | PurchaseInvoiceItem.Quantity, PurchaseOrderItem.Quantity, PurchaseReturnItem.Quantity | ✅ |
+| **RULE-002** | `decimal(18,3)` for ALL quantities | PurchaseInvoiceLine.Quantity, PurchaseOrderItem.Quantity, PurchaseReturnItem.Quantity | ✅ |
 | **RULE-003** | Multi-table ops in transaction | PurchaseService.CreateAsync, PostAsync, CancelAsync — already wrapped in BeginTransactionAsync | ✅ |
 | **RULE-004** | NO hard delete for invoices | Invoice lifecycle: Draft → Posted → Cancelled only | ✅ |
 | **RULE-005** | Stock updated AFTER invoice saved | PurchaseService.PostAsync: SaveChanges → IncreaseStockAsync | ✅ |
@@ -1497,7 +1497,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | **RULE-055** | NEVER raw MessageBox.Show | Verified across all ViewModels | ✅ |
 | **RULE-058** | INotifyDataErrorInfo | PurchaseInvoiceEditorViewModel, PurchaseOrderEditorViewModel | ✅ |
 | **RULE-059** | Save always enabled, validate on click | All editor ViewModels — no CanExecute blocking | ✅ |
-| **RULE-060** | Dynamic UOM — ProductUnit stores conversion | PurchaseInvoiceItem.ProductUnitId links to unit | ✅ |
+| **RULE-060** | Dynamic UOM — ProductUnit stores conversion | PurchaseInvoiceLine.ProductUnitId links to unit | ✅ |
 | **RULE-065** | Pricing stored per ProductUnit | Per-unit cost recorded via ProductUnitId | ✅ |
 | **RULE-071** | WeightedAverage formula | PurchaseService.PostAsync → UpdateProductPricingService | ✅ |
 | **RULE-141** | ExecuteAsync() wrapper for all VMs | All desktop ViewModels use ExecuteAsync | ✅ |
@@ -1594,13 +1594,13 @@ ALTER TABLE [dbo].[PurchaseInvoices] DROP COLUMN IF EXISTS [AttachmentPath];
 ALTER TABLE [dbo].[PurchaseInvoices] DROP COLUMN IF EXISTS [DiscountType];
 ALTER TABLE [dbo].[PurchaseInvoices] DROP COLUMN IF EXISTS [DiscountRate];
 
--- 4. Remove NEW columns from PurchaseInvoiceItems
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP CONSTRAINT IF EXISTS [FK_PurchaseInvoiceItems_ProductUnits_ProductUnitId];
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP COLUMN IF EXISTS [ProductUnitId];
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP COLUMN IF EXISTS [CostInBaseCurrency];
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP COLUMN IF EXISTS [DiscountType];
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP COLUMN IF EXISTS [DiscountRate];
-ALTER TABLE [dbo].[PurchaseInvoiceItems] DROP COLUMN IF EXISTS [AdditionalFeesAmount];
+-- 4. Remove NEW columns from PurchaseInvoiceLines
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP CONSTRAINT IF EXISTS [FK_PurchaseInvoiceLines_ProductUnits_ProductUnitId];
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP COLUMN IF EXISTS [ProductUnitId];
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP COLUMN IF EXISTS [CostInBaseCurrency];
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP COLUMN IF EXISTS [DiscountType];
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP COLUMN IF EXISTS [DiscountRate];
+ALTER TABLE [dbo].[PurchaseInvoiceLines] DROP COLUMN IF EXISTS [AdditionalFeesAmount];
 
 -- 5. Remove NEW columns from PurchaseReturns
 ALTER TABLE [dbo].[PurchaseReturns] DROP COLUMN IF EXISTS [CurrencyId];

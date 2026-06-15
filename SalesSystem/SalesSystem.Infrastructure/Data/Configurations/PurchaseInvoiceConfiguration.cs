@@ -22,12 +22,6 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.PaymentType).HasConversion<byte>();
         builder.Property(pi => pi.Status).HasConversion<byte>();
 
-        // Phase 27 — Additional purchase invoice properties
-        builder.Property(pi => pi.AdditionalFeesTotal).HasPrecision(18, 2).HasDefaultValue(0);
-        builder.Property(pi => pi.AttachmentPath).HasMaxLength(255).IsRequired(false);
-        builder.Property(pi => pi.DiscountType).HasConversion<byte?>().IsRequired(false);
-        builder.Property(pi => pi.DiscountRate).HasPrecision(18, 2).IsRequired(false);
-
         builder.HasOne(pi => pi.Supplier)
             .WithMany()
             .HasForeignKey(pi => pi.SupplierId)
@@ -48,9 +42,14 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
             .HasForeignKey(pi => pi.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(pi => pi.CurrencyId).HasColumnType("smallint");
+
         builder.Property(pi => pi.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
 
-        builder.Property(pi => pi.AttachmentPath).HasMaxLength(255).IsRequired(false);
+        builder.HasOne(pi => pi.CashBox)
+            .WithMany()
+            .HasForeignKey(pi => pi.CashBoxId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(pi => pi.Items)
             .WithOne(i => i.PurchaseInvoice)
@@ -63,23 +62,16 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
     }
 }
 
-public class PurchaseInvoiceItemConfiguration : IEntityTypeConfiguration<PurchaseInvoiceItem>
+public class PurchaseInvoiceLineConfiguration : IEntityTypeConfiguration<PurchaseInvoiceLine>
 {
-    public void Configure(EntityTypeBuilder<PurchaseInvoiceItem> builder)
+    public void Configure(EntityTypeBuilder<PurchaseInvoiceLine> builder)
     {
-        builder.ToTable("PurchaseInvoiceItems");
+        builder.ToTable("PurchaseInvoiceLines");
         builder.HasKey(pii => pii.Id);
         builder.Property(pii => pii.Quantity).HasPrecision(18, 3);
-        builder.Property(pii => pii.UnitCost).HasPrecision(18, 2);
+        builder.Property(pii => pii.UnitPrice).HasPrecision(18, 2);
         builder.Property(pii => pii.LineTotal).HasPrecision(18, 2);
         builder.Property(pii => pii.ProductUnitId).IsRequired();
-
-        // Phase 27 — Additional purchase invoice item properties
-        builder.Property(pii => pii.ProductUnitId).IsRequired();
-        builder.Property(pii => pii.DiscountType).HasConversion<byte?>().IsRequired(false);
-        builder.Property(pii => pii.DiscountRate).HasPrecision(18, 2).IsRequired(false);
-        builder.Property(pii => pii.CostInBaseCurrency).HasPrecision(18, 2).IsRequired(false);
-        builder.Property(pii => pii.AdditionalFeesAmount).HasPrecision(18, 2).HasDefaultValue(0);
 
         builder.HasOne(pii => pii.Product)
             .WithMany()

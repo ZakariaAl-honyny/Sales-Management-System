@@ -18,10 +18,10 @@ public class CustomerRepositoryTests
 
     private static async Task<Customer> CreateTestCustomerAsync(SalesDbContext context, string name)
     {
-        var party = Party.Create(name, PartyType.Customer, 1, createdByUserId: null);
+        var party = Party.Create(name);
         context.Set<Party>().Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, createdByUserId: null);
+        var customer = Customer.Create(party.Id, accountId: 1);
         return customer;
     }
 
@@ -264,17 +264,17 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb12");
         var repository = new GenericRepository<Customer>(context);
         
-        var party1 = Party.Create("Ahmed Ali", PartyType.Customer, 1, createdByUserId: null);
+        var party1 = Party.Create("Ahmed Ali");
         context.Set<Party>().Add(party1);
-        var party2 = Party.Create("Sara Hassan", PartyType.Customer, 1, createdByUserId: null);
+        var party2 = Party.Create("Sara Hassan");
         context.Set<Party>().Add(party2);
-        var party3 = Party.Create("Ahmed Kamal", PartyType.Customer, 1, createdByUserId: null);
+        var party3 = Party.Create("Ahmed Kamal");
         context.Set<Party>().Add(party3);
         await context.SaveChangesAsync();
 
-        context.Customers.Add(Customer.Create(party1.Id, createdByUserId: null));
-        context.Customers.Add(Customer.Create(party2.Id, createdByUserId: null));
-        context.Customers.Add(Customer.Create(party3.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(party1.Id, accountId: 1));
+        context.Customers.Add(Customer.Create(party2.Id, accountId: 1));
+        context.Customers.Add(Customer.Create(party3.Id, accountId: 1));
         await context.SaveChangesAsync();
 
         // Act - Search for customers with "Ahmed" in party name (via join)
@@ -295,17 +295,17 @@ public class CustomerRepositoryTests
         await using var context = CreateContext("CustomerDb13");
         var repository = new GenericRepository<Customer>(context);
         
-        var partyA = Party.Create("Charlie", PartyType.Customer, 1, createdByUserId: null);
+        var partyA = Party.Create("Charlie");
         context.Set<Party>().Add(partyA);
-        var partyB = Party.Create("Alpha", PartyType.Customer, 1, createdByUserId: null);
+        var partyB = Party.Create("Alpha");
         context.Set<Party>().Add(partyB);
-        var partyC = Party.Create("Bravo", PartyType.Customer, 1, createdByUserId: null);
+        var partyC = Party.Create("Bravo");
         context.Set<Party>().Add(partyC);
         await context.SaveChangesAsync();
 
-        context.Customers.Add(Customer.Create(partyA.Id, createdByUserId: null));
-        context.Customers.Add(Customer.Create(partyB.Id, createdByUserId: null));
-        context.Customers.Add(Customer.Create(partyC.Id, createdByUserId: null));
+        context.Customers.Add(Customer.Create(partyA.Id, accountId: 1));
+        context.Customers.Add(Customer.Create(partyB.Id, accountId: 1));
+        context.Customers.Add(Customer.Create(partyC.Id, accountId: 1));
         await context.SaveChangesAsync();
 
         // Act - Order by Party.Name
@@ -330,10 +330,10 @@ public class CustomerRepositoryTests
         
         for (int i = 1; i <= 10; i++)
         {
-            var party = Party.Create($"Customer {i}", PartyType.Customer, 1, createdByUserId: null);
+            var party = Party.Create($"Customer {i}");
             context.Set<Party>().Add(party);
             await context.SaveChangesAsync();
-            var customer = Customer.Create(party.Id, createdByUserId: null);
+            var customer = Customer.Create(party.Id, accountId: 1);
             await repository.AddAsync(customer);
         }
         await context.SaveChangesAsync();

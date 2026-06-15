@@ -6,26 +6,20 @@ namespace SalesSystem.Contracts.Requests;
 /// </summary>
 public record CreateWarehouseRequest(
     short BranchId,
-    string Code,
     string Name,
-    byte Type = 1,
-    string? Location = null,
     string? Phone = null,
     string? Address = null,
-    string? ManagerName = null);
+    string? Notes = null);
 
 /// <summary>
 /// Request to update an existing warehouse.
 /// </summary>
 public record UpdateWarehouseRequest(
     short BranchId,
-    string Code,
     string Name,
-    byte Type = 1,
-    string? Location = null,
     string? Phone = null,
     string? Address = null,
-    string? ManagerName = null,
+    string? Notes = null,
     bool IsActive = true);
 
 /// <summary>
@@ -56,8 +50,8 @@ public record CreateInventoryTransactionLineRequest(
 /// </summary>
 public record CreateWarehouseTransferRequest(
     int TransferNo,
-    short SourceWarehouseId,
-    short DestinationWarehouseId,
+    short FromWarehouseId,
+    short ToWarehouseId,
     DateTime? TransferDate = null,
     string? Notes = null,
     List<CreateWarehouseTransferLineRequest>? Lines = null);

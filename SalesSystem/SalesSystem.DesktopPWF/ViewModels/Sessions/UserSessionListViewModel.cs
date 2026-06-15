@@ -169,7 +169,7 @@ public class UserSessionListViewModel : AdminOnlyViewModel
             await InvokeOnUIThreadAsync(() =>
             {
                 Sessions.Clear();
-                foreach (var item in result.Value.OrderByDescending(x => x.LoginAt))
+                foreach (var item in result.Value.OrderByDescending(x => x.CreatedAt))
                 {
                     Sessions.Add(item);
                 }

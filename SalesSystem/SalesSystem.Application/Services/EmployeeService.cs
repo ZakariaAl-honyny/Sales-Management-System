@@ -75,7 +75,7 @@ public class EmployeeService : IEmployeeService
                 request.PartyId,
                 request.EmployeeNo,
                 request.HireDate,
-                request.DepartmentId,
+                (short?)request.DepartmentId,
                 request.Salary,
                 request.Notes);
 
@@ -119,7 +119,7 @@ public class EmployeeService : IEmployeeService
                     return Result<EmployeeDto>.Failure("القسم المحدد غير موجود", ErrorCodes.NotFound);
             }
 
-            employee.Update(request.DepartmentId, request.Salary, request.Notes);
+            employee.Update((short?)request.DepartmentId, request.Salary, request.Notes);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Employee updated: #{EmployeeNo} (ID: {Id})", employee.EmployeeNo, id);
@@ -183,7 +183,7 @@ public class EmployeeService : IEmployeeService
 
             // Generate next account code under this parent
             var childAccounts = await _uow.Accounts.ToListAsync(
-                predicate: a => a.ParentAccountId == parentAccount.Id, ct: ct);
+                predicate: a => a.ParentId == parentAccount.Id, ct: ct);
 
             int maxSuffix = 0;
             foreach (var child in childAccounts)
@@ -200,15 +200,11 @@ public class EmployeeService : IEmployeeService
                 accountCode: nextCode,
                 nameAr: $"عهدة {employee.Party?.Name ?? employeeId.ToString()}",
                 nameEn: $"Custody - {employee.Party?.Name ?? employeeId.ToString()}",
-                accountType: AccountType.Asset,
-                level: 4,
-                parentAccountId: parentAccount.Id,
-                isSystemAccount: false,
-                allowTransactions: true,
-                openingBalance: 0,
-                description: $"حساب عهدة الموظف {employee.Party?.Name ?? employeeId.ToString()}",
-                explanation: $"حساب عهدة وسلف الموظف - ينشأ تلقائياً عند الحاجة",
-                colorCode: "#2196F3",
+                nature: (byte)AccountType.Asset,
+                isLeaf: true,
+                parentId: parentAccount.Id,
+                isSystem: false,
+                categoryId: null,
                 createdByUserId: createdByUserId);
 
             await _uow.Accounts.AddAsync(account, ct);

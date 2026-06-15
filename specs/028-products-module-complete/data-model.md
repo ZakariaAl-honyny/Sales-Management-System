@@ -93,7 +93,7 @@ public class InventoryBatch : BaseEntity
     public int Id { get; private set; }                    // PK
     public int ProductId { get; private set; }             // FK → Product
     public int WarehouseId { get; private set; }           // FK → Warehouse
-    public int? PurchaseInvoiceItemId { get; private set; } // FK → PurchaseInvoiceItem (nullable)
+    public int? PurchaseInvoiceLineId { get; private set; } // FK → PurchaseInvoiceLine (nullable)
     
     public string BatchNo { get; private set; }            // nvarchar(100) — "OPENING" for opening stock
     public decimal Quantity { get; private set; }          // decimal(18, 3) — current available qty
@@ -109,7 +109,7 @@ public class InventoryBatch : BaseEntity
     public static InventoryBatch Create(
         int productId, int warehouseId, decimal quantity,
         decimal unitCost, string batchNo,
-        int? purchaseInvoiceItemId = null,
+        int? PurchaseInvoiceLineId = null,
         DateTime? manufactureDate = null,
         DateTime? expiryDate = null,
         int? createdByUserId = null)

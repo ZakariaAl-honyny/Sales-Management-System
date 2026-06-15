@@ -6,8 +6,8 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Represents a receipt collected from a customer against one or more sales invoices.
-/// The receipt can be posted (confirmed) or cancelled, and its amount can be
-/// allocated across multiple invoices via CustomerReceiptApplication records.
+/// Schema 6.5: CustomerReceipts. Columns: ReceiptNo (int unique), ReceiptDate, CustomerId FK,
+/// CashBoxId FK, CurrencyId FK, Amount, Notes, Status (tinyint), audit fields.
 /// </summary>
 public class CustomerReceipt : DocumentEntity
 {
@@ -25,17 +25,11 @@ public class CustomerReceipt : DocumentEntity
     public virtual CashBox? CashBox { get; private set; }
     public virtual Currency? Currency { get; private set; }
 
-    /// <summary>
-    /// Allocations of this receipt across multiple sales invoices.
-    /// </summary>
     private readonly List<CustomerReceiptApplication> _applications = new();
     public IReadOnlyCollection<CustomerReceiptApplication> Applications => _applications.AsReadOnly();
 
     private CustomerReceipt() { } // EF Core
 
-    /// <summary>
-    /// Creates a new customer receipt in Draft status.
-    /// </summary>
     public static CustomerReceipt Create(
         int receiptNo,
         DateTime receiptDate,
@@ -75,35 +69,31 @@ public class CustomerReceipt : DocumentEntity
     }
 
     /// <summary>
-    /// Posts the receipt — confirms the collection and records the timestamp.
-    /// Only drafts can be posted.
+    /// Posts the receipt — confirms the collection. Only drafts can be posted.
     /// </summary>
-    public void Post(DateTime? postedAt = null)
+    public void Post()
     {
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("فقط السندات المسودة يمكن ترحيلها.");
-
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
-        PostedAt = postedAt ?? DateTime.UtcNow;
         UpdateTimestamp();
     }
 
     /// <summary>
     /// Cancels the receipt. Only drafts and posted (un-cancelled) receipts can be cancelled.
-    /// Once cancelled, the receipt cannot be modified or re-posted.
     /// </summary>
     public void Cancel()
     {
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("السند ملغي بالفعل.");
-
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
         UpdateTimestamp();
     }
 
     /// <summary>
     /// Updates the receipt fields. Only allowed while the receipt is in Draft status.
-    /// Posted receipts must be cancelled and recreated.
     /// </summary>
     public void Update(
         int cashBoxId,
@@ -139,7 +129,6 @@ public class CustomerReceipt : DocumentEntity
             throw new DomainException("التخصيص مطلوب.");
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("لا يمكن إضافة تخصيصات لسند غير مسود.");
-
         _applications.Add(application);
         UpdateTimestamp();
     }

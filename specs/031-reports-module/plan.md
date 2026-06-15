@@ -40,14 +40,14 @@ Phase 31 delivers comprehensive reporting across 5 categories (Financial, Invent
 |--------|---------------|-------|
 | Sales Invoice List | SalesInvoices | All posted invoices with customer, date, amounts, status; filterable by date range, customer, warehouse, payment type |
 | Sales by Customer | SalesInvoices (grouped by CustomerId) | Invoice count + TotalAmount + PaidAmount + DueAmount per customer; sorted by total descending |
-| Sales by Product | SalesInvoiceItems (grouped by ProductId) | Quantity, LineTotal, CostInBaseCurrency, Profit = LineTotal - CostInBaseCurrency, ProfitMargin% |
-| Sales by Category | SalesInvoiceItems → Products → ProductCategories | Category-level aggregation with invoice count and total amount; includes "غير مصنف" bucket for uncategorised products |
+| Sales by Product | SalesInvoiceLines (grouped by ProductId) | Quantity, LineTotal, CostInBaseCurrency, Profit = LineTotal - CostInBaseCurrency, ProfitMargin% |
+| Sales by Category | SalesInvoiceLines → Products → ProductCategories | Category-level aggregation with invoice count and total amount; includes "غير مصنف" bucket for uncategorised products |
 | Daily Sales Summary | SalesInvoices (grouped by InvoiceDate) | Daily aggregates: invoice count, total amount, discount, net amount |
 | Sales Trends | SalesInvoices (grouped by period) | Monthly/Quarterly/Yearly aggregation with profit margin analysis: TotalSales, TotalCost, TotalProfit, ProfitMargin% |
 | Sales by User | SalesInvoices (grouped by CreatedByUserId) | Invoice count + total amount per user who created the invoice |
-| **Sales Profit per Invoice** | SalesInvoices + SalesInvoiceItems + InventoryBatches | Per-invoice profit = SUM(LineTotal) - SUM(CostInBaseCurrency) — CostInBaseCurrency populated at posting time from average cost (FIFO weighted) |
+| **Sales Profit per Invoice** | SalesInvoices + SalesInvoiceLines + InventoryBatches | Per-invoice profit = SUM(LineTotal) - SUM(CostInBaseCurrency) — CostInBaseCurrency populated at posting time from average cost (FIFO weighted) |
 
-**Key Decision**: Profit calculation uses CostInBaseCurrency stored on SalesInvoiceItem at posting time (sourced from InventoryBatches AverageCost at that moment), not computed live. This ensures profit figures are immutable after posting and match the accounting journal entries.
+**Key Decision**: Profit calculation uses CostInBaseCurrency stored on SalesInvoiceLine at posting time (sourced from InventoryBatches AverageCost at that moment), not computed live. This ensures profit figures are immutable after posting and match the accounting journal entries.
 
 ### 2.4 Purchase Reports
 
@@ -55,7 +55,7 @@ Phase 31 delivers comprehensive reporting across 5 categories (Financial, Invent
 |--------|---------------|-------|
 | Purchase Invoice List | PurchaseInvoices | All posted invoices with supplier, date, amounts, status |
 | Purchases by Supplier | PurchaseInvoices (grouped by SupplierId) | Invoice count + NetTotal + PaidAmount + RemainingAmount per supplier |
-| Purchases by Product | PurchaseInvoiceItems (grouped by ProductId) | Quantity + LineTotal (total cost) per product |
+| Purchases by Product | PurchaseInvoiceLines (grouped by ProductId) | Quantity + LineTotal (total cost) per product |
 | Purchase Trends | PurchaseInvoices (grouped by period) | Monthly/Quarterly/Yearly aggregation of NetTotal |
 
 ### 2.5 Cash Reports

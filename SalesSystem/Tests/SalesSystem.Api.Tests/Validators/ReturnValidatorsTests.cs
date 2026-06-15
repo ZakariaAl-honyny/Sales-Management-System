@@ -25,7 +25,7 @@ public class ReturnValidatorsTests
         public void GivenWarehouseId_WhenValidating_ThenCorrectResult(int warehouseId, bool isValid)
         {
             // Arrange
-            var request = CreateValidRequest() with { WarehouseId = warehouseId };
+            var request = CreateValidRequest() with { WarehouseId = (short)warehouseId };
 
             // Act
             var result = _validator.TestValidate(request);
@@ -115,14 +115,13 @@ public class ReturnValidatorsTests
         private static CreateSalesReturnRequest CreateValidRequest() => new(
             SalesInvoiceId: 1,
             CustomerId: 1,
-            WarehouseId: 1,
+            WarehouseId: (short)1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
+            CurrencyId: null,
             Notes: "Return note",
-            CashBoxId: null,
-            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
-                new(1, 1, 5, 100, 0)
+                new(1, 1, 1, 5, 100, 500, 0)
             }
         );
     }
@@ -169,7 +168,7 @@ public class ReturnValidatorsTests
         public void GivenWarehouseId_WhenValidating_ThenCorrectResult(int warehouseId, bool isValid)
         {
             // Arrange
-            var request = CreateValidRequest() with { WarehouseId = warehouseId };
+            var request = CreateValidRequest() with { WarehouseId = (short)warehouseId };
 
             // Act
             var result = _validator.TestValidate(request);
@@ -252,7 +251,7 @@ public class ReturnValidatorsTests
             Notes: "Purchase return note",
             Items: new List<CreatePurchaseReturnItemRequest>
             {
-                new(ProductId: 1, ProductUnitId: 1, Quantity: 5, UnitCost: 100)
+                new(PurchaseInvoiceLineId: 1, ProductId: 1, ProductUnitId: 1, Quantity: 5, UnitCost: 100, Amount: 500)
             }
         );
     }
@@ -280,7 +279,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(productId, 1, 5, 100, 0)
+                    new(1, productId, 1, 5, 100, 500, 0)
                 }
             };
 
@@ -312,7 +311,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 1, quantity, 100, 0)
+                    new(1, 1, 1, quantity, 100, quantity * 100, 0)
                 }
             };
 
@@ -344,7 +343,7 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 1, 5, unitPrice, 0)
+                    new(1, 1, 1, 5, unitPrice, 5 * unitPrice, 0)
                 }
             };
 
@@ -371,9 +370,9 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 1, 5, 100, 0),
-                    new(2, 1, 10, 50, 5),
-                    new(3, 1, 1, 200, 0)
+                    new(1, 1, 1, 5, 100, 500, 0),
+                    new(2, 2, 1, 10, 50, 500, 5),
+                    new(3, 3, 1, 1, 200, 200, 0)
                 }
             };
 
@@ -392,8 +391,8 @@ public class ReturnValidatorsTests
             {
                 Items = new List<ReturnItemRequest>
                 {
-                    new(1, 1, 5, 100, 0),
-                    new(0, 1, 5, 100, 0) // Invalid ProductId
+                    new(1, 1, 1, 5, 100, 500, 0),
+                    new(1, 0, 1, 5, 100, 500, 0) // Invalid ProductId
                 }
             };
 
@@ -410,14 +409,13 @@ public class ReturnValidatorsTests
         private static CreateSalesReturnRequest CreateValidRequest() => new(
             SalesInvoiceId: 1,
             CustomerId: 1,
-            WarehouseId: 1,
+            WarehouseId: (short)1,
             ReturnDate: DateTime.UtcNow.AddDays(-1),
+            CurrencyId: null,
             Notes: "Return note",
-            CashBoxId: null,
-            RefundAmount: null,
             Items: new List<ReturnItemRequest>
             {
-                new(1, 1, 5, 100, 0)
+                new(1, 1, 1, 5, 100, 500, 0)
             }
         );
     }

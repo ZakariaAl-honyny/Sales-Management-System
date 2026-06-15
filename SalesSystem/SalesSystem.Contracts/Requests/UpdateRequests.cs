@@ -17,24 +17,20 @@ public record UpdatePurchaseInvoiceRequest(
     int WarehouseId,
     int SupplierId,
     DateTime? InvoiceDate,
-    DateOnly? DueDate,
-    PaymentType PaymentType,
+    PaymentType? PaymentType,
     decimal DiscountAmount,
-    byte? DiscountType,                          // NEW
-    decimal? DiscountRate,                       // NEW
     decimal TaxAmount,
     decimal OtherCharges,
     decimal PaidAmount,
-    int? CurrencyId,
+    short? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
-    List<CreatePurchaseInvoiceItemRequest> Items);
+    List<CreatePurchaseInvoiceLineRequest> Items);
 
 public record UpdateSalesInvoiceRequest(
     int WarehouseId,
-    int? CustomerId,
+    int CustomerId,
     DateTime? InvoiceDate,
-    DateOnly? DueDate,
     PaymentType PaymentType,
     decimal DiscountAmount,
     decimal TaxAmount,
@@ -42,7 +38,7 @@ public record UpdateSalesInvoiceRequest(
     decimal PaidAmount,
     int? CashBoxId,
     string? Notes,
-    int? CurrencyId,
+    short? CurrencyId,
     decimal? ExchangeRate,
     int? TaxId,
-    List<CreateSalesInvoiceItemRequest> Items);
+    List<CreateSalesInvoiceLineRequest> Items);

@@ -1,6 +1,5 @@
 using FluentAssertions;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -13,13 +12,12 @@ public class WarehouseTests
         var warehouse = Warehouse.Create(
             branchId: (short)1,
             name: "Main Warehouse",
-            code: "WH-001",
-            location: "Building A",
+            address: "Building A",
             createdByUserId: 1
         );
 
         warehouse.Name.Should().Be("Main Warehouse");
-        warehouse.Location.Should().Be("Building A");
+        warehouse.Address.Should().Be("Building A");
     }
 
     [Theory]
@@ -28,7 +26,7 @@ public class WarehouseTests
     [InlineData("   ")]
     public void Create_GivenInvalidName_ShouldThrowDomainException(string? invalidName)
     {
-        var action = () => Warehouse.Create(branchId: (short)1, name: invalidName!, code: "WH-001");
+        var action = () => Warehouse.Create(branchId: (short)1, name: invalidName!);
 
         action.Should().Throw<DomainException>()
             .WithMessage("*اسم المستودع مطلوب*");
@@ -37,9 +35,9 @@ public class WarehouseTests
     [Fact]
     public void Create_GivenOptionalParametersAreNull_ShouldSucceed()
     {
-        var warehouse = Warehouse.Create(branchId: (short)1, name: "Test Warehouse", code: "WH-001");
+        var warehouse = Warehouse.Create(branchId: (short)1, name: "Test Warehouse");
 
-        warehouse.Location.Should().BeNull();
+        warehouse.Address.Should().BeNull();
     }
 
     [Fact]
@@ -48,22 +46,19 @@ public class WarehouseTests
         var warehouse = Warehouse.Create(
             branchId: (short)1,
             name: "Original Name",
-            code: "WH-001",
-            location: "Old Location",
+            address: "Old Location",
             createdByUserId: 1
         );
 
         warehouse.Update(
             branchId: (short)1,
             name: "Updated Name",
-            code: "WH-001",
-            type: WarehouseType.Main,
-            location: "New Location",
+            address: "New Location",
             updatedByUserId: 1
         );
 
         warehouse.Name.Should().Be("Updated Name");
-        warehouse.Location.Should().Be("New Location");
+        warehouse.Address.Should().Be("New Location");
     }
 
     [Fact]
@@ -72,13 +67,12 @@ public class WarehouseTests
         var warehouse = Warehouse.Create(
             branchId: (short)1,
             name: "Test",
-            code: "WH-001",
-            location: "Loc",
+            address: "Loc",
             createdByUserId: 1
         );
 
-        warehouse.Update(branchId: (short)1, name: "Test", code: "WH-001", type: WarehouseType.Main, location: null, updatedByUserId: 1);
+        warehouse.Update(branchId: (short)1, name: "Test", address: null, updatedByUserId: 1);
 
-        warehouse.Location.Should().BeNull();
+        warehouse.Address.Should().BeNull();
     }
 }

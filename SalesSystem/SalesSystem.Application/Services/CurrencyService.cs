@@ -109,10 +109,9 @@ public class CurrencyService : ICurrencyService
                 request.Name,
                 request.Code,
                 request.Symbol,
-                request.ExchangeRateToBase,
                 request.IsBaseCurrency,
                 request.FractionName,
-                decimalPlaces: request.DecimalPlaces);
+                decimalPlaces: (byte)request.DecimalPlaces);
 
             currency.SetCreatedBy(userId);
 
@@ -144,9 +143,8 @@ public class CurrencyService : ICurrencyService
             currency.Update(
                 request.Name,
                 request.Symbol,
-                request.ExchangeRateToBase,
                 request.FractionName,
-                decimalPlaces: request.DecimalPlaces);
+                decimalPlaces: (byte)request.DecimalPlaces);
             currency.SetUpdatedBy(userId);
 
             await _uow.SaveChangesAsync(ct);
@@ -219,39 +217,11 @@ public class CurrencyService : ICurrencyService
         }
     }
 
-    public async Task<Result> UpdateExchangeRateAsync(int id, decimal newRate, int userId, CancellationToken ct = default)
-    {
-        try
-        {
-            var currency = await _uow.Currencies.GetByIdAsync(id, ct);
-            if (currency == null)
-                return Result.Failure("العملة غير موجودة", ErrorCodes.NotFound);
-
-            currency.UpdateExchangeRate(newRate);
-            currency.SetUpdatedBy(userId);
-
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Exchange rate updated for currency {Id}: {NewRate}", id, newRate);
-            return Result.Success();
-        }
-        catch (DomainException ex)
-        {
-            return Result.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to update exchange rate for currency {Id}", id);
-            return Result.Failure("حدث خطأ أثناء تحديث سعر الصرف.");
-        }
-    }
-
     private static CurrencyDto MapToDto(Currency c) => new(
         c.Id,
         c.Name,
         c.Code,
         c.Symbol,
-        c.ExchangeRateToBase,
         c.IsBaseCurrency,
         c.FractionName,
         c.DecimalPlaces,

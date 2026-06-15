@@ -23,7 +23,7 @@ public class AccountService : IAccountService
     public async Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct)
     {
         var all = await _uow.Accounts.ToListAsync(ct);
-        var roots = all.Where(a => a.ParentAccountId == null && a.IsActive)
+        var roots = all.Where(a => a.ParentId == null && a.IsActive)
             .OrderBy(a => a.AccountCode)
             .Select(a => BuildTreeNode(a, all))
             .ToList();
@@ -36,13 +36,10 @@ public class AccountService : IAccountService
             account.Id,
             account.AccountCode,
             account.NameAr,
-            (byte)account.AccountType,
-            account.Level,
-            account.ColorCode,
-            account.AllowTransactions,
-            account.OpeningBalance,
-            account.Explanation,
-            all.Where(c => c.ParentAccountId == account.Id && c.IsActive)
+            account.Nature,
+            account.IsLeaf,
+            account.CategoryId,
+            all.Where(c => c.ParentId == account.Id && c.IsActive)
                 .OrderBy(c => c.AccountCode)
                 .Select(c => BuildTreeNode(c, all))
                 .ToList()
@@ -70,8 +67,9 @@ public class AccountService : IAccountService
 
     public async Task<Result<List<AccountDto>>> GetByTypeAsync(AccountType type, CancellationToken ct)
     {
+        byte nature = (byte)type;
         var accounts = await _uow.Accounts.ToListAsync(
-            a => a.AccountType == type && a.IsActive,
+            a => a.Nature == nature && a.IsActive,
             ct: ct,
             includePaths: new[] { "ParentAccount" });
         var dtos = accounts.OrderBy(a => a.AccountCode).Select(MapToDto).ToList();
@@ -80,23 +78,17 @@ public class AccountService : IAccountService
 
     public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, int userId, CancellationToken ct)
     {
-        if (request.ParentAccountId.HasValue)
+        if (request.ParentId.HasValue)
         {
-            var parent = await _uow.Accounts.GetByIdAsync(request.ParentAccountId.Value, ct);
+            var parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
             if (parent == null)
                 return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
             if (!parent.IsActive)
                 return Result<AccountDto>.Failure("الحساب الأب غير نشط", ErrorCodes.InvalidOperation);
-            if (request.Level <= parent.Level)
+            if (parent.IsLeaf)
                 return Result<AccountDto>.Failure(
-                    "مستوى الحساب الفرعي يجب أن يكون أعمق من مستوى الحساب الأب",
+                    "لا يمكن إضافة حساب فرعي لحساب تفصيلي — الحساب الأب يجب أن يكون مجموعة",
                     ErrorCodes.ValidationError);
-        }
-        else if (request.Level != 1)
-        {
-            return Result<AccountDto>.Failure(
-                "الحساب الرئيسي (بدون أب) يجب أن يكون مستواه 1",
-                ErrorCodes.ValidationError);
         }
 
         var existing = await _uow.Accounts.FirstOrDefaultAsync(
@@ -107,25 +99,20 @@ public class AccountService : IAccountService
         var account = Account.Create(
             request.AccountCode,
             request.NameAr,
-            request.NameEn ?? "",
-            (AccountType)request.AccountType,
-            request.Level,
-            request.ParentAccountId,
-            request.IsSystemAccount,
-            request.Description,
-            request.ColorCode,
-            request.AllowTransactions,
-            request.OpeningBalance,
-            request.Explanation,
-            request.Notes,
+            request.NameEn,
+            request.Nature,
+            request.IsLeaf,
+            request.ParentId,
+            request.IsSystem,
+            request.CategoryId,
             userId);
 
         await _uow.Accounts.AddAsync(account, ct);
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Account {AccountCode} ({NameAr}) created — Level {Level}, Type {Type}",
-            account.AccountCode, account.NameAr, account.Level, account.AccountType);
+            "Account {AccountCode} ({NameAr}) created — Nature {Nature}, IsLeaf {IsLeaf}",
+            account.AccountCode, account.NameAr, account.Nature, account.IsLeaf);
 
         // Reload to get parent name
         var saved = await _uow.Accounts.FirstOrDefaultAsync(
@@ -139,31 +126,27 @@ public class AccountService : IAccountService
         if (account == null)
             return Result<AccountDto>.Failure("الحساب غير موجود", ErrorCodes.NotFound);
 
-        if (account.IsSystemAccount)
+        if (account.IsSystem)
             return Result<AccountDto>.Failure("لا يمكن تعديل حساب نظامي", ErrorCodes.InvalidOperation);
 
-        if (request.ParentAccountId.HasValue)
+        if (request.ParentId.HasValue)
         {
-            var parent = await _uow.Accounts.GetByIdAsync(request.ParentAccountId.Value, ct);
+            var parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
             if (parent == null)
                 return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
-            if (request.Level <= parent.Level)
+            if (parent.IsLeaf)
                 return Result<AccountDto>.Failure(
-                    "مستوى الحساب الفرعي يجب أن يكون أعمق من مستوى الحساب الأب",
+                    "لا يمكن إضافة حساب فرعي لحساب تفصيلي",
                     ErrorCodes.ValidationError);
         }
 
         account.Update(
             request.NameAr,
-            request.NameEn ?? "",
-            (AccountType)request.AccountType,
-            request.Level,
-            request.ParentAccountId,
-            request.Description,
-            request.ColorCode,
-            request.AllowTransactions,
-            request.Explanation,
-            request.Notes,
+            request.NameEn,
+            request.Nature,
+            request.IsLeaf,
+            request.ParentId,
+            request.CategoryId,
             userId);
 
         await _uow.SaveChangesAsync(ct);
@@ -183,18 +166,17 @@ public class AccountService : IAccountService
         if (account == null)
             return Result.Failure("الحساب غير موجود", ErrorCodes.NotFound);
 
-        if (account.IsSystemAccount)
+        if (account.IsSystem)
             return Result.Failure("لا يمكن حذف حساب نظامي", ErrorCodes.InvalidOperation);
 
         // Use database query instead of HasChildren() — navigation property is not eagerly loaded
         var hasChildren = await _uow.Accounts.AnyAsync(
-            a => a.ParentAccountId == id, ct);
+            a => a.ParentId == id, ct);
         if (hasChildren)
             return Result.Failure(
                 "لا يمكن حذف حساب رئيسي لديه حسابات فرعية — احذف الحسابات الفرعية أولاً",
                 ErrorCodes.ReferencedByOtherEntities);
 
-        // Call MarkAsDeleted() directly on the already-loaded entity (avoids double fetch)
         account.MarkAsDeleted();
         await _uow.SaveChangesAsync(ct);
 
@@ -210,18 +192,16 @@ public class AccountService : IAccountService
             if (account == null)
                 return Result.Failure("الحساب غير موجود", ErrorCodes.NotFound);
 
-            if (account.IsSystemAccount)
+            if (account.IsSystem)
                 return Result.Failure("لا يمكن حذف حساب نظامي", ErrorCodes.InvalidOperation);
 
-            // Use database query instead of HasChildren() — navigation property is not eagerly loaded
             var hasChildren = await _uow.Accounts.AnyAsync(
-                a => a.ParentAccountId == id, ct);
+                a => a.ParentId == id, ct);
             if (hasChildren)
                 return Result.Failure(
                     "لا يمكن حذف حساب رئيسي لديه حسابات فرعية",
                     ErrorCodes.ReferencedByOtherEntities);
 
-            // Remove the entity directly from the change tracker (avoids double fetch — see Bug-2/3)
             _uow.Accounts.DeleteRange(new[] { account });
             await _uow.SaveChangesAsync(ct);
 
@@ -242,18 +222,13 @@ public class AccountService : IAccountService
             a.AccountCode,
             a.NameAr,
             a.NameEn,
-            (byte)a.AccountType,
-            a.Level,
-            a.ParentAccountId,
+            a.Nature,
+            a.IsLeaf,
+            a.ParentId,
             a.ParentAccount?.NameAr,
-            a.IsSystemAccount,
+            a.IsSystem,
             a.IsActive,
-            a.Description,
-            a.ColorCode,
-            a.AllowTransactions,
-            a.OpeningBalance,
-            a.Explanation,
-            a.Notes);
+            a.CategoryId);
     }
 
     /// <summary>

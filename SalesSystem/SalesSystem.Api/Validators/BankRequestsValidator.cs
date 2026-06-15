@@ -12,12 +12,17 @@ public class CreateBankRequestValidator : AbstractValidator<CreateBankRequest>
             .When(x => x.AccountId.HasValue)
             .WithMessage("معرف الحساب المحاسبي غير صالح");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan((short)0).WithMessage("معرف العملة مطلوب");
-
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم البنك مطلوب")
-            .MaximumLength(100).WithMessage("اسم البنك لا يمكن أن يتجاوز 100 حرف");
+            .MaximumLength(150).WithMessage("اسم البنك لا يمكن أن يتجاوز 150 حرف");
+
+        RuleFor(x => x.AccountNumber)
+            .MaximumLength(100).When(x => x.AccountNumber != null)
+            .WithMessage("رقم الحساب لا يمكن أن يتجاوز 100 حرف");
+
+        RuleFor(x => x.Iban)
+            .MaximumLength(100).When(x => x.Iban != null)
+            .WithMessage("الآيبان لا يمكن أن يتجاوز 100 حرف");
     }
 }
 
@@ -27,6 +32,14 @@ public class UpdateBankRequestValidator : AbstractValidator<UpdateBankRequest>
     {
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم البنك مطلوب")
-            .MaximumLength(100).WithMessage("اسم البنك لا يمكن أن يتجاوز 100 حرف");
+            .MaximumLength(150).WithMessage("اسم البنك لا يمكن أن يتجاوز 150 حرف");
+
+        RuleFor(x => x.AccountNumber)
+            .MaximumLength(100).When(x => x.AccountNumber != null)
+            .WithMessage("رقم الحساب لا يمكن أن يتجاوز 100 حرف");
+
+        RuleFor(x => x.Iban)
+            .MaximumLength(100).When(x => x.Iban != null)
+            .WithMessage("الآيبان لا يمكن أن يتجاوز 100 حرف");
     }
 }

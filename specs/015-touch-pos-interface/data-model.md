@@ -8,7 +8,7 @@
 
 ### Reused Entities (No Changes)
 - `SalesSystem.Domain.Entities.SalesInvoice`
-- `SalesSystem.Domain.Entities.SalesInvoiceItem`
+- `SalesSystem.Domain.Entities.SalesInvoiceLine`
 - `SalesSystem.Domain.Entities.Product`
 - `SalesSystem.Domain.Entities.Category`
 

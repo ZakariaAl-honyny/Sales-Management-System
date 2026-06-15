@@ -103,7 +103,7 @@ public record SalesInvoiceDto(
     string? Notes,
     byte Status,
     DateTime CreatedAt,
-    IReadOnlyList<SalesInvoiceItemDto> Items
+    IReadOnlyList<SalesInvoiceLineDto> Items
 );
 ```
 

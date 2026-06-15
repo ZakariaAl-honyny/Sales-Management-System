@@ -204,8 +204,8 @@ public class WarehouseTransfersListViewModel : ViewModelBase
         {
             var searchLower = SearchText.Trim().ToLower();
             return transfer.TransferNo.ToString().Contains(searchLower) ||
-                   (transfer.SourceWarehouseName?.ToLower().Contains(searchLower) ?? false) ||
-                   (transfer.DestinationWarehouseName?.ToLower().Contains(searchLower) ?? false);
+                   (transfer.FromWarehouseName?.ToLower().Contains(searchLower) ?? false) ||
+                   (transfer.ToWarehouseName?.ToLower().Contains(searchLower) ?? false);
         }
 
         return true;

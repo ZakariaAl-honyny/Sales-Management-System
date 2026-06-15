@@ -23,10 +23,8 @@ public interface IUnitOfWork
     IGenericRepository<SupplierPayment> SupplierPayments { get; }
     IGenericRepository<CurrencyRate> CurrencyRates { get; }
     ISystemLogRepository SystemLogs { get; }
-    IGenericRepository<SalesInvoiceItem> SalesInvoiceItems { get; }
-    IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems { get; }
-    IGenericRepository<PurchaseOrderItem> PurchaseOrderItems { get; }
-    IGenericRepository<PurchaseOrder> PurchaseOrders { get; }
+    IGenericRepository<SalesInvoiceLine> SalesInvoiceLines { get; }
+    IGenericRepository<PurchaseInvoiceLine> PurchaseInvoiceLines { get; }
     IGenericRepository<ProductUnit> ProductUnits { get; }
     IGenericRepository<CashBox> CashBoxes { get; }
     IGenericRepository<SystemSetting> SystemSettings { get; }
@@ -49,8 +47,6 @@ public interface IUnitOfWork
     IGenericRepository<UserBranch> UserBranches { get; }
 
     // New entity repositories (v4.7+)
-    IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations { get; }
-    IGenericRepository<AdditionalFee> AdditionalFees { get; }
     IGenericRepository<Party> Parties { get; }
     IGenericRepository<Attachment> Attachments { get; }
     IGenericRepository<Notification> Notifications { get; }
@@ -69,9 +65,6 @@ public interface IUnitOfWork
     IGenericRepository<SupplierPaymentApplication> SupplierPaymentApplications { get; }
     IGenericRepository<AccountCategory> AccountCategories { get; }
     IGenericRepository<CompanySettings> CompanySettings { get; }
-
-    // Cheque repository
-    IGenericRepository<Cheque> Cheques { get; }
 
     // Customer/Supplier Contact repositories
     IGenericRepository<CustomerContact> CustomerContacts { get; }

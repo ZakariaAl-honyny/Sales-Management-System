@@ -388,15 +388,14 @@ public class DashboardViewModelTests : IDisposable
             WarehouseId: 1,
             WarehouseName: "Main Warehouse",
             InvoiceDate: DateTime.Today,
-            DueDate: null,
             PaymentType: 1,
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
             OtherCharges: 0,
-            TotalAmount: totalAmount,
+            NetTotal: totalAmount,
             PaidAmount: totalAmount,
-            DueAmount: 0,
+            RemainingAmount: 0,
             Notes: null,
             Status: status,
             TaxId: null,
@@ -406,9 +405,7 @@ public class DashboardViewModelTests : IDisposable
             ExchangeRate: null,
             CashBoxId: null,
             CashBoxName: null,
-            TotalCost: null,
-            TotalProfit: null,
-            Items: new List<SalesInvoiceItemDto>());
+            Items: new List<SalesInvoiceLineDto>());
     }
 
     private static CustomerDto CreateCustomerDto(int id, string name, bool isActive)
@@ -422,6 +419,7 @@ public class DashboardViewModelTests : IDisposable
             TaxNumber: null,
             CreditLimit: 0,
             IsActive: isActive,
+            PartyId: 1,
             AccountId: 1);
     }
 
@@ -435,6 +433,7 @@ public class DashboardViewModelTests : IDisposable
             Address: null,
             TaxNumber: null,
             IsActive: isActive,
+            PartyId: 1,
             AccountId: 1);
     }
 
@@ -450,11 +449,11 @@ public class DashboardViewModelTests : IDisposable
             ReorderLevel: minStock,
             TrackExpiry: false,
             ImagePath: null,
-            Notes: null,
-            DefaultPurchaseUnitId: null,
-            DefaultSalesUnitId: null,
             IsActive: isActive);
     }
 
     #endregion
 }
+
+
+

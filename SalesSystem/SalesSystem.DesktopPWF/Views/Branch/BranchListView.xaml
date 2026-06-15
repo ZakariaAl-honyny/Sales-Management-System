@@ -101,10 +101,6 @@
                                             Binding="{Binding Name}" 
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
-                        <DataGridTextColumn Header="الكود" 
-                                            Binding="{Binding Code}" 
-                                            Width="120" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         <DataGridTemplateColumn Header="الحالة" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

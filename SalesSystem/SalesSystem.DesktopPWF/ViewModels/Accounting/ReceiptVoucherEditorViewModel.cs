@@ -267,7 +267,7 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
             if (SetProperty(ref _selectedCashBox, value) && value != null)
             {
                 CashBoxId = value.Id;
-                CashBoxName = value.BoxName;
+                CashBoxName = value.Name;
             }
         }
     }
@@ -324,7 +324,7 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     CashBoxes.Clear();
-                    foreach (var box in cashBoxTask.Result.Value.Where(b => b.IsActive).OrderBy(b => b.BoxName))
+                    foreach (var box in cashBoxTask.Result.Value.Where(b => b.IsActive).OrderBy(b => b.Name))
                     {
                         CashBoxes.Add(box);
                     }

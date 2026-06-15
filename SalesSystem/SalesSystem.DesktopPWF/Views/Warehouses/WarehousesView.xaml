@@ -60,19 +60,6 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Type Filter Group -->
-                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
-                    <TextBlock Text="النوع" VerticalAlignment="Center" Margin="0,0,8,0" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                    <ComboBox ItemsSource="{Binding TypeFilterList}"
-                              SelectedValue="{Binding SelectedTypeFilter}"
-                              SelectedValuePath="Key"
-                              DisplayMemberPath="Value"
-                              Style="{StaticResource ModernComboBox}"
-                              Width="120"
-                              AutomationProperties.AutomationId="CboWarehouseTypeFilter"
-                              ToolTip="تصفية المستودعات حسب النوع"/>
-                </StackPanel>
-
                 <!-- Status Filter Group -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
                     <CheckBox Content="عرض غير النشطة" 
@@ -181,40 +168,13 @@
                                              Width="80" 
                                              CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
-                        <DataGridTemplateColumn Header="النوع" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-                                               ToolTip="نوع المستودع — رئيسي / فرعي / صالة عرض / تالف">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Text" Value="رئيسي"/>
-                                                <Setter Property="FontWeight" Value="SemiBold"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Type}" Value="2">
-                                                        <Setter Property="Text" Value="فرعي"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Type}" Value="3">
-                                                        <Setter Property="Text" Value="صالة عرض"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Type}" Value="4">
-                                                        <Setter Property="Text" Value="تالف"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        
                         <DataGridTextColumn Header="اسم المستودع" 
                                              Binding="{Binding Name}" 
                                              Width="*" 
                                              CellStyle="{StaticResource DataGridCellStyle}"/>
                         
-                        <DataGridTextColumn Header="الموقع/العنوان" 
-                                             Binding="{Binding Location}" 
+                        <DataGridTextColumn Header="العنوان" 
+                                             Binding="{Binding Address}" 
                                              Width="2*" 
                                              CellStyle="{StaticResource DataGridCellStyle}"/>
                         

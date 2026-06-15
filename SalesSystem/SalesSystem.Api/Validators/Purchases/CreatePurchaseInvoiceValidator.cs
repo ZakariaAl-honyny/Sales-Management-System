@@ -39,16 +39,12 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.InvoiceDate.HasValue)
             .WithMessage("تاريخ الفاتورة لا يمكن أن يكون في المستقبل");
 
-        RuleFor(x => x.DueDate)
-            .GreaterThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow)).When(x => x.DueDate.HasValue)
-            .WithMessage("تاريخ الاستحقاق لا يمكن أن يكون في الماضي");
-
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)
             .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
 
         // Currency rules
-        RuleFor(x => x.CurrencyId)
+        RuleFor(x => (int)x.CurrencyId!.Value)
             .GreaterThan(0).When(x => x.CurrencyId.HasValue)
             .WithMessage("العملة غير صحيحة");
 
@@ -74,8 +70,8 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
             item.RuleFor(i => i.Quantity)
                 .GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
 
-            item.RuleFor(i => i.UnitCost)
-                .GreaterThanOrEqualTo(0).WithMessage("التكلفة لا يمكن أن تكون سالبة");
+            item.RuleFor(i => i.UnitPrice)
+                .GreaterThanOrEqualTo(0).WithMessage("السعر لا يمكن أن يكون سالباً");
         });
     }
 }

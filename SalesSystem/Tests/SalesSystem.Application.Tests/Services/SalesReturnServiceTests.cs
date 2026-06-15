@@ -266,7 +266,7 @@ public class SalesReturnServiceTests : IDisposable
         public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
         public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
         public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
-        public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+        public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Product> Products => Set<Product>();

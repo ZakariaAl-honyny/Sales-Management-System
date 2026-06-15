@@ -89,14 +89,14 @@ The foundation is **structurally sound** with all 23 entities, 23 DbSets, Fluent
 > 
 > The original migration had **12 `ReferentialAction.Cascade`** entries — a direct violation of RULE-004 in AGENTS.md which mandates `DeleteBehavior.Restrict` on ALL FKs.
 > 
-> **Root Cause**: Item configurations (`SalesInvoiceItemConfiguration`, `PurchaseInvoiceItemConfiguration`, `SalesReturnItemConfiguration`, `PurchaseReturnItemConfiguration`, `StockTransferItemConfiguration`, `SalesReturnConfiguration`, `PurchaseReturnConfiguration`) were missing explicit FK configurations, causing EF Core to default to Cascade.
+> **Root Cause**: Item configurations (`SalesInvoiceLineConfiguration`, `PurchaseInvoiceLineConfiguration`, `SalesReturnItemConfiguration`, `PurchaseReturnItemConfiguration`, `StockTransferItemConfiguration`, `SalesReturnConfiguration`, `PurchaseReturnConfiguration`) were missing explicit FK configurations, causing EF Core to default to Cascade.
 > 
 > **Fix**: Added explicit `HasMany().WithOne().HasForeignKey().OnDelete(DeleteBehavior.Restrict)` for all parent→child and child→Product relationships across all configurations.
 
 > [!CAUTION]
 > **FIX 2 — Missing Navigation Properties (5 entities)**
 > 
-> `SalesInvoiceItem`, `PurchaseInvoiceItem`, `SalesReturnItem`, `PurchaseReturnItem`, and `StockTransferItem` were missing back-navigation properties to their parent entities (e.g., `SalesInvoice`, `PurchaseInvoice`, etc.).
+> `SalesInvoiceLine`, `PurchaseInvoiceLine`, `SalesReturnItem`, `PurchaseReturnItem`, and `StockTransferItem` were missing back-navigation properties to their parent entities (e.g., `SalesInvoice`, `PurchaseInvoice`, etc.).
 > 
 > **Impact**: The Fluent API `.WithOne(i => i.SalesInvoice)` syntax requires these navigation properties to exist. Without them, the build would fail.
 > 
@@ -160,8 +160,8 @@ Phase 1 Foundation Setup is fully verified and compliant with the project CONSTI
 | `SalesInvoiceConfiguration.cs` | Added `HasMany(Items).WithOne().OnDelete(Restrict)` |
 | `PurchaseInvoiceConfiguration.cs` | Added `HasMany(Items).WithOne().OnDelete(Restrict)` |
 | `ReturnsTransfersConfiguration.cs` | Added FK configs for Customer/Supplier/Warehouse/Product + Items on all 6 entities |
-| `SalesInvoiceItem.cs` | Added `SalesInvoice` navigation property |
-| `PurchaseInvoiceItem.cs` | Added `PurchaseInvoice` navigation property |
+| `SalesInvoiceLine.cs` | Added `SalesInvoice` navigation property |
+| `PurchaseInvoiceLine.cs` | Added `PurchaseInvoice` navigation property |
 | `SalesReturn.cs` (SalesReturnItem) | Added `SalesReturn` navigation property |
 | `PurchaseReturn.cs` (PurchaseReturnItem) | Added `PurchaseReturn` navigation property |
 | `StockTransfer.cs` (StockTransferItem) | Added `StockTransfer` navigation property |

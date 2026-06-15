@@ -219,7 +219,7 @@ public class WarehouseMovementReportViewModel : ViewModelBase
                     Warehouses.Clear();
 
                     // Add "All Warehouses" option with Id=0
-                    Warehouses.Add(new WarehouseDto(0, string.Empty, "جميع المخازن", (byte)1, null, null, null, null, true));
+                    Warehouses.Add(new WarehouseDto(0, "جميع المخازن", null, null, null, true));
 
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);

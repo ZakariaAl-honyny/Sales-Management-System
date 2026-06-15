@@ -4,17 +4,14 @@ public record InventoryAdjustmentDto(
     int Id,
     int AdjustmentNo,
     DateTime AdjustmentDate,
-    int WarehouseId,
+    short WarehouseId,
     string? WarehouseName,
     byte AdjustmentType,
     string? AdjustmentTypeName,
-    int AccountId,
-    string? AccountName,
     byte Status,
     string? StatusName,
     DateTime? PostedAt,
-    List<InventoryAdjustmentLineDto>? Lines,
-    bool IsActive
+    List<InventoryAdjustmentLineDto>? Lines
 );
 
 public record InventoryAdjustmentLineDto(
@@ -22,10 +19,7 @@ public record InventoryAdjustmentLineDto(
     int InventoryAdjustmentId,
     int ProductId,
     string? ProductName,
-    int ProductUnitId,
-    string? ProductUnitName,
     decimal Quantity,
     decimal UnitCost,
-    decimal LineTotal,
-    bool IsActive
+    decimal TotalCost
 );

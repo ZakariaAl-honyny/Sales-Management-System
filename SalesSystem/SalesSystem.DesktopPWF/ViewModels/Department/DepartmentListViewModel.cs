@@ -163,8 +163,7 @@ public class DepartmentListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var search = SearchText.Trim().ToLower();
-        return dept.Name.ToLower().Contains(search) ||
-               (dept.BranchName?.ToLower().Contains(search) ?? false);
+        return dept.Name.ToLower().Contains(search);
     }
 
     private void AddDepartment()

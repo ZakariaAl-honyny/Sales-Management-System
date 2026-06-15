@@ -220,7 +220,7 @@
 **Features Planned**:
 - Product entity simplified: remove PurchasePrice/SalePrice/WholesalePrice/RetailPrice/ExpirationDate/Barcode
 - Multi-currency pricing via `ProductPrices` (ProductUnitId, CurrencyId, Price, EffectiveFrom, EffectiveTo)
-- FIFO/FEFO batch tracking via `InventoryBatches` (ProductId, PurchaseInvoiceItemId, Quantity, UnitCost, BatchNo, ExpiryDate)
+- FIFO/FEFO batch tracking via `InventoryBatches` (ProductId, PurchaseInvoiceLineId, Quantity, UnitCost, BatchNo, ExpiryDate)
 - PriceLevel enum: Retail=1, Wholesale=2, VIP=3, Distributor=4
 - PriceLevelService returns `Result<decimal>` for price calculations
 - Multiple product images per product

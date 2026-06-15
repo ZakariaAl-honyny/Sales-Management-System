@@ -32,8 +32,8 @@ A developer reviews the Domain project and finds C# entity classes for all 22 da
 
 **Acceptance Scenarios**:
 
-1. **Given** the Domain project is built, **When** a developer counts entity classes, **Then** there are entity classes corresponding to all 22 tables (Users, Units, Categories, Products, Warehouses, WarehouseStocks, Suppliers, Customers, PurchaseInvoices, PurchaseInvoiceItems, SalesInvoices, SalesInvoiceItems, PurchaseReturns, PurchaseReturnItems, SalesReturns, SalesReturnItems, StockTransfers, StockTransferItems, CustomerPayments, SupplierPayments, InventoryMovements, StoreSettings) plus DocumentSequences and a BaseEntity.
-2. **Given** a SalesInvoiceItem entity, **When** `Quantity=5`, `UnitPrice=100`, `DiscountAmount=50`, **Then** `LineTotal` is calculated as `(5 * 100) - 50 = 450`.
+1. **Given** the Domain project is built, **When** a developer counts entity classes, **Then** there are entity classes corresponding to all 22 tables (Users, Units, Categories, Products, Warehouses, WarehouseStocks, Suppliers, Customers, PurchaseInvoices, PurchaseInvoiceLines, SalesInvoices, SalesInvoiceLines, PurchaseReturns, PurchaseReturnItems, SalesReturns, SalesReturnItems, StockTransfers, StockTransferItems, CustomerPayments, SupplierPayments, InventoryMovements, StoreSettings) plus DocumentSequences and a BaseEntity.
+2. **Given** a SalesInvoiceLine entity, **When** `Quantity=5`, `UnitPrice=100`, `DiscountAmount=50`, **Then** `LineTotal` is calculated as `(5 * 100) - 50 = 450`.
 3. **Given** a SalesInvoice entity, **When** items have LineTotals of 450 and 300, InvoiceDiscount=50, TaxAmount=0, PaidAmount=500, **Then** SubTotal=750, TotalAmount=700, DueAmount=200.
 4. **Given** a SalesInvoice entity, **When** PaidAmount exceeds TotalAmount, **Then** the entity throws a domain exception.
 
@@ -68,7 +68,7 @@ A developer sets the connection string environment variable and runs `dotnet ef 
 1. **Given** a clean SQL Server instance and a configured connection string, **When** `dotnet ef database update` is run, **Then** the database is created with all tables.
 2. **Given** the created database, **When** the `WarehouseStocks` table is inspected, **Then** a CHECK constraint `Quantity >= 0` exists.
 3. **Given** the created database, **When** money columns are inspected (e.g., `SalePrice`, `TotalAmount`, `PaidAmount`), **Then** all are `decimal(18,2)`.
-4. **Given** the created database, **When** quantity columns are inspected (e.g., `Quantity` in WarehouseStocks, SalesInvoiceItems), **Then** all are `decimal(18,3)`.
+4. **Given** the created database, **When** quantity columns are inspected (e.g., `Quantity` in WarehouseStocks, SalesInvoiceLines), **Then** all are `decimal(18,3)`.
 5. **Given** the created database, **When** text columns are inspected, **Then** all are `nvarchar` (never `varchar`).
 6. **Given** the created database, **When** foreign key constraints are inspected, **Then** all use `ON DELETE NO ACTION` (Restrict behavior).
 

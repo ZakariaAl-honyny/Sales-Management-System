@@ -260,8 +260,7 @@ public class AccountsListViewModel : ViewModelBase, IDisposable
             {
                 result.Add(new AccountTreeNodeDto(
                     node.Id, node.AccountCode, node.NameAr, node.AccountType,
-                    node.Level, node.ColorCode, node.AllowTransactions,
-                    node.OpeningBalance, node.Explanation, filteredChildren));
+                    node.IsLeaf, node.CategoryId, filteredChildren));
             }
         }
         return result;

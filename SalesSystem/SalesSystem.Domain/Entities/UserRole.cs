@@ -13,12 +13,12 @@ public class UserRole : Entity
 {
     public int UserId { get; private set; }
     public User User { get; private set; } = null!;
-    public int RoleId { get; private set; }
+    public short RoleId { get; private set; }
     public Role Role { get; private set; } = null!;
 
     protected UserRole() { } // EF Core
 
-    public static UserRole Create(int userId, int roleId)
+    public static UserRole Create(int userId, short roleId)
     {
         return new UserRole
         {

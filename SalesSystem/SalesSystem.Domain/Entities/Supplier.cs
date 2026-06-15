@@ -1,3 +1,4 @@
+using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
@@ -5,15 +6,15 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Supplier entity. Contact information (Name, Phone, Email, Address, TaxNumber, Notes)
-/// lives on the referenced <see cref="Party"/> record with which it shares its Id (PK = FK).
-/// Supplier adds business-specific fields (PaymentTerms, Notes).
+/// lives on the referenced <see cref="Party"/> record via PartyId FK.
+/// Schema §1.4 — Suppliers table.
 /// </summary>
 public class Supplier : ActivatableEntity
 {
     /// <summary>
-    /// Id is BOTH the primary key AND the foreign key to Parties(Id).
-    /// This enforces a 1:1 relationship: one Party → one Supplier.
+    /// FK to the Party record that holds shared contact data.
     /// </summary>
+    public int PartyId { get; private set; }
 
     /// <summary>
     /// Navigation property to the Party record (shared contact data).
@@ -21,42 +22,49 @@ public class Supplier : ActivatableEntity
     public virtual Party Party { get; private set; } = null!;
 
     /// <summary>
-    /// Payment terms for this supplier (e.g. "صافي 30 يوم", "نقداً").
+    /// FK to the Chart of Accounts Account that holds this supplier's balance.
     /// </summary>
-    public string? PaymentTerms { get; private set; }
+    public int AccountId { get; private set; }
 
     /// <summary>
-    /// Free-text notes for this supplier.
+    /// Navigation property to the linked Account.
+    /// The balance of this supplier lives on this Account.
     /// </summary>
-    public string? Notes { get; private set; }
+    public virtual Account? Account { get; private set; }
+
+    /// <summary>
+    /// Optional FK to AccountCategories for supplier classification.
+    /// </summary>
+    public int? CategoryId { get; private set; }
 
     private Supplier() { } // EF Core
 
     /// <summary>
     /// Factory method to create a new supplier.
-    /// The supplier's Id will be set to the same value as the referenced Party.Id
-    /// (shared primary key pattern). Contact data lives on the Party record.
+    /// Contact data lives on the Party record referenced by <paramref name="partyId"/>.
     /// </summary>
-    /// <param name="partyId">FK to the Party record — also becomes this supplier's Id (must be > 0).</param>
-    /// <param name="paymentTerms">Optional payment terms text.</param>
-    /// <param name="notes">Optional free-text notes.</param>
+    /// <param name="partyId">FK to the Party record (must be > 0).</param>
+    /// <param name="accountId">FK to the Account record (must be > 0).</param>
+    /// <param name="categoryId">Optional FK to AccountCategories.</param>
     /// <param name="createdByUserId">ID of the user creating this supplier.</param>
     /// <returns>A new Supplier instance.</returns>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public static Supplier Create(
         int partyId,
-        string? paymentTerms = null,
-        string? notes = null,
+        int accountId,
+        int? categoryId = null,
         int? createdByUserId = null)
     {
         if (partyId <= 0)
             throw new DomainException("معرّف الطرف غير صالح.");
+        if (accountId <= 0)
+            throw new DomainException("معرّف الحساب غير صالح.");
 
         var supplier = new Supplier
         {
-            Id = partyId,
-            PaymentTerms = paymentTerms?.Trim(),
-            Notes = notes?.Trim(),
+            PartyId = partyId,
+            AccountId = accountId,
+            CategoryId = categoryId,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -68,18 +76,14 @@ public class Supplier : ActivatableEntity
     /// Updates the supplier-specific fields.
     /// Contact data is updated on the linked <see cref="Party"/> record separately.
     /// </summary>
-    /// <param name="paymentTerms">New payment terms (null = keep current).</param>
-    /// <param name="notes">New notes (null = keep current).</param>
+    /// <param name="categoryId">New category id (null = keep current).</param>
     /// <param name="updatedByUserId">ID of the user performing the update.</param>
     public void Update(
-        string? paymentTerms = null,
-        string? notes = null,
+        int? categoryId = null,
         int? updatedByUserId = null)
     {
-        if (paymentTerms != null)
-            PaymentTerms = paymentTerms.Trim();
-        if (notes != null)
-            Notes = notes.Trim();
+        if (categoryId.HasValue)
+            CategoryId = categoryId;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

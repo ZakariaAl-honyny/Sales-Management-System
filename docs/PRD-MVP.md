@@ -864,10 +864,10 @@ public record SalesInvoiceDto(
     decimal PaidAmount,
     decimal DueAmount,
     string Status,
-    List<SalesInvoiceItemDto> Items
+    List<SalesInvoiceLineDto> Items
 );
 
-public record SalesInvoiceItemDto(
+public record SalesInvoiceLineDto(
     int ProductId,
     string ProductName,
     decimal Quantity,
@@ -885,10 +885,10 @@ public record CreateSalesInvoiceRequest(
     int PaymentType,           // 1=Cash, 2=Credit, 3=Mixed
     decimal PaidAmount,
     string? Notes,
-    List<SalesInvoiceItemRequest> Items
+    List<SalesInvoiceLineRequest> Items
 );
 
-public record SalesInvoiceItemRequest(
+public record SalesInvoiceLineRequest(
     int ProductId,
     decimal Quantity,
     decimal UnitPrice,
@@ -1637,10 +1637,10 @@ public record CreatePurchaseInvoiceCommand : IRequest<int>
     public int CashBoxId { get; init; }     // NEW: Which cash box pays
     public int CashierId { get; init; }
     public string? Notes { get; init; }
-    public List<PurchaseInvoiceItemRequest> Items { get; init; } = new();
+    public List<PurchaseInvoiceLineRequest> Items { get; init; } = new();
 }
 
-public record PurchaseInvoiceItemRequest(
+public record PurchaseInvoiceLineRequest(
     int ProductUnitId,
     decimal Quantity,
     decimal UnitCost,
@@ -1836,9 +1836,9 @@ public class SalesDbContext : DbContext
     public DbSet<Supplier> Suppliers => Set<Supplier>();
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
-    public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
     public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
-    public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+    public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
     public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
     public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
     public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
@@ -2306,9 +2306,9 @@ public class ProductUnitBuilderViewModel : BaseViewModel
 Task 4.2 â€” Purchase Invoice ViewModel (with Price Sync Indicator)
 csharp
 
-// File: WPF/ViewModels/Invoice/PurchaseInvoiceItemViewModel.cs
+// File: WPF/ViewModels/Invoice/PurchaseInvoiceLineViewModel.cs
 
-public class PurchaseInvoiceItemViewModel : BaseViewModel
+public class PurchaseInvoiceLineViewModel : BaseViewModel
 {
     private readonly IMediator _mediator;
 

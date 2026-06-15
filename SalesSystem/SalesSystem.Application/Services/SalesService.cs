@@ -139,37 +139,23 @@ public class SalesService : ISalesService
                 invoiceNo,
                 request.CustomerId,
                 request.InvoiceDate,
-                request.DueDate,
                 (PaymentType)request.PaymentType,
                 request.DiscountAmount,
                 otherCharges: request.OtherCharges,
                 notes: request.Notes,
                 cashBoxId: request.CashBoxId,
                 taxId: (short?)request.TaxId,
-                currencyId: (short?)request.CurrencyId,
+                currencyId: request.CurrencyId ?? 0,
                 exchangeRate: request.ExchangeRate,
                 createdByUserId: userId
             );
             foreach (var item in request.Items)
             {
-                // Phase 25: Get cost from InventoryBatches via ProductCostService
-                decimal? costInBaseCurrency = null;
-                var costResult = await _productCostService.GetAverageCostAsync(item.ProductId, ct);
-                if (costResult.IsSuccess)
-                {
-                    costInBaseCurrency = costResult.Value;
-                }
-
-                var invoiceItem = SalesInvoiceItem.Create(
+                var invoiceItem = SalesInvoiceLine.Create(
                     item.ProductId,
+                    item.ProductUnitId,
                     item.Quantity,
-                    item.UnitPrice,
-                    item.DiscountAmount,
-                    (SaleMode)item.Mode,
-                    item.Notes,
-                    costInBaseCurrency: costInBaseCurrency,
-                    isPriceOverridden: item.IsPriceOverridden,
-                    productUnitId: item.ProductUnitId
+                    item.UnitPrice
                 );
                 invoice.AddItem(invoiceItem);
             }
@@ -184,9 +170,9 @@ public class SalesService : ISalesService
                 var effectiveCurrencyId = request.CurrencyId ?? (await GetBaseCurrencyIdAsync(ct));
                 foreach (var item in request.Items)
                 {
-                    if (!item.ProductUnitId.HasValue) continue;
+                    if (item.ProductUnitId <= 0) continue;
                     var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
-                        item.ProductUnitId.Value, effectiveCurrencyId, ct);
+                        item.ProductUnitId, effectiveCurrencyId, ct);
                     if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
                     {
                         await transaction.RollbackAsync(ct);
@@ -235,9 +221,9 @@ public class SalesService : ISalesService
 
         try
         {
-            if (request.CustomerId.HasValue)
+            if (request.CustomerId > 0)
             {
-                var customer = await _uow.Customers.GetByIdAsync(request.CustomerId.Value, ct);
+                var customer = await _uow.Customers.GetByIdAsync(request.CustomerId, ct);
                 if (customer == null)
                     return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
             }
@@ -246,17 +232,15 @@ public class SalesService : ISalesService
             invoice.SetPaidAmount(request.PaidAmount);
 
             // Re-create items (simplest way for draft)
-            _uow.SalesInvoiceItems.DeleteRange(invoice.Items);
+            _uow.SalesInvoiceLines.DeleteRange(invoice.Items);
             invoice.Items.Clear();
             foreach (var item in request.Items)
             {
-                var invoiceItem = SalesInvoiceItem.Create(
+                var invoiceItem = SalesInvoiceLine.Create(
                     item.ProductId,
+                    item.ProductUnitId,
                     item.Quantity,
-                    item.UnitPrice,
-                    item.DiscountAmount,
-                    (SaleMode)item.Mode,
-                    item.Notes
+                    item.UnitPrice
                 );
                 invoice.AddItem(invoiceItem);
             }
@@ -319,9 +303,8 @@ public class SalesService : ISalesService
             var effectiveCurrencyId = await GetCurrencyIdAsync(invoice, ct);
             foreach (var item in invoice.Items)
             {
-                if (!item.ProductUnitId.HasValue) continue;
                 var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
-                    item.ProductUnitId.Value, effectiveCurrencyId, ct);
+                    item.ProductUnitId, effectiveCurrencyId, ct);
                 if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
                 {
                     var productName = item.Product?.Name ?? $"معرف {item.ProductId}";
@@ -336,15 +319,23 @@ public class SalesService : ISalesService
 
         if (!allowBelowCostSale)
         {
+            // Fetch costs per distinct product for the warning check
+            var productCosts = new Dictionary<int, decimal>();
+            foreach (var productId in invoice.Items.Select(i => i.ProductId).Distinct())
+            {
+                var costResult = await _productCostService.GetAverageCostAsync(productId, ct);
+                if (costResult.IsSuccess && costResult.Value > 0)
+                    productCosts[productId] = costResult.Value;
+            }
+
             foreach (var item in invoice.Items)
             {
-                if (item.CostInBaseCurrency.HasValue && item.CostInBaseCurrency.Value > 0
-                    && item.UnitPrice < item.CostInBaseCurrency.Value)
+                if (productCosts.TryGetValue(item.ProductId, out var avgCost) && item.UnitPrice < avgCost)
                 {
                     var productName = item.Product?.Name ?? $"معرف {item.ProductId}";
                     _logger.LogWarning(
                         "Sale below cost: Product '{Product}' (unit price {UnitPrice} < cost {Cost}) for invoice #{InvoiceNo} — warning only, sale allowed",
-                        productName, item.UnitPrice, item.CostInBaseCurrency.Value, invoice.InvoiceNo);
+                        productName, item.UnitPrice, avgCost, invoice.InvoiceNo);
                     // Per analysis: warning only, do not block — user can proceed
                 }
             }
@@ -389,16 +380,9 @@ public class SalesService : ISalesService
                 }
 
                 // 4. Update Customer Balance
-                if (invoice.DueAmount > 0)
+                if (invoice.RemainingAmount > 0)
                 {
-                    if (!invoice.CustomerId.HasValue)
-                    {
-                        await transaction.RollbackAsync(ct);
-                        _logger.LogWarning("Cannot post credit invoice {Id} without a customer", invoice.Id);
-                        return Result<SalesInvoiceDto>.Failure("يجب تحديد عميل للفواتير الآجلة");
-                    }
-
-                    var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId.Value, ct);
+                    var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId, ct);
                     if (customer == null)
                     {
                         await transaction.RollbackAsync(ct);
@@ -407,14 +391,14 @@ public class SalesService : ISalesService
                     }
 
                     // Credit limit enforcement — soft check only (balance tracked on linked Account via journal entries)
-                    if (customer.CreditLimit > 0 && invoice.DueAmount > 0)
+                    if (customer.CreditLimit > 0 && invoice.RemainingAmount > 0)
                     {
-                        if (!customer.CheckCreditLimit(invoice.DueAmount))
+                        if (!customer.CheckCreditLimit(invoice.RemainingAmount))
                         {
                             await transaction.RollbackAsync(ct);
                             _logger.LogWarning(
-                                "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Due: {Due}",
-                                customer.Id, customer.CreditLimit, invoice.DueAmount);
+                                "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Remaining: {Remaining}",
+                                customer.Id, customer.CreditLimit, invoice.RemainingAmount);
                             return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
                         }
                     }
@@ -434,8 +418,6 @@ public class SalesService : ISalesService
                         invoice.PaidAmount,
                         paymentAccountId,
                         notes: null,
-                        sourceDocumentId: invoice.Id,
-                        sourceDocumentType: "SalesInvoice",
                         userId: userId,
                         ct: ct);
 
@@ -573,8 +555,6 @@ public class SalesService : ISalesService
                             invoice.PaidAmount,
                             reversalAccountId,
                             notes: "إلغاء فاتورة - مردود مدفوعات",
-                            sourceDocumentId: invoice.Id,
-                            sourceDocumentType: "SalesInvoiceCancel",
                             userId: userId,
                             ct: ct);
 
@@ -628,8 +608,8 @@ public class SalesService : ISalesService
     /// </summary>
     private async Task<short> GetCurrencyIdAsync(SalesInvoice invoice, CancellationToken ct)
     {
-        if (invoice.CurrencyId.HasValue)
-            return invoice.CurrencyId.Value;
+        if (invoice.CurrencyId > 0)
+            return invoice.CurrencyId;
 
         var currencies = await _uow.Currencies.ToListAsync(ct);
         var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency);
@@ -667,15 +647,14 @@ public class SalesService : ISalesService
             i.WarehouseId,
             i.Warehouse?.Name ?? "غير معروف",
             i.InvoiceDate,
-            i.DueDate,
             (byte)i.PaymentType,
             i.SubTotal,
             i.DiscountAmount,
             i.TaxAmount,
             i.OtherCharges,
-            i.TotalAmount,
+            i.NetTotal,
             i.PaidAmount,
-            i.DueAmount,
+            i.RemainingAmount,
             i.Notes,
             (byte)i.Status,
             i.TaxId,
@@ -684,21 +663,14 @@ public class SalesService : ISalesService
             i.CurrencyId,
             i.ExchangeRate,
             i.CashBoxId,
-            i.CashBox?.BoxName,
-            i.TotalCost,
-            i.TotalProfit,
-            i.Items.Select(it => new SalesInvoiceItemDto(
+            i.CashBox?.Name,
+            i.Items.Select(it => new SalesInvoiceLineDto(
                 it.Id,
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitPrice,
-                it.DiscountAmount,
                 it.LineTotal,
-                (byte)it.Mode,
-                it.CostInBaseCurrency,
-                it.Profit,
-                it.IsPriceOverridden,
                 it.ProductUnitId
             )).ToList()
         );

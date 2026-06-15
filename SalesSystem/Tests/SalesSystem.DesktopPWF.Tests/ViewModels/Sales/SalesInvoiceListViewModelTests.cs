@@ -470,15 +470,14 @@ public class SalesInvoiceListViewModelTests : IDisposable
             WarehouseId: 1,
             WarehouseName: "المستودع الرئيسي",
             InvoiceDate: DateTime.Today,
-            DueDate: null,
-            PaymentType: 1,
+                        PaymentType: 1,
             SubTotal: totalAmount,
             DiscountAmount: 0,
             TaxAmount: 0,
             OtherCharges: 0,
-            TotalAmount: totalAmount,
+            NetTotal: totalAmount,
             PaidAmount: totalAmount,
-            DueAmount: 0,
+            RemainingAmount: 0,
             Notes: null,
             Status: status,
             TaxId: null,
@@ -488,10 +487,10 @@ public class SalesInvoiceListViewModelTests : IDisposable
             ExchangeRate: null,
             CashBoxId: null,
             CashBoxName: null,
-            TotalCost: null,
-            TotalProfit: null,
-            Items: new List<SalesInvoiceItemDto>());
+            Items: new List<SalesInvoiceLineDto>());
     }
 
     #endregion
 }
+
+

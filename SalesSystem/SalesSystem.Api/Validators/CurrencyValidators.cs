@@ -18,13 +18,10 @@ public class CreateCurrencyRequestValidator : AbstractValidator<CreateCurrencyRe
 
         RuleFor(x => x.Symbol)
             .NotEmpty().WithMessage("رمز العملة (Symbol) مطلوب")
-            .MaximumLength(10).WithMessage("رمز العملة (Symbol) لا يمكن أن يتجاوز 10 أحرف");
-
-        RuleFor(x => x.ExchangeRateToBase)
-            .GreaterThan(0).WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
+            .MaximumLength(20).WithMessage("رمز العملة (Symbol) لا يمكن أن يتجاوز 20 حرفاً");
 
         RuleFor(x => x.FractionName)
-            .MaximumLength(20).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً")
+            .MaximumLength(50).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 50 حرفاً")
             .When(x => !string.IsNullOrEmpty(x.FractionName));
 
         RuleFor(x => x.DecimalPlaces)
@@ -42,13 +39,10 @@ public class UpdateCurrencyRequestValidator : AbstractValidator<UpdateCurrencyRe
 
         RuleFor(x => x.Symbol)
             .NotEmpty().WithMessage("رمز العملة (Symbol) مطلوب")
-            .MaximumLength(10).WithMessage("رمز العملة (Symbol) لا يمكن أن يتجاوز 10 أحرف");
-
-        RuleFor(x => x.ExchangeRateToBase)
-            .GreaterThan(0).WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
+            .MaximumLength(20).WithMessage("رمز العملة (Symbol) لا يمكن أن يتجاوز 20 حرفاً");
 
         RuleFor(x => x.FractionName)
-            .MaximumLength(20).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 20 حرفاً")
+            .MaximumLength(50).WithMessage("اسم الجزء الكسري لا يمكن أن يتجاوز 50 حرفاً")
             .When(x => !string.IsNullOrEmpty(x.FractionName));
 
         RuleFor(x => x.DecimalPlaces)
@@ -56,11 +50,4 @@ public class UpdateCurrencyRequestValidator : AbstractValidator<UpdateCurrencyRe
     }
 }
 
-public class UpdateExchangeRateRequestValidator : AbstractValidator<UpdateExchangeRateRequest>
-{
-    public UpdateExchangeRateRequestValidator()
-    {
-        RuleFor(x => x.NewRate)
-            .GreaterThan(0).WithMessage("سعر الصرف الجديد يجب أن يكون أكبر من صفر");
-    }
-}
+

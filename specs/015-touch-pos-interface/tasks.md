@@ -47,7 +47,7 @@ To support execution by a smaller/cheaper LLM model, these tasks are written wit
 ## Phase 4: User Story 3 — In-Line Fast Cart Management (Priority P1)
 *Goal: Build the left-side panel for active cart management with inline + / - controls.*
 
-- [X] T010 [P] [US3] Create `TouchPosCartViewModel.cs` in `SalesSystem.DesktopPWF/ViewModels/Sales/`. It should maintain a reference to the active `SalesInvoiceDto` or `ObservableCollection<SalesInvoiceItemDto>`. Implement commands: `IncreaseQtyCommand`, `DecreaseQtyCommand`, `RemoveItemCommand` (each taking the `SalesInvoiceItemDto` as parameter). These commands MUST trigger the calculation logic in the Domain/MainViewModel so totals update.
+- [X] T010 [P] [US3] Create `TouchPosCartViewModel.cs` in `SalesSystem.DesktopPWF/ViewModels/Sales/`. It should maintain a reference to the active `SalesInvoiceDto` or `ObservableCollection<SalesInvoiceLineDto>`. Implement commands: `IncreaseQtyCommand`, `DecreaseQtyCommand`, `RemoveItemCommand` (each taking the `SalesInvoiceLineDto` as parameter). These commands MUST trigger the calculation logic in the Domain/MainViewModel so totals update.
 - [X] T011 [US3] Create `TouchPosCartView.xaml` (UserControl) and its code-behind in `SalesSystem.DesktopPWF/Views/Sales/`. Set `d:DataContext="{d:DesignInstance Type=viewmodels:TouchPosCartViewModel}"`.
 - [X] T012 [US3] In `TouchPosCartView.xaml`, implement a top area using a `ListView` or `DataGrid` bound to the cart items. In the row template, include TextBlocks for Name and Total Price, and three Buttons: `+`, `-`, and `🗑` bound to the commands from T010.
 

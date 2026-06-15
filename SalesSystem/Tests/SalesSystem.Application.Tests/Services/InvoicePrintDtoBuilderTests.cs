@@ -10,8 +10,8 @@ using SalesSystem.Domain.Enums;
 namespace SalesSystem.Application.Tests.Services;
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  LEGACY: InvoicePrintDtoBuilderTests relied on old SalesInvoiceItem.Create/
-//  PurchaseInvoiceItem.Create signatures (InvoiceNo as string, discountAmount
+//  LEGACY: InvoicePrintDtoBuilderTests relied on old SalesInvoiceLine.Create/
+//  PurchaseInvoiceLine.Create signatures (InvoiceNo as string, discountAmount
 //  param) which changed. InvoiceNo is now int, and AddItem no longer has
 //  discountAmount parameter. Preserved for reference — NOT included in build.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -185,8 +185,8 @@ public class InvoicePrintDtoBuilderTests
     {
         var product = CreateProduct("منتج تجريبي");
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1);
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 3, unitPrice: 25.50m, discountAmount: 5);
-        SetNavigation(item, nameof(SalesInvoiceItem.Product), product);
+        var item = SalesInvoiceLine.Create(productId: 1, quantity: 3, unitPrice: 25.50m, discountAmount: 5);
+        SetNavigation(item, nameof(SalesInvoiceLine.Product), product);
         invoice.AddItem(item);
 
         var result = await _sut.BuildFromSalesAsync(
@@ -206,7 +206,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldFallbackToProductIdWhenProductNavigationNull()
     {
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1);
-        var item = SalesInvoiceItem.Create(productId: 42, quantity: 1, unitPrice: 10);
+        var item = SalesInvoiceLine.Create(productId: 42, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
 
         var result = await _sut.BuildFromSalesAsync(
@@ -235,12 +235,12 @@ public class InvoicePrintDtoBuilderTests
         var product2 = CreateProduct("منتج ب");
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1);
 
-        var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 2, unitPrice: 10);
-        SetNavigation(item1, nameof(SalesInvoiceItem.Product), product1);
+        var item1 = SalesInvoiceLine.Create(productId: 1, quantity: 2, unitPrice: 10);
+        SetNavigation(item1, nameof(SalesInvoiceLine.Product), product1);
         invoice.AddItem(item1);
 
-        var item2 = SalesInvoiceItem.Create(productId: 2, quantity: 1, unitPrice: 50, discountAmount: 4);
-        SetNavigation(item2, nameof(SalesInvoiceItem.Product), product2);
+        var item2 = SalesInvoiceLine.Create(productId: 2, quantity: 1, unitPrice: 50, discountAmount: 4);
+        SetNavigation(item2, nameof(SalesInvoiceLine.Product), product2);
         invoice.AddItem(item2);
 
         var result = await _sut.BuildFromSalesAsync(
@@ -258,7 +258,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldMapFinancialTotals()
     {
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, discountAmount: 10);
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 5, unitPrice: 20, discountAmount: 5);
+        var item = SalesInvoiceLine.Create(productId: 1, quantity: 5, unitPrice: 20, discountAmount: 5);
         invoice.AddItem(item);
         invoice.SetTaxAmount(15);
         invoice.SetPaidAmount(100);
@@ -279,7 +279,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldHaveZeroChangeWhenPaidEqualsTotal()
     {
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, discountAmount: 0);
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 50);
+        var item = SalesInvoiceLine.Create(productId: 1, quantity: 1, unitPrice: 50);
         invoice.AddItem(item);
         invoice.SetPaidAmount(50);
 
@@ -300,7 +300,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldMapPaymentMethod(PaymentType paymentType, string expected)
     {
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, paymentType: paymentType);
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 10);
+        var item = SalesInvoiceLine.Create(productId: 1, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
         invoice.SetPaidAmount(10);
 
@@ -314,7 +314,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromSalesAsync_ShouldMapNotes()
     {
         var invoice = SalesInvoice.Create(warehouseId: 1, invoiceNo: 1, notes: "اشترى مع زبون آخر");
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 1, unitPrice: 10);
+        var item = SalesInvoiceLine.Create(productId: 1, quantity: 1, unitPrice: 10);
         invoice.AddItem(item);
         invoice.SetPaidAmount(10);
 
@@ -366,8 +366,8 @@ public class InvoicePrintDtoBuilderTests
     {
         var product = CreateProduct("مادة خام");
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1);
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 10, unitCost: 8.50m);
-        SetNavigation(item, nameof(PurchaseInvoiceItem.Product), product);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10, unitCost: 8.50m);
+        SetNavigation(item, nameof(PurchaseInvoiceLine.Product), product);
         invoice.AddItem(item);
 
         var result = await _sut.BuildFromPurchaseAsync(
@@ -386,7 +386,7 @@ public class InvoicePrintDtoBuilderTests
     public async Task BuildFromPurchaseAsync_ShouldMapFinancialTotals()
     {
         var invoice = PurchaseInvoice.Create(supplierId: 1, warehouseId: 1, invoiceNo: 1, discountAmount: 20);
-        var item = PurchaseInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 100, unitCost: 5);
+        var item = PurchaseInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 100, unitCost: 5);
         invoice.AddItem(item);
         invoice.SetTaxAmount(30);
         invoice.SetPaidAmount(500);

@@ -5,7 +5,7 @@ using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
+
 
 namespace SalesSystem.Application.Services;
 
@@ -36,7 +36,7 @@ public class WarehouseService : IWarehouseService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search;
-            predicate = w => w.Name.Contains(s) || w.Code.Contains(s);
+            predicate = w => w.Name.Contains(s);
         }
 
         var (items, total) = await _uow.Warehouses.GetPagedAsync(
@@ -51,12 +51,9 @@ public class WarehouseService : IWarehouseService
         var warehouse = Warehouse.Create(
             request.BranchId,
             request.Name,
-            request.Code,
-            (WarehouseType)request.Type,
-            request.Location,
             request.Phone,
             request.Address,
-            request.ManagerName
+            request.Notes
         );
 
         await _uow.Warehouses.AddAsync(warehouse, ct);
@@ -75,12 +72,9 @@ public class WarehouseService : IWarehouseService
         warehouse.Update(
             request.BranchId,
             request.Name,
-            request.Code,
-            (WarehouseType)request.Type,
-            request.Location,
             request.Phone,
             request.Address,
-            request.ManagerName
+            request.Notes
         );
 
         if (request.IsActive != warehouse.IsActive)
@@ -118,7 +112,7 @@ public class WarehouseService : IWarehouseService
         if (await _uow.WarehouseStocks.AnyAsync(ws => ws.WarehouseId == id, ct))
             return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه يحتوي على مخزون");
 
-        if (await _uow.WarehouseTransfers.AnyAsync(st => st.SourceWarehouseId == id || st.DestinationWarehouseId == id, ct))
+        if (await _uow.WarehouseTransfers.AnyAsync(st => st.FromWarehouseId == id || st.ToWarehouseId == id, ct))
             return Result.Failure("لا يمكن حذف المخزن نهائياً لأنه مرتبط بتحويلات مخزون");
 
         try
@@ -140,13 +134,10 @@ public class WarehouseService : IWarehouseService
     {
         return new WarehouseDto(
             w.Id,
-            w.Code,
             w.Name,
-            (byte)w.Type,
-            w.Location,
             w.Phone,
             w.Address,
-            w.ManagerName,
+            w.Notes,
             w.IsActive
         );
     }

@@ -114,6 +114,7 @@ public class CustomerEditorViewModelTests : IDisposable
             TaxNumber: null,
             CreditLimit: 5000,
             IsActive: false,
+            PartyId: 1,
             AccountId: 1);
 
         // Act
@@ -156,6 +157,7 @@ public class CustomerEditorViewModelTests : IDisposable
             TaxNumber: null,
             CreditLimit: 0,
             IsActive: true,
+            PartyId: 1,
             AccountId: 1);
 
         var viewModel = new CustomerEditorViewModel(customer, _mockCustomerService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
@@ -555,6 +557,7 @@ public class CustomerEditorViewModelTests : IDisposable
             TaxNumber: null,
             CreditLimit: 0,
             IsActive: true,
+            PartyId: 1,
             AccountId: 1);
     }
 
@@ -576,3 +579,4 @@ public class CustomerEditorViewModelTests : IDisposable
 
     #endregion
 }
+

@@ -199,10 +199,8 @@ public class AccountEditorViewModel : ViewModelBase
             {
                 // ── Update existing account ──
                 var updateRequest = new UpdateAccountRequest(
-                    NameAr, NameEn, AccountType, Level,
-                    _parentAccountId, Description,
-                    string.IsNullOrWhiteSpace(ColorCode) ? null : ColorCode,
-                    AllowTransactions, Description, null);
+                    NameAr, NameEn, AccountType, Level >= 4,
+                    _parentAccountId, null);
 
                 var result = await _accountService.UpdateAsync(_editAccountId!.Value, updateRequest);
                 if (result.IsSuccess)
@@ -221,10 +219,8 @@ public class AccountEditorViewModel : ViewModelBase
             {
                 // ── Create new account ──
                 var createRequest = new CreateAccountRequest(
-                    AccountCode, NameAr, NameEn, AccountType, Level,
-                    _parentAccountId, false, Description,
-                    string.IsNullOrWhiteSpace(ColorCode) ? null : ColorCode,
-                    AllowTransactions, OpeningBalance, Description, null);
+                    AccountCode, NameAr, NameEn, AccountType, Level >= 4,
+                    _parentAccountId, false, null);
 
                 var result = await _accountService.CreateAsync(createRequest);
                 if (result.IsSuccess)

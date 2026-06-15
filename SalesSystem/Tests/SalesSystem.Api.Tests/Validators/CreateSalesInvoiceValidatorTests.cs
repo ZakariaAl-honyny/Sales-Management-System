@@ -178,7 +178,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenEmptyItems_WhenValidating_ThenFails()
     {
         // Arrange
-        var request = CreateValidRequest() with { Items = new List<CreateSalesInvoiceItemRequest>() };
+        var request = CreateValidRequest() with { Items = new List<CreateSalesInvoiceLineRequest>() };
 
         // Act
         var result = _validator.TestValidate(request);
@@ -223,7 +223,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithZeroProductId_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = 0 }
         };
@@ -241,7 +241,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithNegativeProductId_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = -1 }
         };
@@ -259,7 +259,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithValidProductId_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = 1 }
         };
@@ -276,7 +276,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithSmallPositiveQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 0.01m }
         };
@@ -293,7 +293,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithUnitQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 1 }
         };
@@ -310,7 +310,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithLargeQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 1000m }
         };
@@ -327,7 +327,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithZeroQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 0 }
         };
@@ -345,7 +345,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithNegativeQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = -1 }
         };
@@ -363,7 +363,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithSmallNegativeQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = -0.01m }
         };
@@ -381,7 +381,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithZeroUnitPrice_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { UnitPrice = 0 }
         };
@@ -398,7 +398,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithPositiveUnitPrice_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { UnitPrice = 50.25m }
         };
@@ -415,7 +415,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenItemWithNegativeUnitPrice_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { UnitPrice = -0.01m }
         };
@@ -429,58 +429,6 @@ public class CreateSalesInvoiceValidatorTests
             .WithErrorMessage("السعر لا يمكن أن يكون سالباً");
     }
 
-    [Fact]
-    public void GivenItemWithZeroItemDiscount_WhenValidating_ThenPasses()
-    {
-        // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = 0 }
-        };
-        var request = CreateValidRequest() with { Items = items };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].DiscountAmount");
-    }
-
-    [Fact]
-    public void GivenItemWithPositiveDiscount_WhenValidating_ThenPasses()
-    {
-        // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = 10m }
-        };
-        var request = CreateValidRequest() with { Items = items };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].DiscountAmount");
-    }
-
-    [Fact]
-    public void GivenItemWithNegativeDiscount_WhenValidating_ThenFails()
-    {
-        // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
-        {
-            CreateValidItem() with { DiscountAmount = -5 }
-        };
-        var request = CreateValidRequest() with { Items = items };
-
-        // Act
-        var result = _validator.TestValidate(request);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor("Items[0].DiscountAmount")
-            .WithErrorMessage("الخصم لا يمكن أن يكون سالباً");
-    }
-
     #endregion
 
     #region Multiple Items Validation
@@ -489,7 +437,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenMultipleValidItems_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem(productId: 1),
             CreateValidItem(productId: 2),
@@ -508,7 +456,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenOneInvalidItemAmongValidItems_WhenValidating_ThenFailsForInvalidOnly()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem(productId: 1, quantity: 1),
             CreateValidItem(productId: 2, quantity: 0), // Invalid - zero quantity
@@ -554,7 +502,7 @@ public class CreateSalesInvoiceValidatorTests
     public void GivenVeryLargeQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreateSalesInvoiceItemRequest>
+        var items = new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 999999.999m }
         };
@@ -608,12 +556,11 @@ public class CreateSalesInvoiceValidatorTests
     private static CreateSalesInvoiceRequest CreateValidRequest() => new(
         WarehouseId: 1,
         InvoiceNo: null,
-        CustomerId: null,
+        CustomerId: 1,
         CashBoxId: 1,
         InvoiceDate: DateTime.UtcNow.AddDays(-1),
-        DueDate: null,
         PaymentType: PaymentType.Cash,
-        DiscountAmount: 0,
+        DiscountAmount: 0m,
         TaxAmount: 0,
         OtherCharges: 0m,
         PaidAmount: 100m,
@@ -621,23 +568,21 @@ public class CreateSalesInvoiceValidatorTests
         CurrencyId: null,
         ExchangeRate: null,
         TaxId: null,
-        Items: new List<CreateSalesInvoiceItemRequest>
+        Items: new List<CreateSalesInvoiceLineRequest>
         {
             CreateValidItem()
         }
     );
 
-    private static CreateSalesInvoiceItemRequest CreateValidItem(
+    private static CreateSalesInvoiceLineRequest CreateValidItem(
         int productId = 1,
         decimal quantity = 1,
-        decimal unitPrice = 100m,
-        decimal discountAmount = 0
+        decimal unitPrice = 100m
     ) => new(
         ProductId: productId,
         Quantity: quantity,
         UnitPrice: unitPrice,
-        DiscountAmount: discountAmount,
-        Mode: SaleMode.Retail,
-        Notes: null
+        ProductUnitId: 1
     );
 }
+

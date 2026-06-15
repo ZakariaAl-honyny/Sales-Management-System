@@ -53,8 +53,8 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "عميل أول", "0501234567", null, null, null, 0m, true, 1),
-            new(2, "عميل ثاني", "0507654321", null, null, null, 0m, true, 1)
+            new(1, "عميل أول", "0501234567", null, null, null, 0m, true, 1, 1),
+            new(2, "عميل ثاني", "0507654321", null, null, null, 0m, true, 1, 1)
         };
 
         _mockCustomerService
@@ -93,7 +93,7 @@ public class CustomerListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto>
             {
-                new(1, "Test", null, null, null, null, 0m, true, 1)
+                new(1, "Test", null, null, null, null, 0m, true, 1, 1)
             }));
 
         await _viewModel.LoadCustomersAsync();
@@ -109,7 +109,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
         var customerToDelete = new CustomerDto(
-            5, "عميل للحذف", null, null, null, null, 0m, true, 1);
+            5, "عميل للحذف", null, null, null, null, 0m, true, 1, 1);
 
         _mockCustomerService
             .Setup(s => s.GetAllAsync())
@@ -141,7 +141,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
         var customerToDelete = new CustomerDto(
-            5, "عميل", null, null, null, null, 0m, true, 1);
+            5, "عميل", null, null, null, null, 0m, true, 1, 1);
 
         _mockCustomerService.Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto> { customerToDelete }));
@@ -167,7 +167,7 @@ public class CustomerListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenCustomerSelected_PublishesEvent()
     {
         var customerToDelete = new CustomerDto(
-            5, "عميل", null, null, null, null, 0m, true, 1);
+            5, "عميل", null, null, null, null, 0m, true, 1, 1);
 
         _mockCustomerService.Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<CustomerDto>>.Success(new List<CustomerDto> { customerToDelete }));
@@ -200,9 +200,9 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "أحمد محمد", null, null, null, null, 0m, true, 1),
-            new(2, "خالد علي", null, null, null, null, 0m, true, 1),
-            new(3, "أحمد خالد", null, null, null, null, 0m, true, 1)
+            new(1, "أحمد محمد", null, null, null, null, 0m, true, 1, 1),
+            new(2, "خالد علي", null, null, null, null, 0m, true, 1, 1),
+            new(3, "أحمد خالد", null, null, null, null, 0m, true, 1, 1)
         };
 
         _mockCustomerService
@@ -233,8 +233,8 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "أحمد", null, null, null, null, 0m, true, 1),
-            new(2, "خالد", null, null, null, null, 0m, true, 1)
+            new(1, "أحمد", null, null, null, null, 0m, true, 1, 1),
+            new(2, "خالد", null, null, null, null, 0m, true, 1, 1)
         };
 
         _mockCustomerService
@@ -285,7 +285,7 @@ public class CustomerListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1, 1);
         _viewModel.SelectedCustomer = customer;
 
         propertyChangedEvents.Should().Contain("SelectedCustomer");
@@ -316,7 +316,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenCustomerSelected()
     {
-        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1, 1);
         _viewModel.SelectedCustomer = customer;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -331,7 +331,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenCustomerSelected()
     {
-        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1);
+        var customer = new CustomerDto(1, "عميل", null, null, null, null, 0m, true, 1, 1);
         _viewModel.SelectedCustomer = customer;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -377,7 +377,7 @@ public class CustomerListViewModelTests : IDisposable
     [Fact]
     public async Task OnCustomerChanged_WhenEventReceived_RefreshesCustomerList()
     {
-        var customer = new CustomerDto(1, "محدث", null, null, null, null, 0m, true, 1);
+        var customer = new CustomerDto(1, "محدث", null, null, null, null, 0m, true, 1, 1);
 
         var callCount = 0;
         _mockCustomerService
@@ -420,7 +420,7 @@ public class CustomerListViewModelTests : IDisposable
     {
         var customers = new List<CustomerDto>
         {
-            new(1, "عميل", null, null, null, null, 0m, true, 1)
+            new(1, "عميل", null, null, null, null, 0m, true, 1, 1)
         };
 
         _mockCustomerService

@@ -12,16 +12,17 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 5,
-            notes: "Supplier return",
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1,
+            notes: "Supplier return"
         );
 
         pr.ReturnNo.Should().Be(1);
         pr.WarehouseId.Should().Be(1);
         pr.SupplierId.Should().Be(5);
-        pr.PurchaseInvoiceId.Should().BeNull();
+        pr.PurchaseInvoiceId.Should().Be(20);
         pr.Notes.Should().Be("Supplier return");
         pr.Status.Should().Be(InvoiceStatus.Draft);
     }
@@ -31,7 +32,12 @@ public class PurchaseReturnTests
     [InlineData(-1)]
     public void Create_GivenInvalidReturnNo_ShouldThrowDomainException(int invalidReturnNo)
     {
-        var action = () => PurchaseReturn.Create(returnNo: invalidReturnNo, warehouseId: (short)1, supplierId: 1);
+        var action = () => PurchaseReturn.Create(
+            returnNo: invalidReturnNo,
+            purchaseInvoiceId: 20,
+            supplierId: 1,
+            warehouseId: (short)1,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("رقم الإرجاع مطلوب.");
@@ -40,7 +46,12 @@ public class PurchaseReturnTests
     [Fact]
     public void Create_GivenWarehouseIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => PurchaseReturn.Create(returnNo: 1, warehouseId: 0, supplierId: 1);
+        var action = () => PurchaseReturn.Create(
+            returnNo: 1,
+            purchaseInvoiceId: 20,
+            supplierId: 1,
+            warehouseId: 0,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("المستودع مطلوب.");
@@ -49,59 +60,66 @@ public class PurchaseReturnTests
     [Fact]
     public void Create_GivenSupplierIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => PurchaseReturn.Create(returnNo: 1, warehouseId: (short)1, supplierId: 0);
+        var action = () => PurchaseReturn.Create(
+            returnNo: 1,
+            purchaseInvoiceId: 20,
+            supplierId: 0,
+            warehouseId: (short)1,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("المورد مطلوب.");
     }
 
     [Fact]
-    public void AddItem_GivenValidData_ShouldAddItemAndRecalculateTotals()
+    public void AddLine_GivenValidData_ShouldAddLineAndRecalculateTotal()
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 2, unitCost: 100m);
+        var line = PurchaseReturnLine.Create(purchaseInvoiceLineId: 5, quantity: 2m, amount: 200m);
+        pr.AddLine(line);
 
-        pr.Items.Should().HaveCount(1);
-        pr.SubTotal.Should().Be(200m); // 2 * 100
+        pr.Lines.Should().HaveCount(1);
         pr.TotalAmount.Should().Be(200m);
     }
 
     [Fact]
-    public void AddItem_MultipleItems_ShouldSumLineTotalsCorrectly()
+    public void AddLine_MultipleLines_ShouldSumAmountsCorrectly()
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
-        pr.AddItem(productId: 2, productUnitId: 1, quantity: 2, unitCost: 50m);
+        pr.AddLine(PurchaseReturnLine.Create(purchaseInvoiceLineId: 1, quantity: 1m, amount: 100m));
+        pr.AddLine(PurchaseReturnLine.Create(purchaseInvoiceLineId: 2, quantity: 2m, amount: 100m));
 
-        pr.Items.Should().HaveCount(2);
-        pr.SubTotal.Should().Be(200m); // 100 + (2*50)
+        pr.Lines.Should().HaveCount(2);
+        pr.TotalAmount.Should().Be(200m);
     }
 
     [Fact]
-    public void RecalculateTotals_EmptyItems_ShouldSetTotalsToZero()
+    public void RecalculateTotals_EmptyLines_ShouldSetTotalToZero()
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         pr.RecalculateTotals();
 
-        pr.SubTotal.Should().Be(0m);
         pr.TotalAmount.Should().Be(0m);
     }
 
@@ -110,12 +128,13 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
         pr.Post();
 
         pr.Status.Should().Be(InvoiceStatus.Posted);
@@ -126,9 +145,10 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         var action = () => pr.Post();
@@ -142,18 +162,19 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
         pr.Post();
 
         var action = () => pr.Post();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("فقط المرتجعات المسودة يمكن ترحيلها.");
+            .WithMessage("فقط مرتجعات المشتريات المسودة يمكن ترحيلها.");
     }
 
     [Fact]
@@ -161,9 +182,10 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         pr.Cancel();
@@ -176,12 +198,13 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        pr.AddItem(productId: 1, productUnitId: 1, quantity: 1, unitCost: 100m);
+        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
         pr.Post();
         pr.Cancel();
 
@@ -193,9 +216,10 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            warehouseId: (short)1,
+            purchaseInvoiceId: 20,
             supplierId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         pr.Cancel();
@@ -203,66 +227,49 @@ public class PurchaseReturnTests
         var action = () => pr.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المرتجع ملغى بالفعل.");
-    }
-
-    [Fact]
-    public void Create_GivenNoPurchaseInvoiceId_ShouldBeNull()
-    {
-        var pr = PurchaseReturn.Create(
-            returnNo: 1,
-            warehouseId: (short)1,
-            supplierId: 1,
-            userId: 1
-        );
-
-        pr.PurchaseInvoiceId.Should().BeNull();
+            .WithMessage("مرتجع المشتريات ملغي بالفعل.");
     }
 }
 
-public class PurchaseReturnItemTests
+public class PurchaseReturnLineTests
 {
     [Fact]
-    public void Create_GivenValidData_ShouldCreateItem()
+    public void Create_GivenValidData_ShouldCreateLine()
     {
-        var item = PurchaseReturnItem.Create(
-            productId: 1,
-            productUnitId: 1,
-            quantity: 2,
-            unitCost: 100m
+        var line = PurchaseReturnLine.Create(
+            purchaseInvoiceLineId: 5,
+            quantity: 2m,
+            amount: 200m
         );
 
-        item.ProductId.Should().Be(1);
-        item.Quantity.Should().Be(2);
-        item.UnitCost.Should().Be(100m);
-        item.LineTotal.Should().Be(200m);
+        line.PurchaseInvoiceLineId.Should().Be(5);
+        line.Quantity.Should().Be(2m);
+        line.Amount.Should().Be(200m);
     }
 
     [Fact]
-    public void Create_GivenProductIdIsZero_ShouldThrowArgumentException()
+    public void Create_GivenPurchaseInvoiceLineIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => PurchaseReturnItem.Create(
-            productId: 0,
-            productUnitId: 1,
-            quantity: 1,
-            unitCost: 100m
+        var action = () => PurchaseReturnLine.Create(
+            purchaseInvoiceLineId: 0,
+            quantity: 1m,
+            amount: 100m
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المنتج مطلوب.");
+            .WithMessage("رقم بند فاتورة الشراء الأصلي مطلوب.");
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Create_GivenInvalidQuantity_ShouldThrowArgumentException(decimal invalidQuantity)
+    public void Create_GivenInvalidQuantity_ShouldThrowDomainException(decimal invalidQuantity)
     {
-        var action = () => PurchaseReturnItem.Create(
-            productId: 1,
-            productUnitId: 1,
+        var action = () => PurchaseReturnLine.Create(
+            purchaseInvoiceLineId: 1,
             quantity: invalidQuantity,
-            unitCost: 100m
+            amount: 100m
         );
 
         action.Should().Throw<DomainException>()
@@ -272,45 +279,27 @@ public class PurchaseReturnItemTests
     [Theory]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Create_GivenNegativeUnitCost_ShouldThrowArgumentException(decimal negativeCost)
+    public void Create_GivenNegativeAmount_ShouldThrowDomainException(decimal negativeAmount)
     {
-        var action = () => PurchaseReturnItem.Create(
-            productId: 1,
-            productUnitId: 1,
-            quantity: 1,
-            unitCost: negativeCost
+        var action = () => PurchaseReturnLine.Create(
+            purchaseInvoiceLineId: 1,
+            quantity: 1m,
+            amount: negativeAmount
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("تكلفة الوحدة لا يمكن أن تكون سالبة.");
+            .WithMessage("المبلغ لا يمكن أن يكون سالباً.");
     }
 
     [Fact]
-    public void Create_GivenZeroUnitCost_ShouldSucceed()
+    public void Create_GivenZeroAmount_ShouldSucceed()
     {
-        var item = PurchaseReturnItem.Create(
-            productId: 1,
-            productUnitId: 1,
-            quantity: 1,
-            unitCost: 0m
+        var line = PurchaseReturnLine.Create(
+            purchaseInvoiceLineId: 1,
+            quantity: 1m,
+            amount: 0m
         );
 
-        item.UnitCost.Should().Be(0m);
-        item.LineTotal.Should().Be(0m);
-    }
-
-    [Fact]
-    public void RecalculateLineTotal_ShouldUpdateLineTotal()
-    {
-        var item = PurchaseReturnItem.Create(
-            productId: 1,
-            productUnitId: 1,
-            quantity: 3,
-            unitCost: 50m
-        );
-
-        item.RecalculateLineTotal();
-
-        item.LineTotal.Should().Be(150m);
+        line.Amount.Should().Be(0m);
     }
 }

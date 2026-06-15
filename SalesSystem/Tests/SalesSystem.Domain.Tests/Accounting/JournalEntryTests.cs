@@ -21,8 +21,8 @@ public class JournalEntryTests
     private static JournalEntry CreateBalancedEntry()
     {
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 100m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
+        entry.AddCreditLine(accountId: 2, amount: 100m);
         return entry;
     }
 
@@ -42,7 +42,7 @@ public class JournalEntryTests
 
         // Assert
         entry.EntryNumber.Should().Be("JE-2026-000001");
-        entry.TransactionDate.Should().Be(new DateTime(2026, 6, 1));
+        entry.EntryDate.Should().Be(new DateTime(2026, 6, 1));
         entry.EntryType.Should().Be(JournalEntryType.Manual);
         entry.Status.Should().Be(JournalEntryStatus.Draft);
         entry.ReversedByEntryId.Should().BeNull();
@@ -51,8 +51,6 @@ public class JournalEntryTests
         entry.ReferenceType.Should().BeNull();
         entry.ReferenceId.Should().BeNull();
         entry.ReferenceNumber.Should().BeNull();
-        entry.CurrencyId.Should().BeNull();
-        entry.ExchangeRate.Should().BeNull();
     }
 
     [Fact]
@@ -296,7 +294,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
 
         // Assert
         entry.Lines.Should().HaveCount(1);
@@ -311,7 +309,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
+        entry.AddCreditLine(accountId: 2, amount: 50m);
 
         // Assert
         entry.Lines.Should().HaveCount(1);
@@ -326,9 +324,9 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 200m);
-        entry.AddDebitLine(accountId: 3, "301", "صندوق", amount: 150m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 350m);
+        entry.AddDebitLine(accountId: 1, amount: 200m);
+        entry.AddDebitLine(accountId: 3, amount: 150m);
+        entry.AddCreditLine(accountId: 2, amount: 350m);
 
         // Assert
         entry.Lines.Should().HaveCount(3);
@@ -341,7 +339,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        var act = () => entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: -100m);
+        var act = () => entry.AddDebitLine(accountId: 1, amount: -100m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -355,7 +353,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        var act = () => entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 0m);
+        var act = () => entry.AddDebitLine(accountId: 1, amount: 0m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -369,7 +367,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        var act = () => entry.AddCreditLine(accountId: 2, "201", "دائن", amount: -50m);
+        var act = () => entry.AddCreditLine(accountId: 2, amount: -50m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -383,7 +381,7 @@ public class JournalEntryTests
         var entry = CreateEmptyEntry();
 
         // Act
-        var act = () => entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 0m);
+        var act = () => entry.AddCreditLine(accountId: 2, amount: 0m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -398,7 +396,7 @@ public class JournalEntryTests
         entry.Post(postedByUserId: 1);
 
         // Act
-        var act = () => entry.AddDebitLine(accountId: 3, "301", "رأس المال", amount: 50m);
+        var act = () => entry.AddDebitLine(accountId: 3, amount: 50m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -413,7 +411,7 @@ public class JournalEntryTests
         entry.Post(postedByUserId: 1);
 
         // Act
-        var act = () => entry.AddCreditLine(accountId: 3, "301", "رأس المال", amount: 50m);
+        var act = () => entry.AddCreditLine(accountId: 3, amount: 50m);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -447,10 +445,10 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
-        entry.AddDebitLine(accountId: 3, "301", "صندوق", amount: 200m);
-        entry.AddDebitLine(accountId: 5, "501", "بنك", amount: 50m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 350m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
+        entry.AddDebitLine(accountId: 3, amount: 200m);
+        entry.AddDebitLine(accountId: 5, amount: 50m);
+        entry.AddCreditLine(accountId: 2, amount: 350m);
 
         // Assert
         entry.TotalDebit.Should().Be(350m);
@@ -461,10 +459,10 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 500m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 300m);
-        entry.AddCreditLine(accountId: 4, "401", "مورد", amount: 150m);
-        entry.AddCreditLine(accountId: 6, "601", "ضريبة", amount: 50m);
+        entry.AddDebitLine(accountId: 1, amount: 500m);
+        entry.AddCreditLine(accountId: 2, amount: 300m);
+        entry.AddCreditLine(accountId: 4, amount: 150m);
+        entry.AddCreditLine(accountId: 6, amount: 50m);
 
         // Assert
         entry.TotalCredit.Should().Be(500m);
@@ -475,8 +473,8 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 12345.67m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 12345.67m);
+        entry.AddDebitLine(accountId: 1, amount: 12345.67m);
+        entry.AddCreditLine(accountId: 2, amount: 12345.67m);
 
         // Assert
         entry.TotalDebit.Should().Be(12345.67m);
@@ -487,8 +485,8 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 999999.99m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 999999.99m);
+        entry.AddDebitLine(accountId: 1, amount: 999999.99m);
+        entry.AddCreditLine(accountId: 2, amount: 999999.99m);
 
         // Assert
         entry.TotalCredit.Should().Be(999999.99m);
@@ -514,8 +512,8 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
+        entry.AddCreditLine(accountId: 2, amount: 50m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -542,9 +540,9 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 1000m);
-        entry.AddDebitLine(accountId: 3, "301", "بنك", amount: 500m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 1500m);
+        entry.AddDebitLine(accountId: 1, amount: 1000m);
+        entry.AddDebitLine(accountId: 3, amount: 500m);
+        entry.AddCreditLine(accountId: 2, amount: 1500m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -564,9 +562,9 @@ public class JournalEntryTests
             "قيد مبيعات",
             JournalEntryType.Sales,
             createdBy: 1);
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 1150m);
-        entry.AddCreditLine(accountId: 9, "401", "إيرادات المبيعات", amount: 1000m);
-        entry.AddCreditLine(accountId: 6, "601", "ضريبة المخرجات", amount: 150m);
+        entry.AddDebitLine(accountId: 1, amount: 1150m);
+        entry.AddCreditLine(accountId: 9, amount: 1000m);
+        entry.AddCreditLine(accountId: 6, amount: 150m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -588,9 +586,9 @@ public class JournalEntryTests
             "قيد مشتريات",
             JournalEntryType.Purchase,
             createdBy: 1);
-        entry.AddDebitLine(accountId: 3, "301", "المخزون", amount: 500m);
-        entry.AddDebitLine(accountId: 7, "701", "ضريبة المدخلات", amount: 25m);
-        entry.AddCreditLine(accountId: 1, "101", "نقدي", amount: 525m);
+        entry.AddDebitLine(accountId: 3, amount: 500m);
+        entry.AddDebitLine(accountId: 7, amount: 25m);
+        entry.AddCreditLine(accountId: 1, amount: 525m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -606,8 +604,8 @@ public class JournalEntryTests
     {
         // Arrange: difference of 0.0005m is less than 0.001 tolerance
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100.0005m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 100m);
+        entry.AddDebitLine(accountId: 1, amount: 100.0005m);
+        entry.AddCreditLine(accountId: 2, amount: 100m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -621,8 +619,8 @@ public class JournalEntryTests
     {
         // Arrange: difference of 0.002m is more than 0.001 tolerance
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100.002m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 100m);
+        entry.AddDebitLine(accountId: 1, amount: 100.002m);
+        entry.AddCreditLine(accountId: 2, amount: 100m);
 
         // Act
         var balanced = entry.IsBalanced();
@@ -652,8 +650,8 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
+        entry.AddCreditLine(accountId: 2, amount: 50m);
 
         // Act
         var act = () => entry.Post(postedByUserId: 1);
@@ -781,8 +779,8 @@ public class JournalEntryTests
     {
         // Arrange
         var entry = CreateEmptyEntry();
-        entry.AddDebitLine(accountId: 1, "101", "نقدي", amount: 100m);
-        entry.AddCreditLine(accountId: 2, "201", "دائن", amount: 50m);
+        entry.AddDebitLine(accountId: 1, amount: 100m);
+        entry.AddCreditLine(accountId: 2, amount: 50m);
 
         // Act
         var act = () => entry.Post(postedByUserId: 1);

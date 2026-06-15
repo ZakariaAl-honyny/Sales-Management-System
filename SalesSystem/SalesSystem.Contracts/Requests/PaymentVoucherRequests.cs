@@ -9,9 +9,7 @@ public record CreatePaymentVoucherRequest(
     int CashBoxId,
     int AccountId,
     decimal TotalAmount,
-    string? Notes = null,
-    int? SourceDocumentId = null,
-    string? SourceDocumentType = null
+    string? Notes = null
 );
 
 /// <summary>
@@ -19,7 +17,5 @@ public record CreatePaymentVoucherRequest(
 /// </summary>
 public record UpdatePaymentVoucherRequest(
     DateTime? VoucherDate = null,
-    string? Notes = null,
-    int? SourceDocumentId = null,
-    string? SourceDocumentType = null
+    string? Notes = null
 );

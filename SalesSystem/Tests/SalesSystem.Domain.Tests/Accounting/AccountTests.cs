@@ -17,23 +17,17 @@ public class AccountTests
             accountCode: "CASH01",
             nameAr: "نقدي",
             nameEn: "Cash",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         account.AccountCode.Should().Be("CASH01");
         account.NameAr.Should().Be("نقدي");
         account.NameEn.Should().Be("Cash");
-        account.AccountType.Should().Be(AccountType.Asset);
-        account.Level.Should().Be(4);
-        account.ParentAccountId.Should().BeNull();
-        account.IsSystemAccount.Should().BeFalse();
-        account.AllowTransactions.Should().BeTrue();
-        account.Description.Should().BeNull();
-        account.ColorCode.Should().BeNull();
-        account.OpeningBalance.Should().BeNull();
-        account.Notes.Should().BeNull();
+        account.GetAccountType().Should().Be(AccountType.Asset);
+        account.ParentId.Should().BeNull();
+        account.IsSystem.Should().BeFalse();
+        account.IsLeaf.Should().BeTrue();
         account.IsActive.Should().BeTrue();
     }
 
@@ -45,14 +39,13 @@ public class AccountTests
             accountCode: "1000",
             nameAr: "الأصول",
             nameEn: "Assets",
-            accountType: AccountType.Asset,
-            level: 1,
-            isSystemAccount: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false,
+            isSystem: true);
 
         // Assert
-        account.Level.Should().Be(1);
-        account.AllowTransactions.Should().BeFalse();
-        account.IsSystemAccount.Should().BeTrue();
+        account.IsLeaf.Should().BeFalse();
+        account.IsSystem.Should().BeTrue();
     }
 
     [Fact]
@@ -63,9 +56,8 @@ public class AccountTests
             accountCode: "",
             nameAr: "اسم",
             nameEn: "name",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -80,9 +72,8 @@ public class AccountTests
             accountCode: "CODE01",
             nameAr: "",
             nameEn: "Name",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -97,9 +88,8 @@ public class AccountTests
             accountCode: "CODE01",
             nameAr: "   ",
             nameEn: "Name",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -114,9 +104,8 @@ public class AccountTests
             accountCode: "CODE01",
             nameAr: "اسم",
             nameEn: "Name",
-            accountType: (AccountType)99,
-            level: 4,
-            allowTransactions: true);
+            nature: 99,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -131,9 +120,9 @@ public class AccountTests
             accountCode: "PAR01",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 2,
-            parentAccountId: -1);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false,
+            parentId: -1);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -148,9 +137,8 @@ public class AccountTests
             accountCode: "ABCDEFGHIJKLMNOPQRSTU",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -158,19 +146,19 @@ public class AccountTests
     }
 
     [Fact]
-    public void Create_LevelOutOfRange_ThrowsDomainException()
+    public void Create_NatureOutOfRange_ThrowsDomainException()
     {
         // Act
         var act = () => Account.Create(
             accountCode: "LEV01",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 0);
+            nature: 0,
+            isLeaf: false);
 
         // Assert
         act.Should().Throw<DomainException>()
-            .Which.Message.Should().Be("مستوى الحساب يجب أن يكون بين 1 و 10");
+            .Which.Message.Should().Contain("نوع الحساب غير صالح");
     }
 
     [Fact]
@@ -181,46 +169,41 @@ public class AccountTests
             accountCode: "LEV02",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 11);
+            nature: 99);
 
         // Assert
         act.Should().Throw<DomainException>()
-            .Which.Message.Should().Be("مستوى الحساب يجب أن يكون بين 1 و 10");
+            .Which.Message.Should().Contain("نوع الحساب غير صالح");
     }
 
     [Fact]
     public void Create_Level4WithoutAllowTransactions_ThrowsDomainException()
     {
         // Act
-        var act = () => Account.Create(
+        var account = Account.Create(
             accountCode: "DTL01",
             nameAr: "تفصيلي",
             nameEn: "Detail",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: false);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false);
 
         // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Be("الحساب التفصيلي يجب أن يسمح بالحركات");
+        account.IsLeaf.Should().BeFalse();
     }
 
     [Fact]
-    public void Create_Level3WithAllowTransactions_Succeeds()
+    public void Create_IsLeafTrue_Succeeds()
     {
         // Act
         var account = Account.Create(
             accountCode: "SUB01",
             nameAr: "حساب وسيط",
             nameEn: "Sub Account",
-            accountType: AccountType.Asset,
-            level: 3,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
-        account.Level.Should().Be(3);
-        account.AllowTransactions.Should().BeTrue();
+        account.IsLeaf.Should().BeTrue();
     }
 
     [Fact]
@@ -231,12 +214,12 @@ public class AccountTests
             accountCode: "SUB01",
             nameAr: "حساب فرعي",
             nameEn: "Sub Account",
-            accountType: AccountType.Asset,
-            level: 2,
-            parentAccountId: 10);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false,
+            parentId: 10);
 
         // Assert
-        account.ParentAccountId.Should().Be(10);
+        account.ParentId.Should().Be(10);
     }
 
     [Fact]
@@ -247,80 +230,43 @@ public class AccountTests
             accountCode: "SYS001",
             nameAr: "حساب نظامي",
             nameEn: "System",
-            accountType: AccountType.Equity,
-            level: 1,
-            isSystemAccount: true);
+            nature: (byte)AccountType.Equity,
+            isLeaf: false,
+            isSystem: true);
 
         // Assert
-        account.IsSystemAccount.Should().BeTrue();
+        account.IsSystem.Should().BeTrue();
     }
 
     [Fact]
-    public void Create_WithDescription_SetsDescription()
+    public void Create_WithCategoryId_SetsCategoryId()
     {
         // Act
         var account = Account.Create(
             accountCode: "DESC01",
             nameAr: "وصف",
             nameEn: "Description",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true,
-            description: "هذا شرح للحساب");
+            nature: (byte)AccountType.Liability,
+            isLeaf: true,
+            categoryId: 1);
 
         // Assert
-        account.Description.Should().Be("هذا شرح للحساب");
+        account.CategoryId.Should().Be(1);
     }
 
     [Fact]
-    public void Create_WithColorCode_SetsColorCode()
+    public void Create_NonLeaf_Succeeds()
     {
         // Act
         var account = Account.Create(
             accountCode: "CLR01",
             nameAr: "ملون",
             nameEn: "Colored",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true,
-            colorCode: "#2196F3");
+            nature: (byte)AccountType.Asset,
+            isLeaf: false);
 
         // Assert
-        account.ColorCode.Should().Be("#2196F3");
-    }
-
-    [Fact]
-    public void Create_WithOpeningBalance_SetsOpeningBalance()
-    {
-        // Act
-        var account = Account.Create(
-            accountCode: "BAL01",
-            nameAr: "رصيد",
-            nameEn: "Balance",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true,
-            openingBalance: 15000.50m);
-
-        // Assert
-        account.OpeningBalance.Should().Be(15000.50m);
-    }
-
-    [Fact]
-    public void Create_WithNotes_SetsNotes()
-    {
-        // Act
-        var account = Account.Create(
-            accountCode: "NOTE01",
-            nameAr: "ملاحظات",
-            nameEn: "Notes",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true,
-            notes: "هذه ملاحظة توضيحية");
-
-        // Assert
-        account.Notes.Should().Be("هذه ملاحظة توضيحية");
+        account.IsLeaf.Should().BeFalse();
     }
 
     [Fact]
@@ -331,9 +277,8 @@ public class AccountTests
             accountCode: "USR01",
             nameAr: "مستخدم",
             nameEn: "User",
-            accountType: AccountType.Expense,
-            level: 4,
-            allowTransactions: true,
+            nature: (byte)AccountType.Expense,
+            isLeaf: true,
             createdByUserId: 5);
 
         // Assert
@@ -348,9 +293,8 @@ public class AccountTests
             accountCode: "OPT01",
             nameAr: "اختياري",
             nameEn: string.Empty,
-            accountType: AccountType.Revenue,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Revenue,
+            isLeaf: true);
 
         // Assert
         account.NameEn.Should().Be(string.Empty);
@@ -364,9 +308,8 @@ public class AccountTests
             accountCode: "  CODE01  ",
             nameAr: "اسم",
             nameEn: "Name",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         account.AccountCode.Should().Be("CODE01");
@@ -380,9 +323,8 @@ public class AccountTests
             accountCode: "CODE01",
             nameAr: "  اسم مع مسافات  ",
             nameEn: "Name",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Liability,
+            isLeaf: true);
 
         // Assert
         account.NameAr.Should().Be("اسم مع مسافات");
@@ -397,13 +339,11 @@ public class AccountTests
             accountCode: "LVL01",
             nameAr: "مستوى أول",
             nameEn: "Level One",
-            accountType: AccountType.Asset,
-            level: 1,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
-        account.Level.Should().Be(1);
-        account.AllowTransactions.Should().BeTrue();
+        account.IsLeaf.Should().BeTrue();
     }
 
     [Fact]
@@ -414,30 +354,20 @@ public class AccountTests
             accountCode: "ALL01",
             nameAr: "جميع الحقول",
             nameEn: "All Fields",
-            accountType: AccountType.Asset,
-            level: 4,
-            parentAccountId: 1,
-            isSystemAccount: false,
-            description: "شرح كامل",
-            colorCode: "#FF9800",
-            allowTransactions: true,
-            openingBalance: 5000m,
-            notes: "ملاحظات",
+            nature: (byte)AccountType.Asset,
+            isLeaf: true,
+            parentId: 1,
+            isSystem: false,
             createdByUserId: 10);
 
         // Assert
         account.AccountCode.Should().Be("ALL01");
         account.NameAr.Should().Be("جميع الحقول");
         account.NameEn.Should().Be("All Fields");
-        account.AccountType.Should().Be(AccountType.Asset);
-        account.Level.Should().Be(4);
-        account.ParentAccountId.Should().Be(1);
-        account.IsSystemAccount.Should().BeFalse();
-        account.Description.Should().Be("شرح كامل");
-        account.ColorCode.Should().Be("#FF9800");
-        account.AllowTransactions.Should().BeTrue();
-        account.OpeningBalance.Should().Be(5000m);
-        account.Notes.Should().Be("ملاحظات");
+        account.GetAccountType().Should().Be(AccountType.Asset);
+        account.ParentId.Should().Be(1);
+        account.IsSystem.Should().BeFalse();
+        account.IsLeaf.Should().BeTrue();
         account.CreatedByUserId.Should().Be(10);
         account.IsActive.Should().BeTrue();
     }
@@ -452,8 +382,8 @@ public class AccountTests
             accountCode: "CHD01",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 2);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false);
 
         // Act
         var result = account.HasChildren();
@@ -472,16 +402,16 @@ public class AccountTests
             accountCode: "SYS001",
             nameAr: "نظامي",
             nameEn: "System",
-            accountType: AccountType.Equity,
-            level: 1,
-            isSystemAccount: true);
+            nature: (byte)AccountType.Equity,
+            isLeaf: false,
+            isSystem: true);
 
         // Act
         var act = () => account.Update(
             nameAr: "معدل",
             nameEn: "Modified",
-            accountType: AccountType.Equity,
-            level: 1);
+            nature: (byte)AccountType.Equity,
+            isLeaf: false);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -496,29 +426,21 @@ public class AccountTests
             accountCode: "UPD01",
             nameAr: "قديم",
             nameEn: "Old",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "جديد",
             nameEn: "New",
-            accountType: AccountType.Asset,
-            level: 4,
-            description: "وصف محدث",
-            colorCode: "#F44336",
-            allowTransactions: true,
-            notes: "ملاحظة محدثة");
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         account.NameAr.Should().Be("جديد");
         account.NameEn.Should().Be("New");
-        account.AccountType.Should().Be(AccountType.Asset);
-        account.Level.Should().Be(4);
-        account.Description.Should().Be("وصف محدث");
-        account.ColorCode.Should().Be("#F44336");
-        account.Notes.Should().Be("ملاحظة محدثة");
+        account.GetAccountType().Should().Be(AccountType.Asset);
+        account.IsLeaf.Should().BeTrue();
     }
 
     [Fact]
@@ -529,16 +451,15 @@ public class AccountTests
             accountCode: "UPD02",
             nameAr: "اسم",
             nameEn: "Name",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         var act = () => account.Update(
             nameAr: "",
             nameEn: "New Name",
-            accountType: AccountType.Asset,
-            level: 4);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -553,46 +474,19 @@ public class AccountTests
             accountCode: "UPD04",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            parentAccountId: 15,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true,
+            parentId: 15);
 
         // Assert
-        account.ParentAccountId.Should().Be(15);
-    }
-
-    [Fact]
-    public void Update_WithNotes_SetsNotes()
-    {
-        // Arrange
-        var account = Account.Create(
-            accountCode: "UPD05",
-            nameAr: "حساب",
-            nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
-
-        // Act
-        account.Update(
-            nameAr: "محدث",
-            nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true,
-            notes: "ملاحظة جديدة");
-
-        // Assert
-        account.Notes.Should().Be("ملاحظة جديدة");
+        account.ParentId.Should().Be(15);
     }
 
     [Fact]
@@ -603,17 +497,15 @@ public class AccountTests
             accountCode: "UPD06",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true,
+            nature: (byte)AccountType.Asset,
+            isLeaf: true,
             updatedByUserId: 7);
 
         // Assert
@@ -628,20 +520,20 @@ public class AccountTests
             accountCode: "UPD07",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 2,
-            parentAccountId: 10);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false,
+            parentId: 10);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 2,
-            parentAccountId: null);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false,
+            parentId: null);
 
         // Assert
-        account.ParentAccountId.Should().BeNull();
+        account.ParentId.Should().BeNull();
     }
 
     [Fact]
@@ -652,18 +544,16 @@ public class AccountTests
             accountCode: "UPD08",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
         var beforeUpdate = account.UpdatedAt;
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Assert
         account.UpdatedAt.Should().NotBeNull();
@@ -678,16 +568,15 @@ public class AccountTests
             accountCode: "UPD09",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         var act = () => account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: (AccountType)99,
-            level: 4);
+            nature: 99,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
@@ -702,141 +591,109 @@ public class AccountTests
             accountCode: "UPD10",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         var act = () => account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 0);
+            nature: 0,
+            isLeaf: true);
 
         // Assert
         act.Should().Throw<DomainException>()
-            .Which.Message.Should().Be("مستوى الحساب يجب أن يكون بين 1 و 10");
+            .Which.Message.Should().Contain("نوع الحساب غير صالح");
     }
 
     [Fact]
-    public void Update_Level4WithoutAllowTransactions_ThrowsDomainException()
-    {
-        // Arrange
-        var account = Account.Create(
-            accountCode: "UPD11",
-            nameAr: "حساب",
-            nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
-
-        // Act
-        var act = () => account.Update(
-            nameAr: "محدث",
-            nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: false);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Be("الحساب التفصيلي يجب أن يسمح بالحركات");
-    }
-
-    [Fact]
-    public void Update_ChangesAccountType_Succeeds()
+    public void Update_ChangesNature_Succeeds()
     {
         // Arrange
         var account = Account.Create(
             accountCode: "UPD12",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Liability,
+            isLeaf: true);
 
         // Assert
-        account.AccountType.Should().Be(AccountType.Liability);
+        account.GetAccountType().Should().Be(AccountType.Liability);
     }
 
     [Fact]
-    public void Update_ChangesLevel_Succeeds()
+    public void Update_ChangesIsLeaf_Succeeds()
     {
         // Arrange
         var account = Account.Create(
             accountCode: "UPD13",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 2);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 3);
+            nature: (byte)AccountType.Asset,
+            isLeaf: false);
 
         // Assert
-        account.Level.Should().Be(3);
+        account.IsLeaf.Should().BeFalse();
     }
 
     [Fact]
-    public void Update_ChangesDescription_Succeeds()
+    public void Update_WithCategoryId_Succeeds()
     {
         // Arrange
         var account = Account.Create(
             accountCode: "UPD14",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            description: "شرح جديد",
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true,
+            categoryId: 5);
 
         // Assert
-        account.Description.Should().Be("شرح جديد");
+        account.CategoryId.Should().Be(5);
     }
 
     [Fact]
-    public void Update_ChangesColorCode_Succeeds()
+    public void Update_ChangesCategoryId_Succeeds()
     {
         // Arrange
         var account = Account.Create(
             accountCode: "UPD15",
             nameAr: "حساب",
             nameEn: "Account",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         account.Update(
             nameAr: "محدث",
             nameEn: "Updated",
-            accountType: AccountType.Asset,
-            level: 4,
-            colorCode: "#4CAF50",
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true,
+            categoryId: 3);
 
         // Assert
-        account.ColorCode.Should().Be("#4CAF50");
+        account.CategoryId.Should().Be(3);
     }
 
     // ─── Deactivate ───────────────────────────────────
@@ -849,9 +706,9 @@ public class AccountTests
             accountCode: "SYS002",
             nameAr: "نظامي",
             nameEn: "System",
-            accountType: AccountType.Equity,
-            level: 1,
-            isSystemAccount: true);
+            nature: (byte)AccountType.Equity,
+            isLeaf: false,
+            isSystem: true);
 
         // Act
         var act = () => account.Deactivate();
@@ -869,9 +726,8 @@ public class AccountTests
             accountCode: "DEACT01",
             nameAr: "حساب عادي",
             nameEn: "Normal",
-            accountType: AccountType.Expense,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Expense,
+            isLeaf: true);
 
         // Act
         account.Deactivate();
@@ -888,9 +744,8 @@ public class AccountTests
             accountCode: "DEACT02",
             nameAr: "حساب عادي",
             nameEn: "Normal",
-            accountType: AccountType.Expense,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Expense,
+            isLeaf: true);
 
         // Act
         account.Deactivate(updatedByUserId: 3);
@@ -909,9 +764,9 @@ public class AccountTests
             accountCode: "SYS003",
             nameAr: "نظامي",
             nameEn: "System",
-            accountType: AccountType.Equity,
-            level: 1,
-            isSystemAccount: true);
+            nature: (byte)AccountType.Equity,
+            isLeaf: false,
+            isSystem: true);
 
         // Act
         var act = () => account.MarkAsDeleted();
@@ -929,9 +784,8 @@ public class AccountTests
             accountCode: "DEL01",
             nameAr: "حساب عادي",
             nameEn: "Normal",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Liability,
+            isLeaf: true);
 
         // Act
         account.MarkAsDeleted();
@@ -950,9 +804,8 @@ public class AccountTests
             accountCode: "RST01",
             nameAr: "مستعاد",
             nameEn: "Restored",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
         account.Deactivate();
         account.IsActive.Should().BeFalse();
 
@@ -971,9 +824,8 @@ public class AccountTests
             accountCode: "RST02",
             nameAr: "نشط",
             nameEn: "Active",
-            accountType: AccountType.Revenue,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Revenue,
+            isLeaf: true);
 
         // Act
         account.Restore();
@@ -992,9 +844,8 @@ public class AccountTests
             accountCode: "AST01",
             nameAr: "أصل",
             nameEn: "Asset",
-            accountType: AccountType.Asset,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Asset,
+            isLeaf: true);
 
         // Act
         var result = account.IsDebitNormal();
@@ -1011,9 +862,8 @@ public class AccountTests
             accountCode: "EXP01",
             nameAr: "مصروف",
             nameEn: "Expense",
-            accountType: AccountType.Expense,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Expense,
+            isLeaf: true);
 
         // Act
         var result = account.IsDebitNormal();
@@ -1030,9 +880,8 @@ public class AccountTests
             accountCode: "LIB01",
             nameAr: "التزام",
             nameEn: "Liability",
-            accountType: AccountType.Liability,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Liability,
+            isLeaf: true);
 
         // Act
         var result = account.IsDebitNormal();
@@ -1049,9 +898,8 @@ public class AccountTests
             accountCode: "REV01",
             nameAr: "إيراد",
             nameEn: "Revenue",
-            accountType: AccountType.Revenue,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Revenue,
+            isLeaf: true);
 
         // Act
         var result = account.IsDebitNormal();
@@ -1068,9 +916,8 @@ public class AccountTests
             accountCode: "EQT01",
             nameAr: "حقوق ملكية",
             nameEn: "Equity",
-            accountType: AccountType.Equity,
-            level: 4,
-            allowTransactions: true);
+            nature: (byte)AccountType.Equity,
+            isLeaf: true);
 
         // Act
         var result = account.IsDebitNormal();

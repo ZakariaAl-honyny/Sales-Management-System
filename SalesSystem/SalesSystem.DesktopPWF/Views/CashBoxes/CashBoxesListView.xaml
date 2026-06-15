@@ -123,7 +123,7 @@
                           AutomationProperties.AutomationId="DgCashBoxes">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="اسم الصندوق" 
-                                            Binding="{Binding BoxName}" 
+                                            Binding="{Binding Name}" 
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
 
@@ -132,10 +132,10 @@
                                             Width="140" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
 
-                        <DataGridTextColumn Header="رقم الهاتف" 
-                                            Binding="{Binding PhoneNumber}" 
-                                            Width="120" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        <DataGridTextColumn Header="الوصف" 
+                                            Binding="{Binding Description}" 
+                                            Width="*" 
+                                            CellStyle="{StaticResource DataGridCellStyle}"/>
 
                         <DataGridTemplateColumn Header="الحالة" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>

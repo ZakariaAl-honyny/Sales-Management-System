@@ -417,7 +417,7 @@ Tracks which sales invoice items consumed from which purchase lot.
 |---|-------|------|---------|----------|-------------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
 | 2 | `InventoryBatchId` | `int FK` | — | ✅ | FK→InventoryBatches, Restrict |
-| 3 | `SalesInvoiceItemId` | `int FK?` | `null` | ❌ | FK→SalesInvoiceItems |
+| 3 | `SalesInvoiceLineId` | `int FK?` | `null` | ❌ | FK→SalesInvoiceLines |
 | 4 | `SalesReturnItemId` | `int FK?` | `null` | ❌ | FK→SalesReturnItems |
 | 5 | `Quantity` | `decimal(18,3)` | — | ✅ | `CHECK > 0` |
 | 6 | `UnitCost` | `decimal(18,2)` | — | ✅ | Cost at time of allocation |

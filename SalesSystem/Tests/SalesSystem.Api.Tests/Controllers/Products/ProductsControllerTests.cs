@@ -173,9 +173,6 @@ public class ProductsControllerTests : ControllerTestBase
         ReorderLevel: 10.00m,
         TrackExpiry: false,
         ImagePath: null,
-        Notes: null,
-        DefaultPurchaseUnitId: null,
-        DefaultSalesUnitId: null,
         IsActive: true);
 
     private static CreateProductRequest CreateValidRequest() => new(
@@ -193,3 +190,5 @@ public class ProductsControllerTests : ControllerTestBase
         ReorderLevel: 15.00m,
         IsActive: true);
 }
+
+

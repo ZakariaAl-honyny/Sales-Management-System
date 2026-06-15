@@ -7,12 +7,12 @@ public class CreateWarehouseTransferValidator : AbstractValidator<CreateWarehous
 {
     public CreateWarehouseTransferValidator()
     {
-        RuleFor(x => x.SourceWarehouseId)
+        RuleFor(x => x.FromWarehouseId)
             .Must(id => id > 0).WithMessage("يجب اختيار المستودع المصدر");
 
-        RuleFor(x => x.DestinationWarehouseId)
+        RuleFor(x => x.ToWarehouseId)
             .Must(id => id > 0).WithMessage("يجب اختيار المستودع الوجهة")
-            .NotEqual(x => x.SourceWarehouseId).WithMessage("المستودع الوجهة لا يمكن أن يكون نفس المستودع المصدر");
+            .NotEqual(x => x.FromWarehouseId).WithMessage("المستودع الوجهة لا يمكن أن يكون نفس المستودع المصدر");
 
         RuleFor(x => x.TransferDate)
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.TransferDate.HasValue)

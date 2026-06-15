@@ -11,13 +11,13 @@ public class SystemLogConfiguration : IEntityTypeConfiguration<SystemLog>
         builder.ToTable("SystemLogs");
 
         builder.HasKey(e => e.Id);
-
-        builder.Property(e => e.LogLevel)
-            .IsRequired()
-            .HasMaxLength(20);
+        builder.Property(e => e.Id).HasColumnType("bigint");
 
         builder.Property(e => e.Level)
-            .IsRequired(false);
+            .IsRequired();
+
+        builder.Property(e => e.Source)
+            .HasMaxLength(100);
 
         builder.Property(e => e.Message)
             .IsRequired()
@@ -26,15 +26,6 @@ public class SystemLogConfiguration : IEntityTypeConfiguration<SystemLog>
         builder.Property(e => e.Exception)
             .HasColumnType("nvarchar(max)");
 
-        builder.Property(e => e.Source)
-            .HasMaxLength(100);
-
-        builder.Property(e => e.Context)
-            .HasMaxLength(200);
-
-        builder.Property(e => e.MachineName)
-            .HasMaxLength(100);
-
-        builder.HasQueryFilter(e => e.IsActive);
+        builder.HasIndex(e => new { e.Level, e.CreatedAt }).IsDescending(false, true);
     }
 }

@@ -12,7 +12,7 @@ public class SystemSettingTests
         var setting = SystemSetting.Create(
             settingKey: "StoreName",
             settingValue: "My Store",
-            dataType: "string",
+            settingType: 1,
             category: "General",
             displayName: "اسم المتجر",
             description: "اسم المتجر الظاهر في الفواتير"
@@ -20,7 +20,7 @@ public class SystemSettingTests
 
         setting.SettingKey.Should().Be("StoreName");
         setting.SettingValue.Should().Be("My Store");
-        setting.DataType.Should().Be("string");
+        setting.SettingType.Should().Be((byte)1);
         setting.Category.Should().Be("General");
         setting.DisplayName.Should().Be("اسم المتجر");
         setting.Description.Should().Be("اسم المتجر الظاهر في الفواتير");
@@ -34,22 +34,22 @@ public class SystemSettingTests
             settingValue: "0.15"
         );
 
-        setting.DataType.Should().Be("string");
+        setting.SettingType.Should().Be((byte)1);
         setting.Category.Should().Be("General");
         setting.DisplayName.Should().Be("");
         setting.Description.Should().BeNull();
     }
 
     [Fact]
-    public void Create_GivenDifferentDataType_ShouldStoreCorrectly()
+    public void Create_GivenDifferentSettingType_ShouldStoreCorrectly()
     {
         var setting = SystemSetting.Create(
             settingKey: "TaxRate",
             settingValue: "0.15",
-            dataType: "decimal"
+            settingType: 3
         );
 
-        setting.DataType.Should().Be("decimal");
+        setting.SettingType.Should().Be((byte)3);
     }
 
     [Fact]
@@ -131,23 +131,23 @@ public class SystemSettingTests
     }
 
     [Fact]
-    public void UpdateValue_GivenUpdatedBy_ShouldSetUpdatedBy()
+    public void UpdateValue_GivenUpdatedByUserId_ShouldSetUpdatedByUserId()
     {
         var setting = SystemSetting.Create("TaxRate", "0.15");
 
-        setting.UpdateValue("0.20", updatedBy: 5);
+        setting.UpdateValue("0.20", updatedByUserId: 5);
 
-        setting.UpdatedBy.Should().Be(5);
+        setting.UpdatedByUserId.Should().Be(5);
     }
 
     [Fact]
-    public void UpdateValue_GivenNullUpdatedBy_ShouldNotSetUpdatedBy()
+    public void UpdateValue_GivenNullUpdatedByUserId_ShouldNotSetUpdatedByUserId()
     {
         var setting = SystemSetting.Create("TaxRate", "0.15");
 
-        setting.UpdateValue("0.20", updatedBy: null);
+        setting.UpdateValue("0.20", updatedByUserId: null);
 
-        setting.UpdatedBy.Should().BeNull();
+        setting.UpdatedByUserId.Should().BeNull();
     }
 
     [Fact]
@@ -165,11 +165,11 @@ public class SystemSettingTests
     {
         var setting = SystemSetting.Create("Key", "v1");
 
-        setting.UpdateValue("v2", updatedBy: 1);
-        setting.UpdateValue("v3", updatedBy: 2);
+        setting.UpdateValue("v2", updatedByUserId: 1);
+        setting.UpdateValue("v3", updatedByUserId: 2);
 
         setting.SettingValue.Should().Be("v3");
-        setting.UpdatedBy.Should().Be(2);
+        setting.UpdatedByUserId.Should().Be(2);
     }
 
     [Fact]
@@ -192,6 +192,6 @@ public class SystemSettingTests
         setting.SettingKey.Should().Be("Key");
         setting.SettingValue.Should().Be("Value");
         setting.Category.Should().Be("General");
-        setting.DataType.Should().Be("string");
+        setting.SettingType.Should().Be((byte)1);
     }
 }

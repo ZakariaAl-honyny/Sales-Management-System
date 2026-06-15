@@ -17,7 +17,7 @@ public class BankService : IBankService
     private readonly ILogger<BankService> _logger;
 
     /// <summary>
-    /// Parent account code for Bank sub-accounts (Level 3 under Assets).
+    /// Parent account code for Bank sub-accounts (Level 3 under Current Assets).
     /// </summary>
     private const string BankParentAccountCode = "1120";
 
@@ -63,36 +63,37 @@ public class BankService : IBankService
     {
         try
         {
-            // Validate currency
-            var currency = await _uow.Currencies.FirstOrDefaultAsync(
-                c => c.Id == (short)request.CurrencyId, ct);
-            if (currency == null)
-                return Result<BankDto>.Failure("العملة المحددة غير موجودة", ErrorCodes.NotFound);
+            int accountId;
 
-            // Create the bank domain entity (AccountId can be null — the service
-            // auto-creates a sub-account under parent "1120 — البنوك")
-            var bank = Bank.Create(
-                request.AccountId,
-                request.Name,
-                (short)request.CurrencyId,
-                createdByUserId: userId);
+            // Resolve the chart-of-accounts account: either use the provided AccountId
+            // or auto-create a Level-4 detail account under parent "1120 — البنوك".
+            if (request.AccountId.HasValue && request.AccountId.Value > 0)
+            {
+                accountId = request.AccountId.Value;
 
-            // Auto-create Chart of Accounts sub-account under "1120 — البنوك" if no AccountId provided
-            if (!request.AccountId.HasValue || request.AccountId.Value <= 0)
+                var accountExists = await _uow.Accounts.AnyAsync(
+                    a => a.Id == accountId, ct);
+                if (!accountExists)
+                    return Result<BankDto>.Failure(
+                        "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+            }
+            else
             {
                 var accountResult = await AutoCreateBankAccountAsync(request.Name, userId, ct);
                 if (!accountResult.IsSuccess || accountResult.Value == null)
                     return Result<BankDto>.Failure(
                         accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للبنك");
-                bank.SetAccountId(accountResult.Value.Id);
+
+                accountId = accountResult.Value.Id;
             }
-            else
-            {
-                // Validate the specified account exists
-                var accountExists = await _uow.Accounts.AnyAsync(a => a.Id == request.AccountId.Value, ct);
-                if (!accountExists)
-                    return Result<BankDto>.Failure("الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
-            }
+
+            // Create the bank domain entity — AccountId is always resolved before this call
+            var bank = Bank.Create(
+                request.Name,
+                accountId,
+                accountNumber: request.AccountNumber,
+                iban: request.Iban,
+                createdByUserId: userId);
 
             await _uow.Banks.AddAsync(bank, ct);
             await _uow.SaveChangesAsync(ct);
@@ -127,7 +128,11 @@ public class BankService : IBankService
             if (bank == null)
                 return Result<BankDto>.Failure("البنك غير موجود", ErrorCodes.NotFound);
 
-            bank.Update(request.Name, (short)request.CurrencyId, updatedByUserId: userId);
+            bank.Update(
+                request.Name,
+                accountNumber: request.AccountNumber,
+                iban: request.Iban,
+                updatedByUserId: userId);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
@@ -188,7 +193,7 @@ public class BankService : IBankService
 
             // Find max child code under parent to auto-increment
             var children = await _uow.Accounts.ToListAsync(
-                a => a.ParentAccountId == parent.Id,
+                a => a.ParentId == parent.Id,
                 q => q.OrderByDescending(a => a.AccountCode),
                 ct: ct);
 
@@ -201,16 +206,11 @@ public class BankService : IBankService
                 accountCode: newCode,
                 nameAr: $"بنك {bankName}",
                 nameEn: $"Bank {bankName}",
-                accountType: AccountType.Asset,
-                level: 4,
-                parentAccountId: parent.Id,
-                isSystemAccount: false,
-                description: $"الحساب الجاري للبنك: {bankName}",
-                colorCode: "#2196F3",
-                allowTransactions: true,
-                openingBalance: 0,
-                explanation: null,
-                notes: null,
+                nature: (byte)AccountType.Asset,
+                isLeaf: true,
+                parentId: parent.Id,
+                isSystem: false,
+                categoryId: null,
                 createdByUserId: userId);
 
             await _uow.Accounts.AddAsync(account, ct);
@@ -235,7 +235,10 @@ public class BankService : IBankService
             bank.Id,
             bank.AccountId,
             bank.Account?.NameAr ?? bank.Account?.NameEn,
+            bank.Account?.AccountCode,
             bank.Name,
+            bank.AccountNumber,
+            bank.IBAN,
             bank.IsActive
         );
     }

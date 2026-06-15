@@ -1,17 +1,14 @@
 namespace SalesSystem.Contracts.Responses;
 
 /// <summary>
-/// Response for Warehouse entity — no AccountId, IsDefault, or Notes per new schema.
+/// Response for Warehouse entity — no AccountId, IsDefault, Code, Type, Location, or ManagerName per schema.
 /// </summary>
 public record WarehouseResponse(
     int Id,
-    string Code,
     string Name,
-    byte Type,
-    string? Location,
     string? Phone,
     string? Address,
-    string? ManagerName,
+    string? Notes,
     bool IsActive);
 
 /// <summary>

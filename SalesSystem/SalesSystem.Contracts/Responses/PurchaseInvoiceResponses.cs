@@ -19,13 +19,13 @@ public record PurchaseInvoiceResponse(
     int? CurrencyId, string? CurrencyCode, decimal? ExchangeRate,
     string? AttachmentPath,
     string? Notes,
-    List<PurchaseInvoiceItemResponse> Items
+    List<PurchaseInvoiceLineResponse> Items
 );
 
 /// <summary>
 /// استجابة بند فاتورة الشراء.
 /// </summary>
-public record PurchaseInvoiceItemResponse(
+public record PurchaseInvoiceLineResponse(
     int Id, int ProductId, string ProductName,
     int ProductUnitId, string ProductUnitName,
     decimal Quantity, decimal UnitCost, decimal LineTotal

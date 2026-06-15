@@ -132,7 +132,7 @@ public interface IAccountingIntegrationService
     /// Creates journal entry for a standalone sales return.
     /// Reverses revenue: Dr SalesReturnsAccount / Cr CustomerAccount (for the return amount).
     /// Reverses COGS: Dr InventoryAccount / Cr COGSAccount (for the returned items' cost).
-    /// Uses per-entity Customer.Party.AccountId with fallback to AccountsReceivable.
+    /// Uses per-entity Customer.AccountId with fallback to AccountsReceivable.
     /// </summary>
     Task<Result<int>> CreateSalesReturnEntryAsync(
         SalesReturn salesReturn,

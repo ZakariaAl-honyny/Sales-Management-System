@@ -93,6 +93,11 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         ToggleStandaloneModeCommand = new RelayCommand(ToggleStandaloneMode);
     }
 
+    private void ToggleStandaloneMode()
+    {
+        IsLinkedToInvoice = !IsLinkedToInvoice;
+    }
+
     #region Properties
     public DateTime ReturnDate
     {
@@ -159,6 +164,15 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     {
         get => _isLinkedToInvoice;
         set => SetProperty(ref _isLinkedToInvoice, value);
+    }
+
+    public bool IsStandaloneMode => !IsLinkedToInvoice;
+
+    private int? _standaloneSupplierId;
+    public int? StandaloneSupplierId
+    {
+        get => _standaloneSupplierId;
+        set => SetProperty(ref _standaloneSupplierId, value);
     }
 
     public ObservableCollection<WarehouseDto> Warehouses
@@ -425,9 +439,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 Status = (InvoiceStatus)dto.Status;
                 SelectedCurrencyId = dto.CurrencyId;
                 ExchangeRate = dto.ExchangeRate ?? 1.0m;
-                if (dto.DiscountType.HasValue) SelectedDiscountType = dto.DiscountType.Value;
-                DiscountRate = dto.DiscountRate;
-                IsStandaloneMode = !dto.LinkToInvoice;
 
                 if (dto.PurchaseInvoiceId.HasValue)
                 {
@@ -569,10 +580,12 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         {
             ErrorMessage = null;
             var returnItems = Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
+                PurchaseInvoiceLineId: i.PurchaseInvoiceLineId,
                 ProductId: i.ProductId,
                 ProductUnitId: i.ProductUnitId,
                 Quantity: i.ReturnQuantity,
-                UnitCost: i.UnitPrice
+                UnitCost: i.UnitPrice,
+                Amount: i.ReturnQuantity * i.UnitPrice
             )).ToList();
 
             var supplierId = SelectedInvoice?.SupplierId ?? SelectedSupplierId;
@@ -612,31 +625,21 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 
     private CreatePurchaseReturnRequest BuildRequest()
     {
-        decimal discountAmount = 0;
-        if (SelectedDiscountType == 1 && DiscountRate.HasValue)
-        {
-            discountAmount = TotalAmount * DiscountRate.Value / 100m;
-        }
-
         return new CreatePurchaseReturnRequest(
-            PurchaseInvoiceId: IsStandaloneMode ? null : SelectedInvoice?.Id,
+            PurchaseInvoiceId: SelectedInvoice?.Id,
             SupplierId: IsStandaloneMode ? (StandaloneSupplierId ?? 0) : (SelectedInvoice?.SupplierId ?? 0),
             WarehouseId: SelectedWarehouseId,
             ReturnDate: ReturnDate,
             CurrencyId: SelectedCurrencyId,
-            ExchangeRate: ExchangeRate != 1.0m ? ExchangeRate : null,
-            DiscountAmount: discountAmount,
-            DiscountType: SelectedDiscountType > 0 ? SelectedDiscountType : (byte?)null,
-            DiscountRate: DiscountRate,
+            ExchangeRate: ExchangeRate,
             Notes: Notes,
-            Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
+            Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
+                PurchaseInvoiceLineId: i.PurchaseInvoiceLineId,
                 ProductId: i.ProductId,
                 ProductUnitId: i.ProductUnitId,
                 Quantity: i.ReturnQuantity,
-                UnitPrice: i.UnitPrice,
-                DiscountAmount: i.DiscountAmount,
-                Mode: i.Mode,
-                Notes: i.Notes
+                UnitCost: i.UnitPrice,
+                Amount: i.ReturnQuantity * i.UnitPrice
             )).ToList()
         );
     }
@@ -780,6 +783,7 @@ public class PurchaseReturnItemViewModel : ViewModelBase
     private decimal _returnQuantity;
     private readonly ISoundService? _soundService;
 
+    public int PurchaseInvoiceLineId { get; }
     public int ProductId { get; }
     public int ProductUnitId { get; }
     public string ProductName { get; }
@@ -803,19 +807,21 @@ public class PurchaseReturnItemViewModel : ViewModelBase
         }
     }
 
-    public PurchaseReturnItemViewModel(PurchaseInvoiceItemDto item, ISoundService? soundService = null)
+    public PurchaseReturnItemViewModel(PurchaseInvoiceLineDto item, ISoundService? soundService = null)
     {
+        PurchaseInvoiceLineId = item.Id;
         ProductId = item.ProductId;
         ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
-        UnitPrice = item.UnitCost;
+        UnitPrice = item.UnitPrice;
         _returnQuantity = 0;
         _soundService = soundService;
     }
 
     public PurchaseReturnItemViewModel(PurchaseReturnItemDto item, ISoundService? soundService = null)
     {
+        PurchaseInvoiceLineId = 0; // Not available from DTO, set to 0 (read-only view)
         ProductId = item.ProductId;
         ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;

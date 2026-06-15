@@ -25,10 +25,6 @@ public class PurchaseService : IPurchaseService
     private readonly IDocumentSequenceService _documentSequenceService;
     private readonly ILogger<PurchaseService> _logger;
 
-    private static readonly string AttachmentDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-        "SalesSystem", "PurchaseAttachments");
-
     public PurchaseService(
         IUnitOfWork uow,
         IInventoryService inventoryService,
@@ -131,26 +127,23 @@ public class PurchaseService : IPurchaseService
                     (short)request.WarehouseId,
                     invoiceNo,
                     request.InvoiceDate,
-                    request.DueDate,
                     (Domain.Enums.PaymentType)request.PaymentType,
                     request.DiscountAmount,
-                    request.DiscountType is not null ? (Domain.Enums.DiscountType)request.DiscountType.Value : null,
-                    request.DiscountRate,
                     request.OtherCharges,
                     request.Notes,
                     taxId: null,
-                    currencyId: request.CurrencyId is not null ? (short?)request.CurrencyId.Value : null,
+                    currencyId: (short)(request.CurrencyId ?? 1),
                     exchangeRate: request.ExchangeRate,
                     createdByUserId: userId
                 );
 
                 foreach (var item in request.Items)
                 {
-                    var invoiceItem = PurchaseInvoiceItem.Create(
+                    var invoiceItem = PurchaseInvoiceLine.Create(
                         item.ProductId,
                         item.ProductUnitId,
                         item.Quantity,
-                        item.UnitCost
+                        item.UnitPrice
                     );
                     invoice.AddItem(invoiceItem);
                 }
@@ -187,25 +180,21 @@ public class PurchaseService : IPurchaseService
         try
         {
             if (request.CurrencyId.HasValue)
-                invoice.SetCurrency(request.CurrencyId is not null ? (short?)request.CurrencyId.Value : null, request.ExchangeRate);
+                invoice.SetCurrency(request.CurrencyId ?? 1, request.ExchangeRate);
 
             invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount, request.OtherCharges);
             invoice.SetPaidAmount(request.PaidAmount);
 
             // Re-create items (simplest way for draft)
-            _uow.PurchaseInvoiceItems.DeleteRange(invoice.Items);
+            _uow.PurchaseInvoiceLines.DeleteRange(invoice.Items);
             invoice.Items.Clear();
             foreach (var item in request.Items)
             {
-                Domain.Enums.DiscountType? itemDiscountType = item.DiscountType.HasValue
-                    ? (Domain.Enums.DiscountType)item.DiscountType.Value
-                    : null;
-
-                var invoiceItem = PurchaseInvoiceItem.Create(
+                var invoiceItem = PurchaseInvoiceLine.Create(
                     item.ProductId,
                     item.ProductUnitId,
                     item.Quantity,
-                    item.UnitCost
+                    item.UnitPrice
                 );
                 invoice.AddItem(invoiceItem);
             }
@@ -256,7 +245,7 @@ public class PurchaseService : IPurchaseService
                     Index = index,
                     LineTotal = item.LineTotal,
                     Quantity = item.Quantity,
-                    UnitCost = item.UnitCost
+                    UnitCost = item.UnitPrice
                 }).ToArray();
 
                 var landedCosts = AdditionalChargeAllocator.Allocate(
@@ -268,7 +257,7 @@ public class PurchaseService : IPurchaseService
                 for (int i = 0; i < itemsList.Count; i++)
                 {
                     var item = itemsList[i];
-                    var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitCost);
+                    var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitPrice);
                     var stockResult = await _inventoryService.IncreaseStockAsync(
                         item.ProductId,
                         invoice.WarehouseId,
@@ -292,7 +281,7 @@ public class PurchaseService : IPurchaseService
 
                     try
                     {
-                        var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitCost);
+                        var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitPrice);
                         var baseUnit = item.Product.GetBaseUnit();
                         var result = await _pricingService.UpdateFromPurchaseAsync(
                             new UpdatePricingRequest(
@@ -375,7 +364,7 @@ public class PurchaseService : IPurchaseService
                             item.ProductId,
                             invoice.WarehouseId,
                             item.Quantity,
-                            unitCost: item.UnitCost,
+                            unitCost: item.UnitPrice,
                             userId: userId,
                             ct: ct);
 
@@ -412,96 +401,6 @@ public class PurchaseService : IPurchaseService
         }, ct);
     }
 
-    public async Task<Result<string>> UploadAttachmentAsync(int id, string base64Content, string? fileName, CancellationToken ct)
-    {
-        var invoice = await _uow.PurchaseInvoices.GetByIdAsync(id, ct);
-        if (invoice == null)
-            return Result<string>.Failure("فاتورة الشراء غير موجودة", ErrorCodes.NotFound);
-
-        if (invoice.Status != InvoiceStatus.Draft)
-            return Result<string>.Failure("يمكن إرفاق ملفات فقط للفواتير المسودة");
-
-        try
-        {
-            var path = await SaveAttachmentAsync(id, base64Content, fileName, ct);
-            if (path == null)
-                return Result<string>.Failure("فشل في حفظ المرفق");
-
-            invoice.SetAttachment(path);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("تم رفع المرفق للفاتورة {InvoiceId}: {Path}", id, path);
-
-            return Result<string>.Success(path);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "خطأ أثناء رفع المرفق للفاتورة {InvoiceId}", id);
-            return Result<string>.Failure("حدث خطأ أثناء رفع المرفق");
-        }
-    }
-
-    public async Task<Result> DeleteAttachmentAsync(int id, CancellationToken ct)
-    {
-        var invoice = await _uow.PurchaseInvoices.GetByIdAsync(id, ct);
-        if (invoice == null)
-            return Result.Failure("فاتورة الشراء غير موجودة", ErrorCodes.NotFound);
-
-        if (string.IsNullOrEmpty(invoice.AttachmentPath))
-            return Result.Failure("لا يوجد مرفق محذوف");
-
-        try
-        {
-            if (File.Exists(invoice.AttachmentPath))
-                File.Delete(invoice.AttachmentPath);
-
-            invoice.SetAttachment(null);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("تم حذف المرفق للفاتورة {InvoiceId}", id);
-
-            return Result.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "خطأ أثناء حذف المرفق للفاتورة {InvoiceId}", id);
-            return Result.Failure("حدث خطأ أثناء حذف المرفق");
-        }
-    }
-
-    // ─── Private Helpers ─────────────────────────────────────────────────────
-
-    private async Task<string?> SaveAttachmentAsync(int invoiceId, string base64Content, string? fileName, CancellationToken ct)
-    {
-        try
-        {
-            var dir = Path.Combine(AttachmentDir, invoiceId.ToString());
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-
-            var ext = string.IsNullOrEmpty(fileName) ? ".pdf" : Path.GetExtension(fileName);
-            if (string.IsNullOrEmpty(ext)) ext = ".pdf";
-
-            var safeFileName = $"attachment_{DateTime.Now:yyyyMMddHHmmss}{ext}";
-            var filePath = Path.Combine(dir, safeFileName);
-
-            var bytes = Convert.FromBase64String(base64Content);
-            await File.WriteAllBytesAsync(filePath, bytes, ct);
-
-            return filePath;
-        }
-        catch (FormatException)
-        {
-            _logger.LogWarning("محتوى Base64 غير صالح للمرفق في الفاتورة {InvoiceId}", invoiceId);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "فشل حفظ المرفق للفاتورة {InvoiceId}", invoiceId);
-            return null;
-        }
-    }
-
     private PurchaseInvoiceDto MapToDto(PurchaseInvoice i)
     {
         return new PurchaseInvoiceDto(
@@ -512,7 +411,6 @@ public class PurchaseService : IPurchaseService
             i.WarehouseId,
             i.Warehouse?.Name ?? "غير معروف",
             i.InvoiceDate,
-            i.DueDate,
             (byte)i.PaymentType,
             i.SubTotal,
             i.DiscountAmount,
@@ -528,15 +426,14 @@ public class PurchaseService : IPurchaseService
             (decimal?)i.Tax?.Rate,
             i.CurrencyId,
             i.ExchangeRate,
-            i.AttachmentPath,
-            i.Items.Select(it => new PurchaseInvoiceItemDto(
+            i.Items.Select(it => new PurchaseInvoiceLineDto(
                 it.Id,
                 it.ProductId,
                 it.Product?.Name ?? "غير معروف",
                 it.ProductUnitId,
                 it.ProductUnit?.Unit?.Name ?? "غير معروف",
                 it.Quantity,
-                it.UnitCost,
+                it.UnitPrice,
                 it.LineTotal
             )).ToList()
         );

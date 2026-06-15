@@ -10,7 +10,7 @@ namespace SalesSystem.Domain.Entities;
 /// Maps to "ProductUnits" table in the new schema — pure junction table (ProductId, UnitId, Factor, IsBaseUnit).
 /// No prices or barcodes stored here — pricing via ProductPrices table, barcode via Product.Barcode.
 /// </summary>
-public class ProductUnit : ActivatableEntity
+public class ProductUnit : AuditableEntity
 {
     // ─── Properties ───────────────────────────────
     public int ProductId { get; private set; }

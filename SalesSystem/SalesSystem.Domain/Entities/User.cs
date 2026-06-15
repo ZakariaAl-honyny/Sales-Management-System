@@ -12,7 +12,7 @@ namespace SalesSystem.Domain.Entities;
 public class User : ActivatableEntity
 {
     public string UserName { get; private set; } = string.Empty;
-    public string? PasswordHash { get; private set; }          // Nullable — passwordless setup per RULE-305
+    public string PasswordHash { get; private set; } = string.Empty;
     public int? EmployeeId { get; private set; }               // Optional link to employee record
     public string FullName { get; private set; } = string.Empty; // Display name for UI
     public string? Phone { get; private set; }
@@ -21,7 +21,7 @@ public class User : ActivatableEntity
     public bool MustChangePassword { get; private set; } = true;
     public DateTime? PasswordChangedAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
-    public int LoginAttempts { get; private set; }
+    public short LoginAttempts { get; private set; }
 
     // ─── Navigation ─────────────────────────────────
     private readonly List<UserRole> _userRoles = new();
@@ -55,7 +55,6 @@ public class User : ActivatableEntity
             EmployeeId = employeeId,
             Status = UserStatus.Active,
             MustChangePassword = true,
-            PasswordHash = null,
             LoginAttempts = 0
         };
         user.SetCreatedBy(createdByUserId);

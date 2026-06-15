@@ -16,13 +16,11 @@ public class PartyEditorViewModel : ViewModelBase
 
     private int _partyId;
     private string _name = string.Empty;
-    private byte _partyType = 1;
-    private string? _nameAr;
     private string? _phone;
-    private string? _mobile;
     private string? _email;
     private string? _address;
     private string? _taxNumber;
+    private string? _notes;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -63,28 +61,10 @@ public class PartyEditorViewModel : ViewModelBase
         }
     }
 
-    public byte PartyType
-    {
-        get => _partyType;
-        set => SetProperty(ref _partyType, value);
-    }
-
-    public string? NameAr
-    {
-        get => _nameAr;
-        set => SetProperty(ref _nameAr, value);
-    }
-
     public string? Phone
     {
         get => _phone;
         set => SetProperty(ref _phone, value);
-    }
-
-    public string? Mobile
-    {
-        get => _mobile;
-        set => SetProperty(ref _mobile, value);
     }
 
     public string? Email
@@ -103,6 +83,12 @@ public class PartyEditorViewModel : ViewModelBase
     {
         get => _taxNumber;
         set => SetProperty(ref _taxNumber, value);
+    }
+
+    public string? Notes
+    {
+        get => _notes;
+        set => SetProperty(ref _notes, value);
     }
 
     public bool IsActive
@@ -131,14 +117,12 @@ public class PartyEditorViewModel : ViewModelBase
     public void LoadParty(PartyDto party)
     {
         _partyId = party.Id;
-        _partyType = party.PartyType;
         _name = party.Name;
-        _nameAr = party.NameAr;
         _phone = party.Phone;
-        _mobile = party.Mobile;
         _email = party.Email;
         _address = party.Address;
         _taxNumber = party.TaxNumber;
+        _notes = party.Notes;
         _isActive = party.IsActive;
         _isEditMode = true;
     }
@@ -163,12 +147,11 @@ public class PartyEditorViewModel : ViewModelBase
         {
             var request = new UpdatePartyRequest(
                 Name: Name,
-                NameAr: NameAr,
                 Phone: Phone,
-                Mobile: Mobile,
                 Email: Email,
                 Address: Address,
-                TaxNumber: TaxNumber);
+                TaxNumber: TaxNumber,
+                Notes: Notes);
 
             var result = await _partyService.UpdateAsync(_partyId, request);
 
@@ -186,13 +169,11 @@ public class PartyEditorViewModel : ViewModelBase
         {
             var request = new CreatePartyRequest(
                 Name: Name,
-                PartyType: PartyType,
-                NameAr: NameAr,
                 Phone: Phone,
-                Mobile: Mobile,
                 Email: Email,
                 Address: Address,
-                TaxNumber: TaxNumber);
+                TaxNumber: TaxNumber,
+                Notes: Notes);
 
             var result = await _partyService.CreateAsync(request);
 

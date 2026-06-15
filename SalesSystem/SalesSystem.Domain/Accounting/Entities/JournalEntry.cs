@@ -12,25 +12,28 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// </summary>
 public class JournalEntry : DocumentEntity
 {
+    /// <summary>
+    /// Formatted display string derived from EntryNo (kept for thick-client display).
+    /// </summary>
     public string EntryNumber { get; private set; } = string.Empty;
 
     /// <summary>
     /// Integer sequence number for this journal entry (matches DB sequence).
-    /// Separate from the formatted EntryNumber string for efficient indexing and querying.
     /// </summary>
     public int EntryNo { get; private set; }
 
-    public DateTime TransactionDate { get; private set; }
+    /// <summary>
+    /// Date the entry was recorded (maps to schema EntryDate).
+    /// </summary>
+    public DateTime EntryDate { get; private set; }
+
     public string Description { get; private set; } = string.Empty;
     public JournalEntryType EntryType { get; private set; }
     public JournalEntryStatus Status { get; private set; }
     public string? ReferenceType { get; private set; }
     public int? ReferenceId { get; private set; }
     public string? ReferenceNumber { get; private set; }
-    public short? CurrencyId { get; private set; }
-    public decimal? ExchangeRate { get; private set; }
-    public string? AttachmentPath { get; private set; }
-    public short? BranchId { get; private set; }
+    public bool IsReversed { get; private set; }
     public int? ReversedByEntryId { get; private set; }
     public JournalEntry? ReversedByEntry { get; private set; }
 
@@ -47,16 +50,13 @@ public class JournalEntry : DocumentEntity
     public static JournalEntry Create(
         string entryNumber,
         int entryNo,
-        DateTime transactionDate,
+        DateTime entryDate,
         string description,
         JournalEntryType entryType,
         int createdBy,
         string? referenceType = null,
         int? referenceId = null,
-        string? referenceNumber = null,
-        short? currencyId = null,
-        decimal? exchangeRate = null,
-        string? attachmentPath = null)
+        string? referenceNumber = null)
     {
         if (string.IsNullOrWhiteSpace(entryNumber))
             throw new DomainException("رقم القيد المحاسبي مطلوب");
@@ -64,7 +64,7 @@ public class JournalEntry : DocumentEntity
         if (entryNo <= 0)
             throw new DomainException("الرقم التسلسلي للقيد المحاسبي مطلوب");
 
-        if (transactionDate == default)
+        if (entryDate == default)
             throw new DomainException("تاريخ القيد المحاسبي مطلوب");
 
         if (string.IsNullOrWhiteSpace(description))
@@ -80,16 +80,13 @@ public class JournalEntry : DocumentEntity
         {
             EntryNumber = entryNumber.Trim(),
             EntryNo = entryNo,
-            TransactionDate = transactionDate,
+            EntryDate = entryDate,
             Description = description.Trim(),
             EntryType = entryType,
             Status = JournalEntryStatus.Draft,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId,
-            ReferenceNumber = referenceNumber?.Trim(),
-            CurrencyId = currencyId,
-            ExchangeRate = exchangeRate,
-            AttachmentPath = attachmentPath?.Trim()
+            ReferenceNumber = referenceNumber?.Trim()
         };
         entry.SetCreatedBy(createdBy);
         return entry;
@@ -99,8 +96,6 @@ public class JournalEntry : DocumentEntity
 
     public void AddDebitLine(
         int accountId,
-        string accountCode,
-        string accountNameAr,
         decimal amount,
         string? description = null)
     {
@@ -108,15 +103,13 @@ public class JournalEntry : DocumentEntity
             throw new DomainException("لا يمكن تعديل قيد محاسبي تم ترحيله أو إلغاؤه");
 
         var line = JournalEntryLine.CreateDebit(
-            accountId, accountCode, accountNameAr, amount, description);
+            accountId, amount, description);
         _lines.Add(line);
         UpdateTimestamp();
     }
 
     public void AddCreditLine(
         int accountId,
-        string accountCode,
-        string accountNameAr,
         decimal amount,
         string? description = null)
     {
@@ -124,7 +117,7 @@ public class JournalEntry : DocumentEntity
             throw new DomainException("لا يمكن تعديل قيد محاسبي تم ترحيله أو إلغاؤه");
 
         var line = JournalEntryLine.CreateCredit(
-            accountId, accountCode, accountNameAr, amount, description);
+            accountId, amount, description);
         _lines.Add(line);
         UpdateTimestamp();
     }

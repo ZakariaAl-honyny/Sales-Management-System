@@ -135,40 +135,23 @@ public class ProductUnitService : IProductUnitService
             if (unit == null)
                 return Result.Failure("الوحدة غير موجودة", ErrorCodes.NotFound);
 
-            if (strategy == DeleteStrategy.Deactivate)
-            {
-                if (product.Units.Count(u => u.IsActive) <= 1)
-                    return Result.Failure("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
+            if (product.Units.Count <= 1)
+                return Result.Failure("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
 
-                unit.MarkAsDeleted();
-                await _uow.SaveChangesAsync(ct);
+            var hasSales = await _uow.SalesInvoiceLines.AnyAsync(i => i.ProductId == productId, ct);
+            if (hasSales)
+                return Result.Failure("لا يمكن حذف الوحدة لأن المنتج مرتبط بعمليات بيع");
 
-                _logger.LogInformation("Unit {UnitId} deactivated for product {ProductId} (UnitId={DomainUnitId})", unitId, productId, unit.UnitId);
-                return Result.Success();
-            }
+            var hasPurchases = await _uow.PurchaseInvoiceLines.AnyAsync(i => i.ProductId == productId, ct);
+            if (hasPurchases)
+                return Result.Failure("لا يمكن حذف الوحدة لأن المنتج مرتبط بعمليات شراء");
 
-            if (strategy == DeleteStrategy.Permanent)
-            {
-                if (product.Units.Count(u => u.IsActive) <= 1)
-                    return Result.Failure("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
+            product.RemoveUnit(unit);
+            await _uow.ProductUnits.HardDeleteAsync(unitId, ct);
+            await _uow.SaveChangesAsync(ct);
 
-                var hasSales = await _uow.SalesInvoiceItems.AnyAsync(i => i.ProductId == productId, ct);
-                if (hasSales)
-                    return Result.Failure("لا يمكن حذف الوحدة نهائياً لأن المنتج مرتبط بعمليات بيع");
-
-                var hasPurchases = await _uow.PurchaseInvoiceItems.AnyAsync(i => i.ProductId == productId, ct);
-                if (hasPurchases)
-                    return Result.Failure("لا يمكن حذف الوحدة نهائياً لأن المنتج مرتبط بعمليات شراء");
-
-                product.RemoveUnit(unit);
-                await _uow.ProductUnits.HardDeleteAsync(unitId, ct);
-                await _uow.SaveChangesAsync(ct);
-
-                _logger.LogInformation("Unit {UnitId} permanently deleted from product {ProductId}", unitId, productId);
-                return Result.Success();
-            }
-
-            return Result.Failure("استراتيجية حذف غير معروفة");
+            _logger.LogInformation("Unit {UnitId} deleted from product {ProductId} (strategy: {Strategy})", unitId, productId, strategy);
+            return Result.Success();
         }
         catch (DomainException ex)
         {
@@ -229,7 +212,6 @@ public class ProductUnitService : IProductUnitService
             unit.UnitId,
             unit.Unit?.Name ?? "",
             unit.Factor,
-            unit.IsBaseUnit,
-            unit.IsActive);
+            unit.IsBaseUnit);
     }
 }

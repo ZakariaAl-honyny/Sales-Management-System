@@ -154,7 +154,7 @@ public class FiscalYearService : IFiscalYearService
 
             // Check no unposted journal entries for this fiscal year
             var unpostedCount = await _uow.JournalEntries.CountAsync(
-                je => je.TransactionDate.Year == fiscalYear.Year
+                je => je.EntryDate.Year == fiscalYear.Year
                     && je.Status == Domain.Accounting.Enums.JournalEntryStatus.Draft, ct);
             if (unpostedCount > 0)
                 return Result<FiscalYearDto>.Failure(

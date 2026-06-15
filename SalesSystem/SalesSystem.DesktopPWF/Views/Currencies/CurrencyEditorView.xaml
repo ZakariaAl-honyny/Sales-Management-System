@@ -70,16 +70,6 @@
                     <TextBlock Text="الرمز الذي يمثل العملة — مثال: $, ﷼, €"
                                Style="{StaticResource HelperTextStyle}"/>
 
-                    <!-- Exchange Rate -->
-                    <TextBlock Text="سعر الصرف مقابل الأساسي *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
-                    <TextBox Text="{Binding ExchangeRateToBase, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                             Style="{StaticResource ModernTextBox}"
-                             Width="150"
-                             TabIndex="4"
-                             ToolTip="أدخل سعر صرف العملة مقابل العملة الأساسية — مثال: 550 يعني أن الدولار = 550 ريال يمني"/>
-                    <TextBlock Text="أدخل سعر الصرف — مثال: 550 يعني أن 1 دولار = 550 ريال يمني (العملة الأساسية)"
-                               Style="{StaticResource HelperTextStyle}"/>
-
                     <!-- Base Currency Indicator (Read-Only) -->
                     <Border Margin="0,12,0,0"
                             Padding="12,8"

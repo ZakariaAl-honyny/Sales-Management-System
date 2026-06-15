@@ -37,9 +37,9 @@ public class ReportRepository : IReportRepository
                 i.SubTotal,
                 i.DiscountAmount,
                 i.TaxAmount,
-                i.TotalAmount,
+                i.NetTotal,
                 i.PaidAmount,
-                i.DueAmount
+                i.RemainingAmount
             ))
             .ToListAsync(ct);
     }
@@ -133,8 +133,8 @@ public class ReportRepository : IReportRepository
     public async Task<IEnumerable<CustomerFinancialBalanceDto>> GetCustomerBalancesReportAsync(int? customerId, CancellationToken ct)
     {
         var query = _context.Customers
+            .Include(c => c.Account)
             .Include(c => c.Party)
-                .ThenInclude(p => p.Account)
             .AsQueryable();
 
         if (customerId.HasValue)
@@ -145,12 +145,12 @@ public class ReportRepository : IReportRepository
             .Select(c => new CustomerFinancialBalanceDto(
                 c.Id,
                 c.Party.Name,
-                c.Party.Account.OpeningBalance ?? 0m,
-                _context.SalesInvoices.Where(i => i.CustomerId == c.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.TotalAmount),
+                0m,
+                _context.SalesInvoices.Where(i => i.CustomerId == c.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.NetTotal),
                 _context.SalesReturns.Where(r => r.CustomerId == c.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
                 0m,
                 0m,
-                c.Party.Account.CurrentBalance ?? 0m
+                0m
             ))
             .ToListAsync(ct);
     }
@@ -158,8 +158,8 @@ public class ReportRepository : IReportRepository
     public async Task<IEnumerable<SupplierBalanceReportDto>> GetSupplierBalancesReportAsync(int? supplierId, CancellationToken ct)
     {
         var query = _context.Suppliers
+            .Include(s => s.Account)
             .Include(s => s.Party)
-                .ThenInclude(p => p.Account)
             .AsQueryable();
 
         if (supplierId.HasValue)
@@ -170,12 +170,12 @@ public class ReportRepository : IReportRepository
             .Select(s => new SupplierBalanceReportDto(
                 s.Id,
                 s.Party.Name,
-                s.Party.Account.OpeningBalance ?? 0m,
+                0m,
                 _context.PurchaseInvoices.Where(i => i.SupplierId == s.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.NetTotal),
                 _context.PurchaseReturns.Where(r => r.SupplierId == s.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
                 _context.SupplierPayments.Where(p => p.SupplierId == s.Id).Sum(p => p.Amount),
                 0m,
-                s.Party.Account.CurrentBalance ?? 0m
+                0m
             ))
             .ToListAsync(ct);
     }
@@ -260,8 +260,8 @@ public class ReportRepository : IReportRepository
                 ws.Warehouse!.Name,
                 ws.Quantity,
                 ws.Product.ReorderLevel,
-                ws.AvgCost,
-                ws.Quantity * ws.AvgCost
+                0m,
+                0m
             ))
             .ToListAsync(ct);
     }
@@ -454,38 +454,39 @@ public class ReportRepository : IReportRepository
         // Sales returns (unless filtering to Purchases only)
         if (string.IsNullOrEmpty(returnType) || returnType == "Sales")
         {
-            var salesQuery = _context.SalesReturnItems
-                .Include(sri => sri.SalesReturn)
+            var salesQuery = _context.SalesReturnLines
+                .Include(srl => srl.SalesReturn)
                     .ThenInclude(sr => sr!.Customer)
                         .ThenInclude(c => c!.Party)
-                .Include(sri => sri.Product)
-                .Where(sri => sri.SalesReturn!.Status == InvoiceStatus.Posted)
+                .Include(srl => srl.SalesInvoiceLine)
+                    .ThenInclude(sil => sil.Product)
+                .Where(srl => srl.SalesReturn!.Status == InvoiceStatus.Posted)
                 .AsQueryable();
 
             if (from.HasValue)
             {
                 var fromDate = from.Value.Date;
-                salesQuery = salesQuery.Where(sri => sri.SalesReturn!.ReturnDate >= fromDate);
+                salesQuery = salesQuery.Where(srl => srl.SalesReturn!.ReturnDate >= fromDate);
             }
             if (to.HasValue)
             {
                 var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
-                salesQuery = salesQuery.Where(sri => sri.SalesReturn!.ReturnDate <= toDate);
+                salesQuery = salesQuery.Where(srl => srl.SalesReturn!.ReturnDate <= toDate);
             }
             if (productId.HasValue)
-                salesQuery = salesQuery.Where(sri => sri.ProductId == productId.Value);
+                salesQuery = salesQuery.Where(srl => srl.SalesInvoiceLine!.ProductId == productId.Value);
 
             var salesData = await salesQuery
-                .Select(sri => new ReturnsReportDto(
-                    sri.SalesReturn!.ReturnNo,
-                    sri.SalesReturn.ReturnDate,
+                .Select(srl => new ReturnsReportDto(
+                    srl.SalesReturn!.ReturnNo.ToString(),
+                    srl.SalesReturn.ReturnDate,
                     "مبيعات",
-                    sri.SalesReturn.Customer != null ? sri.SalesReturn.Customer.Party.Name : null,
-                    sri.Product!.Name,
-                    sri.Quantity,
-                    sri.LineTotal,
+                    srl.SalesReturn.Customer != null ? srl.SalesReturn.Customer.Party.Name : null,
+                    srl.SalesInvoiceLine!.Product!.Name,
+                    srl.Quantity,
+                    srl.Amount,
                     null,
-                    sri.SalesReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
+                    srl.SalesReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
                 ))
                 .ToListAsync(ct);
 
@@ -495,38 +496,39 @@ public class ReportRepository : IReportRepository
         // Purchase returns (unless filtering to Sales only)
         if (string.IsNullOrEmpty(returnType) || returnType == "Purchases")
         {
-            var purchaseQuery = _context.PurchaseReturnItems
-                .Include(pri => pri.PurchaseReturn)
+            var purchaseQuery = _context.PurchaseReturnLines
+                .Include(prl => prl.PurchaseReturn)
                     .ThenInclude(pr => pr!.Supplier)
                         .ThenInclude(s => s!.Party)
-                .Include(pri => pri.Product)
-                .Where(pri => pri.PurchaseReturn!.Status == InvoiceStatus.Posted)
+                .Include(prl => prl.PurchaseInvoiceLine)
+                    .ThenInclude(pil => pil.Product)
+                .Where(prl => prl.PurchaseReturn!.Status == InvoiceStatus.Posted)
                 .AsQueryable();
 
             if (from.HasValue)
             {
                 var fromDate = from.Value.Date;
-                purchaseQuery = purchaseQuery.Where(pri => pri.PurchaseReturn!.ReturnDate >= fromDate);
+                purchaseQuery = purchaseQuery.Where(prl => prl.PurchaseReturn!.ReturnDate >= fromDate);
             }
             if (to.HasValue)
             {
                 var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
-                purchaseQuery = purchaseQuery.Where(pri => pri.PurchaseReturn!.ReturnDate <= toDate);
+                purchaseQuery = purchaseQuery.Where(prl => prl.PurchaseReturn!.ReturnDate <= toDate);
             }
             if (productId.HasValue)
-                purchaseQuery = purchaseQuery.Where(pri => pri.ProductId == productId.Value);
+                purchaseQuery = purchaseQuery.Where(prl => prl.PurchaseInvoiceLine!.ProductId == productId.Value);
 
             var purchaseData = await purchaseQuery
-                .Select(pri => new ReturnsReportDto(
-                    pri.PurchaseReturn!.ReturnNo.ToString(),
-                    pri.PurchaseReturn.ReturnDate,
+                .Select(prl => new ReturnsReportDto(
+                    prl.PurchaseReturn!.ReturnNo.ToString(),
+                    prl.PurchaseReturn.ReturnDate,
                     "مشتريات",
-                    pri.PurchaseReturn.Supplier.Party.Name,
-                    pri.Product!.Name,
-                    pri.Quantity,
-                    pri.LineTotal,
+                    prl.PurchaseReturn.Supplier.Party.Name,
+                    prl.PurchaseInvoiceLine!.Product!.Name,
+                    prl.Quantity,
+                    prl.Amount,
                     null,
-                    pri.PurchaseReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
+                    prl.PurchaseReturn.Status == InvoiceStatus.Posted ? "مرحل" : "مسودة"
                 ))
                 .ToListAsync(ct);
 
@@ -568,20 +570,20 @@ public class ReportRepository : IReportRepository
                         .Where(i => i.CustomerId == customer.Id && i.Status == InvoiceStatus.Posted)
                         .ToListAsync(ct);
 
-                    var totalDue = invoices.Sum(i => i.DueAmount);
+                    var totalDue = invoices.Sum(i => i.RemainingAmount);
                     var totalBalance = totalDue;
                     decimal current = 0, days1To30 = 0, days31To60 = 0, days61To90 = 0, days90Plus = 0;
 
                     foreach (var inv in invoices)
                     {
-                        if (inv.DueAmount <= 0) continue;
+                        if (inv.RemainingAmount <= 0) continue;
                         var ageDays = (today - inv.InvoiceDate).Days;
 
-                        if (ageDays <= 0) current += inv.DueAmount;
-                        else if (ageDays <= 30) days1To30 += inv.DueAmount;
-                        else if (ageDays <= 60) days31To60 += inv.DueAmount;
-                        else if (ageDays <= 90) days61To90 += inv.DueAmount;
-                        else days90Plus += inv.DueAmount;
+                        if (ageDays <= 0) current += inv.RemainingAmount;
+                        else if (ageDays <= 30) days1To30 += inv.RemainingAmount;
+                        else if (ageDays <= 60) days31To60 += inv.RemainingAmount;
+                        else if (ageDays <= 90) days61To90 += inv.RemainingAmount;
+                        else days90Plus += inv.RemainingAmount;
                     }
 
                     result.Add(new AgingReportDto(
@@ -680,7 +682,7 @@ public class ReportRepository : IReportRepository
 
         var salesMonth = await _context.SalesInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStart && i.InvoiceDate < tomorrow)
-            .SumAsync(i => i.TotalAmount, ct);
+            .SumAsync(i => i.NetTotal, ct);
 
         var purchasesMonth = await _context.PurchaseInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStart && i.InvoiceDate < tomorrow)
@@ -698,16 +700,13 @@ public class ReportRepository : IReportRepository
         var totalProductsCount = await _context.Products
             .CountAsync(p => p.IsActive, ct);
 
-        var totalReceivables = await _context.Parties
-            .Where(p => p.PartyType == PartyType.Customer)
-            .SumAsync(p => p.Account.CurrentBalance ?? 0m, ct);
-
-        var totalPayables = await _context.Parties
-            .Where(p => p.PartyType == PartyType.Supplier)
-            .SumAsync(p => p.Account.CurrentBalance ?? 0m, ct);
+        // TODO: Compute from JournalEntryLine balances once accounting engine is fully wired.
+        // Party no longer has PartyType or AccountId — receivables/payables are now on Customer.AccountId and Supplier.AccountId.
+        var totalReceivables = 0m;
+        var totalPayables = 0m;
 
         return new DashboardSummaryDto(
-            salesToday.Sum(i => i.TotalAmount),
+            salesToday.Sum(i => i.NetTotal),
             salesToday.Count,
             purchasesToday,
             lowStockCount,

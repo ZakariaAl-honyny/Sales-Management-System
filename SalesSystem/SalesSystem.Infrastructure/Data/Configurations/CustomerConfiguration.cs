@@ -10,29 +10,41 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     {
         builder.ToTable("Customers");
 
-        // Id is both PK and FK to Parties(Id) — shared primary key pattern
+        // Customer.Id is auto-increment PK (separate from Party.Id)
         builder.HasKey(c => c.Id);
-
         builder.Property(c => c.Id)
-            .ValueGeneratedNever(); // Id is assigned from Party.Id, not auto-generated
+            .ValueGeneratedOnAdd();
 
         // Properties
         builder.Property(c => c.CreditLimit)
             .HasPrecision(18, 2);
 
-        builder.Property(c => c.CustomerSince);
-
-        builder.Property(c => c.PriceLevel);
-
-        builder.Property(c => c.Notes)
-            .HasMaxLength(500);
-
-        // 1:1 relationship with Party via shared PK
+        // FK to Party
         builder.HasOne(c => c.Party)
-            .WithOne()
-            .HasForeignKey<Customer>(c => c.Id)
+            .WithMany()
+            .HasForeignKey(c => c.PartyId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        // FK to Account
+        builder.HasOne(c => c.Account)
+            .WithMany()
+            .HasForeignKey(c => c.AccountId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
+        // CategoryId is a lookup — no FK constraint (type mismatch with smallint PK)
+        builder.Property(c => c.CategoryId).IsRequired(false);
+
+        // Indexes
+        builder.HasIndex(c => c.PartyId)
+            .HasDatabaseName("IX_Customers_PartyId");
+
+        builder.HasIndex(c => c.AccountId)
+            .HasDatabaseName("IX_Customers_AccountId");
+
+        builder.HasIndex(c => c.CategoryId)
+            .HasDatabaseName("IX_Customers_CategoryId");
 
         // Global query filter — soft delete
         builder.HasQueryFilter(c => c.IsActive);

@@ -34,7 +34,7 @@ public interface IFifoAllocationService
         int productId,
         short warehouseId,
         decimal quantityNeeded,
-        int? salesInvoiceItemId,
+        int? SalesInvoiceLineId,
         int? createdByUserId,
         CancellationToken ct);
 
@@ -73,7 +73,7 @@ public record InventoryBatchAllocation(
     int BatchId,
     decimal Quantity,
     decimal UnitCost,
-    int? SalesInvoiceItemId = null
+    int? SalesInvoiceLineId = null
 );
 
 /// <summary>

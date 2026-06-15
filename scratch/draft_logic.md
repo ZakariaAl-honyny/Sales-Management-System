@@ -341,9 +341,9 @@
 - Customer
 - Warehouse
 - PurchaseInvoice
-- PurchaseInvoiceItem
+- PurchaseInvoiceLine
 - SalesInvoice
-- SalesInvoiceItem
+- SalesInvoiceLine
 - ReturnInvoice
 - StockTransfer
 - SupplierPayment
@@ -2817,11 +2817,11 @@ _eventBus.Subscribe<ProductChangedMessage>(_ =>
 
 ---
 
-## J) PurchaseInvoiceItems
+## J) PurchaseInvoiceLines
 ����� ������ ������.
 
 ### �������
-- `PurchaseInvoiceItemId` int PK
+- `PurchaseInvoiceLineId` int PK
 - `PurchaseInvoiceId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
@@ -2863,11 +2863,11 @@ _eventBus.Subscribe<ProductChangedMessage>(_ =>
 
 ---
 
-## L) SalesInvoiceItems
+## L) SalesInvoiceLines
 ����� ������ �����.
 
 ### �������
-- `SalesInvoiceItemId` int PK
+- `SalesInvoiceLineId` int PK
 - `SalesInvoiceId` int not null FK
 - `ProductId` int not null FK
 - `Quantity` decimal(18,3) not null
@@ -3081,8 +3081,8 @@ _eventBus.Subscribe<ProductChangedMessage>(_ =>
 - `Product 1 -> * WarehouseStocks`
 - `Supplier 1 -> * PurchaseInvoices`
 - `Customer 1 -> * SalesInvoices`
-- `PurchaseInvoice 1 -> * PurchaseInvoiceItems`
-- `SalesInvoice 1 -> * SalesInvoiceItems`
+- `PurchaseInvoice 1 -> * PurchaseInvoiceLines`
+- `SalesInvoice 1 -> * SalesInvoiceLines`
 - `PurchaseInvoice 1 -> * PurchaseReturns`  (�������)
 - `SalesInvoice 1 -> * SalesReturns` (�������)
 - `Warehouse 1 -> * StockTransfers`
@@ -3123,9 +3123,9 @@ _eventBus.Subscribe<ProductChangedMessage>(_ =>
 - Suppliers
 - Customers
 - PurchaseInvoices
-- PurchaseInvoiceItems
+- PurchaseInvoiceLines
 - SalesInvoices
-- SalesInvoiceItems
+- SalesInvoiceLines
 - PurchaseReturns
 - SalesReturns
 - StockTransfers
@@ -3436,22 +3436,22 @@ GO
 
 ---
 
-## 4.2 PurchaseInvoiceItems
+## 4.2 PurchaseInvoiceLines
 
 ```sql
-CREATE TABLE dbo.PurchaseInvoiceItems
+CREATE TABLE dbo.PurchaseInvoiceLines
 (
-    PurchaseInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceItems PRIMARY KEY,
+    PurchaseInvoiceLineId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PurchaseInvoiceLines PRIMARY KEY,
     PurchaseInvoiceId       INT NOT NULL,
     ProductId               INT NOT NULL,
     Quantity                DECIMAL(18,3) NOT NULL,
     UnitCost                DECIMAL(18,2) NOT NULL,
-    DiscountAmount          DECIMAL(18,2) NOT NULL CONSTRAINT DF_PurchaseInvoiceItems_DiscountAmount DEFAULT(0),
+    DiscountAmount          DECIMAL(18,2) NOT NULL CONSTRAINT DF_PurchaseInvoiceLines_DiscountAmount DEFAULT(0),
     LineTotal               DECIMAL(18,2) NOT NULL,
     Notes                   NVARCHAR(250) NULL,
 
-    CONSTRAINT FK_PurchaseInvoiceItems_Invoices FOREIGN KEY (PurchaseInvoiceId) REFERENCES dbo.PurchaseInvoices(PurchaseInvoiceId),
-    CONSTRAINT FK_PurchaseInvoiceItems_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId)
+    CONSTRAINT FK_PurchaseInvoiceLines_Invoices FOREIGN KEY (PurchaseInvoiceId) REFERENCES dbo.PurchaseInvoices(PurchaseInvoiceId),
+    CONSTRAINT FK_PurchaseInvoiceLines_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId)
 );
 GO
 ```
@@ -3496,22 +3496,22 @@ GO
 
 ---
 
-## 5.2 SalesInvoiceItems
+## 5.2 SalesInvoiceLines
 
 ```sql
-CREATE TABLE dbo.SalesInvoiceItems
+CREATE TABLE dbo.SalesInvoiceLines
 (
-    SalesInvoiceItemId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceItems PRIMARY KEY,
+    SalesInvoiceLineId   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SalesInvoiceLines PRIMARY KEY,
     SalesInvoiceId       INT NOT NULL,
     ProductId            INT NOT NULL,
     Quantity             DECIMAL(18,3) NOT NULL,
     UnitPrice            DECIMAL(18,2) NOT NULL,
-    DiscountAmount       DECIMAL(18,2) NOT NULL CONSTRAINT DF_SalesInvoiceItems_DiscountAmount DEFAULT(0),
+    DiscountAmount       DECIMAL(18,2) NOT NULL CONSTRAINT DF_SalesInvoiceLines_DiscountAmount DEFAULT(0),
     LineTotal            DECIMAL(18,2) NOT NULL,
     Notes                NVARCHAR(250) NULL,
 
-    CONSTRAINT FK_SalesInvoiceItems_Invoices FOREIGN KEY (SalesInvoiceId) REFERENCES dbo.SalesInvoices(SalesInvoiceId),
-    CONSTRAINT FK_SalesInvoiceItems_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId)
+    CONSTRAINT FK_SalesInvoiceLines_Invoices FOREIGN KEY (SalesInvoiceId) REFERENCES dbo.SalesInvoices(SalesInvoiceId),
+    CONSTRAINT FK_SalesInvoiceLines_Products FOREIGN KEY (ProductId) REFERENCES dbo.Products(ProductId)
 );
 GO
 ```
@@ -4006,8 +4006,8 @@ namespace SalesSystem.Domain.Entities
         public bool IsActive { get; set; } = true;
 
         public ICollection<WarehouseStock> WarehouseStocks { get; set; } = new List<WarehouseStock>();
-        public ICollection<PurchaseInvoiceItem> PurchaseInvoiceItems { get; set; } = new List<PurchaseInvoiceItem>();
-        public ICollection<SalesInvoiceItem> SalesInvoiceItems { get; set; } = new List<SalesInvoiceItem>();
+        public ICollection<PurchaseInvoiceLine> PurchaseInvoiceLines { get; set; } = new List<PurchaseInvoiceLine>();
+        public ICollection<SalesInvoiceLine> SalesInvoiceLines { get; set; } = new List<SalesInvoiceLine>();
     }
 }
 ```
@@ -4180,18 +4180,18 @@ namespace SalesSystem.Domain.Entities
         public int? CreatedByUserId { get; set; }
         public User? CreatedByUser { get; set; }
 
-        public ICollection<PurchaseInvoiceItem> Items { get; set; } = new List<PurchaseInvoiceItem>();
+        public ICollection<PurchaseInvoiceLine> Items { get; set; } = new List<PurchaseInvoiceLine>();
     }
 }
 ```
 
-## PurchaseInvoiceItem
+## PurchaseInvoiceLine
 ```csharp
 namespace SalesSystem.Domain.Entities
 {
-    public class PurchaseInvoiceItem
+    public class PurchaseInvoiceLine
     {
-        public int PurchaseInvoiceItemId { get; set; }
+        public int PurchaseInvoiceLineId { get; set; }
 
         public int PurchaseInvoiceId { get; set; }
         public PurchaseInvoice PurchaseInvoice { get; set; } = default!;
@@ -4244,18 +4244,18 @@ namespace SalesSystem.Domain.Entities
         public int? CreatedByUserId { get; set; }
         public User? CreatedByUser { get; set; }
 
-        public ICollection<SalesInvoiceItem> Items { get; set; } = new List<SalesInvoiceItem>();
+        public ICollection<SalesInvoiceLine> Items { get; set; } = new List<SalesInvoiceLine>();
     }
 }
 ```
 
-## SalesInvoiceItem
+## SalesInvoiceLine
 ```csharp
 namespace SalesSystem.Domain.Entities
 {
-    public class SalesInvoiceItem
+    public class SalesInvoiceLine
     {
-        public int SalesInvoiceItemId { get; set; }
+        public int SalesInvoiceLineId { get; set; }
 
         public int SalesInvoiceId { get; set; }
         public SalesInvoice SalesInvoice { get; set; } = default!;
@@ -5653,16 +5653,16 @@ SalesSystem.Contracts
 ?   ??? Purchases
 ?   ?   ??? PurchaseInvoiceDto.cs
 ?   ?   ??? PurchaseInvoiceListDto.cs
-?   ?   ??? PurchaseInvoiceItemDto.cs
+?   ?   ??? PurchaseInvoiceLineDto.cs
 ?   ?   ??? CreatePurchaseInvoiceRequestDto.cs
-?   ?   ??? CreatePurchaseInvoiceItemRequestDto.cs
+?   ?   ??? CreatePurchaseInvoiceLineRequestDto.cs
 ?   ?
 ?   ??? Sales
 ?       ??? SalesInvoiceDto.cs
 ?       ??? SalesInvoiceListDto.cs
-?       ??? SalesInvoiceItemDto.cs
+?       ??? SalesInvoiceLineDto.cs
 ?       ??? CreateSalesInvoiceRequestDto.cs
-?       ??? CreateSalesInvoiceItemRequestDto.cs
+?       ??? CreateSalesInvoiceLineRequestDto.cs
 ```
 
 ---
@@ -5890,13 +5890,13 @@ namespace SalesSystem.Contracts.Invoices.Common
 
 # 5) DTOs ������ ������� ������
 
-## `PurchaseInvoiceItemDto.cs`
+## `PurchaseInvoiceLineDto.cs`
 ```csharp
 namespace SalesSystem.Contracts.Invoices.Purchases
 {
-    public class PurchaseInvoiceItemDto
+    public class PurchaseInvoiceLineDto
     {
-        public int PurchaseInvoiceItemId { get; set; }
+        public int PurchaseInvoiceLineId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
 
@@ -5944,7 +5944,7 @@ namespace SalesSystem.Contracts.Invoices.Purchases
         public int? CreatedByUserId { get; set; }
         public string? CreatedByUserName { get; set; }
 
-        public List<PurchaseInvoiceItemDto> Items { get; set; } = [];
+        public List<PurchaseInvoiceLineDto> Items { get; set; } = [];
     }
 }
 ```
@@ -5971,13 +5971,13 @@ namespace SalesSystem.Contracts.Invoices.Purchases
 }
 ```
 
-## `CreatePurchaseInvoiceItemRequestDto.cs`
+## `CreatePurchaseInvoiceLineRequestDto.cs`
 ```csharp
 using System.ComponentModel.DataAnnotations;
 
 namespace SalesSystem.Contracts.Invoices.Purchases
 {
-    public class CreatePurchaseInvoiceItemRequestDto
+    public class CreatePurchaseInvoiceLineRequestDto
     {
         public int ProductId { get; set; }
 
@@ -6030,7 +6030,7 @@ namespace SalesSystem.Contracts.Invoices.Purchases
         public string? Notes { get; set; }
 
         [Required]
-        public List<CreatePurchaseInvoiceItemRequestDto> Items { get; set; } = [];
+        public List<CreatePurchaseInvoiceLineRequestDto> Items { get; set; } = [];
     }
 }
 ```
@@ -6039,13 +6039,13 @@ namespace SalesSystem.Contracts.Invoices.Purchases
 
 # 6) DTOs ������ ������� �����
 
-## `SalesInvoiceItemDto.cs`
+## `SalesInvoiceLineDto.cs`
 ```csharp
 namespace SalesSystem.Contracts.Invoices.Sales
 {
-    public class SalesInvoiceItemDto
+    public class SalesInvoiceLineDto
     {
-        public int SalesInvoiceItemId { get; set; }
+        public int SalesInvoiceLineId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
 
@@ -6093,7 +6093,7 @@ namespace SalesSystem.Contracts.Invoices.Sales
         public int? CreatedByUserId { get; set; }
         public string? CreatedByUserName { get; set; }
 
-        public List<SalesInvoiceItemDto> Items { get; set; } = [];
+        public List<SalesInvoiceLineDto> Items { get; set; } = [];
     }
 }
 ```
@@ -6120,13 +6120,13 @@ namespace SalesSystem.Contracts.Invoices.Sales
 }
 ```
 
-## `CreateSalesInvoiceItemRequestDto.cs`
+## `CreateSalesInvoiceLineRequestDto.cs`
 ```csharp
 using System.ComponentModel.DataAnnotations;
 
 namespace SalesSystem.Contracts.Invoices.Sales
 {
-    public class CreateSalesInvoiceItemRequestDto
+    public class CreateSalesInvoiceLineRequestDto
     {
         public int ProductId { get; set; }
 
@@ -6178,7 +6178,7 @@ namespace SalesSystem.Contracts.Invoices.Sales
         public string? Notes { get; set; }
 
         [Required]
-        public List<CreateSalesInvoiceItemRequestDto> Items { get; set; } = [];
+        public List<CreateSalesInvoiceLineRequestDto> Items { get; set; } = [];
     }
 }
 ```
@@ -6311,8 +6311,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Category, opt => opt.Ignore())
                 .ForMember(d => d.Unit, opt => opt.Ignore())
                 .ForMember(d => d.WarehouseStocks, opt => opt.Ignore())
-                .ForMember(d => d.PurchaseInvoiceItems, opt => opt.Ignore())
-                .ForMember(d => d.SalesInvoiceItems, opt => opt.Ignore())
+                .ForMember(d => d.PurchaseInvoiceLines, opt => opt.Ignore())
+                .ForMember(d => d.SalesInvoiceLines, opt => opt.Ignore())
                 .ForMember(d => d.CreatedAt, opt => opt.Ignore())
                 .ForMember(d => d.UpdatedAt, opt => opt.Ignore());
 
@@ -6321,8 +6321,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Category, opt => opt.Ignore())
                 .ForMember(d => d.Unit, opt => opt.Ignore())
                 .ForMember(d => d.WarehouseStocks, opt => opt.Ignore())
-                .ForMember(d => d.PurchaseInvoiceItems, opt => opt.Ignore())
-                .ForMember(d => d.SalesInvoiceItems, opt => opt.Ignore())
+                .ForMember(d => d.PurchaseInvoiceLines, opt => opt.Ignore())
+                .ForMember(d => d.SalesInvoiceLines, opt => opt.Ignore())
                 .ForMember(d => d.CreatedAt, opt => opt.Ignore())
                 .ForMember(d => d.UpdatedAt, opt => opt.Ignore());
         }
@@ -6347,7 +6347,7 @@ namespace SalesSystem.Application.Mapping
     {
         public PurchaseInvoiceMappingProfile()
         {
-            CreateMap<PurchaseInvoiceItem, PurchaseInvoiceItemDto>()
+            CreateMap<PurchaseInvoiceLine, PurchaseInvoiceLineDto>()
                 .ForMember(d => d.ProductName,
                     opt => opt.MapFrom(s => s.Product != null ? s.Product.Name : string.Empty));
 
@@ -6378,8 +6378,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Status,
                     opt => opt.MapFrom(s => (ContractEnums.InvoiceStatusDto)s.Status));
 
-            CreateMap<CreatePurchaseInvoiceItemRequestDto, PurchaseInvoiceItem>()
-                .ForMember(d => d.PurchaseInvoiceItemId, opt => opt.Ignore())
+            CreateMap<CreatePurchaseInvoiceLineRequestDto, PurchaseInvoiceLine>()
+                .ForMember(d => d.PurchaseInvoiceLineId, opt => opt.Ignore())
                 .ForMember(d => d.PurchaseInvoice, opt => opt.Ignore())
                 .ForMember(d => d.Product, opt => opt.Ignore())
                 .ForMember(d => d.LineTotal, opt => opt.Ignore());
@@ -6423,7 +6423,7 @@ namespace SalesSystem.Application.Mapping
     {
         public SalesInvoiceMappingProfile()
         {
-            CreateMap<SalesInvoiceItem, SalesInvoiceItemDto>()
+            CreateMap<SalesInvoiceLine, SalesInvoiceLineDto>()
                 .ForMember(d => d.ProductName,
                     opt => opt.MapFrom(s => s.Product != null ? s.Product.Name : string.Empty));
 
@@ -6454,8 +6454,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Status,
                     opt => opt.MapFrom(s => (ContractEnums.InvoiceStatusDto)s.Status));
 
-            CreateMap<CreateSalesInvoiceItemRequestDto, SalesInvoiceItem>()
-                .ForMember(d => d.SalesInvoiceItemId, opt => opt.Ignore())
+            CreateMap<CreateSalesInvoiceLineRequestDto, SalesInvoiceLine>()
+                .ForMember(d => d.SalesInvoiceLineId, opt => opt.Ignore())
                 .ForMember(d => d.SalesInvoice, opt => opt.Ignore())
                 .ForMember(d => d.Product, opt => opt.Ignore())
                 .ForMember(d => d.LineTotal, opt => opt.Ignore());
@@ -6780,7 +6780,7 @@ AutoMapper ��� ������ ��:
 var invoice = _mapper.Map<SalesInvoice>(request);
 
 invoice.InvoiceNo = await _numberGenerator.GenerateSalesInvoiceNoAsync(cancellationToken);
-invoice.Items = _mapper.Map<List<SalesInvoiceItem>>(request.Items);
+invoice.Items = _mapper.Map<List<SalesInvoiceLine>>(request.Items);
 
 foreach (var item in invoice.Items)
 {
@@ -7123,7 +7123,7 @@ namespace SalesSystem.Application.Services
             }
 
             // ����� ������ + ������ �� �������
-            var invoiceItems = new List<SalesInvoiceItem>();
+            var invoiceItems = new List<SalesInvoiceLine>();
             decimal subTotal = 0m;
 
             foreach (var item in request.Items)
@@ -7166,7 +7166,7 @@ namespace SalesSystem.Application.Services
                 if (lineTotal < 0)
                     return Result<int>.Failure($"Invalid line total for product '{product.Name}'.");
 
-                invoiceItems.Add(new SalesInvoiceItem
+                invoiceItems.Add(new SalesInvoiceLine
                 {
                     ProductId = product.ProductId,
                     Quantity = item.Quantity,
@@ -18872,13 +18872,13 @@ SalesSystem.Contracts/Purchases
 
 ---
 
-## `PurchaseInvoiceItemDto.cs`
+## `PurchaseInvoiceLineDto.cs`
 ```csharp
 namespace SalesSystem.Contracts.Purchases
 {
-    public class PurchaseInvoiceItemDto
+    public class PurchaseInvoiceLineDto
     {
-        public int PurchaseInvoiceItemId { get; set; }
+        public int PurchaseInvoiceLineId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -18927,7 +18927,7 @@ namespace SalesSystem.Contracts.Purchases
         public int? CreatedByUserId { get; set; }
         public string? CreatedByUserName { get; set; }
 
-        public List<PurchaseInvoiceItemDto> Items { get; set; } = [];
+        public List<PurchaseInvoiceLineDto> Items { get; set; } = [];
     }
 }
 ```
@@ -18958,13 +18958,13 @@ namespace SalesSystem.Contracts.Purchases
 
 ---
 
-## `CreatePurchaseInvoiceItemRequestDto.cs`
+## `CreatePurchaseInvoiceLineRequestDto.cs`
 ```csharp
 using System.ComponentModel.DataAnnotations;
 
 namespace SalesSystem.Contracts.Purchases
 {
-    public class CreatePurchaseInvoiceItemRequestDto
+    public class CreatePurchaseInvoiceLineRequestDto
     {
         public int ProductId { get; set; }
 
@@ -19018,7 +19018,7 @@ namespace SalesSystem.Contracts.Purchases
         public string? Notes { get; set; }
 
         [Required]
-        public List<CreatePurchaseInvoiceItemRequestDto> Items { get; set; } = [];
+        public List<CreatePurchaseInvoiceLineRequestDto> Items { get; set; } = [];
     }
 }
 ```
@@ -19152,7 +19152,7 @@ namespace SalesSystem.Application.Mapping
     {
         public PurchaseMappingProfile()
         {
-            CreateMap<PurchaseInvoiceItem, PurchaseInvoiceItemDto>()
+            CreateMap<PurchaseInvoiceLine, PurchaseInvoiceLineDto>()
                 .ForMember(d => d.ProductName,
                     opt => opt.MapFrom(s => s.Product != null ? s.Product.Name : string.Empty));
 
@@ -19183,8 +19183,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Status,
                     opt => opt.MapFrom(s => (ContractEnums.InvoiceStatusDto)s.Status));
 
-            CreateMap<CreatePurchaseInvoiceItemRequestDto, PurchaseInvoiceItem>()
-                .ForMember(d => d.PurchaseInvoiceItemId, opt => opt.Ignore())
+            CreateMap<CreatePurchaseInvoiceLineRequestDto, PurchaseInvoiceLine>()
+                .ForMember(d => d.PurchaseInvoiceLineId, opt => opt.Ignore())
                 .ForMember(d => d.PurchaseInvoice, opt => opt.Ignore())
                 .ForMember(d => d.Product, opt => opt.Ignore())
                 .ForMember(d => d.LineTotal, opt => opt.Ignore());
@@ -19287,7 +19287,7 @@ namespace SalesSystem.Application.Services
             if (request.PaymentType != InvoicePaymentTypeDto.Cash && !request.DueDate.HasValue)
                 return Result<int>.Failure("Due date is required for credit or mixed purchases.");
 
-            var invoiceItems = new List<PurchaseInvoiceItem>();
+            var invoiceItems = new List<PurchaseInvoiceLine>();
             decimal subTotal = 0m;
 
             foreach (var item in request.Items)
@@ -19318,7 +19318,7 @@ namespace SalesSystem.Application.Services
                 if (lineTotal < 0)
                     return Result<int>.Failure($"Invalid line total for product '{product.Name}'.");
 
-                invoiceItems.Add(new PurchaseInvoiceItem
+                invoiceItems.Add(new PurchaseInvoiceLine
                 {
                     ProductId = product.ProductId,
                     Quantity = item.Quantity,
@@ -20567,7 +20567,7 @@ namespace SalesSystem.Desktop.Forms.Purchases
                     TaxAmount = nudTax.Value,
                     PaidAmount = nudPaid.Value,
                     Notes = TrimToNull(txtNotes.Text),
-                    Items = _items.Select(x => new CreatePurchaseInvoiceItemRequestDto
+                    Items = _items.Select(x => new CreatePurchaseInvoiceLineRequestDto
                     {
                         ProductId = x.ProductId,
                         Quantity = x.Quantity,
@@ -20766,13 +20766,13 @@ SalesSystem.Contracts/Sales
 
 ---
 
-## `SalesInvoiceItemDto.cs`
+## `SalesInvoiceLineDto.cs`
 ```csharp
 namespace SalesSystem.Contracts.Sales
 {
-    public class SalesInvoiceItemDto
+    public class SalesInvoiceLineDto
     {
-        public int SalesInvoiceItemId { get; set; }
+        public int SalesInvoiceLineId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
         public decimal Quantity { get; set; }
@@ -20821,7 +20821,7 @@ namespace SalesSystem.Contracts.Sales
         public int? CreatedByUserId { get; set; }
         public string? CreatedByUserName { get; set; }
 
-        public List<SalesInvoiceItemDto> Items { get; set; } = [];
+        public List<SalesInvoiceLineDto> Items { get; set; } = [];
     }
 }
 ```
@@ -20852,13 +20852,13 @@ namespace SalesSystem.Contracts.Sales
 
 ---
 
-## `CreateSalesInvoiceItemRequestDto.cs`
+## `CreateSalesInvoiceLineRequestDto.cs`
 ```csharp
 using System.ComponentModel.DataAnnotations;
 
 namespace SalesSystem.Contracts.Sales
 {
-    public class CreateSalesInvoiceItemRequestDto
+    public class CreateSalesInvoiceLineRequestDto
     {
         public int ProductId { get; set; }
 
@@ -20911,7 +20911,7 @@ namespace SalesSystem.Contracts.Sales
         public string? Notes { get; set; }
 
         [Required]
-        public List<CreateSalesInvoiceItemRequestDto> Items { get; set; } = [];
+        public List<CreateSalesInvoiceLineRequestDto> Items { get; set; } = [];
     }
 }
 ```
@@ -21045,7 +21045,7 @@ namespace SalesSystem.Application.Mapping
     {
         public SalesMappingProfile()
         {
-            CreateMap<SalesInvoiceItem, SalesInvoiceItemDto>()
+            CreateMap<SalesInvoiceLine, SalesInvoiceLineDto>()
                 .ForMember(d => d.ProductName,
                     opt => opt.MapFrom(s => s.Product != null ? s.Product.Name : string.Empty));
 
@@ -21076,8 +21076,8 @@ namespace SalesSystem.Application.Mapping
                 .ForMember(d => d.Status,
                     opt => opt.MapFrom(s => (ContractEnums.InvoiceStatusDto)s.Status));
 
-            CreateMap<CreateSalesInvoiceItemRequestDto, SalesInvoiceItem>()
-                .ForMember(d => d.SalesInvoiceItemId, opt => opt.Ignore())
+            CreateMap<CreateSalesInvoiceLineRequestDto, SalesInvoiceLine>()
+                .ForMember(d => d.SalesInvoiceLineId, opt => opt.Ignore())
                 .ForMember(d => d.SalesInvoice, opt => opt.Ignore())
                 .ForMember(d => d.Product, opt => opt.Ignore())
                 .ForMember(d => d.LineTotal, opt => opt.Ignore());
@@ -22117,7 +22117,7 @@ namespace SalesSystem.Desktop.Forms.Sales
                     TaxAmount = nudTax.Value,
                     PaidAmount = nudPaid.Value,
                     Notes = TrimToNull(txtNotes.Text),
-                    Items = _items.Select(x => new CreateSalesInvoiceItemRequestDto
+                    Items = _items.Select(x => new CreateSalesInvoiceLineRequestDto
                     {
                         ProductId = x.ProductId,
                         Quantity = x.Quantity,
@@ -29381,7 +29381,7 @@ namespace SalesSystem.Application.Services
                 return Result<int>.Failure("Due date is required for credit or mixed purchases.");
 
             // 2. ����� ������ ����� ����������
-            var invoiceItems = new List<PurchaseInvoiceItem>();
+            var invoiceItems = new List<PurchaseInvoiceLine>();
             decimal subTotal = 0m;
 
             foreach (var item in request.Items)
@@ -29396,7 +29396,7 @@ namespace SalesSystem.Application.Services
                 if (lineTotal < 0)
                     return Result<int>.Failure($"Invalid line total for product '{product.Name}'.");
 
-                invoiceItems.Add(new PurchaseInvoiceItem
+                invoiceItems.Add(new PurchaseInvoiceLine
                 {
                     ProductId = product.ProductId,
                     Quantity = item.Quantity,
@@ -29995,7 +29995,7 @@ namespace SalesSystem.Desktop.Forms.Purchases
         private readonly IWarehouseApiService _warehouseApiService;
         private readonly IProductApiService _productApiService;
         
-        private readonly BindingList<CreatePurchaseInvoiceItemRequestDto> _items = new();
+        private readonly BindingList<CreatePurchaseInvoiceLineRequestDto> _items = new();
 
         // Header Controls
         private ComboBox cmbSupplier = null!;
@@ -30193,7 +30193,7 @@ namespace SalesSystem.Desktop.Forms.Purchases
             }
             else
             {
-                _items.Add(new CreatePurchaseInvoiceItemRequestDto
+                _items.Add(new CreatePurchaseInvoiceLineRequestDto
                 {
                     ProductId = product.ProductId,
                     Quantity = nudQuantity.Value,
@@ -30568,7 +30568,7 @@ namespace SalesSystem.Desktop.Forms.Sales
         private readonly IWarehouseApiService _warehouseApiService;
         private readonly IProductApiService _productApiService;
         
-        private readonly BindingList<CreateSalesInvoiceItemRequestDto> _items = new();
+        private readonly BindingList<CreateSalesInvoiceLineRequestDto> _items = new();
 
         // Header
         private ComboBox cmbCustomer = null!;
@@ -30768,7 +30768,7 @@ namespace SalesSystem.Desktop.Forms.Sales
             }
             else
             {
-                _items.Add(new CreateSalesInvoiceItemRequestDto
+                _items.Add(new CreateSalesInvoiceLineRequestDto
                 {
                     ProductId = product.ProductId,
                     Quantity = nudQuantity.Value,
@@ -34675,9 +34675,9 @@ namespace SalesSystem.Infrastructure.Persistence
         public DbSet<Supplier> Suppliers => Set<Supplier>();
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
-        public DbSet<PurchaseInvoiceItem> PurchaseInvoiceItems => Set<PurchaseInvoiceItem>();
+        public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
         public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
-        public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+        public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
         public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
         public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
         public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
@@ -36400,7 +36400,7 @@ private void PerformLogout()
 ���� ������ ������ SalesSystem.Desktop/Services/Printing ��� ��� ��� �����:
 C#
 using System.Drawing.Printing;
-using SalesSystem.Contracts.Invoices.Sales; // ����� ��� SalesInvoiceDto � SalesInvoiceItemDto
+using SalesSystem.Contracts.Invoices.Sales; // ����� ��� SalesInvoiceDto � SalesInvoiceLineDto
 
 namespace SalesSystem.Desktop.Services.Printing
 {

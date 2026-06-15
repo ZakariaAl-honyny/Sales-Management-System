@@ -34,16 +34,16 @@ public static class PrintDtoExtensions
         };
     }
 
-    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<SalesInvoiceItemDto> items)
+    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<SalesInvoiceLineDto> items)
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
             ProductName = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitPrice,
-            Discount = i.DiscountAmount,
+            Discount = 0m,
             LineTotal = i.LineTotal,
-            Mode = i.Mode
+            Mode = 1
         }).ToList();
     }
 
@@ -54,9 +54,9 @@ public static class PrintDtoExtensions
             SubTotal = invoice.SubTotal,
             TaxAmount = invoice.TaxAmount,
             Discount = invoice.DiscountAmount,
-            TotalAmount = invoice.TotalAmount,
+            TotalAmount = invoice.NetTotal,
             PaidAmount = invoice.PaidAmount,
-            DueAmount = invoice.DueAmount
+            DueAmount = invoice.RemainingAmount
         };
     }
 
@@ -75,13 +75,13 @@ public static class PrintDtoExtensions
         };
     }
 
-    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<PurchaseInvoiceItemDto> items)
+    public static List<InvoiceItemPrintDto> ToPrintDtos(this IEnumerable<PurchaseInvoiceLineDto> items)
     {
         return items.Select(i => new InvoiceItemPrintDto
         {
             ProductName = i.ProductName,
             Quantity = i.Quantity,
-            UnitPrice = i.UnitCost,
+            UnitPrice = i.UnitPrice,
             Discount = 0m,
             LineTotal = i.LineTotal,
             Mode = 1
@@ -124,7 +124,7 @@ public static class PrintDtoExtensions
             UnitPrice = i.UnitPrice,
             Discount = i.DiscountAmount,
             LineTotal = i.LineTotal,
-            Mode = i.Mode
+            Mode = i.Mode != 0 ? i.Mode : (byte)1
         }).ToList();
     }
 
@@ -202,8 +202,8 @@ public static class PrintDtoExtensions
         {
             TransferNumber = transfer.TransferNo.ToString(),
             Date = transfer.TransferDate,
-            FromWarehouse = transfer.SourceWarehouseName ?? "غير معروف",
-            ToWarehouse = transfer.DestinationWarehouseName ?? "غير معروف",
+            FromWarehouse = transfer.FromWarehouseName ?? "غير معروف",
+            ToWarehouse = transfer.ToWarehouseName ?? "غير معروف",
             Notes = transfer.Notes ?? string.Empty
         };
     }

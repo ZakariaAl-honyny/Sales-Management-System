@@ -141,13 +141,13 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
 
             var detailsMessage = string.Join("\n",
                 lines.Select(l =>
-                    $"    {l.AccountCode} - {l.AccountNameAr}\n" +
+                    $"    حساب #{l.AccountId}\n" +
                     $"    مدين: {l.Debit:N2}    دائن: {l.Credit:N2}" +
                     (string.IsNullOrEmpty(l.Description) ? "" : $"    ({l.Description})")
                 ));
 
             var message = $"رقم القيد: {detail.EntryNumber}\n" +
-                          $"التاريخ: {detail.TransactionDate:yyyy/MM/dd HH:mm}\n" +
+                          $"التاريخ: {detail.EntryDate:yyyy/MM/dd HH:mm}\n" +
                           $"البيان: {detail.Description}\n" +
                           $"النوع: {GetEntryTypeDisplay(detail.EntryType)}\n" +
                            $"الحالة: {detail.StatusDisplay}" +
@@ -339,7 +339,7 @@ public class JournalEntryItemViewModel : ViewModelBase
 
     public int Id => _dto.Id;
     public string EntryNumber => _dto.EntryNumber;
-    public DateTime TransactionDate => _dto.TransactionDate;
+    public DateTime EntryDate => _dto.EntryDate;
     public string Description => _dto.Description;
     public string EntryType => _dto.EntryType;
     public string EntryTypeDisplay => JournalEntriesListViewModel.GetEntryTypeDisplay(_dto.EntryType);
@@ -368,5 +368,5 @@ public class JournalEntryItemViewModel : ViewModelBase
     /// <summary>
     /// Short date format for display.
     /// </summary>
-    public string TransactionDateFormatted => TransactionDate.ToString("yyyy/MM/dd");
+    public string TransactionDateFormatted => EntryDate.ToString("yyyy/MM/dd");
 }

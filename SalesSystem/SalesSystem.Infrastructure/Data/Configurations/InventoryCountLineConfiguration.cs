@@ -10,9 +10,23 @@ public class InventoryCountLineConfiguration : IEntityTypeConfiguration<Inventor
     {
         builder.ToTable("InventoryCountLines");
         builder.HasKey(l => l.Id);
-        builder.Property(l => l.SystemQuantity).HasPrecision(18, 3);
-        builder.Property(l => l.ActualQuantity).HasPrecision(18, 3);
-        builder.Property(l => l.Difference).HasPrecision(18, 3);
+        builder.Property(l => l.SystemQuantity)
+            .HasPrecision(18, 3)
+            .IsRequired();
+        builder.Property(l => l.ActualQuantity)
+            .HasPrecision(18, 3)
+            .IsRequired();
+        builder.Property(l => l.DifferenceQuantity)
+            .HasPrecision(18, 3)
+            .IsRequired();
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CHK_InvCountLines_SystemQuantity_NonNegative",
+                "[SystemQuantity] >= 0");
+            t.HasCheckConstraint("CHK_InvCountLines_ActualQuantity_NonNegative",
+                "[ActualQuantity] >= 0");
+        });
 
         builder.HasOne(l => l.InventoryCount)
             .WithMany(ic => ic.Lines)
@@ -24,9 +38,9 @@ public class InventoryCountLineConfiguration : IEntityTypeConfiguration<Inventor
             .HasForeignKey(l => l.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(l => l.ProductUnit)
+        builder.HasOne(l => l.Batch)
             .WithMany()
-            .HasForeignKey(l => l.ProductUnitId)
+            .HasForeignKey(l => l.BatchId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

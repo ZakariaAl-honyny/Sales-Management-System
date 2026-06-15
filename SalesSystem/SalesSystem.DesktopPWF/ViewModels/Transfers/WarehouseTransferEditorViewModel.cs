@@ -249,8 +249,8 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
         if (result.IsSuccess && result.Value != null)
         {
             var transfer = result.Value;
-            SourceWarehouseId = transfer.SourceWarehouseId;
-            DestinationWarehouseId = transfer.DestinationWarehouseId;
+            SourceWarehouseId = transfer.FromWarehouseId;
+            DestinationWarehouseId = transfer.ToWarehouseId;
             TransferDate = transfer.TransferDate;
             Notes = transfer.Notes;
             Status = transfer.Status;
@@ -262,8 +262,8 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
                 {
                     ProductId = line.ProductId,
                     ProductName = line.ProductName ?? string.Empty,
-                    ProductUnitId = line.ProductUnitId,
-                    ProductUnitName = line.ProductUnitName ?? "حبة",
+                    BatchId = line.BatchId,
+                    BatchNo = line.BatchNo,
                     Quantity = line.Quantity,
                     UnitCost = line.UnitCost
                 });
@@ -295,8 +295,9 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    ProductUnitId = product.DefaultPurchaseUnitId ?? 0, // Use purchase unit for transfers; 0 = service auto
+                    ProductUnitId = 0, // 0 = service auto
                     ProductUnitName = "حبة",
+                    BatchId = 0,
                     Quantity = 1,
                     UnitCost = 0m
                 });
@@ -472,6 +473,8 @@ public class WarehouseTransferLineItem : ViewModelBase
     private string? _productName;
     private int _productUnitId;
     private string? _productUnitName;
+    private int _batchId;
+    private int? _batchNo;
     private decimal _quantity;
     private decimal _unitCost;
 
@@ -497,6 +500,18 @@ public class WarehouseTransferLineItem : ViewModelBase
     {
         get => _productUnitName;
         set => SetProperty(ref _productUnitName, value);
+    }
+
+    public int BatchId
+    {
+        get => _batchId;
+        set => SetProperty(ref _batchId, value);
+    }
+
+    public int? BatchNo
+    {
+        get => _batchNo;
+        set => SetProperty(ref _batchNo, value);
     }
 
     public decimal Quantity

@@ -252,13 +252,13 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
         if (!result.IsSuccess || result.Value == null) return;
 
         var unpaid = result.Value
-            .Where(inv => inv.Status == 2 && inv.DueAmount > 0) // Posted + has outstanding balance
+            .Where(inv => inv.Status == 2 && inv.RemainingAmount > 0) // Posted + has outstanding balance
             .Select(inv => new UnpaidInvoiceAllocationItem
             {
                 InvoiceId = inv.Id,
                 InvoiceNo = inv.InvoiceNo,
                 InvoiceDate = inv.InvoiceDate.ToString("yyyy-MM-dd"),
-                TotalAmount = inv.TotalAmount,
+                TotalAmount = inv.NetTotal,
                 PaidAmount = inv.PaidAmount,
                 AllocatedAmount = 0
             })

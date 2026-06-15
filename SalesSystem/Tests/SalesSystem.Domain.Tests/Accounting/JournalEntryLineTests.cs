@@ -14,8 +14,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 150.75m);
 
         // Assert
@@ -28,8 +26,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 100m);
 
         // Assert
@@ -42,8 +38,6 @@ public class JournalEntryLineTests
         // Act
         var act = () => JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: -50m);
 
         // Assert
@@ -57,8 +51,6 @@ public class JournalEntryLineTests
         // Act
         var act = () => JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 0m);
 
         // Assert
@@ -67,62 +59,15 @@ public class JournalEntryLineTests
     }
 
     [Fact]
-    public void CreateDebitLine_EmptyAccountCode_ThrowsDomainException()
-    {
-        // Act
-        var act = () => JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "",
-            accountNameAr: "نقدي",
-            amount: 100m);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("رمز الحساب مطلوب");
-    }
-
-    [Fact]
-    public void CreateDebitLine_EmptyAccountNameAr_ThrowsDomainException()
-    {
-        // Act
-        var act = () => JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "101",
-            accountNameAr: "",
-            amount: 100m);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("اسم الحساب بالعربية مطلوب");
-    }
-
-    [Fact]
-    public void CreateDebitLine_SetsAccountIdAndCode()
+    public void CreateDebitLine_SetsAccountId()
     {
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 42,
-            accountCode: "ACC042",
-            accountNameAr: "حساب تجريبي",
             amount: 200m);
 
         // Assert
         line.AccountId.Should().Be(42);
-        line.AccountCode.Should().Be("ACC042");
-    }
-
-    [Fact]
-    public void CreateDebitLine_SetsAccountNameAr()
-    {
-        // Act
-        var line = JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
-            amount: 100m);
-
-        // Assert
-        line.AccountNameAr.Should().Be("نقدي");
     }
 
     [Fact]
@@ -131,8 +76,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 100m,
             description: "دفع نقدي");
 
@@ -146,40 +89,10 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 100m);
 
         // Assert
         line.Description.Should().BeNull();
-    }
-
-    [Fact]
-    public void CreateDebitLine_TrimsAccountCode()
-    {
-        // Act
-        var line = JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "  101  ",
-            accountNameAr: "نقدي",
-            amount: 100m);
-
-        // Assert
-        line.AccountCode.Should().Be("101");
-    }
-
-    [Fact]
-    public void CreateDebitLine_TrimsAccountNameAr()
-    {
-        // Act
-        var line = JournalEntryLine.CreateDebit(
-            accountId: 1,
-            accountCode: "101",
-            accountNameAr: "  نقدي  ",
-            amount: 100m);
-
-        // Assert
-        line.AccountNameAr.Should().Be("نقدي");
     }
 
     // ─── CreateCreditLine ─────────────────────────────
@@ -190,8 +103,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: 250.50m);
 
         // Assert
@@ -204,8 +115,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: 100m);
 
         // Assert
@@ -218,8 +127,6 @@ public class JournalEntryLineTests
         // Act
         var act = () => JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: -50m);
 
         // Assert
@@ -233,8 +140,6 @@ public class JournalEntryLineTests
         // Act
         var act = () => JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: 0m);
 
         // Assert
@@ -243,62 +148,15 @@ public class JournalEntryLineTests
     }
 
     [Fact]
-    public void CreateCreditLine_EmptyAccountCode_ThrowsDomainException()
-    {
-        // Act
-        var act = () => JournalEntryLine.CreateCredit(
-            accountId: 2,
-            accountCode: "",
-            accountNameAr: "دائن",
-            amount: 100m);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("رمز الحساب مطلوب");
-    }
-
-    [Fact]
-    public void CreateCreditLine_EmptyAccountNameAr_ThrowsDomainException()
-    {
-        // Act
-        var act = () => JournalEntryLine.CreateCredit(
-            accountId: 2,
-            accountCode: "201",
-            accountNameAr: "",
-            amount: 100m);
-
-        // Assert
-        act.Should().Throw<DomainException>()
-            .Which.Message.Should().Contain("اسم الحساب بالعربية مطلوب");
-    }
-
-    [Fact]
-    public void CreateCreditLine_SetsAccountIdAndCode()
+    public void CreateCreditLine_SetsAccountId()
     {
         // Act
         var line = JournalEntryLine.CreateCredit(
             accountId: 55,
-            accountCode: "ACC055",
-            accountNameAr: "حساب دائن",
             amount: 300m);
 
         // Assert
         line.AccountId.Should().Be(55);
-        line.AccountCode.Should().Be("ACC055");
-    }
-
-    [Fact]
-    public void CreateCreditLine_SetsAccountNameAr()
-    {
-        // Act
-        var line = JournalEntryLine.CreateCredit(
-            accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن رئيسي",
-            amount: 100m);
-
-        // Assert
-        line.AccountNameAr.Should().Be("دائن رئيسي");
     }
 
     [Fact]
@@ -307,8 +165,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: 100m,
             description: "قيد دائن");
 
@@ -322,40 +178,10 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateCredit(
             accountId: 2,
-            accountCode: "201",
-            accountNameAr: "دائن",
             amount: 100m);
 
         // Assert
         line.Description.Should().BeNull();
-    }
-
-    [Fact]
-    public void CreateCreditLine_TrimsAccountCode()
-    {
-        // Act
-        var line = JournalEntryLine.CreateCredit(
-            accountId: 2,
-            accountCode: "  201  ",
-            accountNameAr: "دائن",
-            amount: 100m);
-
-        // Assert
-        line.AccountCode.Should().Be("201");
-    }
-
-    [Fact]
-    public void CreateCreditLine_TrimsAccountNameAr()
-    {
-        // Act
-        var line = JournalEntryLine.CreateCredit(
-            accountId: 2,
-            accountCode: "201",
-            accountNameAr: "  دائن  ",
-            amount: 100m);
-
-        // Assert
-        line.AccountNameAr.Should().Be("دائن");
     }
 
     // ─── BaseEntity Inheritance ───────────────────────
@@ -366,8 +192,6 @@ public class JournalEntryLineTests
         // Act
         var line = JournalEntryLine.CreateDebit(
             accountId: 1,
-            accountCode: "101",
-            accountNameAr: "نقدي",
             amount: 100m);
 
         // Assert

@@ -53,57 +53,24 @@
                          ToolTip="أدخل اسماً فريداً للمستودع — هذا الحقل مطلوب ولا يمكن أن يكون فارغاً"/>
                 <TextBlock Text="اسم مميز يساعدك في التعرف على المخزن" Style="{StaticResource HelperTextStyle}"/>
 
-                <!-- Type -->
-                <TextBlock Text="نوع المستودع *" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
-                <ComboBox ItemsSource="{Binding TypeList}"
-                          SelectedValue="{Binding SelectedType}"
-                          SelectedValuePath="Key"
-                          DisplayMemberPath="Value"
-                          Style="{StaticResource ModernComboBox}"
-                          TabIndex="2"
-                          AutomationProperties.AutomationId="CboWarehouseType"
-                          ToolTip="اختر نوع المستودع — رئيسي، فرعي، صالة عرض، أو تالف"/>
-
-                <!-- Location -->
-                <TextBlock Text="الموقع / العنوان" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
-                <TextBox Text="{Binding Location, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
-                         Style="{StaticResource ModernTextBox}"
-                         TextWrapping="Wrap" 
-                         AcceptsReturn="True" 
-                         VerticalContentAlignment="Top" 
-                         Tag="مثال: صنعاء - شارع الستين - بجوار بنك التضامن"
-                         TabIndex="3"
-                         helpers:FocusHelper.AdvanceOnEnter="True"
-                         AutomationProperties.AutomationId="TxtWarehouseLocation"
-                         ToolTip="الموقع الجغرافي للمستودع — اختياري"/>
-                <TextBlock Text="وصف دقيق يساعد السائقين أو عمال التوصيل" Style="{StaticResource HelperTextStyle}"/>
-
                 <!-- Phone -->
                 <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
                 <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                          Style="{StaticResource ModernTextBox}"
-                         TabIndex="4"
+                         TabIndex="2"
                          AutomationProperties.AutomationId="TxtWarehousePhone"
                          ToolTip="رقم هاتف المستودع — اختياري، بحد أقصى 20 حرفاً"/>
 
                 <!-- Address -->
-                <TextBlock Text="العنوان التفصيلي" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
+                <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
                 <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                          Style="{StaticResource ModernTextBox}"
                          TextWrapping="Wrap"
                          AcceptsReturn="True"
                          VerticalContentAlignment="Top"
-                         TabIndex="5"
+                         TabIndex="3"
                          AutomationProperties.AutomationId="TxtWarehouseAddress"
                          ToolTip="العنوان الكامل للمستودع — اختياري"/>
-
-                <!-- Manager Name -->
-                <TextBlock Text="مدير المستودع" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>
-                <TextBox Text="{Binding ManagerName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                         Style="{StaticResource ModernTextBox}"
-                         TabIndex="6"
-                         AutomationProperties.AutomationId="TxtWarehouseManager"
-                         ToolTip="اسم مدير المستودع المسؤول — اختياري"/>
 
                 <!-- Notes -->
                 <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}" Margin="4,0,0,6"/>

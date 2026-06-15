@@ -476,16 +476,17 @@ public class SalesReturnEditorViewModel : ViewModelBase
             var request = new CreateSalesReturnRequest(
                 SalesInvoiceId: SelectedInvoice?.Id,
                 CustomerId: SelectedInvoice?.CustomerId,
-                WarehouseId: SelectedWarehouseId,
+                WarehouseId: (short)SelectedWarehouseId,
                 ReturnDate: ReturnDate,
+                CurrencyId: (short?)1,
                 Notes: Notes,
-                CashBoxId: EnableRefund && SelectedCashBox?.Id > 0 ? SelectedCashBox.Id : null,
-                RefundAmount: EnableRefund ? RefundAmount : null,
                 Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
+                    SalesInvoiceLineId: i.SalesInvoiceLineId,
                     ProductId: i.ProductId,
-                    ProductUnitId: 1,
+                    ProductUnitId: i.ProductUnitId,
                     Quantity: i.ReturnQuantity,
                     UnitPrice: i.UnitPrice,
+                    Amount: i.ReturnQuantity * i.UnitPrice - i.DiscountAmount,
                     DiscountAmount: i.DiscountAmount,
                     Mode: i.Mode
                 )).ToList()
@@ -525,7 +526,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
                              $"لا يمكن التعديل بعد الترحيل.";
 
         if (EnableRefund && SelectedCashBox != null)
-            confirmMessage += $"\n💰 سيتم استرداد {RefundAmount:N2} إلى صندوق {SelectedCashBox.BoxName}.";
+            confirmMessage += $"\n💰 سيتم استرداد {RefundAmount:N2} إلى صندوق {SelectedCashBox.Name}.";
 
         var confirm = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل - تحليل الأثر", confirmMessage);
         if (!confirm) return;
@@ -667,7 +668,9 @@ public class SalesReturnItemViewModel : ViewModelBase
     private byte _mode = 1;
     private readonly ISoundService? _soundService;
 
+    public int SalesInvoiceLineId { get; }
     public int ProductId { get; }
+    public int ProductUnitId { get; }
     public string ProductName { get; }
     public decimal OriginalQuantity { get; }
     public decimal UnitPrice { get; }
@@ -690,23 +693,25 @@ public class SalesReturnItemViewModel : ViewModelBase
         }
     }
 
-    public SalesReturnItemViewModel(SalesInvoiceItemDto item, ISoundService? soundService = null)
+    public SalesReturnItemViewModel(SalesInvoiceLineDto item, ISoundService? soundService = null)
     {
+        SalesInvoiceLineId = item.Id;
         ProductId = item.ProductId;
+        ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitPrice;
-        DiscountAmount = item.DiscountAmount;
-        _mode = item.Mode;
         _returnQuantity = 0;
         _soundService = soundService;
     }
 
     public SalesReturnItemViewModel(SalesReturnItemDto item, ISoundService? soundService = null)
     {
+        SalesInvoiceLineId = 0; // Not available from DTO, set to 0 (read-only view)
         ProductId = item.ProductId;
+        ProductUnitId = 1;
         ProductName = item.ProductName;
-        OriginalQuantity = item.Quantity; // In case of viewing, we might need a different property but for simplicity
+        OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitPrice;
         DiscountAmount = item.DiscountAmount;
         _mode = item.Mode;

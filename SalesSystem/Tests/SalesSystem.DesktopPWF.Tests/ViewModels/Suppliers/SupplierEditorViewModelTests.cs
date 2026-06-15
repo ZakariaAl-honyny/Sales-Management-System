@@ -78,7 +78,7 @@ public class SupplierEditorViewModelTests : IDisposable
             Address: null,
             TaxNumber: null,
             IsActive: true,
-            AccountId: 1);
+            PartyId: 1, AccountId: 1);
 
         // Act - Use the service-based constructor
         var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
@@ -120,7 +120,7 @@ public class SupplierEditorViewModelTests : IDisposable
             Address: "العنوان",
             TaxNumber: null,
             IsActive: false,
-            AccountId: 1);
+            PartyId: 1, AccountId: 1);
 
         // Act
         var viewModel = new SupplierEditorViewModel(supplier, _mockSupplierService.Object, _mockEventBus.Object, _mockDialogService.Object, _mockScreenWindowService.Object);
@@ -431,7 +431,7 @@ public class SupplierEditorViewModelTests : IDisposable
             Address: null,
             TaxNumber: null,
             IsActive: true,
-            AccountId: 1);
+            PartyId: 1, AccountId: 1);
     }
 
     #endregion

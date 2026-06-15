@@ -25,7 +25,7 @@ public class Employee : ActivatableEntity
     /// <summary>
     /// FK to the Department the employee belongs to (optional).
     /// </summary>
-    public int? DepartmentId { get; private set; }
+    public short? DepartmentId { get; private set; }
 
     /// <summary>
     /// Navigation property to the linked Department.
@@ -81,7 +81,7 @@ public class Employee : ActivatableEntity
         int partyId,
         int employeeNo,
         DateTime hireDate,
-        int? departmentId = null,
+        short? departmentId = null,
         decimal salary = 0,
         string? notes = null,
         int? createdByUserId = null)
@@ -119,7 +119,7 @@ public class Employee : ActivatableEntity
     /// <param name="updatedByUserId">ID of the user performing the update.</param>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public void Update(
-        int? departmentId = null,
+        short? departmentId = null,
         decimal? salary = null,
         string? notes = null,
         int? updatedByUserId = null)

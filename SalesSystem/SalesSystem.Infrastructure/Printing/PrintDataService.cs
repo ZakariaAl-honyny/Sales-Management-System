@@ -79,7 +79,7 @@ public class PrintDataService : IPrintDataService
     {
         var returnEntity = await _uow.SalesReturns.Query()
             .Include(r => r.Customer).ThenInclude(c => c!.Party)
-            .Include(r => r.Items).ThenInclude(it => it.Product)
+            .Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == returnId, ct);
 
         if (returnEntity == null)
@@ -96,8 +96,7 @@ public class PrintDataService : IPrintDataService
     {
         var returnEntity = await _uow.PurchaseReturns.Query()
             .Include(r => r.Supplier).ThenInclude(s => s!.Party)
-            .Include(r => r.Items).ThenInclude(it => it.Product)
-            .Include(r => r.Items).ThenInclude(it => it.ProductUnit).ThenInclude(pu => pu.Unit)
+            .Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == returnId, ct);
 
         if (returnEntity == null)

@@ -19,12 +19,6 @@ public class WarehouseStockConfiguration : IEntityTypeConfiguration<WarehouseSto
             .IsRequired()
             .HasPrecision(18, 3);
 
-        builder.Property(ws => ws.AvgCost)
-            .IsRequired()
-            .HasPrecision(18, 2)
-            .HasDefaultValue(0)
-            .HasComment("متوسط التكلفة المرجح");
-
         builder.HasIndex(ws => new { ws.WarehouseId, ws.ProductId })
             .IsUnique()
             .HasDatabaseName("IX_WarehouseStocks_Warehouse_Product");

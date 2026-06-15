@@ -32,12 +32,12 @@ ALL quantities: `decimal(18,3)` — NEVER `int` unless human explicitly approves
 **Canonical Formulas (computed in Domain Layer ONLY):**
 
 ```csharp
-// Sales LineTotal — inside SalesInvoiceItem entity
+// Sales LineTotal — inside SalesInvoiceLine entity
 // Quantity is always stored in Retail Units. 
 // If Mode == Wholesale, Price is WholesalePrice, and QtyInRetail = Qty * ConversionFactor.
 LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 
-// Purchase LineTotal — inside PurchaseInvoiceItem entity
+// Purchase LineTotal — inside PurchaseInvoiceLine entity
 LineTotal = (Quantity * UnitCost) - DiscountAmount;
 
 // Invoice totals — inside Invoice entity
@@ -374,7 +374,7 @@ else if (strategy == DeleteStrategy.Permanent)
 ```
 
 **Reference Validation Required:**
-- Product → Check SalesInvoiceItems, PurchaseInvoiceItems
+- Product → Check SalesInvoiceLines, PurchaseInvoiceLines
 - Category → Check Products
 - Unit → Check Products (UnitId, RetailUnitId, WholesaleUnitId)
 - Warehouse → Check WarehouseStocks, StockTransfers
@@ -403,7 +403,7 @@ public static Product Create(...)
 }
 ```
 
-**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryTransaction, InventoryBatch, CustomerPayment, SupplierPayment, SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem, ProductUnit, UnitBarcode, CashBox, CashTransaction, ProductPriceHistory
+**Entities with Guard Clauses:** Product, Customer, Supplier, SalesInvoice, PurchaseInvoice, WarehouseStock, StockTransfer, SalesReturn, PurchaseReturn, User, Category, Unit, Warehouse, DocumentSequence, StoreSettings, InventoryTransaction, InventoryBatch, CustomerPayment, SupplierPayment, SalesInvoiceLine, PurchaseInvoiceLine, SalesReturnItem, PurchaseReturnItem, StockTransferItem, ProductUnit, UnitBarcode, CashBox, CashTransaction, ProductPriceHistory
 
 **Exception Type:** `DomainException` — NEVER `ArgumentException` in Domain layer.
 
@@ -944,7 +944,7 @@ All table definitions, column types, constraints, indexes, and FK relationships 
 | Module | File Section | Tables |
 |--------|-------------|--------|
 | 1 — Security & Users | `# 3) Security & Identity` | Users, Roles, Permissions, AuditLogs, UserSessions |
-| 2 — Sales & Purchases | `# 4) Sales & Purchases` | SalesInvoices, SalesInvoiceItems, PurchaseInvoices, PurchaseInvoiceItems, SalesReturns, PurchaseReturns |
+| 2 — Sales & Purchases | `# 4) Sales & Purchases` | SalesInvoices, SalesInvoiceLines, PurchaseInvoices, PurchaseInvoiceLines, SalesReturns, PurchaseReturns |
 | 3 — Customers & Suppliers | `# 5) Customers & Suppliers` | Parties, Customers, Suppliers |
 | 4 — Products & Inventory | `# 6) Products & Inventory` | Products, Categories, Units, ProductUnits, UnitBarcodes, ProductPrices, ProductImages |
 | 5 — Inventory Transactions | `# 7) Inventory Transactions` | InventoryBatches, WarehouseStocks, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, WarehouseTransferLines |

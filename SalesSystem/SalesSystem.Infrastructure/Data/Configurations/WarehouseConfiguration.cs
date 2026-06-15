@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -22,35 +21,21 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
             .ValueGeneratedOnAdd();
 
         // === Properties ===
-        builder.Property(w => w.Code)
-            .IsRequired()
-            .HasMaxLength(10)
-            .HasComment("كود المستودع — فريد");
-
         builder.Property(w => w.Name)
             .IsRequired()
-            .HasMaxLength(100)
+            .HasMaxLength(150)
             .HasComment("اسم المستودع");
 
-        builder.Property(w => w.Type)
-            .HasConversion<int>()
-            .HasDefaultValue(WarehouseType.Main)
-            .IsRequired();
-
-        builder.Property(w => w.Location)
-            .HasMaxLength(200)
-            .IsRequired(false);
-
         builder.Property(w => w.Phone)
-            .HasMaxLength(20)
+            .HasMaxLength(30)
             .IsRequired(false);
 
         builder.Property(w => w.Address)
-            .HasMaxLength(200)
+            .HasMaxLength(300)
             .IsRequired(false);
 
-        builder.Property(w => w.ManagerName)
-            .HasMaxLength(100)
+        builder.Property(w => w.Notes)
+            .HasMaxLength(500)
             .IsRequired(false);
 
         builder.Property(w => w.IsActive)
@@ -62,14 +47,6 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
             .HasForeignKey(w => w.BranchId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
-
-        // === Indexes ===
-        builder.HasIndex(w => w.Code)
-            .IsUnique()
-            .HasDatabaseName("IX_Warehouses_Code");
-
-        builder.HasIndex(w => w.BranchId)
-            .HasDatabaseName("IX_Warehouses_BranchId");
 
         // === Global query filter — soft delete ===
         builder.HasQueryFilter(w => w.IsActive);

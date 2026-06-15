@@ -104,8 +104,8 @@ The `operation` delegate receives no parameters — it accesses `IUnitOfWork` re
 
 | Operation | Tables Mutated (within one transaction) |
 |-----------|----------------------------------------|
-| Post Sales Invoice | SalesInvoices, SalesInvoiceItems, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines, CashTransactions (if cash), Customers (balance) |
-| Post Purchase Invoice | PurchaseInvoices, PurchaseInvoiceItems, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines |
+| Post Sales Invoice | SalesInvoices, SalesInvoiceLines, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines, CashTransactions (if cash), Customers (balance) |
+| Post Purchase Invoice | PurchaseInvoices, PurchaseInvoiceLines, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines |
 | Post Sales Return | SalesReturns, SalesReturnItems, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines |
 | Post Purchase Return | PurchaseReturns, PurchaseReturnItems, WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, JournalEntries, JournalEntryLines |
 | Stock Transfer | WarehouseTransfers, WarehouseTransferLines, WarehouseStocks (source + dest), InventoryTransactions, InventoryTransactionLines |

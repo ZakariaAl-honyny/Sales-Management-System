@@ -37,7 +37,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Customer", "Warehouse", "Items.Product");
+            r => r.Id == id, ct, "Customer", "Warehouse", "Lines.SalesInvoiceLine.Product");
 
         if (sr == null)
             return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود", ErrorCodes.NotFound);
@@ -63,54 +63,54 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> CreateAsync(CreateSalesReturnRequest request, int userId, CancellationToken ct)
     {
         // 1. Validation
-        if (request.SalesInvoiceId.HasValue)
+        if (request.SalesInvoiceId <= 0)
+            return Result<SalesReturnDto>.Failure("فاتورة المبيعات الأصلية مطلوبة");
+
+        var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
+            i => i.Id == request.SalesInvoiceId, ct, "Items");
+
+        if (invoice == null) return Result<SalesReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
+
+        foreach (var item in request.Items)
         {
-            var invoice = await _uow.SalesInvoices.FirstOrDefaultAsync(
-                i => i.Id == request.SalesInvoiceId.Value, ct, "Items");
+            var originalLine = invoice.Items.FirstOrDefault(it => it.Id == item.SalesInvoiceLineId);
+            if (originalLine == null)
+                return Result<SalesReturnDto>.Failure($"المنتج غير موجود في الفاتورة الأصلية");
 
-            if (invoice == null) return Result<SalesReturnDto>.Failure("الفاتورة الأصلية غير موجودة");
-
-            foreach (var item in request.Items)
-            {
-                var originalLine = invoice.Items.FirstOrDefault(it => it.ProductId == item.ProductId);
-                if (originalLine == null)
-                    return Result<SalesReturnDto>.Failure($"المنتج {item.ProductId} غير موجود في الفاتورة الأصلية");
-
-                if (item.Quantity > originalLine.Quantity)
-                    return Result<SalesReturnDto>.Failure($"الكمية المرتجعة للمنتج {item.ProductId} أكبر من الكمية المباعة ({originalLine.Quantity})");
-            }
+            if (item.Quantity > originalLine.Quantity)
+                return Result<SalesReturnDto>.Failure($"الكمية المرتجعة للمنتج أكبر من الكمية المباعة ({originalLine.Quantity})");
         }
 
         // 2. Transaction
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<SalesReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
-                var returnNoResult = await _sequenceService.GetNextNumberAsync("SR", ct);
+                var returnNoResult = await _sequenceService.GetNextIntAsync("SalesReturn", ct);
                 if (!returnNoResult.IsSuccess) return Result<SalesReturnDto>.Failure(returnNoResult.Error!);
 
                 var salesReturn = SalesReturn.Create(
-                    returnNoResult.Value!,
-                    (short)request.WarehouseId,
-                    request.CustomerId,
-                    request.SalesInvoiceId,
+                    returnNoResult.Value,
+                    request.SalesInvoiceId ?? 0,
+                    request.CustomerId ?? 0,
+                    request.WarehouseId,
+                    request.CurrencyId ?? 1,
                     request.ReturnDate,
                     request.Notes,
-                    userId: userId,
-                    cashBoxId: request.CashBoxId,
-                    refundAmount: request.RefundAmount ?? 0
+                    userId
                 );
 
                 foreach (var item in request.Items)
                 {
-                    salesReturn.AddItem(item.ProductId, item.Quantity, item.UnitPrice, item.DiscountAmount, (SaleMode)item.Mode, item.Notes);
+                    var line = SalesReturnLine.Create(
+                        item.SalesInvoiceLineId,
+                        item.Quantity,
+                        item.Amount);
+                    salesReturn.AddLine(line);
                 }
 
                 await _uow.SalesReturns.AddAsync(salesReturn, ct);
                 await _uow.SaveChangesAsync(ct);
-
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Return created as Draft: {ReturnNo} (ID: {Id})", salesReturn.ReturnNo, salesReturn.Id);
 
@@ -118,13 +118,11 @@ public class SalesReturnService : ISalesReturnService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "Domain exception creating sales return: {Message}", ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogError(ex, "Error creating sales return");
                 return Result<SalesReturnDto>.Failure("حدث خطأ أثناء حفظ المرتجع");
             }
@@ -133,64 +131,40 @@ public class SalesReturnService : ISalesReturnService
 
     public async Task<Result<SalesReturnDto>> PostAsync(int id, PostSalesReturnRequest request, int userId, CancellationToken ct)
     {
+        // Overload with request params — forward to main PostAsync
         return await PostAsync(id, userId, ct);
     }
 
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
+            r => r.Id == id, ct, "Lines", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<SalesReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 sr.Post();
                 await _uow.SaveChangesAsync(ct);
 
-                // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                 // Update Stock
-                foreach (var item in sr.Items)
+                foreach (var item in sr.Lines)
                 {
                     await _inventoryService.IncreaseStockAsync(
-                        item.ProductId,
+                        item.SalesInvoiceLine != null ? item.SalesInvoiceLine.ProductId : 0,
                         sr.WarehouseId,
                         item.Quantity,
-                        unitCost: item.UnitPrice,
+                        unitCost: item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
                         userId: userId,
                         ct: ct);
-                }
-
-                // Create payment voucher (سند صرف) for refund if CashBoxId is set
-                // TODO: Use proper currencyId and accountId when available
-                if (sr.CashBoxId.HasValue && sr.RefundAmount > 0)
-                {
-                    var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
-                        sr.CashBoxId.Value,
-                        currencyId: 1, // Default SAR
-                        sr.RefundAmount,
-                        accountId: 1, // Default cash account
-                        notes: "مردود مبيعات",
-                        sourceDocumentId: sr.Id,
-                        sourceDocumentType: "SalesReturn",
-                        userId: userId,
-                        ct: ct);
-
-                    if (!cashResult.IsSuccess)
-                    {
-                        _logger.LogWarning("Payment voucher recording failed for sales return {Id}: {Error}",
-                            sr.Id, cashResult.Error);
-                    }
                 }
 
                 // Create journal entry for the sales return
-                var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
                 var entryResult = await _accountingService.CreateSalesReturnEntryAsync(
-                    sr, totalCost, userId, ct);
+                    sr, sr.TotalAmount, userId, ct);
                 if (!entryResult.IsSuccess)
                 {
                     _logger.LogWarning("Journal entry creation failed for sales return {Id}: {Error}",
@@ -199,20 +173,17 @@ public class SalesReturnService : ISalesReturnService
                 }
 
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Return posted: {ReturnNo} (ID: {Id})", sr.ReturnNo, sr.Id);
                 return await GetByIdAsync(sr.Id, ct);
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "Domain exception posting sales return {Id}: {Message}", id, ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogError(ex, "Error posting sales return {Id}", id);
                 return Result<SalesReturnDto>.Failure("حدث خطأ أثناء ترحيل المرتجع");
             }
@@ -222,36 +193,33 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Items.Product", "Customer", "Customer.Party");
+            r => r.Id == id, ct, "Lines", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status == InvoiceStatus.Cancelled)
             return Result<SalesReturnDto>.Failure("مرتجع المبيعات ملغى بالفعل", ErrorCodes.InvalidOperation);
 
-        return await _uow.ExecuteAsync(async () =>
+        return await _uow.ExecuteTransactionAsync<Result<SalesReturnDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 if (sr.Status == InvoiceStatus.Posted)
                 {
                     // Reverse Stock
-                    foreach (var item in sr.Items)
+                    foreach (var item in sr.Lines)
                     {
-                        // Phase 25: GetRetailQuantityEquivalent removed.
                         await _inventoryService.DecreaseStockAsync(
-                            item.ProductId,
+                            item.SalesInvoiceLine != null ? item.SalesInvoiceLine.ProductId : 0,
                             sr.WarehouseId,
                             item.Quantity,
-                            unitCost: item.UnitPrice,
+                            unitCost: item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
                             userId: userId,
                             ct: ct);
                     }
 
                     // Reverse the journal entry for the posted sales return
-                    var totalCost = sr.Items.Sum(i => i.UnitPrice * i.Quantity);
                     var reversalResult = await _accountingService.ReverseSalesReturnEntryAsync(
-                        sr, totalCost, userId, ct);
+                        sr, sr.TotalAmount, userId, ct);
                     if (!reversalResult.IsSuccess)
                     {
                         _logger.LogWarning("Journal entry reversal failed for sales return {Id}: {Error}",
@@ -262,20 +230,17 @@ public class SalesReturnService : ISalesReturnService
 
                 sr.Cancel();
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Return cancelled: {ReturnNo} (ID: {Id})", sr.ReturnNo, sr.Id);
                 return await GetByIdAsync(sr.Id, ct);
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "Domain exception cancelling sales return {Id}: {Message}", id, ex.Message);
                 return Result<SalesReturnDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogError(ex, "Error cancelling sales return {Id}", id);
                 return Result<SalesReturnDto>.Failure("حدث خطأ أثناء إلغاء المرتجع");
             }
@@ -286,33 +251,33 @@ public class SalesReturnService : ISalesReturnService
     {
         return new SalesReturnDto(
             r.Id,
-            r.ReturnNo,
+            r.ReturnNo.ToString(), // ReturnNo is int, DTO expects string
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
             r.Customer?.Party?.Name ?? "غير معروف",
             r.SalesInvoiceId,
             r.ReturnDate,
-            r.SubTotal,
+            0, // SubTotal removed
             0, // TaxAmount (not in entity yet)
             0, // DiscountAmount (not in entity yet)
             r.TotalAmount,
             r.CurrencyId,
-            r.ExchangeRate,
+            null, // ExchangeRate removed
             r.Notes,
             (byte)r.Status,
-            r.CashBoxId,
-            null, // CashBoxName — not loaded via navigation
-            r.RefundAmount,
-            r.Items.Select(it => new SalesReturnItemDto(
+            null, // CashBoxId removed
+            null, // CashBoxName removed
+            0, // RefundAmount removed
+            r.Lines.Select(it => new SalesReturnItemDto(
                 it.Id,
-                it.ProductId,
-                it.Product?.Name ?? "غير معروف",
+                it.SalesInvoiceLine?.ProductId ?? 0,
+                it.SalesInvoiceLine?.Product?.Name ?? "غير معروف",
                 it.Quantity,
-                it.UnitPrice,
-                it.DiscountAmount,
-                it.LineTotal,
-                (byte)it.Mode
+                it.Amount,
+                0, // DiscountAmount removed
+                it.Amount,
+                1 // Mode default (Retail)
             )).ToList()
         );
     }

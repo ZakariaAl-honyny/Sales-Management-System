@@ -53,6 +53,6 @@ public class UnpaidInvoiceAllocationItem : INotifyPropertyChanged
 /// <summary>
 /// Represents an unpaid purchase invoice for supplier payment allocation.
 /// </summary>
-public class UnpaidPurchaseInvoiceItem : UnpaidInvoiceAllocationItem
+public class UnpaidPurchaseInvoiceLine : UnpaidInvoiceAllocationItem
 {
 }

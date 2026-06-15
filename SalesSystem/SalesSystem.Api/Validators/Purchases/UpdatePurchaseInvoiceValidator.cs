@@ -25,7 +25,11 @@ public class UpdatePurchaseInvoiceValidator : AbstractValidator<UpdatePurchaseIn
         RuleFor(x => x.OtherCharges)
             .GreaterThanOrEqualTo(0).WithMessage("مصاريف إضافية لا يمكن أن تكون سالبة");
 
-        RuleFor(x => x.CurrencyId)
+        RuleFor(x => x.PaymentType!.Value)
+            .IsInEnum().When(x => x.PaymentType.HasValue)
+            .WithMessage("نوع الدفع غير صحيح");
+
+        RuleFor(x => (int)x.CurrencyId!.Value)
             .GreaterThan(0).When(x => x.CurrencyId.HasValue)
             .WithMessage("العملة غير صحيحة");
 
@@ -55,8 +59,8 @@ public class UpdatePurchaseInvoiceValidator : AbstractValidator<UpdatePurchaseIn
             item.RuleFor(i => i.Quantity)
                 .GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
 
-            item.RuleFor(i => i.UnitCost)
-                .GreaterThanOrEqualTo(0).WithMessage("التكلفة لا يمكن أن تكون سالبة");
+            item.RuleFor(i => i.UnitPrice)
+                .GreaterThanOrEqualTo(0).WithMessage("السعر لا يمكن أن يكون سالباً");
         });
     }
 }

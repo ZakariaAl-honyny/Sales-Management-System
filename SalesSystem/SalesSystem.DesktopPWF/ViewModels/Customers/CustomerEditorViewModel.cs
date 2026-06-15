@@ -25,7 +25,6 @@ public class CustomerEditorViewModel : ViewModelBase
     private string _address = string.Empty;
     private string _taxNumber = string.Empty;
     private decimal _creditLimit;
-    private byte? _priceLevel;
     private string _notes = string.Empty;
     private bool _isActive = true;
     private bool _isEditMode;
@@ -64,7 +63,6 @@ public class CustomerEditorViewModel : ViewModelBase
         _address = customer.Address ?? string.Empty;
         _taxNumber = customer.TaxNumber ?? string.Empty;
         _creditLimit = customer.CreditLimit;
-        _priceLevel = customer.PriceLevel;
         _isActive = customer.IsActive;
         _isEditMode = true;
     }
@@ -150,21 +148,6 @@ public class CustomerEditorViewModel : ViewModelBase
         }
     }
 
-    public byte? PriceLevel
-    {
-        get => _priceLevel;
-        set
-        {
-            if (SetProperty(ref _priceLevel, value))
-            {
-                if (value.HasValue && (value < 1 || value > 4))
-                    AddError(nameof(PriceLevel), "مستوى السعر يجب أن يكون بين 1 و 4");
-                else
-                    ClearErrors(nameof(PriceLevel));
-            }
-        }
-    }
-
     public string Notes
     {
         get => _notes;
@@ -200,8 +183,6 @@ public class CustomerEditorViewModel : ViewModelBase
             AddError(nameof(Name), "اسم العميل مطلوب");
         if (CreditLimit < 0)
             AddError(nameof(CreditLimit), "الحد الائتماني يجب أن يكون أكبر من أو يساوي صفر");
-        if (PriceLevel.HasValue && (PriceLevel < 1 || PriceLevel > 4))
-            AddError(nameof(PriceLevel), "مستوى السعر يجب أن يكون بين 1 و 4");
 
         return await ValidateAllAsync();
     }
@@ -223,8 +204,7 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
                 CreditLimit,
-                IsActive,
-                PriceLevel: PriceLevel);
+                IsActive);
 
             result = await _customerService.UpdateAsync(_customerId, updateRequest);
         }
@@ -236,8 +216,7 @@ public class CustomerEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                CreditLimit,
-                PriceLevel: PriceLevel);
+                CreditLimit);
 
             result = await _customerService.CreateAsync(createRequest);
         }

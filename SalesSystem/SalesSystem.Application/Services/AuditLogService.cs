@@ -31,7 +31,7 @@ public class AuditLogService : IAuditLogService
                 userId, action, entityType, entityId);
 
             var auditLog = AuditLog.Create(userId, action, entityType,
-                entityId, details, ipAddress);
+                entityId?.ToString(), details, ipAddress);
 
             await _uow.AuditLogs.AddAsync(auditLog, ct);
 
@@ -153,24 +153,24 @@ public class AuditLogService : IAuditLogService
         {
             var entityType = query.EntityType;
             predicate = predicate != null
-                ? Combine(predicate, l => l.EntityType.Contains(entityType))
-                : l => l.EntityType.Contains(entityType);
+                ? Combine(predicate, l => (l.EntityName ?? "").Contains(entityType))
+                : l => (l.EntityName ?? "").Contains(entityType);
         }
 
         if (query.From.HasValue)
         {
             var from = query.From.Value;
             predicate = predicate != null
-                ? Combine(predicate, l => l.Timestamp >= from)
-                : l => l.Timestamp >= from;
+                ? Combine(predicate, l => l.CreatedAt >= from)
+                : l => l.CreatedAt >= from;
         }
 
         if (query.To.HasValue)
         {
             var to = query.To.Value;
             predicate = predicate != null
-                ? Combine(predicate, l => l.Timestamp <= to)
-                : l => l.Timestamp <= to;
+                ? Combine(predicate, l => l.CreatedAt <= to)
+                : l => l.CreatedAt <= to;
         }
 
         return predicate;
@@ -194,11 +194,11 @@ public class AuditLogService : IAuditLogService
             UserId: log.UserId,
             UserName: log.User?.UserName,
             Action: log.Action,
-            EntityType: log.EntityType,
+            EntityType: log.EntityName,
             EntityId: log.EntityId,
             Details: log.Details,
             IpAddress: log.IpAddress,
-            Timestamp: log.Timestamp
+            Timestamp: log.CreatedAt
         );
     }
 }

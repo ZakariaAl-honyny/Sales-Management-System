@@ -192,23 +192,10 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
 
         ErrorMessage = null;
 
-        var result = await _currencyService.UpdateExchangeRateAsync(SelectedCurrency!.Id, NewRate);
-
-        if (result.IsSuccess)
-        {
-            _toastService.ShowSuccess($"تم إضافة سعر الصرف الجديد للعملة {SelectedCurrency.Name}");
-            _soundService.PlaySuccess();
-            _eventBus.Publish(new CurrencyRateChangedMessage(SelectedCurrency.Id));
-            NewRate = 0;
-            EffectiveFromDate = DateTime.Today;
-        }
-        else
-        {
-            var errorMsg = HandleFailure(result.Error ?? "فشل في إضافة سعر الصرف", "CurrencyRatesViewModel.AddRateAsync");
-            ErrorMessage = errorMsg;
-            await _dialogService.ShowErrorAsync("خطأ في إضافة سعر الصرف", errorMsg);
-            _soundService.PlayError();
-        }
+        // Exchange rates are now managed via CurrencyRates table (separate service)
+        // TODO: Use new ICurrencyRateApiService when implemented
+        await _dialogService.ShowWarningAsync("تحت التطوير", "إدارة أسعار الصرف عبر سجل الأسعار قيد التطوير");
+        return;
     }
 
     private async Task<bool> ValidateAsync()

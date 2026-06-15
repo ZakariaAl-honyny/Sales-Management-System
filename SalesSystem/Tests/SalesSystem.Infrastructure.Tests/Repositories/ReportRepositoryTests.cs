@@ -22,7 +22,7 @@ public class ReportRepositoryTests
 
     private async Task SeedTestData(SalesDbContext context)
     {
-        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-01");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse");
         var category = ProductCategory.Create(name: "Test Category");
         var unit = Unit.Create(name: "Piece");
 
@@ -38,12 +38,7 @@ public class ReportRepositoryTests
         var account = Account.Create(
             accountCode: "9999",
             nameAr: nameAr,
-            nameEn: nameAr,
-            accountType: AccountType.Asset,
-            level: 4,
-            isSystemAccount: false,
-            allowTransactions: true,
-            openingBalance: 0
+            nameEn: nameAr
         );
         context.Accounts.Add(account);
         await context.SaveChangesAsync();
@@ -52,11 +47,11 @@ public class ReportRepositoryTests
 
     private async Task<int> SeedCustomer(SalesDbContext context, string name)
     {
-        var accountId = await SeedAccount(context, $"حساب {name}");
-        var party = Party.Create(name, PartyType.Customer, accountId);
+        await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
         return customer.Id;
@@ -64,11 +59,11 @@ public class ReportRepositoryTests
 
     private async Task<int> SeedSupplier(SalesDbContext context, string name)
     {
-        var accountId = await SeedAccount(context, $"حساب {name}");
-        var party = Party.Create(name, PartyType.Supplier, accountId);
+        await SeedAccount(context, $"حساب {name}");
+        var party = Party.Create(name);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var supplier = Supplier.Create(partyId: party.Id);
+        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
         context.Suppliers.Add(supplier);
         await context.SaveChangesAsync();
         return supplier.Id;
@@ -94,7 +89,7 @@ public class ReportRepositoryTests
             paymentType: PaymentType.Cash
         );
 
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m);
+        var item = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10m, unitPrice: 100m);
         invoice.AddItem(item);
         invoice.Post();
 
@@ -132,7 +127,7 @@ public class ReportRepositoryTests
             customerId: customerId
         );
 
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m);
+        var item = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10m, unitPrice: 100m);
         draftInvoice.AddItem(item);
         // Keep as Draft - don't call Post()
 
@@ -167,7 +162,7 @@ public class ReportRepositoryTests
             invoiceNo: 1,
             customerId: customerId
         );
-        var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
+        var item1 = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitPrice: 100m);
         invoiceInRange.AddItem(item1);
         invoiceInRange.Post();
 
@@ -178,7 +173,7 @@ public class ReportRepositoryTests
             customerId: customerId,
             invoiceDate: DateTime.UtcNow.AddDays(30)
         );
-        var item2 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
+        var item2 = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitPrice: 100m);
         invoiceOutOfRange.AddItem(item2);
         invoiceOutOfRange.Post();
 
@@ -241,7 +236,7 @@ public class ReportRepositoryTests
         var repository = new ReportRepository(context, Mock.Of<ILogger<ReportRepository>>());
 
         var warehouse1 = context.Warehouses.First();
-        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2", code: "WH-02");
+        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2");
         context.Warehouses.Add(warehouse2);
 
         var product = Product.Create(
@@ -429,14 +424,14 @@ public class ReportRepositoryTests
 
         var warehouse = context.Warehouses.First();
         var unit = context.Units.First();
-        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: unit.Id);
+        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: (short)unit.Id);
         product.AddUnit(productUnit);
         await context.SaveChangesAsync();
 
         var transaction = InventoryTransaction.Create(
             transactionNo: 1,
             transactionType: InventoryTransactionType.Purchase,
-            warehouseId: warehouse.Id,
+            warehouseId: (short)warehouse.Id,
             transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
@@ -484,7 +479,7 @@ public class ReportRepositoryTests
 
         var warehouse = context.Warehouses.First();
         var unit = context.Units.First();
-        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: unit.Id);
+        var productUnit = ProductUnit.CreateBaseUnit(productId: product.Id, unitId: (short)unit.Id);
         product.AddUnit(productUnit);
         await context.SaveChangesAsync();
 
@@ -492,7 +487,7 @@ public class ReportRepositoryTests
         var transactionInRange = InventoryTransaction.Create(
             transactionNo: 1,
             transactionType: InventoryTransactionType.Purchase,
-            warehouseId: warehouse.Id,
+            warehouseId: (short)warehouse.Id,
             transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
@@ -514,7 +509,7 @@ public class ReportRepositoryTests
         var transactionOutOfRange = InventoryTransaction.Create(
             transactionNo: 2,
             transactionType: InventoryTransactionType.Sale,
-            warehouseId: warehouse.Id,
+            warehouseId: (short)warehouse.Id,
             transactionDate: DateTime.UtcNow.AddDays(-10),
             createdByUserId: 1
         );

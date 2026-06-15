@@ -11,8 +11,6 @@ public class JournalEntryLineViewModel : ViewModelBase
 {
     private readonly JournalEntryEditorViewModel _parent;
     private int _accountId;
-    private string _accountCode = string.Empty;
-    private string _accountNameAr = string.Empty;
     private decimal _debit;
     private decimal _credit;
     private string? _description;
@@ -32,8 +30,6 @@ public class JournalEntryLineViewModel : ViewModelBase
         return new JournalEntryLineViewModel(parent)
         {
             _accountId = dto.AccountId,
-            _accountCode = dto.AccountCode,
-            _accountNameAr = dto.AccountNameAr,
             _debit = dto.Debit,
             _credit = dto.Credit,
             _description = dto.Description
@@ -52,32 +48,10 @@ public class JournalEntryLineViewModel : ViewModelBase
         }
     }
 
-    public string AccountCode
-    {
-        get => _accountCode;
-        set
-        {
-            if (SetProperty(ref _accountCode, value))
-                OnPropertyChanged(nameof(AccountDisplay));
-        }
-    }
-
-    public string AccountNameAr
-    {
-        get => _accountNameAr;
-        set
-        {
-            if (SetProperty(ref _accountNameAr, value))
-                OnPropertyChanged(nameof(AccountDisplay));
-        }
-    }
-
     /// <summary>
-    /// Combined display for account in DataGrid columns.
+    /// Display for account in DataGrid columns.
     /// </summary>
-    public string AccountDisplay => string.IsNullOrWhiteSpace(AccountCode)
-        ? AccountNameAr
-        : $"{AccountCode} - {AccountNameAr}";
+    public string AccountDisplay => $"حساب #{AccountId}";
 
     public decimal Debit
     {

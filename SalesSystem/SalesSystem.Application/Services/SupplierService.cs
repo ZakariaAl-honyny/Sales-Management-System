@@ -26,7 +26,7 @@ public class SupplierService : ISupplierService
     public async Task<Result<SupplierDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var supplier = await _uow.Suppliers.FirstOrDefaultAsync(
-            s => s.Id == id, ct, "Party.Account");
+            s => s.Id == id, ct, "Party");
         if (supplier == null)
             return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -44,7 +44,7 @@ public class SupplierService : ISupplierService
         }
 
         var (items, total) = await _uow.Suppliers.GetPagedAsync(
-            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive, "Party.Account");
+            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive, "Party");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, total, page, pageSize));
@@ -63,10 +63,7 @@ public class SupplierService : ISupplierService
             // Step 2: Create Party record (Name, Phone, Email, Address, TaxNumber)
             var party = Party.Create(
                 name: request.Name,
-                partyType: PartyType.Supplier,
-                accountId: accountId,
                 phone: request.Phone,
-                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
@@ -74,9 +71,10 @@ public class SupplierService : ISupplierService
             await _uow.Parties.AddAsync(party, ct);
             await _uow.SaveChangesAsync(ct);
 
-            // Step 3: Create Supplier record with shared PK (Id = Party.Id)
+            // Step 3: Create Supplier record with PartyId FK (separate from Supplier.Id)
             var supplier = Supplier.Create(
                 partyId: party.Id,
+                accountId: accountId,
                 createdByUserId: userId);
             await _uow.Suppliers.AddAsync(supplier, ct);
             await _uow.SaveChangesAsync(ct);
@@ -84,7 +82,7 @@ public class SupplierService : ISupplierService
             _logger.LogInformation("Supplier created: {SupplierName} (ID: {SupplierId})", party.Name, supplier.Id);
 
             var saved = await _uow.Suppliers.FirstOrDefaultAsync(
-                s => s.Id == supplier.Id, ct, "Party.Account");
+                s => s.Id == supplier.Id, ct, "Party");
             return Result<SupplierDto>.Success(MapToDto(saved!));
         }
         catch (DomainException ex)
@@ -103,25 +101,22 @@ public class SupplierService : ISupplierService
         try
         {
             var supplier = await _uow.Suppliers.FirstOrDefaultIgnoreFiltersAsync(
-                s => s.Id == id, ct, "Party.Account");
+                s => s.Id == id, ct, "Party");
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
             // Update Party record (contact data)
             supplier.Party.Update(
                 name: request.Name,
-                accountId: supplier.Party.AccountId, // AccountId unchanged
                 phone: request.Phone,
-                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
                 updatedByUserId: userId);
 
-            // Update supplier-specific fields
-            supplier.Update(
-                notes: null,
-                updatedByUserId: userId);
+            // Supplier has no domain-specific fields beyond Party contact data.
+            // CategoryId is managed through a separate endpoint.
+            supplier.Update(updatedByUserId: userId);
 
             if (request.IsActive != supplier.IsActive)
             {
@@ -135,7 +130,7 @@ public class SupplierService : ISupplierService
             _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Party.Name, supplier.Id);
 
             var updated = await _uow.Suppliers.FirstOrDefaultAsync(
-                s => s.Id == supplier.Id, ct, "Party.Account");
+                s => s.Id == supplier.Id, ct, "Party");
             return Result<SupplierDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -191,18 +186,16 @@ public class SupplierService : ISupplierService
 
     /// <summary>
     /// Auto-creates a Level 4 Liability account under the AP parent account for this supplier.
-    /// Uses the parent account at code "2100 — حسابات الموردين" (Accounts Payable).
-    /// Falls back to SystemAccountMappings.AccountsPayableAccountId if 2100 not found.
+    /// Uses the parent account at code "1320 — الموردون" (Accounts Payable).
+    /// Falls back to SystemAccountMappings.AccountsPayableAccountId if 1320 not found.
     /// </summary>
     private async Task<Result<int>> AutoCreateSupplierAccountAsync(string supplierName, int userId, CancellationToken ct)
     {
         try
         {
-            // Try to find parent account "2100 — حسابات الموردين" by code
             var apParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
                 a => a.AccountCode == "1320" && a.IsActive, ct);
 
-            // Fallback: use SystemAccountMappings.AccountsPayableAccountId parent
             if (apParentAccount == null)
             {
                 var apMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
@@ -211,31 +204,25 @@ public class SupplierService : ISupplierService
                     return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
 
                 var apAccount = await _uow.Accounts.GetByIdAsync(apMapping.AccountId, ct);
-                if (apAccount == null || apAccount.ParentAccountId == null)
+                if (apAccount == null || apAccount.ParentId == null)
                     return Result<int>.Failure("لم يتم العثور على حساب الموردين", ErrorCodes.NotFound);
 
-                apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentAccountId.Value, ct);
+                apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentId.Value, ct);
                 if (apParentAccount == null)
                     return Result<int>.Failure("لم يتم العثور على حساب الموردين الرئيسي", ErrorCodes.NotFound);
             }
 
-            // Generate next account code under this parent
             var nextCode = await GenerateNextAccountCodeAsync(apParentAccount.Id, apParentAccount.AccountCode, ct);
 
-            // Create the new account
             var newAccount = Account.Create(
                 accountCode: nextCode,
                 nameAr: supplierName,
                 nameEn: supplierName,
-                accountType: AccountType.Liability,
-                level: 4,
-                parentAccountId: apParentAccount.Id,
-                isSystemAccount: false,
-                description: $"حساب مورد: {supplierName}",
-                colorCode: "#F44336",
-                allowTransactions: true,
-                openingBalance: 0,
-                explanation: $"حساب تلقائي للمورد {supplierName}",
+                nature: (byte)AccountType.Liability,
+                isLeaf: true,
+                parentId: apParentAccount.Id,
+                isSystem: false,
+                categoryId: null,
                 createdByUserId: userId
             );
 
@@ -253,13 +240,10 @@ public class SupplierService : ISupplierService
         }
     }
 
-    /// <summary>
-    /// Generates the next available account code under a parent account.
-    /// </summary>
     private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
     {
         var childAccounts = await _uow.Accounts.ToListAsync(
-            predicate: a => a.ParentAccountId == parentAccountId,
+            predicate: a => a.ParentId == parentAccountId,
             ct: ct);
 
         int maxSuffix = 0;
@@ -287,8 +271,9 @@ public class SupplierService : ISupplierService
             s.Party.Address,
             s.Party.TaxNumber,
             s.IsActive,
-            AccountId: s.Party.AccountId,
-            AccountName: s.Party.Account?.NameAr
+            PartyId: s.PartyId,
+            AccountId: s.AccountId,
+            CategoryId: s.CategoryId
         );
     }
 }

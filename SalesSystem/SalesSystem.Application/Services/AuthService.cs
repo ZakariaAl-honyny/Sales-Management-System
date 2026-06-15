@@ -110,7 +110,7 @@ public class AuthService : IAuthService
                 var expiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
 
                 // Create session
-                var session = UserSession.Create(user.Id, HashToken(token), DateTime.UtcNow, _jwtSettings.ExpirationHours);
+                var session = UserSession.Create(user.Id, HashToken(token), _jwtSettings.ExpirationHours);
                 await _uow.UserSessions.AddAsync(session, ct);
 
                 await _uow.SaveChangesAsync(ct);
@@ -125,7 +125,7 @@ public class AuthService : IAuthService
             var jwtExpiresAt = DateTime.UtcNow.AddHours(_jwtSettings.ExpirationHours);
 
             // Create session
-            var userSession = UserSession.Create(user.Id, HashToken(jwtToken), DateTime.UtcNow, _jwtSettings.ExpirationHours);
+            var userSession = UserSession.Create(user.Id, HashToken(jwtToken), _jwtSettings.ExpirationHours);
             await _uow.UserSessions.AddAsync(userSession, ct);
 
             _logger.LogInformation("Login successful for user: {UserName} (Id={UserId})", user.UserName, user.Id);

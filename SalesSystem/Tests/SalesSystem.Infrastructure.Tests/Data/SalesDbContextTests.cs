@@ -32,11 +32,11 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Test Customer", PartyType.Customer, 1, phone: "0123456789");
+        var party = Party.Create("Test Customer", phone: "0123456789");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
 
         context.Customers.Add(customer);
         
@@ -62,11 +62,11 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Original Name", PartyType.Customer, 1, phone: "1234567890");
+        var party = Party.Create("Original Name", phone: "1234567890");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
@@ -75,7 +75,7 @@ public class SalesDbContextTests
         await context.SaveChangesAsync();
 
         // Also update Party name/phone
-        party.Update("Updated Name", party.AccountId, phone: "9876543210", updatedByUserId: null);
+        party.Update("Updated Name", phone: "9876543210", updatedByUserId: null);
         await context.SaveChangesAsync();
 
         // Assert
@@ -98,11 +98,11 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("To Delete", PartyType.Customer, 1);
+        var party = Party.Create("To Delete");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
@@ -153,12 +153,12 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Customer 1", PartyType.Customer, 1);
+        var party = Party.Create("Customer 1");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var customer = Customer.Create(partyId: party.Id);
-        var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", code: "WH-MAIN", location: "Test Location");
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", address: "Test Location");
         warehouse.SetCreatedBy(1);
 
         context.Customers.Add(customer);
@@ -185,14 +185,14 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party1 = Party.Create("Customer One", PartyType.Customer, 1);
-        var party2 = Party.Create("Customer Two", PartyType.Customer, 1);
+        var party1 = Party.Create("Customer One");
+        var party2 = Party.Create("Customer Two");
         context.Parties.Add(party1);
         context.Parties.Add(party2);
         await context.SaveChangesAsync();
 
-        var customer1 = Customer.Create(partyId: party1.Id);
-        var customer2 = Customer.Create(partyId: party2.Id);
+        var customer1 = Customer.Create(partyId: party1.Id, accountId: 1);
+        var customer2 = Customer.Create(partyId: party2.Id, accountId: 1);
         
         context.Customers.Add(customer1);
         context.Customers.Add(customer2);
@@ -218,14 +218,14 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse 1", code: "WH-01", location: "Location 1");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse 1", address: "Location 1");
         warehouse.SetCreatedBy(1);
         
-        var party = Party.Create("Customer 1", PartyType.Customer, 1);
+        var party = Party.Create("Customer 1");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
         
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
         
         context.Warehouses.Add(warehouse);
         context.Customers.Add(customer);
@@ -255,7 +255,7 @@ public class SalesDbContextTests
     }
 
     [Fact]
-    public async Task DbContext_SalesInvoiceItem_HasDecimalPrecisionForQuantity()
+    public async Task DbContext_SalesInvoiceLine_HasDecimalPrecisionForQuantity()
     {
         // Arrange
         var options = new DbContextOptionsBuilder<SalesDbContext>()
@@ -264,14 +264,22 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse 1", code: "WH-01", location: "Location 1");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse 1", address: "Location 1");
         warehouse.SetCreatedBy(1);
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create(warehouse.Id, 1);
+        // Create a party and customer for the invoice
+        var party = Party.Create("Test Customer");
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync();
+
+        var invoice = SalesInvoice.Create(warehouse.Id, 1, customer.Id);
         // Quantity uses precision (18,3) - should store up to 3 decimal places
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 100.123m, unitPrice: 50.789m);
+        var item = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 100.123m, unitPrice: 50.789m);
         invoice.AddItem(item);
 
         context.SalesInvoices.Add(invoice);
@@ -293,11 +301,11 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Precision Test Customer", PartyType.Customer, 1);
+        var party = Party.Create("Precision Test Customer");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var customer = Customer.Create(partyId: party.Id);
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
         /* IncreaseBalance removed — balance lives on linked Account */
 
         context.Customers.Add(customer);
@@ -318,14 +326,22 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse", code: "WH-01", location: "Loc");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse", address: "Loc");
         warehouse.SetCreatedBy(1);
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        var invoice = SalesInvoice.Create(warehouse.Id, 1);
-        var item1 = SalesInvoiceItem.Create(productId: 1, quantity: 5m, unitPrice: 100m);
-        var item2 = SalesInvoiceItem.Create(productId: 2, quantity: 3m, unitPrice: 200m);
+        // Create a party and customer for the invoice
+        var party = Party.Create("Test Customer");
+        context.Parties.Add(party);
+        await context.SaveChangesAsync();
+        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        context.Customers.Add(customer);
+        await context.SaveChangesAsync();
+
+        var invoice = SalesInvoice.Create(warehouse.Id, 1, customer.Id);
+        var item1 = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitPrice: 100m);
+        var item2 = SalesInvoiceLine.Create(productId: 2, productUnitId: 1, quantity: 3m, unitPrice: 200m);
         invoice.AddItem(item1);
         invoice.AddItem(item2);
 
@@ -351,14 +367,14 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party1 = Party.Create("Active Customer", PartyType.Customer, 1);
-        var party2 = Party.Create("Deleted Customer", PartyType.Customer, 1);
+        var party1 = Party.Create("Active Customer");
+        var party2 = Party.Create("Deleted Customer");
         context.Parties.Add(party1);
         context.Parties.Add(party2);
         await context.SaveChangesAsync();
 
-        var customer1 = Customer.Create(partyId: party1.Id);
-        var customer2 = Customer.Create(partyId: party2.Id);
+        var customer1 = Customer.Create(partyId: party1.Id, accountId: 1);
+        var customer2 = Customer.Create(partyId: party2.Id, accountId: 1);
         context.Customers.Add(customer1);
         context.Customers.Add(customer2);
         await context.SaveChangesAsync();

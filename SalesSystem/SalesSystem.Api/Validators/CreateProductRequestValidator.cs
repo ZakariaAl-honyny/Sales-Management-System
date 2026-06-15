@@ -31,10 +31,6 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
             .MaximumLength(500).WithMessage("مسار الصورة لا يمكن أن يتجاوز 500 حرف")
             .When(x => !string.IsNullOrEmpty(x.ImagePath));
 
-        RuleFor(x => x.Notes)
-            .MaximumLength(1000).WithMessage("الملاحظات لا يمكن أن تتجاوز 1000 حرف")
-            .When(x => !string.IsNullOrEmpty(x.Notes));
-
         // ─── Opening Stock Validation ─────────────────────────────────
         RuleFor(x => x.OpeningQuantity)
             .GreaterThan(0).WithMessage("الكمية الافتتاحية يجب أن تكون أكبر من صفر")

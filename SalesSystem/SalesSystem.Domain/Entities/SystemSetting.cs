@@ -7,51 +7,47 @@ public class SystemSetting : AuditableEntity
 {
     public string SettingKey { get; private set; } = string.Empty;
     public string SettingValue { get; private set; } = string.Empty;
-    public string DataType { get; private set; } = "string";
+    /// <summary>
+    /// Schema: SettingType tinyint — 1=String, 2=Integer, 3=Decimal, 4=Boolean.
+    /// </summary>
+    public byte SettingType { get; private set; } = 1;
     public string Category { get; private set; } = string.Empty;
     public string DisplayName { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public string? Note { get; private set; }
-    public int? UpdatedBy { get; private set; }
 
     private SystemSetting() : base() { } // EF Core - calls base constructor to init CreatedAt
 
     public static SystemSetting Create(
         string settingKey,
         string settingValue,
-        string dataType = "string",
+        byte settingType = 1,
         string category = "General",
         string displayName = "",
-        string? description = null,
-        string? note = null)
+        string? description = null)
     {
         if (string.IsNullOrWhiteSpace(settingKey))
             throw new DomainException("مفتاح الإعداد مطلوب.");
         if (string.IsNullOrWhiteSpace(category))
             throw new DomainException("تصنيف الإعداد مطلوب.");
-
-        var validDataTypes = new[] { "string", "int", "bool", "decimal" };
-        if (!validDataTypes.Contains(dataType))
-            throw new DomainException("نوع البيانات غير صالح. يجب أن يكون string أو int أو bool أو decimal.");
+        if (settingType < 1 || settingType > 4)
+            throw new DomainException("نوع الإعداد غير صالح (1=نص, 2=رقم, 3=عشري, 4=منطقي).");
 
         return new SystemSetting
         {
             SettingKey = settingKey.Trim(),
             SettingValue = settingValue,
-            DataType = dataType,
+            SettingType = settingType,
             Category = category,
             DisplayName = displayName,
             Description = description,
-            Note = note,
             UpdatedAt = DateTime.UtcNow
         };
     }
 
-    public void UpdateValue(string newValue, int? updatedBy = null, string? note = null)
+    public void UpdateValue(string newValue, int? updatedByUserId = null)
     {
         SettingValue = newValue;
-        UpdatedBy = updatedBy;
-        Note = note;
+        SetUpdatedBy(updatedByUserId);
         UpdatedAt = DateTime.UtcNow;
     }
 }

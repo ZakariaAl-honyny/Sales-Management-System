@@ -1,11 +1,10 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
-using System.Collections.Generic;
-using System.Linq;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Entities;
@@ -40,7 +39,16 @@ public class LogService : ILogService
     {
         try
         {
-            var log = SystemLog.Create(logLevel, message, exception, stackTrace, source, context, userId, machineName);
+            var level = logLevel switch
+            {
+                "Info" => (byte)1,
+                "Warning" => (byte)2,
+                "Error" => (byte)3,
+                "Fatal" => (byte)4,
+                _ => (byte)2
+            };
+
+            var log = SystemLog.Create(level, message, source, exception);
             await _uow.SystemLogs.AddAsync(log, ct);
             await _uow.SaveChangesAsync(ct);
 
@@ -74,8 +82,16 @@ public class LogService : ILogService
         {
             var (items, totalCount) = await _uow.SystemLogs.GetAllAsync(level, source, search, from, to, page, pageSize, ct);
             var dtos = items.Select(x => new SystemLogDto(
-                x.Id, x.LogLevel, x.Level, x.Message, x.Exception,
-                x.StackTrace, x.Source, x.Context, x.MachineName, x.CreatedAt)).ToList();
+                x.Id,
+                null,           // LogLevel (string) — mapped from Level byte
+                x.Level,        // Level (byte?)
+                x.Message,
+                x.Exception,
+                null,           // StackTrace
+                x.Source,
+                null,           // Context
+                null,           // MachineName
+                x.CreatedAt)).ToList();
 
             return Result<PagedResult<SystemLogDto>>.Success(
                 new PagedResult<SystemLogDto> { Items = dtos, TotalCount = totalCount, Page = page, PageSize = pageSize });

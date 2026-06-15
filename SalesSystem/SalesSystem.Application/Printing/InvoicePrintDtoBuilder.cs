@@ -47,7 +47,7 @@ public class InvoicePrintDtoBuilder
                 item.ProductUnit?.Unit?.Name ?? string.Empty,
                 item.Quantity,
                 item.UnitPrice,
-                item.DiscountAmount,
+                0m,
                 item.LineTotal
             )).ToList(),
             SubTotal = invoice.SubTotal,
@@ -55,7 +55,7 @@ public class InvoicePrintDtoBuilder
             OtherCharges = invoice.OtherCharges,
             TaxRate = taxRate,
             TaxAmount = invoice.TaxAmount,
-            GrandTotal = invoice.TotalAmount,
+            GrandTotal = invoice.NetTotal,
             IsTaxInclusive = false,
             PaymentMethod = invoice.PaymentType switch
             {
@@ -65,7 +65,7 @@ public class InvoicePrintDtoBuilder
                 _ => "نقدي"
             },
             AmountPaid = invoice.PaidAmount,
-            ChangeAmount = Math.Max(0, invoice.PaidAmount - invoice.TotalAmount),
+            ChangeAmount = Math.Max(0, invoice.PaidAmount - invoice.NetTotal),
             Notes = invoice.Notes
         };
         return Task.FromResult(dto);
@@ -99,7 +99,7 @@ public class InvoicePrintDtoBuilder
                 item.Product?.Name ?? $"منتج #{item.ProductId}",
                 item.ProductUnit?.Unit?.Name ?? string.Empty,
                 item.Quantity,
-                item.UnitCost,
+                item.UnitPrice,
                 0m,
                 item.LineTotal
             )).ToList(),
@@ -148,16 +148,16 @@ public class InvoicePrintDtoBuilder
             CustomerOrSupplierName = returnEntity.Customer?.Party?.Name ?? "عميل",
             CustomerPhone = returnEntity.Customer?.Party?.Phone,
             CustomerAddress = returnEntity.Customer?.Party?.Address,
-            Items = returnEntity.Items.Select(item => new InvoiceItemPrintDto(
-                item.Product?.Name ?? $"منتج #{item.ProductId}",
-                // SalesReturnItem has no ProductUnitId — unit not tracked on sales returns
+            Items = returnEntity.Lines.Select(item => new InvoiceItemPrintDto(
+                $"بند #{item.SalesInvoiceLineId}",
+                // SalesReturnLine has no ProductUnitId — unit not tracked on sales returns
                 string.Empty,
                 item.Quantity,
-                item.UnitPrice,
-                item.DiscountAmount,
-                item.LineTotal
+                item.Amount,
+                0m,
+                item.Amount
             )).ToList(),
-            SubTotal = returnEntity.SubTotal,
+            SubTotal = returnEntity.TotalAmount,
             DiscountAmount = 0,
             OtherCharges = 0,
             TaxRate = taxRate,
@@ -196,15 +196,15 @@ public class InvoicePrintDtoBuilder
             CustomerOrSupplierName = returnEntity.Supplier?.Party?.Name ?? "مورد",
             CustomerPhone = returnEntity.Supplier?.Party?.Phone,
             CustomerAddress = returnEntity.Supplier?.Party?.Address,
-            Items = returnEntity.Items.Select(item => new InvoiceItemPrintDto(
-                item.Product?.Name ?? $"منتج #{item.ProductId}",
-                item.ProductUnit?.Unit?.Name ?? string.Empty,
+            Items = returnEntity.Lines.Select(item => new InvoiceItemPrintDto(
+                $"بند #{item.PurchaseInvoiceLineId}",
+                string.Empty,
                 item.Quantity,
-                item.UnitCost,
+                item.Amount,
                 0m,
-                item.LineTotal
+                item.Amount
             )).ToList(),
-            SubTotal = returnEntity.SubTotal,
+            SubTotal = returnEntity.TotalAmount,
             DiscountAmount = 0,
             OtherCharges = 0,
             TaxRate = taxRate,

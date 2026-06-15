@@ -15,10 +15,11 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
         builder.Property(si => si.DiscountAmount).HasPrecision(18, 2);
         builder.Property(si => si.TaxAmount).HasPrecision(18, 2);
         builder.Property(si => si.OtherCharges).HasPrecision(18, 2);
-        builder.Property(si => si.TotalAmount).HasPrecision(18, 2);
+        builder.Property(si => si.NetTotal).HasPrecision(18, 2);
         builder.Property(si => si.PaidAmount).HasPrecision(18, 2);
-        builder.Property(si => si.DueAmount).HasPrecision(18, 2);
+        builder.Property(si => si.RemainingAmount).HasPrecision(18, 2);
         builder.Property(si => si.Notes).HasMaxLength(500);
+        builder.Property(si => si.InvoiceDate).HasColumnType("date");
         builder.Property(si => si.PaymentType).HasConversion<byte>();
         builder.Property(si => si.Status).HasConversion<byte>();
 
@@ -48,7 +49,6 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.Property(si => si.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
-        builder.Property(si => si.TotalCost).HasPrecision(18, 2);
 
         builder.HasMany(si => si.Items)
             .WithOne(i => i.SalesInvoice)
@@ -57,30 +57,29 @@ public class SalesInvoiceConfiguration : IEntityTypeConfiguration<SalesInvoice>
 
         builder.HasQueryFilter(si => si.Status != SalesSystem.Domain.Enums.InvoiceStatus.Cancelled);
 
-        builder.ToTable(t => t.HasCheckConstraint("CHK_SalesInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [TotalAmount]"));
+        builder.ToTable(t => t.HasCheckConstraint("CHK_SalesInvoices_PaidAmount", "[PaidAmount] >= 0 AND [PaidAmount] <= [NetTotal]"));
     }
 }
 
-public class SalesInvoiceItemConfiguration : IEntityTypeConfiguration<SalesInvoiceItem>
+public class SalesInvoiceLineConfiguration : IEntityTypeConfiguration<SalesInvoiceLine>
 {
-    public void Configure(EntityTypeBuilder<SalesInvoiceItem> builder)
+    public void Configure(EntityTypeBuilder<SalesInvoiceLine> builder)
     {
-        builder.ToTable("SalesInvoiceItems");
+        builder.ToTable("SalesInvoiceLines");
         builder.HasKey(sii => sii.Id);
         builder.Property(sii => sii.Quantity).HasPrecision(18, 3);
         builder.Property(sii => sii.UnitPrice).HasPrecision(18, 2);
-        builder.Property(sii => sii.DiscountAmount).HasPrecision(18, 2);
         builder.Property(sii => sii.LineTotal).HasPrecision(18, 2);
-        builder.Property(sii => sii.Mode).HasConversion<byte>();
-        builder.Property(sii => sii.Notes).HasMaxLength(250);
-        builder.Property(sii => sii.CostInBaseCurrency).HasPrecision(18, 2);
-        builder.Property(sii => sii.IsPriceOverridden);
-        builder.Property(sii => sii.ProductUnitId);
+        builder.Property(sii => sii.ProductUnitId).IsRequired();
 
         builder.HasOne(sii => sii.Product)
             .WithMany()
             .HasForeignKey(sii => sii.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(sii => sii.ProductUnit)
+            .WithMany()
+            .HasForeignKey(sii => sii.ProductUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

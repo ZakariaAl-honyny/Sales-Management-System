@@ -11,15 +11,15 @@ public class SalesReturnTests
     public void Create_GivenValidData_ShouldCreateSalesReturn()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
-            customerId: 5,
+            returnNo: 1,
             salesInvoiceId: 10,
-            notes: "Customer return",
-            userId: 1
+            customerId: 5,
+            warehouseId: (short)1,
+            currencyId: (short)1,
+            notes: "Customer return"
         );
 
-        sr.ReturnNo.Should().Be("SR-2026-000001");
+        sr.ReturnNo.Should().Be(1);
         sr.WarehouseId.Should().Be(1);
         sr.CustomerId.Should().Be(5);
         sr.SalesInvoiceId.Should().Be(10);
@@ -28,12 +28,16 @@ public class SalesReturnTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Create_GivenInvalidReturnNo_ShouldThrowDomainException(string? invalidReturnNo)
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Create_GivenInvalidReturnNo_ShouldThrowDomainException(int invalidReturnNo)
     {
-        var action = () => SalesReturn.Create(returnNo: invalidReturnNo!, warehouseId: 1, customerId: 1);
+        var action = () => SalesReturn.Create(
+            returnNo: invalidReturnNo,
+            salesInvoiceId: 10,
+            customerId: 1,
+            warehouseId: (short)1,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("رقم الإرجاع مطلوب.");
@@ -42,83 +46,80 @@ public class SalesReturnTests
     [Fact]
     public void Create_GivenWarehouseIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => SalesReturn.Create(returnNo: "SR-001", warehouseId: 0, customerId: 1);
+        var action = () => SalesReturn.Create(
+            returnNo: 1,
+            salesInvoiceId: 10,
+            customerId: 1,
+            warehouseId: 0,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("المستودع مطلوب.");
     }
 
     [Fact]
-    public void Create_GivenWarehouseIdIsNegative_ShouldThrowDomainException()
+    public void Create_GivenSalesInvoiceIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => SalesReturn.Create(returnNo: "SR-001", warehouseId: -1, customerId: 1);
+        var action = () => SalesReturn.Create(
+            returnNo: 1,
+            salesInvoiceId: 0,
+            customerId: 1,
+            warehouseId: (short)1,
+            currencyId: (short)1);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المستودع مطلوب.");
+            .WithMessage("فاتورة المبيعات الأصلية مطلوبة.");
     }
 
     [Fact]
-    public void AddItem_GivenValidData_ShouldAddItemAndRecalculateTotals()
+    public void AddLine_GivenValidData_ShouldAddLineAndRecalculateTotal()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.AddItem(productId: 1, quantity: 2, unitPrice: 100m, discountAmount: 10m);
+        var line = SalesReturnLine.Create(salesInvoiceLineId: 5, quantity: 2m, amount: 190m);
+        sr.AddLine(line);
 
-        sr.Items.Should().HaveCount(1);
-        sr.SubTotal.Should().Be(190m); // (2 * 100) - 10
+        sr.Lines.Should().HaveCount(1);
         sr.TotalAmount.Should().Be(190m);
     }
 
     [Fact]
-    public void AddItem_MultipleItems_ShouldSumLineTotalsCorrectly()
+    public void AddLine_MultipleLines_ShouldSumAmountsCorrectly()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.AddItem(productId: 1, quantity: 1, unitPrice: 100m);
-        sr.AddItem(productId: 2, quantity: 2, unitPrice: 50m, discountAmount: 5m);
+        sr.AddLine(SalesReturnLine.Create(salesInvoiceLineId: 1, quantity: 1m, amount: 100m));
+        sr.AddLine(SalesReturnLine.Create(salesInvoiceLineId: 2, quantity: 2m, amount: 95m));
 
-        sr.Items.Should().HaveCount(2);
-        sr.SubTotal.Should().Be(195m); // 100 + (2*50-5)
+        sr.Lines.Should().HaveCount(2);
+        sr.TotalAmount.Should().Be(195m);
     }
 
     [Fact]
-    public void AddItem_GivenZeroDiscount_ShouldCalculateCorrectly()
+    public void RecalculateTotals_EmptyLines_ShouldSetTotalToZero()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
-        );
-
-        sr.AddItem(productId: 1, quantity: 3, unitPrice: 50m, discountAmount: 0m);
-
-        sr.SubTotal.Should().Be(150m);
-    }
-
-    [Fact]
-    public void RecalculateTotals_EmptyItems_ShouldSetTotalsToZero()
-    {
-        var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
-            customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         sr.RecalculateTotals();
 
-        sr.SubTotal.Should().Be(0m);
         sr.TotalAmount.Should().Be(0m);
     }
 
@@ -126,13 +127,14 @@ public class SalesReturnTests
     public void Post_GivenDraftReturn_ShouldTransitionToPosted()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.AddItem(productId: 1, quantity: 1, unitPrice: 100m);
+        sr.AddLine(SalesReturnLine.Create(1, 1m, 100m));
         sr.Post();
 
         sr.Status.Should().Be(InvoiceStatus.Posted);
@@ -142,10 +144,11 @@ public class SalesReturnTests
     public void Post_GivenEmptyReturn_ShouldThrowDomainException()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         var action = () => sr.Post();
@@ -158,29 +161,31 @@ public class SalesReturnTests
     public void Post_GivenAlreadyPostedReturn_ShouldThrowDomainException()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.AddItem(productId: 1, quantity: 1, unitPrice: 100m);
+        sr.AddLine(SalesReturnLine.Create(1, 1m, 100m));
         sr.Post();
 
         var action = () => sr.Post();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("فقط المرتجعات المسودة يمكن ترحيلها.");
+            .WithMessage("فقط مرتجعات المبيعات المسودة يمكن ترحيلها.");
     }
 
     [Fact]
     public void Cancel_GivenDraftReturn_ShouldTransitionToCancelled()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         sr.Cancel();
@@ -192,13 +197,14 @@ public class SalesReturnTests
     public void Cancel_GivenPostedReturn_ShouldTransitionToCancelled()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.AddItem(productId: 1, quantity: 1, unitPrice: 100m);
+        sr.AddLine(SalesReturnLine.Create(1, 1m, 100m));
         sr.Post();
         sr.Cancel();
 
@@ -209,10 +215,11 @@ public class SalesReturnTests
     public void Cancel_GivenAlreadyCancelled_ShouldThrowDomainException()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
         sr.Cancel();
@@ -220,92 +227,63 @@ public class SalesReturnTests
         var action = () => sr.Cancel();
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المرتجع ملغى بالفعل.");
+            .WithMessage("مرتجع المبيعات ملغي بالفعل.");
     }
 
     [Fact]
-    public void Create_GivenNoCustomerId_ShouldBeNull()
+    public void Create_GivenSalesInvoiceIdRequired_ShouldNotBeNull()
     {
         var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
-            customerId: null,
-            userId: 1
-        );
-
-        sr.CustomerId.Should().BeNull();
-    }
-
-    [Fact]
-    public void Create_GivenNoSalesInvoiceId_ShouldBeNull()
-    {
-        var sr = SalesReturn.Create(
-            returnNo: "SR-2026-000001",
-            warehouseId: 1,
+            returnNo: 1,
+            salesInvoiceId: 10,
             customerId: 1,
-            salesInvoiceId: null,
-            userId: 1
+            warehouseId: (short)1,
+            currencyId: (short)1
         );
 
-        sr.SalesInvoiceId.Should().BeNull();
+        sr.SalesInvoiceId.Should().Be(10);
     }
 }
 
-public class SalesReturnItemTests
+public class SalesReturnLineTests
 {
     [Fact]
-    public void Create_GivenValidData_ShouldCreateItem()
+    public void Create_GivenValidData_ShouldCreateLine()
     {
-        var item = SalesReturnItem.Create(
-            productId: 1,
-            quantity: 2,
-            unitPrice: 100m,
-            discountAmount: 10m
+        var line = SalesReturnLine.Create(
+            salesInvoiceLineId: 5,
+            quantity: 2m,
+            amount: 190m
         );
 
-        item.ProductId.Should().Be(1);
-        item.Quantity.Should().Be(2);
-        item.UnitPrice.Should().Be(100m);
-        item.DiscountAmount.Should().Be(10m);
-        item.LineTotal.Should().Be(190m); // (2 * 100) - 10
+        line.SalesInvoiceLineId.Should().Be(5);
+        line.Quantity.Should().Be(2m);
+        line.Amount.Should().Be(190m);
     }
 
     [Fact]
-    public void Create_GivenProductIdIsZero_ShouldThrowArgumentException()
+    public void Create_GivenSalesInvoiceLineIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => SalesReturnItem.Create(
-            productId: 0,
-            quantity: 1,
-            unitPrice: 100m
+        var action = () => SalesReturnLine.Create(
+            salesInvoiceLineId: 0,
+            quantity: 1m,
+            amount: 100m
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("المنتج مطلوب.");
-    }
-
-    [Fact]
-    public void Create_GivenProductIdIsNegative_ShouldThrowArgumentException()
-    {
-        var action = () => SalesReturnItem.Create(
-            productId: -1,
-            quantity: 1,
-            unitPrice: 100m
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("المنتج مطلوب.");
+            .WithMessage("رقم بند الفاتورة الأصلي مطلوب.");
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Create_GivenInvalidQuantity_ShouldThrowArgumentException(decimal invalidQuantity)
+    public void Create_GivenInvalidQuantity_ShouldThrowDomainException(decimal invalidQuantity)
     {
-        var action = () => SalesReturnItem.Create(
-            productId: 1,
+        var action = () => SalesReturnLine.Create(
+            salesInvoiceLineId: 1,
             quantity: invalidQuantity,
-            unitPrice: 100m
+            amount: 100m
         );
 
         action.Should().Throw<DomainException>()
@@ -315,83 +293,39 @@ public class SalesReturnItemTests
     [Theory]
     [InlineData(-1)]
     [InlineData(-100)]
-    public void Create_GivenNegativeUnitPrice_ShouldThrowArgumentException(decimal negativePrice)
+    public void Create_GivenNegativeAmount_ShouldThrowDomainException(decimal negativeAmount)
     {
-        var action = () => SalesReturnItem.Create(
-            productId: 1,
-            quantity: 1,
-            unitPrice: negativePrice
+        var action = () => SalesReturnLine.Create(
+            salesInvoiceLineId: 1,
+            quantity: 1m,
+            amount: negativeAmount
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("سعر الوحدة لا يمكن أن يكون سالباً.");
+            .WithMessage("المبلغ لا يمكن أن يكون سالباً.");
     }
 
     [Fact]
-    public void Create_GivenZeroUnitPrice_ShouldSucceed()
+    public void Create_GivenZeroAmount_ShouldSucceed()
     {
-        var item = SalesReturnItem.Create(
-            productId: 1,
-            quantity: 1,
-            unitPrice: 0m
+        var line = SalesReturnLine.Create(
+            salesInvoiceLineId: 1,
+            quantity: 1m,
+            amount: 0m
         );
 
-        item.UnitPrice.Should().Be(0m);
-        item.LineTotal.Should().Be(0m);
+        line.Amount.Should().Be(0m);
     }
 
     [Fact]
     public void Create_GivenMinimumQuantity_ShouldSucceed()
     {
-        var item = SalesReturnItem.Create(
-            productId: 1,
+        var line = SalesReturnLine.Create(
+            salesInvoiceLineId: 1,
             quantity: 0.001m,
-            unitPrice: 100m
+            amount: 100m
         );
 
-        item.Quantity.Should().Be(0.001m);
-        item.LineTotal.Should().Be(0.1m);
-    }
-
-    [Fact]
-    public void Create_GivenNoDiscount_ShouldHaveZeroDiscount()
-    {
-        var item = SalesReturnItem.Create(
-            productId: 1,
-            quantity: 1,
-            unitPrice: 100m
-        );
-
-        item.DiscountAmount.Should().Be(0m);
-        item.LineTotal.Should().Be(100m);
-    }
-
-    [Fact]
-    public void Create_GivenZeroDiscount_ShouldCalculateCorrectly()
-    {
-        var item = SalesReturnItem.Create(
-            productId: 1,
-            quantity: 3,
-            unitPrice: 50m,
-            discountAmount: 0m
-        );
-
-        item.LineTotal.Should().Be(150m);
-    }
-
-    [Fact]
-    public void RecalculateLineTotal_ShouldUpdateLineTotal()
-    {
-        var item = SalesReturnItem.Create(
-            productId: 1,
-            quantity: 2,
-            unitPrice: 100m,
-            discountAmount: 10m
-        );
-
-        // Simulate price change
-        item.RecalculateLineTotal();
-
-        item.LineTotal.Should().Be(190m);
+        line.Quantity.Should().Be(0.001m);
     }
 }

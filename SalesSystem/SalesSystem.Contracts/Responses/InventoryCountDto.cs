@@ -4,15 +4,13 @@ public record InventoryCountDto(
     int Id,
     int CountNo,
     DateTime CountDate,
-    int WarehouseId,
+    short WarehouseId,
     string? WarehouseName,
     byte Status,
     string? StatusName,
     string? Notes,
     DateTime? PostedAt,
-    int? PostedByUserId,
-    List<InventoryCountLineDto>? Lines,
-    bool IsActive
+    List<InventoryCountLineDto>? Lines
 );
 
 public record InventoryCountLineDto(
@@ -20,10 +18,7 @@ public record InventoryCountLineDto(
     int InventoryCountId,
     int ProductId,
     string? ProductName,
-    int ProductUnitId,
-    string? ProductUnitName,
     decimal SystemQuantity,
     decimal ActualQuantity,
-    decimal Difference,
-    bool IsActive
+    decimal DifferenceQuantity
 );

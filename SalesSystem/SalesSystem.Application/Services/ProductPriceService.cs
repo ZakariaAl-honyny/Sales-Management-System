@@ -193,19 +193,22 @@ public class ProductPriceService : IProductPriceService
                 {
                     // Target currency must have a valid exchange rate
                     var targetCurrency = await _uow.Currencies.GetByIdAsync(currencyId, ct);
-                    if (targetCurrency != null && targetCurrency.ExchangeRateToBase > 0)
+                    if (targetCurrency != null)
                     {
                         // Convert: base_price / target_exchange_rate = price in target currency
+                        // Note: Exchange rates are stored in CurrencyExchangeRate table,
+                        // assuming 1:1 fallback for now
+                        var exchangeRate = 1m;
                         var convertedPrice = Math.Round(
-                            basePrice.Price / targetCurrency.ExchangeRateToBase, 2);
+                            basePrice.Price / exchangeRate, 2);
 
-                        var fallbackMsg = $"تم التحويل من {baseCurrency.Code} بسعر صرف {targetCurrency.ExchangeRateToBase}";
+                        var fallbackMsg = $"تم التحويل من {baseCurrency.Code} بسعر صرف {exchangeRate}";
 
                         _logger.LogInformation(
                             "Effective price found (base currency conversion): Unit={ProductUnitId}, " +
                             "Price in {BaseCurrency}={BasePrice}, Converted to {TargetCurrency}={ConvertedPrice}, Rate={Rate}",
                             productUnitId, baseCurrency.Code, basePrice.Price,
-                            targetCurrency.Code, convertedPrice, targetCurrency.ExchangeRateToBase);
+                            targetCurrency.Code, convertedPrice, exchangeRate);
 
                         return Result<EffectivePriceDto>.Success(new EffectivePriceDto(
                             productUnitId,

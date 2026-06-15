@@ -27,7 +27,7 @@ public class CustomerService : ICustomerService
     public async Task<Result<CustomerDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var customer = await _uow.Customers.FirstOrDefaultAsync(
-            c => c.Id == id, ct, "Party.Account");
+            c => c.Id == id, ct, "Party");
         if (customer == null)
             return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
@@ -45,7 +45,7 @@ public class CustomerService : ICustomerService
         }
 
         var (items, total) = await _uow.Customers.GetPagedAsync(
-            predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive, "Party.Account");
+            predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive, "Party");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<CustomerDto>>.Success(PagedResult<CustomerDto>.Create(dtos, total, page, pageSize));
@@ -64,10 +64,7 @@ public class CustomerService : ICustomerService
             // Step 2: Create Party record (Name, Phone, Email, Address, TaxNumber)
             var party = Party.Create(
                 name: request.Name,
-                partyType: PartyType.Customer,
-                accountId: accountId,
                 phone: request.Phone,
-                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
@@ -75,11 +72,11 @@ public class CustomerService : ICustomerService
             await _uow.Parties.AddAsync(party, ct);
             await _uow.SaveChangesAsync(ct);
 
-            // Step 3: Create Customer record with shared PK (Id = Party.Id)
+            // Step 3: Create Customer record with PartyId FK (separate from Customer.Id)
             var customer = Customer.Create(
                 partyId: party.Id,
+                accountId: accountId,
                 creditLimit: request.CreditLimit,
-                priceLevel: request.PriceLevel,
                 createdByUserId: userId);
             await _uow.Customers.AddAsync(customer, ct);
             await _uow.SaveChangesAsync(ct);
@@ -88,7 +85,7 @@ public class CustomerService : ICustomerService
 
             // Re-fetch with navigation properties for DTO mapping
             var saved = await _uow.Customers.FirstOrDefaultAsync(
-                c => c.Id == customer.Id, ct, "Party.Account");
+                c => c.Id == customer.Id, ct, "Party");
             return Result<CustomerDto>.Success(MapToDto(saved!));
         }
         catch (DomainException ex)
@@ -107,16 +104,14 @@ public class CustomerService : ICustomerService
         try
         {
             var customer = await _uow.Customers.FirstOrDefaultIgnoreFiltersAsync(
-                c => c.Id == id, ct, "Party.Account");
+                c => c.Id == id, ct, "Party");
             if (customer == null)
                 return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
             // Update Party record (contact data)
             customer.Party.Update(
                 name: request.Name,
-                accountId: customer.Party.AccountId, // AccountId unchanged
                 phone: request.Phone,
-                mobile: null,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
@@ -125,8 +120,6 @@ public class CustomerService : ICustomerService
             // Update customer-specific fields
             customer.Update(
                 creditLimit: request.CreditLimit,
-                priceLevel: request.PriceLevel,
-                notes: null,
                 updatedByUserId: userId);
 
             if (request.IsActive != customer.IsActive)
@@ -141,7 +134,7 @@ public class CustomerService : ICustomerService
             _logger.LogInformation("Customer updated: {CustomerName} (ID: {CustomerId})", customer.Party.Name, customer.Id);
 
             var updated = await _uow.Customers.FirstOrDefaultAsync(
-                c => c.Id == customer.Id, ct, "Party.Account");
+                c => c.Id == customer.Id, ct, "Party");
             return Result<CustomerDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -204,12 +197,10 @@ public class CustomerService : ICustomerService
                 predicate,
                 q => q.OrderByDescending(c => c.Id),
                 page, pageSize, ct,
-                includePaths: new[] { "Party.Account" });
+                includePaths: new[] { "Party" });
 
             var dtos = items.Select(c =>
             {
-                // Balance is tracked on the linked Account via journal entries.
-                // For reporting, read the computed balance from the account entity (OpeningBalance + journal totals).
                 return new CustomerBalanceReportDto(
                     c.Id, c.Party.Name, c.Party.Phone, null,
                     CreditLimit: c.CreditLimit,
@@ -232,16 +223,13 @@ public class CustomerService : ICustomerService
     {
         try
         {
-            // Customers grouped by aging buckets — balance read from linked Account
             var (items, total) = await _uow.Customers.GetPagedAsync(
                 null,
                 q => q.OrderByDescending(c => c.Id),
-                page, pageSize, ct, false, "Party.Account");
+                page, pageSize, ct, false, "Party");
 
             var dtos = items.Select(c =>
             {
-                // Aging bucket: balance must be read from linked Account (via journal entries).
-                // Placeholder: uses CreditLimit as proxy for now.
                 var agingBucket = c.CreditLimit > 0 ? "له حد ائتماني" : "بدون حد ائتماني";
                 return new CustomerAgingReportDto(
                     c.Id, c.Party.Name, c.Party.Phone, 0,
@@ -267,11 +255,9 @@ public class CustomerService : ICustomerService
     {
         try
         {
-            // Try to find parent account "1130 — العملاء" by code
             var arParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
                 a => a.AccountCode == "1130" && a.IsActive, ct);
 
-            // Fallback: use SystemAccountMappings.AccountsReceivableAccountId parent
             if (arParentAccount == null)
             {
                 var arMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
@@ -280,31 +266,25 @@ public class CustomerService : ICustomerService
                     return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
 
                 var arAccount = await _uow.Accounts.GetByIdAsync(arMapping.AccountId, ct);
-                if (arAccount == null || arAccount.ParentAccountId == null)
+                if (arAccount == null || arAccount.ParentId == null)
                     return Result<int>.Failure("لم يتم العثور على حساب العملاء", ErrorCodes.NotFound);
 
-                arParentAccount = await _uow.Accounts.GetByIdAsync(arAccount.ParentAccountId.Value, ct);
+                arParentAccount = await _uow.Accounts.GetByIdAsync(arAccount.ParentId.Value, ct);
                 if (arParentAccount == null)
                     return Result<int>.Failure("لم يتم العثور على حساب العملاء الرئيسي", ErrorCodes.NotFound);
             }
 
-            // Generate next account code under this parent
             var nextCode = await GenerateNextAccountCodeAsync(arParentAccount.Id, arParentAccount.AccountCode, ct);
 
-            // Create the new account
             var newAccount = Account.Create(
                 accountCode: nextCode,
                 nameAr: customerName,
                 nameEn: customerName,
-                accountType: AccountType.Asset,
-                level: 4,
-                parentAccountId: arParentAccount.Id,
-                isSystemAccount: false,
-                description: $"حساب عميل: {customerName}",
-                colorCode: "#2196F3",
-                allowTransactions: true,
-                openingBalance: 0,
-                explanation: $"حساب تلقائي للعميل {customerName}",
+                nature: (byte)AccountType.Asset,
+                isLeaf: true,
+                parentId: arParentAccount.Id,
+                isSystem: false,
+                categoryId: null,
                 createdByUserId: userId
             );
 
@@ -322,14 +302,10 @@ public class CustomerService : ICustomerService
         }
     }
 
-    /// <summary>
-    /// Generates the next available account code under a parent account.
-        /// For example, under parent "1130", existing children "1131","1132" produce "1133".
-    /// </summary>
     private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
     {
         var childAccounts = await _uow.Accounts.ToListAsync(
-            predicate: a => a.ParentAccountId == parentAccountId,
+            predicate: a => a.ParentId == parentAccountId,
             ct: ct);
 
         int maxSuffix = 0;
@@ -358,11 +334,9 @@ public class CustomerService : ICustomerService
             c.Party.TaxNumber,
             c.CreditLimit,
             c.IsActive,
-            AccountId: c.Party.AccountId,
-            AccountName: c.Party.Account?.NameAr,
-            CustomerSince: c.CustomerSince,
-            PriceLevel: c.PriceLevel,
-            Notes: c.Notes
+            PartyId: c.PartyId,
+            AccountId: c.AccountId,
+            CategoryId: c.CategoryId
         );
     }
 }

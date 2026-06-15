@@ -218,7 +218,7 @@ public class UsersController : ControllerBase
 
             foreach (var roleId in roleIds)
             {
-                var userRole = UserRole.Create(id, roleId);
+                var userRole = UserRole.Create(id, (short)roleId);
                 await _uow.UserRoles.AddAsync(userRole, ct);
             }
 

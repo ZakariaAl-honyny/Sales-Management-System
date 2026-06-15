@@ -5,32 +5,32 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
 
-public class PurchaseInvoiceItemTests
+public class PurchaseInvoiceLineTests
 {
     [Fact]
-    public void Create_GivenValidData_ShouldSetLineTotalAsQuantityTimesUnitCost()
+    public void Create_GivenValidData_ShouldSetLineTotalAsQuantityTimesUnitPrice()
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 10m,
-            unitCost: 15.50m
+            unitPrice: 15.50m
         );
 
         item.ProductId.Should().Be(1);
         item.Quantity.Should().Be(10m);
-        item.UnitCost.Should().Be(15.50m);
+        item.UnitPrice.Should().Be(15.50m);
         item.LineTotal.Should().Be(10m * 15.50m);
     }
 
     [Fact]
     public void Create_GivenZeroProductId_ShouldThrowDomainException()
     {
-        var action = () => PurchaseInvoiceItem.Create(
+        var action = () => PurchaseInvoiceLine.Create(
             productId: 0,
             productUnitId: 1,
             quantity: 5m,
-            unitCost: 10m
+            unitPrice: 10m
         );
 
         action.Should().Throw<DomainException>()
@@ -40,11 +40,11 @@ public class PurchaseInvoiceItemTests
     [Fact]
     public void Create_GivenZeroProductUnitId_ShouldThrowDomainException()
     {
-        var action = () => PurchaseInvoiceItem.Create(
+        var action = () => PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 0,
             quantity: 5m,
-            unitCost: 10m
+            unitPrice: 10m
         );
 
         action.Should().Throw<DomainException>()
@@ -54,11 +54,11 @@ public class PurchaseInvoiceItemTests
     [Fact]
     public void Create_GivenNegativeQuantity_ShouldThrowDomainException()
     {
-        var action = () => PurchaseInvoiceItem.Create(
+        var action = () => PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: -1m,
-            unitCost: 10m
+            unitPrice: 10m
         );
 
         action.Should().Throw<DomainException>()
@@ -68,11 +68,11 @@ public class PurchaseInvoiceItemTests
     [Fact]
     public void Create_GivenZeroQuantity_ShouldThrowDomainException()
     {
-        var action = () => PurchaseInvoiceItem.Create(
+        var action = () => PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 0m,
-            unitCost: 10m
+            unitPrice: 10m
         );
 
         action.Should().Throw<DomainException>()
@@ -80,30 +80,30 @@ public class PurchaseInvoiceItemTests
     }
 
     [Fact]
-    public void Create_GivenNegativeUnitCost_ShouldThrowDomainException()
+    public void Create_GivenNegativeUnitPrice_ShouldThrowDomainException()
     {
-        var action = () => PurchaseInvoiceItem.Create(
+        var action = () => PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 5m,
-            unitCost: -3m
+            unitPrice: -3m
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*تكلفة الوحدة لا يمكن أن تكون سالبة*");
+            .WithMessage("*سعر الوحدة لا يمكن أن يكون سالباً*");
     }
 
     [Fact]
-    public void Create_GivenZeroUnitCost_ShouldSucceed()
+    public void Create_GivenZeroUnitPrice_ShouldSucceed()
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 5m,
-            unitCost: 0m
+            unitPrice: 0m
         );
 
-        item.UnitCost.Should().Be(0m);
+        item.UnitPrice.Should().Be(0m);
         item.LineTotal.Should().Be(0m);
     }
 
@@ -113,11 +113,11 @@ public class PurchaseInvoiceItemTests
     [InlineData(9999)]
     public void Create_GivenValidProductId_ShouldSucceed(int productId)
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: productId,
             productUnitId: 1,
             quantity: 1m,
-            unitCost: 10m
+            unitPrice: 10m
         );
 
         item.ProductId.Should().Be(productId);
@@ -126,21 +126,21 @@ public class PurchaseInvoiceItemTests
     [Fact]
     public void RecalculateLineTotal_AfterModifyingQuantity_ShouldRecalculate()
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 5m,
-            unitCost: 20m
+            unitPrice: 20m
         );
 
         item.LineTotal.Should().Be(100m);
 
         // Reflect the Quantity change by using a new instance pattern
-        var recalculated = PurchaseInvoiceItem.Create(
+        var recalculated = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 10m,
-            unitCost: 20m
+            unitPrice: 20m
         );
 
         recalculated.LineTotal.Should().Be(200m);
@@ -149,11 +149,11 @@ public class PurchaseInvoiceItemTests
     [Fact]
     public void Create_GivenDecimalQuantity_ShouldPreservePrecision()
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: 0.500m,
-            unitCost: 10.00m
+            unitPrice: 10.00m
         );
 
         item.Quantity.Should().Be(0.500m);
@@ -166,11 +166,11 @@ public class PurchaseInvoiceItemTests
     [InlineData(999999.999)]
     public void Create_GivenVariousQuantities_ShouldComputeLineTotal(decimal quantity)
     {
-        var item = PurchaseInvoiceItem.Create(
+        var item = PurchaseInvoiceLine.Create(
             productId: 1,
             productUnitId: 1,
             quantity: quantity,
-            unitCost: 10.50m
+            unitPrice: 10.50m
         );
 
         item.LineTotal.Should().Be(quantity * 10.50m);

@@ -22,7 +22,7 @@ public class SystemAccountMappingsController : ControllerBase
     /// Gets all system account mappings.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int? branchId, CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] short? branchId, CancellationToken ct)
     {
         var result = await _service.GetAllMappingsAsync(branchId, ct);
         if (result.IsSuccess)
@@ -34,7 +34,7 @@ public class SystemAccountMappingsController : ControllerBase
     /// Gets a system account mapping by key.
     /// </summary>
     [HttpGet("by-key/{key}")]
-    public async Task<IActionResult> GetByKey(string key, [FromQuery] int? branchId, CancellationToken ct)
+    public async Task<IActionResult> GetByKey(string key, [FromQuery] short? branchId, CancellationToken ct)
     {
         if (!Enum.TryParse<SalesSystem.Domain.Accounting.Enums.SystemAccountKey>(key, out var mappingKey))
             return BadRequest(new { error = "مفتاح الربط غير صالح" });

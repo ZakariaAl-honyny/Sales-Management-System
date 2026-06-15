@@ -16,13 +16,14 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.HasIndex(x => x.EntryNumber).IsUnique();
         builder.Property(x => x.EntryNo).IsRequired();
         builder.HasIndex(x => x.EntryNo).IsUnique();
-        builder.Property(x => x.TransactionDate).IsRequired();
+        builder.Property(x => x.EntryDate).IsRequired().HasColumnType("date");
         builder.Property(x => x.Description).HasMaxLength(500);
-        builder.Property(x => x.EntryType).HasConversion<int>().IsRequired();
+        builder.Property(x => x.EntryType).HasColumnType("tinyint").HasConversion<byte>().IsRequired();
 
         // ─── 3-State Lifecycle (replaces IsPosted/IsReversed) ───────────
         builder.Property(x => x.Status)
-            .HasConversion<int>()
+            .HasColumnType("tinyint")
+            .HasConversion<byte>()
             .IsRequired();
 
         builder.Property(x => x.ReferenceType).HasMaxLength(50);
@@ -31,18 +32,7 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
             .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
 
-        // ─── Multi-Currency ─────────────────────────────────────────────
-        builder.Property(x => x.CurrencyId);
-        builder.HasIndex(x => x.CurrencyId);
-
-        builder.Property(x => x.ExchangeRate)
-            .HasPrecision(18, 2);
-
-        // ─── Attachments ────────────────────────────────────────────────
-        builder.Property(x => x.AttachmentPath)
-            .HasMaxLength(500);
-
-        builder.HasIndex(x => x.TransactionDate);
+        builder.HasIndex(x => x.EntryDate);
 
         // Lines collection — Restrict (soft-delete only, no hard deletes)
         builder.HasMany(x => x.Lines)

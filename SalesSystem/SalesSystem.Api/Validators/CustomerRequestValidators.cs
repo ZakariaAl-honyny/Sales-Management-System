@@ -28,9 +28,6 @@ public class CreateCustomerRequestValidator : AbstractValidator<CreateCustomerRe
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
 
-        RuleFor(x => x.PriceLevel)
-            .InclusiveBetween((byte)1, (byte)4).WithMessage("مستوى السعر يجب أن يكون بين 1 و 4")
-            .When(x => x.PriceLevel.HasValue);
     }
 }
 
@@ -61,9 +58,5 @@ public class UpdateCustomerRequestValidator : AbstractValidator<UpdateCustomerRe
 
         RuleFor(x => x.IsActive)
             .NotNull().WithMessage("حالة التفعيل مطلوبة");
-
-        RuleFor(x => x.PriceLevel)
-            .InclusiveBetween((byte)1, (byte)4).WithMessage("مستوى السعر يجب أن يكون بين 1 و 4")
-            .When(x => x.PriceLevel.HasValue);
     }
 }

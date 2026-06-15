@@ -14,7 +14,7 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
         builder.Property(e => e.ExpenseNo).IsRequired();
         builder.Property(e => e.ExpenseDate).IsRequired().HasColumnType("date");
         builder.Property(e => e.Amount).HasPrecision(18, 2).IsRequired();
-        builder.Property(e => e.Status).HasConversion<int>().IsRequired();
+        builder.Property(e => e.Status).HasColumnType("tinyint").HasConversion<byte>().IsRequired();
         builder.Property(e => e.Notes).HasMaxLength(500).IsRequired(false);
         builder.Property(e => e.PostedAt).IsRequired(false);
 

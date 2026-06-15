@@ -190,7 +190,7 @@ public class CustomerReceiptService : ICustomerReceiptService
             // If already posted, reverse the journal entry first
             if (receipt.Status == InvoiceStatus.Posted)
             {
-                var customerAccountId = receipt.Customer?.Party?.AccountId ?? 0;
+                var customerAccountId = receipt.Customer?.AccountId ?? 0;
                 var customerName = receipt.Customer?.Party?.Name ?? "";
                 var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
                     receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
@@ -271,14 +271,14 @@ public class CustomerReceiptService : ICustomerReceiptService
             receipt.CustomerId,
             receipt.Customer?.Party?.Name,
             receipt.CashBoxId,
-            receipt.CashBox?.BoxName,
+            receipt.CashBox?.Name,
             receipt.CurrencyId,
             receipt.Currency?.Name,
             receipt.Amount,
             receipt.Notes,
             (byte)receipt.Status,
             GetStatusName(receipt.Status),
-            receipt.PostedAt,
+            null, // CustomerReceipt is AuditableEntity — no PostedAt field
             receipt.Applications?.Select(a => new CustomerReceiptApplicationDto(
                 a.Id,
                 a.CustomerReceiptId,

@@ -115,7 +115,8 @@ public partial class MainWindow : Window
     private void UsersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<UserListViewModel>();
     private void SalesInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesInvoiceListViewModel>();
     private void PurchaseInvoicesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseInvoiceListViewModel>();
-    private void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseOrderListViewModel>();
+    private async void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) =>
+        await _dialogService.ShowInfoAsync("غير متاح", "شاشة أوامر الشراء غير متاحة في هذه النسخة");
     private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();
     private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseReturnListViewModel>();
     private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseListViewModel>();
@@ -281,11 +282,6 @@ public partial class MainWindow : Window
     private void OpenNewProductsWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("المنتجات", "Products");
     private void OpenNewCustomersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("العملاء", "Customers");
     private void OpenNewSuppliersWindow_Click(object sender, RoutedEventArgs e) => OpenPageInNewWindow("الموردين", "Suppliers");
-
-    private async void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        await _dialogService.ShowInfoAsync("غير متاح", "شاشة أوامر الشراء غير متاحة في هذه النسخة");
-    }
 
     private async void OpenNewPurchaseOrdersWindow_Click(object sender, RoutedEventArgs e)
     {

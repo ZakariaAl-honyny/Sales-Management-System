@@ -15,6 +15,11 @@ namespace SalesSystem.Domain.Entities;
 /// </summary>
 public class Role : ActivatableEntity
 {
+    /// <summary>
+    /// Schema: smallint PK (short).
+    /// </summary>
+    public new short Id { get; private set; }
+
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
 

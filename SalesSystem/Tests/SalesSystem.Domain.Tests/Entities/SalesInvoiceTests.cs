@@ -14,7 +14,6 @@ public class SalesInvoiceTests
             warehouseId: 1,
             invoiceNo: 1, customerId: 1,
             invoiceDate: new DateTime(2027, 1, 1),
-            dueDate: new DateOnly(2027, 1, 31),
             paymentType: PaymentType.Cash,
             discountAmount: 0,
             notes: "Test invoice",
@@ -25,7 +24,6 @@ public class SalesInvoiceTests
         invoice.WarehouseId.Should().Be(1);
         invoice.CustomerId.Should().Be(1);
         invoice.InvoiceDate.Should().Be(new DateTime(2027, 1, 1));
-        invoice.DueDate.Should().Be(new DateOnly(2027, 1, 31));
         invoice.PaymentType.Should().Be(PaymentType.Cash);
         invoice.DiscountAmount.Should().Be(0);
         invoice.Notes.Should().Be("Test invoice");
@@ -37,28 +35,29 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item1 = SalesInvoiceItem.Create(
+        var item1 = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 2,
-            unitPrice: 100m,
-            discountAmount: 10m
+            unitPrice: 100m
         );
 
-        var item2 = SalesInvoiceItem.Create(
+        var item2 = SalesInvoiceLine.Create(
             productId: 2,
+            productUnitId: 1,
             quantity: 3,
-            unitPrice: 50m,
-            discountAmount: 5m
+            unitPrice: 50m
         );
 
         invoice.AddItem(item1);
         invoice.AddItem(item2);
 
         invoice.Items.Should().HaveCount(2);
-        invoice.SubTotal.Should().Be(335m);
+        invoice.SubTotal.Should().Be(350m);
     }
 
     [Fact]
@@ -66,19 +65,20 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 5,
-            unitPrice: 200m,
-            discountAmount: 50m
+            unitPrice: 200m
         );
 
         invoice.AddItem(item);
 
-        invoice.SubTotal.Should().Be(950m);
+        invoice.SubTotal.Should().Be(1000m);
     }
 
     [Theory]
@@ -88,11 +88,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -109,11 +111,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -131,11 +135,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -154,7 +160,8 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
         var action = () => invoice.SetTaxAmount(negativeTax);
@@ -168,11 +175,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -181,7 +190,7 @@ public class SalesInvoiceTests
         invoice.SetTaxAmount(15m);
 
         invoice.TaxAmount.Should().Be(15m);
-        invoice.TotalAmount.Should().Be(115m);
+        invoice.NetTotal.Should().Be(115m);
     }
 
     [Fact]
@@ -189,11 +198,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -209,7 +220,8 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
         var action = () => invoice.Post();
@@ -224,11 +236,13 @@ public class SalesInvoiceTests
         // Arrange
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -246,11 +260,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -268,11 +284,13 @@ public class SalesInvoiceTests
         // Draft invoices can be cancelled (no stock/balance to reverse)
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -290,11 +308,13 @@ public class SalesInvoiceTests
         // Posted invoices with PaidAmount > 0 cannot be cancelled directly
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -312,11 +332,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -335,11 +357,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -358,24 +382,24 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, discountAmount: 50m,
+            invoiceNo: 1, customerId: 1, discountAmount: 50m,
             createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 2,
-            unitPrice: 100m,
-            discountAmount: 20m
+            unitPrice: 100m
         );
         invoice.AddItem(item);
 
         invoice.SetTaxAmount(30m);
 
-        invoice.SubTotal.Should().Be(180m);
+        invoice.SubTotal.Should().Be(200m);
         invoice.DiscountAmount.Should().Be(50m);
         invoice.TaxAmount.Should().Be(30m);
-        invoice.TotalAmount.Should().Be(160m);
+        invoice.NetTotal.Should().Be(180m);
     }
 
     [Fact]
@@ -383,12 +407,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, discountAmount: 100m,
+            invoiceNo: 1, customerId: 1, discountAmount: 100m,
             createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 500m
         );
@@ -397,7 +422,7 @@ public class SalesInvoiceTests
         invoice.SetTaxAmount(60m);
 
         invoice.SubTotal.Should().Be(500m);
-        invoice.TotalAmount.Should().Be(460m);
+        invoice.NetTotal.Should().Be(460m);
     }
 
     [Fact]
@@ -405,11 +430,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 200m
         );
@@ -418,9 +445,9 @@ public class SalesInvoiceTests
 
         invoice.SetPaidAmount(100m);
 
-        invoice.TotalAmount.Should().Be(220m);
+        invoice.NetTotal.Should().Be(220m);
         invoice.PaidAmount.Should().Be(100m);
-        invoice.DueAmount.Should().Be(120m);
+        invoice.RemainingAmount.Should().Be(120m);
     }
 
     [Fact]
@@ -428,7 +455,8 @@ public class SalesInvoiceTests
     {
         var action = () => SalesInvoice.Create(
             warehouseId: 0,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
         action.Should().Throw<DomainException>()
@@ -440,7 +468,7 @@ public class SalesInvoiceTests
     {
         var action = () => SalesInvoice.Create(
             warehouseId: -1,
-            invoiceNo: 1,
+            invoiceNo: 1, customerId: 1,
             createdByUserId: 1
         );
 
@@ -453,11 +481,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -475,11 +505,13 @@ public class SalesInvoiceTests
     {
         var invoice = SalesInvoice.Create(
             warehouseId: 1,
-            invoiceNo: 1, createdByUserId: 1
+            invoiceNo: 1, customerId: 1,
+            createdByUserId: 1
         );
 
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );

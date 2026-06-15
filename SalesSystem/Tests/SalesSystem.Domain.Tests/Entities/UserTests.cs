@@ -17,7 +17,7 @@ public class UserTests
         );
 
         user.UserName.Should().Be("john.doe");
-        user.PasswordHash.Should().BeNull();
+        user.PasswordHash.Should().Be(string.Empty); // Schema: nvarchar(256) NOT NULL
         user.FullName.Should().Be("John Doe");
         user.Status.Should().Be(UserStatus.Active);
         user.MustChangePassword.Should().BeTrue();

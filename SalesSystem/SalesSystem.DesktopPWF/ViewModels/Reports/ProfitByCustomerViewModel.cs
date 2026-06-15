@@ -164,7 +164,7 @@ public class ProfitByCustomerViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Customers.Clear();
-                    Customers.Add(new CustomerDto(0, "جميع العملاء", null, null, null, null, 0, true, 0));
+                    Customers.Add(new CustomerDto(0, "جميع العملاء", null, null, null, null, 0, true, 0, 0));
                     foreach (var c in result.Value)
                         Customers.Add(c);
                 });

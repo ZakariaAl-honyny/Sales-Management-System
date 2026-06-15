@@ -248,7 +248,7 @@ public class DashboardViewModel : ViewModelBase
                     Id = inv.Id,
                     CustomerName = inv.CustomerName ?? "عميل نقدي",
                     Date = inv.InvoiceDate,
-                    Amount = inv.TotalAmount,
+                    Amount = inv.NetTotal,
                     Status = inv.Status
                 });
             }

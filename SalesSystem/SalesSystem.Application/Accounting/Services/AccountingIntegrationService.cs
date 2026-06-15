@@ -38,7 +38,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
     // ─── Helper: Fetch multiple system accounts in parallel ─────────
     private async Task<Result<Dictionary<SystemAccountKey, int>>> GetAccountIdDictionaryAsync(
-        int? branchId, IEnumerable<SystemAccountKey> keys, CancellationToken ct)
+        short? branchId, IEnumerable<SystemAccountKey> keys, CancellationToken ct)
     {
         var tasks = keys.Select(async key =>
         {
@@ -48,8 +48,10 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
         var results = await Task.WhenAll(tasks);
         var dict = new Dictionary<SystemAccountKey, int>();
-        foreach (var (key, result) in results)
+        foreach (var tuple in results)
         {
+            var key = tuple.Key;
+            var result = tuple.Result;
             if (!result.IsSuccess || result.Value == null)
                 return Result<Dictionary<SystemAccountKey, int>>.Failure(
                     $"الحساب النظامي غير مهيأ: {key}");
@@ -86,7 +88,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
     // ─── Helper: Fetch a single system account ──────────────────────
     private async Task<Result<int>> GetAccountIdAsync(SystemAccountKey key,
-        int? branchId, CancellationToken ct)
+        short? branchId, CancellationToken ct)
     {
         var result = await _systemAccountService.GetMappingAsync(key, branchId, ct);
         if (!result.IsSuccess || result.Value == null)
@@ -99,15 +101,15 @@ public class AccountingIntegrationService : IAccountingIntegrationService
     // ─── Helpers: Get per-entity account IDs ────────────────────────
     private static int GetCustomerAccountId(SalesInvoice invoice, Dictionary<SystemAccountKey, int> m)
     {
-        return invoice.Customer?.Party?.AccountId > 0
-            ? invoice.Customer.Party.AccountId
+        return invoice.Customer?.AccountId > 0
+            ? invoice.Customer.AccountId
             : m.GetValueOrDefault(SystemAccountKey.AccountsReceivable, 0);
     }
 
     private static int GetSupplierAccountId(PurchaseInvoice invoice, Dictionary<SystemAccountKey, int> m)
     {
-        return invoice.Supplier?.Party?.AccountId > 0
-            ? invoice.Supplier.Party.AccountId
+        return invoice.Supplier?.AccountId > 0
+            ? invoice.Supplier.AccountId
             : m.GetValueOrDefault(SystemAccountKey.AccountsPayable, 0);
     }
 
@@ -136,7 +138,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var openingBalanceEquityAccountId = openingEquityResult.Value;
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: transactionDate,
+                EntryDate: transactionDate,
                 Description: $"قيد افتتاحي — رصيد افتتاحي للعميل: {customerName}",
                 EntryType: JournalEntryType.OpeningBalance,
                 ReferenceType: "Customer",
@@ -189,7 +191,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var openingBalanceEquityAccountId = openingEquityResult.Value;
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: transactionDate,
+                EntryDate: transactionDate,
                 Description: $"قيد افتتاحي — رصيد افتتاحي للمورد: {supplierName}",
                 EntryType: JournalEntryType.OpeningBalance,
                 ReferenceType: "Supplier",
@@ -246,7 +248,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: transactionDate,
+                EntryDate: transactionDate,
                 Description: $"قيد افتتاحي — رصيد افتتاحي للمنتج: {productName}",
                 EntryType: JournalEntryType.OpeningBalance,
                 ReferenceType: "Product",
@@ -319,7 +321,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             {
                 lines.Add(new JournalEntryLineRequest(
                     m[SystemAccountKey.DefaultCash],
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     0,
                     "الجزء النقدي من فاتورة البيع"));
             }
@@ -328,7 +330,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
                     customerAccountId,
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     0,
                     "الجزء الآجل من فاتورة البيع"));
             }
@@ -342,7 +344,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 var customerAccountId = GetCustomerAccountId(invoice, m);
                 lines.Add(new JournalEntryLineRequest(
                     customerAccountId,
-                    invoice.DueAmount,
+                    invoice.RemainingAmount,
                     0,
                     "الجزء الآجل من فاتورة البيع (مختلط)"));
             }
@@ -390,7 +392,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: invoice.InvoiceDate,
+                EntryDate: invoice.InvoiceDate,
                 Description: $"قيد ترحيل فاتورة بيع رقم {invoice.InvoiceNo}",
                 EntryType: JournalEntryType.Sales,
                 ReferenceType: "SalesInvoice",
@@ -482,7 +484,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 lines.Add(new JournalEntryLineRequest(
                     m[SystemAccountKey.DefaultCash],
                     0,
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     "عكس الجزء النقدي من فاتورة البيع"));
             }
             else if (invoice.PaymentType == PaymentType.Credit)
@@ -491,7 +493,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 lines.Add(new JournalEntryLineRequest(
                     customerAccountId,
                     0,
-                    invoice.TotalAmount,
+                    invoice.NetTotal,
                     "عكس الجزء الآجل من فاتورة البيع"));
             }
             else if (invoice.PaymentType == PaymentType.Mixed)
@@ -505,7 +507,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 lines.Add(new JournalEntryLineRequest(
                     customerAccountId,
                     0,
-                    invoice.DueAmount,
+                    invoice.RemainingAmount,
                     "عكس الجزء الآجل من فاتورة البيع (مختلط)"));
             }
 
@@ -548,32 +550,15 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
             else
             {
-                // Fallback: compute COGS estimate from invoice items
+                // Fallback: cannot compute COGS estimate without CostInBaseCurrency on SalesInvoiceLine
+                // The revenue-side reversal is still applied above.
                 _logger.LogWarning(
-                    "Original journal entry not found for SalesInvoice {Id} ({InvoiceNo}), computing COGS from items",
+                    "Original journal entry not found for SalesInvoice {Id} ({InvoiceNo}), COGS reversal skipped (no per-item cost data available)",
                     invoice.Id, invoice.InvoiceNo);
-
-                var computedCost = invoice.Items.Sum(item =>
-                {
-                    return item.Quantity * (item.CostInBaseCurrency ?? 0m);
-                });
-                if (computedCost > 0)
-                {
-                    lines.Add(new JournalEntryLineRequest(
-                        m[SystemAccountKey.Inventory],
-                        computedCost,
-                        0,
-                        "عكس تكلفة البضاعة المباعة — إعادة المخزون (تقديري)"));
-                    lines.Add(new JournalEntryLineRequest(
-                        m[SystemAccountKey.CostOfGoodsSold],
-                        0,
-                        computedCost,
-                        "عكس تكلفة البضاعة المباعة (تقديري)"));
-                }
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس ترحيل فاتورة بيع رقم {invoice.InvoiceNo}",
                 EntryType: JournalEntryType.SalesReturn,
                 ReferenceType: "SalesInvoice",
@@ -681,7 +666,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: invoice.InvoiceDate,
+                EntryDate: invoice.InvoiceDate,
                 Description: $"قيد ترحيل فاتورة شراء رقم {invoice.InvoiceNo}" +
                     (invoice.OtherCharges > 0 ? $" (تكلفة شاملة: {invoice.OtherCharges:N2} مصاريف إضافية)" : ""),
                 EntryType: JournalEntryType.Purchase,
@@ -790,7 +775,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس ترحيل فاتورة شراء رقم {invoice.InvoiceNo}",
                 EntryType: JournalEntryType.PurchaseReturn,
                 ReferenceType: "PurchaseInvoice",
@@ -840,8 +825,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             // Get customer account ID (per-entity account routing)
-            var customerAccountId = salesReturn.Customer?.Party?.AccountId > 0
-                ? salesReturn.Customer.Party.AccountId
+            var customerAccountId = salesReturn.Customer?.AccountId > 0
+                ? salesReturn.Customer.AccountId
                 : m[SystemAccountKey.AccountsReceivable];
 
             var lines = new List<JournalEntryLineRequest>();
@@ -880,15 +865,15 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: salesReturn.ReturnDate,
+                EntryDate: salesReturn.ReturnDate,
                 Description: $"قيد ترحيل مردود مبيعات رقم {salesReturn.ReturnNo}" +
-                    (salesReturn.SalesInvoiceId.HasValue
+                    (salesReturn.SalesInvoiceId > 0
                         ? $" (مرتبط بفاتورة بيع {salesReturn.SalesInvoiceId})"
                         : " (مرتجع مستقل)"),
                 EntryType: JournalEntryType.SalesReturn,
                 ReferenceType: "SalesReturn",
                 ReferenceId: salesReturn.Id,
-                ReferenceNumber: salesReturn.ReturnNo,
+                ReferenceNumber: salesReturn.ReturnNo.ToString(),
                 Lines: lines
             );
 
@@ -934,8 +919,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             // Get customer account ID (per-entity account routing)
-            var customerAccountId = salesReturn.Customer?.Party?.AccountId > 0
-                ? salesReturn.Customer.Party.AccountId
+            var customerAccountId = salesReturn.Customer?.AccountId > 0
+                ? salesReturn.Customer.AccountId
                 : m[SystemAccountKey.AccountsReceivable];
 
             var lines = new List<JournalEntryLineRequest>();
@@ -975,7 +960,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس ترحيل مردود مبيعات رقم {salesReturn.ReturnNo}",
                 EntryType: JournalEntryType.SalesReturn,
                 ReferenceType: "SalesReturn",
@@ -1022,8 +1007,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             // Get supplier account ID (per-entity account routing)
-            var supplierAccountId = purchaseReturn.Supplier?.Party?.AccountId > 0
-                ? purchaseReturn.Supplier.Party.AccountId
+            var supplierAccountId = purchaseReturn.Supplier?.AccountId > 0
+                ? purchaseReturn.Supplier.AccountId
                 : m[SystemAccountKey.AccountsPayable];
 
             var lines = new List<JournalEntryLineRequest>();
@@ -1043,9 +1028,9 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 "مردود مشتريات"));
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: purchaseReturn.ReturnDate,
+                EntryDate: purchaseReturn.ReturnDate,
                 Description: $"قيد ترحيل مردود مشتريات رقم {purchaseReturn.ReturnNo}" +
-                    (purchaseReturn.PurchaseInvoiceId.HasValue
+                    (purchaseReturn.PurchaseInvoiceId > 0
                         ? $" (مرتبط بفاتورة شراء {purchaseReturn.PurchaseInvoiceId})"
                         : " (مرتجع مستقل)"),
                 EntryType: JournalEntryType.PurchaseReturn,
@@ -1093,8 +1078,8 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             // Get supplier account ID (per-entity account routing)
-            var supplierAccountId = purchaseReturn.Supplier?.Party?.AccountId > 0
-                ? purchaseReturn.Supplier.Party.AccountId
+            var supplierAccountId = purchaseReturn.Supplier?.AccountId > 0
+                ? purchaseReturn.Supplier.AccountId
                 : m[SystemAccountKey.AccountsPayable];
 
             var lines = new List<JournalEntryLineRequest>();
@@ -1115,7 +1100,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 "عكس مردود مشتريات — إعادة ذمّة المورد"));
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس ترحيل مردود مشتريات رقم {purchaseReturn.ReturnNo}",
                 EntryType: JournalEntryType.PurchaseReturn,
                 ReferenceType: "PurchaseReturn",
@@ -1163,7 +1148,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: receipt.ReceiptDate,
+                EntryDate: receipt.ReceiptDate,
                 Description: $"قيد سند قبض من العميل: {customerName}",
                 EntryType: JournalEntryType.CustomerReceipt,
                 ReferenceType: "CustomerReceipt",
@@ -1172,7 +1157,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 Lines: new List<JournalEntryLineRequest>
                 {
                     new(m[SystemAccountKey.DefaultCash], receipt.Amount, 0, "سند قبض من العميل"),
-                    new(receipt.Customer?.Party?.AccountId ?? m[SystemAccountKey.AccountsReceivable], 0, receipt.Amount, "سند قبض من العميل")
+                    new(receipt.Customer?.AccountId ?? m[SystemAccountKey.AccountsReceivable], 0, receipt.Amount, "سند قبض من العميل")
                 }
             );
 
@@ -1212,7 +1197,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             // Reverse: Dr AR / Cr Cash (mirror of original Dr Cash / Cr AR)
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس سند قبض من العميل: {customerName}",
                 EntryType: JournalEntryType.Manual,
                 ReferenceType: "CustomerReceipt",
@@ -1264,7 +1249,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             var request = new CreateJournalEntryRequest(
-                TransactionDate: payment.PaymentDate,
+                EntryDate: payment.PaymentDate,
                 Description: $"قيد سند دفع للمورد: {supplierName}",
                 EntryType: JournalEntryType.SupplierPayment,
                 ReferenceType: "SupplierPayment",
@@ -1272,7 +1257,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 ReferenceNumber: payment.Id.ToString(),
                 Lines: new List<JournalEntryLineRequest>
                 {
-                    new(payment.Supplier?.Party?.AccountId ?? m[SystemAccountKey.AccountsPayable], payment.Amount, 0, "سند دفع للمورد"),
+                    new(payment.Supplier?.AccountId ?? m[SystemAccountKey.AccountsPayable], payment.Amount, 0, "سند دفع للمورد"),
                     new(m[SystemAccountKey.DefaultCash], 0, payment.Amount, "سند دفع للمورد")
                 }
             );
@@ -1313,7 +1298,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
 
             // Reverse: Dr Cash / Cr AP (mirror of original Dr AP / Cr Cash)
             var request = new CreateJournalEntryRequest(
-                TransactionDate: DateTime.UtcNow,
+                EntryDate: DateTime.UtcNow,
                 Description: $"قيد عكس سند دفع للمورد: {supplierName}",
                 EntryType: JournalEntryType.Manual,
                 ReferenceType: "SupplierPayment",

@@ -173,7 +173,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     /// <summary>
     /// Unpaid purchase invoices for the selected supplier, available for allocation
     /// </summary>
-    public ObservableCollection<UnpaidPurchaseInvoiceItem> UnpaidInvoices { get; } = new();
+    public ObservableCollection<UnpaidPurchaseInvoiceLine> UnpaidInvoices { get; } = new();
 
     /// <summary>
     /// Total amount allocated across all invoices
@@ -277,7 +277,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
 
         var unpaid = result.Value
             .Where(inv => inv.Status == 2 && inv.NetTotal > inv.PaidAmount) // Posted + outstanding
-            .Select(inv => new UnpaidPurchaseInvoiceItem
+            .Select(inv => new UnpaidPurchaseInvoiceLine
             {
                 InvoiceId = inv.Id,
                 InvoiceNo = inv.InvoiceNo,

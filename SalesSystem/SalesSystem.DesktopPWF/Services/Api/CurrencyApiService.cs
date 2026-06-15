@@ -55,11 +55,4 @@ public class CurrencyApiService : ApiServiceBase, ICurrencyApiService
             "CurrencyApiService.DeletePermanentlyAsync");
     }
 
-    public async Task<Result> UpdateExchangeRateAsync(int id, decimal newRate)
-    {
-        return await ExecuteCommandAsync(
-            () => _httpClient.PutAsJsonAsync($"api/v1/currencies/{id}/exchange-rate", new UpdateExchangeRateRequest(newRate)),
-            "CurrencyApiService.UpdateExchangeRateAsync");
-    }
-
 }

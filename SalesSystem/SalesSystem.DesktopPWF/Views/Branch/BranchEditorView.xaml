@@ -35,14 +35,6 @@
                              helpers:FocusHelper.AdvanceOnEnter="True"
                              ToolTip="أدخل اسم الفرع — هذا الحقل إلزامي"/>
 
-                    <!-- Code -->
-                    <TextBlock Text="الكود" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>
-                    <TextBox Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource ModernTextBox}"
-                             Tag="رمز الفرع (اختياري)"
-                             TabIndex="2"
-                             ToolTip="رمز الفرع — اختياري"/>
-
                     <!-- IsActive -->
                     <CheckBox Content="نشط" 
                               IsChecked="{Binding IsActive}"

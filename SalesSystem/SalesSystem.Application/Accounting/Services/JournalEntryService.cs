@@ -79,25 +79,22 @@ public class JournalEntryService : IJournalEntryService
             var entry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value.EntryNumber,
                 entryNo,
-                request.TransactionDate,
+                request.EntryDate,
                 request.Description ?? string.Empty,
                 request.EntryType,
                 userId,
                 request.ReferenceType,
                 request.ReferenceId,
-                request.ReferenceNumber,
-                (short?)request.CurrencyId,
-                request.ExchangeRate,
-                request.AttachmentPath);
+                request.ReferenceNumber);
 
             // 7. Add debit/credit lines via domain methods
             foreach (var line in request.Lines)
             {
                 var account = accountMap[line.AccountId];
                 if (line.Debit > 0)
-                    entry.AddDebitLine(line.AccountId, account.AccountCode, account.NameAr, line.Debit, line.Description);
+                    entry.AddDebitLine(line.AccountId, line.Debit, line.Description);
                 if (line.Credit > 0)
-                    entry.AddCreditLine(line.AccountId, account.AccountCode, account.NameAr, line.Credit, line.Description);
+                    entry.AddCreditLine(line.AccountId, line.Credit, line.Description);
             }
 
             // 8. Save to database (Draft)
@@ -128,7 +125,7 @@ public class JournalEntryService : IJournalEntryService
         {
             var (items, totalCount) = await _uow.JournalEntries.GetPagedAsync(
                 predicate: null,
-                orderConfig: q => q.OrderByDescending(e => e.TransactionDate).ThenByDescending(e => e.Id),
+                orderConfig: q => q.OrderByDescending(e => e.EntryDate).ThenByDescending(e => e.Id),
                 page: page,
                 pageSize: pageSize,
                 ct: ct,
@@ -267,7 +264,7 @@ public class JournalEntryService : IJournalEntryService
         return new JournalEntryListDto(
             entry.Id,
             entry.EntryNumber,
-            entry.TransactionDate,
+            entry.EntryDate,
             entry.Description,
             GetEntryTypeDisplay(entry.EntryType),
             entry.ReferenceType,
@@ -277,9 +274,6 @@ public class JournalEntryService : IJournalEntryService
             entry.TotalCredit,
             (int)entry.Status,
             GetStatusDisplay(entry.Status),
-            entry.CurrencyId,
-            entry.ExchangeRate,
-            entry.AttachmentPath,
             entry.CreatedAt,
             entry.CreatedByUserId
         );
@@ -290,8 +284,6 @@ public class JournalEntryService : IJournalEntryService
         var lineDtos = entry.Lines.Select(line => new JournalEntryLineDetailDto(
             line.Id,
             line.AccountId,
-            line.AccountCode,
-            line.AccountNameAr,
             line.Debit,
             line.Credit,
             line.Description
@@ -300,7 +292,7 @@ public class JournalEntryService : IJournalEntryService
         return new JournalEntryDetailDto(
             entry.Id,
             entry.EntryNumber,
-            entry.TransactionDate,
+            entry.EntryDate,
             entry.Description,
             GetEntryTypeDisplay(entry.EntryType),
             entry.ReferenceType,
@@ -308,9 +300,6 @@ public class JournalEntryService : IJournalEntryService
             entry.ReferenceNumber,
             (int)entry.Status,
             GetStatusDisplay(entry.Status),
-            entry.CurrencyId,
-            entry.ExchangeRate,
-            entry.AttachmentPath,
             entry.ReversedByEntryId,
             entry.CreatedAt,
             entry.CreatedByUserId,
@@ -333,7 +322,7 @@ public class JournalEntryService : IJournalEntryService
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
                     && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate <= queryDate,
+                    && jel.JournalEntry.EntryDate <= queryDate,
                 null,
                 ct,
                 false,
@@ -347,7 +336,7 @@ public class JournalEntryService : IJournalEntryService
                 accountId,
                 account.AccountCode,
                 account.NameAr,
-                account.AccountType,
+                (byte)account.GetAccountType(),
                 totalDebit,
                 totalCredit,
                 balance,
@@ -376,7 +365,7 @@ public class JournalEntryService : IJournalEntryService
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
                     && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate < startDate,
+                    && jel.JournalEntry.EntryDate < startDate,
                 null,
                 ct,
                 false,
@@ -391,8 +380,8 @@ public class JournalEntryService : IJournalEntryService
                 jel => jel.AccountId == accountId
                     && jel.JournalEntry != null
                     && jel.JournalEntry.Status == JournalEntryStatus.Posted
-                    && jel.JournalEntry.TransactionDate >= startDate
-                    && jel.JournalEntry.TransactionDate <= endDate,
+                    && jel.JournalEntry.EntryDate >= startDate
+                    && jel.JournalEntry.EntryDate <= endDate,
                 null,
                 ct,
                 false,
@@ -400,7 +389,7 @@ public class JournalEntryService : IJournalEntryService
 
             var runningBalance = openingBalance;
             var statementLines = periodLines
-                .OrderBy(l => l.JournalEntry!.TransactionDate)
+                .OrderBy(l => l.JournalEntry!.EntryDate)
                 .ThenBy(l => l.Id)
                 .Select(l =>
                 {
@@ -408,7 +397,7 @@ public class JournalEntryService : IJournalEntryService
                         ? l.Debit - l.Credit
                         : l.Credit - l.Debit;
                     return new AccountLedgerLineDto(
-                        l.JournalEntry!.TransactionDate,
+                        l.JournalEntry!.EntryDate,
                         l.JournalEntry.EntryNumber,
                         l.Description ?? "",
                         l.JournalEntry.ReferenceNumber,

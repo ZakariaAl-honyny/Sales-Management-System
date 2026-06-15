@@ -89,7 +89,7 @@
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         
                         <DataGridTextColumn Header="وقت الدخول" 
-                                            Binding="{Binding LoginAt, StringFormat={}{0:yyyy/MM/dd HH:mm:ss}}" 
+                                            Binding="{Binding CreatedAt, StringFormat={}{0:yyyy/MM/dd HH:mm:ss}}" 
                                             Width="1.5*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         

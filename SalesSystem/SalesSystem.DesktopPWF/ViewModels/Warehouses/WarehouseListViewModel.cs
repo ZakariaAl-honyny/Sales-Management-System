@@ -30,7 +30,6 @@ public class WarehouseListViewModel : ViewModelBase
     private ICollectionView? _warehousesView;
     private WarehouseDto? _selectedWarehouse;
     private string _searchText = string.Empty;
-    private byte? _selectedTypeFilter;
     private string? _errorMessage;
     private bool _isEmpty;
     private bool _includeInactive;
@@ -133,29 +132,6 @@ public class WarehouseListViewModel : ViewModelBase
 
     public int WarehousesCount => Warehouses.Count;
 
-    /// <summary>
-    /// Type filter list for the filter ComboBox (null = "الكل").
-    /// </summary>
-    public List<KeyValuePair<byte?, string>> TypeFilterList { get; } = new()
-    {
-        new KeyValuePair<byte?, string>(null, "الكل"),
-        new KeyValuePair<byte?, string>(1, "رئيسي"),
-        new KeyValuePair<byte?, string>(2, "فرعي"),
-        new KeyValuePair<byte?, string>(3, "صالة عرض"),
-        new KeyValuePair<byte?, string>(4, "تالف"),
-    };
-
-    public byte? SelectedTypeFilter
-    {
-        get => _selectedTypeFilter;
-        set
-        {
-            if (SetProperty(ref _selectedTypeFilter, value))
-            {
-                WarehousesView?.Refresh();
-            }
-        }
-    }
     #endregion
 
     #region Commands
@@ -218,16 +194,12 @@ public class WarehouseListViewModel : ViewModelBase
     {
         if (obj is not WarehouseDto warehouse) return false;
 
-        // Type filter
-        if (SelectedTypeFilter.HasValue && warehouse.Type != SelectedTypeFilter.Value)
-            return false;
-
         // Text search
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var searchLower = SearchText.Trim().ToLower();
-        return warehouse.Name.ToLower().Contains(searchLower) ||
-               (warehouse.Location?.ToLower().Contains(searchLower) ?? false);
+        return warehouse.Name.ToLower().Contains(searchLower)
+            || (warehouse.Address?.ToLower().Contains(searchLower) ?? false);
     }
 
     private void AddWarehouse()
@@ -322,13 +294,10 @@ public class WarehouseListViewModel : ViewModelBase
 
         var request = new UpdateWarehouseRequest(
             BranchId: (short)1,
-            Code: string.Empty,
             Name: SelectedWarehouse.Name,
-            Type: SelectedWarehouse.Type,
-            Location: SelectedWarehouse.Location,
             Phone: SelectedWarehouse.Phone,
             Address: SelectedWarehouse.Address,
-            ManagerName: SelectedWarehouse.ManagerName,
+            Notes: SelectedWarehouse.Notes,
             IsActive: true
         );
 

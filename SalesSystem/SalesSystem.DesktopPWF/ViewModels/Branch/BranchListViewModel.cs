@@ -163,8 +163,7 @@ public class BranchListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var search = SearchText.Trim().ToLower();
-        return branch.Name.ToLower().Contains(search) ||
-               (branch.Code?.ToLower().Contains(search) ?? false);
+        return branch.Name.ToLower().Contains(search);
     }
 
     private void AddBranch()

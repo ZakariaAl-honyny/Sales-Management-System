@@ -18,14 +18,14 @@ public class SalesInvoiceRepositoryTests
 
     private async Task SeedTestData(SalesDbContext context)
     {
-        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-TEST");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse");
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
         
-        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        var party = Party.Create("Test Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         context.Customers.Add(customer);
         
         await context.SaveChangesAsync();
@@ -69,7 +69,8 @@ public class SalesInvoiceRepositoryTests
         
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
-            invoiceNo: 1
+            invoiceNo: 1,
+            customerId: context.Customers.First().Id
         );
         await repository.AddAsync(invoice);
         await context.SaveChangesAsync();
@@ -106,9 +107,10 @@ public class SalesInvoiceRepositoryTests
         
         var repository = new GenericRepository<SalesInvoice>(context);
         
-        var invoice1 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1);
-        var invoice2 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 2);
-        var invoice3 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 3);
+        var customerId = context.Customers.First().Id;
+        var invoice1 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1, customerId: customerId);
+        var invoice2 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 2, customerId: customerId);
+        var invoice3 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 3, customerId: customerId);
 
         await repository.AddAsync(invoice1);
         await repository.AddAsync(invoice2);
@@ -133,7 +135,8 @@ public class SalesInvoiceRepositoryTests
         
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
-            invoiceNo: 1
+            invoiceNo: 1,
+            customerId: context.Customers.First().Id
         );
         await repository.AddAsync(invoice);
         await context.SaveChangesAsync();
@@ -158,11 +161,12 @@ public class SalesInvoiceRepositoryTests
         
         var repository = new GenericRepository<SalesInvoice>(context);
         
-        var invoice1 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1);
-        var invoice2 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 2);
+        var customerId = context.Customers.First().Id;
+        var invoice1 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 1, customerId: customerId);
+        var invoice2 = SalesInvoice.Create(warehouseId: context.Warehouses.First().Id, invoiceNo: 2, customerId: customerId);
         
         // Add item to invoice1 before posting
-        var item = SalesInvoiceItem.Create(productId: 1, quantity: 10m, unitPrice: 100m);
+        var item = SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 10m, unitPrice: 100m);
         invoice1.AddItem(item);
         invoice1.Post();
         
@@ -195,14 +199,16 @@ public class SalesInvoiceRepositoryTests
             customerId: context.Customers.First().Id
         );
 
-        var item1 = SalesInvoiceItem.Create(
+        var item1 = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m
         );
         
-        var item2 = SalesInvoiceItem.Create(
+        var item2 = SalesInvoiceLine.Create(
             productId: 2,
+            productUnitId: 1,
             quantity: 5m,
             unitPrice: 50m
         );
@@ -234,11 +240,13 @@ public class SalesInvoiceRepositoryTests
         
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
-            invoiceNo: 1
+            invoiceNo: 1,
+            customerId: context.Customers.First().Id
         );
         
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m
         );
@@ -268,11 +276,13 @@ public class SalesInvoiceRepositoryTests
         
         var invoice = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
-            invoiceNo: 1
+            invoiceNo: 1,
+            customerId: context.Customers.First().Id
         );
         
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 10m,
             unitPrice: 100m
         );
@@ -317,7 +327,8 @@ public class SalesInvoiceRepositoryTests
         );
         var invoice3 = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
-            invoiceNo: 3
+            invoiceNo: 3,
+            customerId: customer1.Id
         );
 
         await repository.AddAsync(invoice1);
@@ -331,7 +342,7 @@ public class SalesInvoiceRepositoryTests
             .ToListAsync();
 
         // Assert
-        customerInvoices.Should().HaveCount(2);
+        customerInvoices.Should().HaveCount(3);
     }
 
     [Fact]
@@ -343,19 +354,23 @@ public class SalesInvoiceRepositoryTests
         
         var repository = new GenericRepository<SalesInvoice>(context);
         
+        var customerId = context.Customers.First().Id;
         var invoice1 = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 1,
+            customerId: customerId,
             invoiceDate: DateTime.UtcNow.AddDays(-2)
         );
         var invoice2 = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 2,
+            customerId: customerId,
             invoiceDate: DateTime.UtcNow
         );
         var invoice3 = SalesInvoice.Create(
             warehouseId: context.Warehouses.First().Id,
             invoiceNo: 3,
+            customerId: customerId,
             invoiceDate: DateTime.UtcNow.AddDays(-1)
         );
 

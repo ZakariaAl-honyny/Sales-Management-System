@@ -931,7 +931,7 @@ All notable changes to this project will be documented in this file.
 
 ### Removed
 - **Code column** — Removed from Product, Customer, and Supplier entities (domain, DB, DTOs, ViewModels, XAML).
-- **ProductCode** — Removed from all invoice item DTOs (SalesInvoiceItem, PurchaseInvoiceItem, SalesReturnItem, PurchaseReturnItem, StockTransferItem).
+- **ProductCode** — Removed from all invoice item DTOs (SalesInvoiceLine, PurchaseInvoiceLine, SalesReturnItem, PurchaseReturnItem, StockTransferItem).
 - **Code fields** — Removed from report DTOs (StockReport, CustomerBalanceReport, SupplierBalanceReport, LowStockReport).
 - **Code auto-generation** — Removed DocumentSequenceService calls for PRD/CUST/SUP prefixes in ProductService, CustomerService, SupplierService.
 - **Code validation** — Removed from API validators (Product, Customer, Supplier).

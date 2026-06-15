@@ -78,7 +78,7 @@ public class CashBoxReportService : ICashBoxReportService
                 var totalExpense = expenseByBox.GetValueOrDefault(cb.Id, 0m);
                 return new CashBoxSummaryDto(
                     CashBoxId: cb.Id,
-                    CashBoxName: cb.BoxName,
+                    CashBoxName: cb.Name,
                     TotalIncome: totalIncome,
                     TotalExpense: totalExpense,
                     NetBalance: totalIncome - totalExpense);
@@ -189,7 +189,7 @@ public class CashBoxReportService : ICashBoxReportService
             Id: voucher.Id,
             VoucherNo: voucher.VoucherNo,
             VoucherDate: voucher.VoucherDate,
-            CashBoxName: voucher.CashBox?.BoxName ?? string.Empty,
+            CashBoxName: voucher.CashBox?.Name ?? string.Empty,
             AccountName: voucher.Account?.NameAr ?? string.Empty,
             TotalAmount: voucher.TotalAmount,
             Notes: voucher.Notes,
@@ -202,11 +202,10 @@ public class CashBoxReportService : ICashBoxReportService
             Id: voucher.Id,
             VoucherNo: voucher.VoucherNo,
             VoucherDate: voucher.VoucherDate,
-            CashBoxName: voucher.CashBox?.BoxName ?? string.Empty,
+            CashBoxName: voucher.CashBox?.Name ?? string.Empty,
             AccountName: voucher.Account?.NameAr ?? string.Empty,
             TotalAmount: voucher.TotalAmount,
             Notes: voucher.Notes,
-            SourceDocumentType: voucher.SourceDocumentType,
             StatusDisplay: GetStatusDisplay(voucher.Status));
     }
 

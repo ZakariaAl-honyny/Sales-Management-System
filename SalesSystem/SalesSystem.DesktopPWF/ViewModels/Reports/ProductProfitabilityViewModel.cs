@@ -177,7 +177,7 @@ public class ProductProfitabilityViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Products.Clear();
-                    Products.Add(new ProductDto(0, "جميع المنتجات", 0, null, null, null, 0, false, null, null, null, null, true));
+                    Products.Add(new ProductDto(0, "جميع المنتجات", 0, null, null, null, 0, false, null, true));
                     foreach (var p in result.Value)
                         Products.Add(p);
                 });
@@ -199,7 +199,7 @@ public class ProductProfitabilityViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Categories.Clear();
-                    Categories.Add(new ProductCategoryDto(0, "جميع التصنيفات", null, null, true));
+                    Categories.Add(new ProductCategoryDto(0, "جميع التصنيفات", null, true));
                     foreach (var c in result.Value)
                         Categories.Add(c);
                 });

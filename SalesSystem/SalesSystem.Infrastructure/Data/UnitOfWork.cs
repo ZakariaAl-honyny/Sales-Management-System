@@ -33,10 +33,8 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<SupplierPayment>? _supplierPayments;
     private IGenericRepository<CurrencyRate>? _currencyRates;
     private ISystemLogRepository? _systemLogs;
-    private IGenericRepository<SalesInvoiceItem>? _salesInvoiceItems;
-    private IGenericRepository<PurchaseInvoiceItem>? _purchaseInvoiceItems;
-    private IGenericRepository<PurchaseOrderItem>? _purchaseOrderItems;
-    private IGenericRepository<PurchaseOrder>? _purchaseOrders;
+    private IGenericRepository<SalesInvoiceLine>? _SalesInvoiceLines;
+    private IGenericRepository<PurchaseInvoiceLine>? _PurchaseInvoiceLines;
     private IGenericRepository<ProductUnit>? _productUnits;
     private IGenericRepository<CashBox>? _cashBoxes;
     private IGenericRepository<SystemSetting>? _systemSettings;
@@ -59,8 +57,6 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<ProductPrice>? _productPrices;
 
     // New entity repositories (v4.7+)
-    private IGenericRepository<AdditionalFeeAllocation>? _additionalFeeAllocations;
-    private IGenericRepository<AdditionalFee>? _additionalFees;
     private IGenericRepository<Party>? _parties;
     private IGenericRepository<Attachment>? _attachments;
     private IGenericRepository<Notification>? _notifications;
@@ -82,9 +78,6 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     private IGenericRepository<CustomerContact>? _customerContacts;
     private IGenericRepository<SupplierContact>? _supplierContacts;
-
-    // Cheque repository
-    private IGenericRepository<Cheque>? _cheques;
 
     // === New Inventory Module (v4.10+) ===
     private IGenericRepository<InventoryTransaction>? _inventoryTransactions;
@@ -113,10 +106,8 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<SupplierPayment> SupplierPayments => _supplierPayments ??= new GenericRepository<SupplierPayment>(_context);
     public IGenericRepository<CurrencyRate> CurrencyRates => _currencyRates ??= new GenericRepository<CurrencyRate>(_context);
     public ISystemLogRepository SystemLogs => _systemLogs ??= new SystemLogRepository(_context);
-    public IGenericRepository<SalesInvoiceItem> SalesInvoiceItems => _salesInvoiceItems ??= new GenericRepository<SalesInvoiceItem>(_context);
-    public IGenericRepository<PurchaseInvoiceItem> PurchaseInvoiceItems => _purchaseInvoiceItems ??= new GenericRepository<PurchaseInvoiceItem>(_context);
-    public IGenericRepository<PurchaseOrderItem> PurchaseOrderItems => _purchaseOrderItems ??= new GenericRepository<PurchaseOrderItem>(_context);
-    public IGenericRepository<PurchaseOrder> PurchaseOrders => _purchaseOrders ??= new GenericRepository<PurchaseOrder>(_context);
+    public IGenericRepository<SalesInvoiceLine> SalesInvoiceLines => _SalesInvoiceLines ??= new GenericRepository<SalesInvoiceLine>(_context);
+    public IGenericRepository<PurchaseInvoiceLine> PurchaseInvoiceLines => _PurchaseInvoiceLines ??= new GenericRepository<PurchaseInvoiceLine>(_context);
     public IGenericRepository<ProductUnit> ProductUnits => _productUnits ??= new GenericRepository<ProductUnit>(_context);
     public IGenericRepository<CashBox> CashBoxes => _cashBoxes ??= new GenericRepository<CashBox>(_context);
     public IGenericRepository<SystemSetting> SystemSettings => _systemSettings ??= new GenericRepository<SystemSetting>(_context);
@@ -138,8 +129,6 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<InventoryBatch> InventoryBatches => _inventoryBatches ??= new GenericRepository<InventoryBatch>(_context);
     public IGenericRepository<ProductPrice> ProductPrices => _productPrices ??= new GenericRepository<ProductPrice>(_context);
     // New entity repositories (v4.7+)
-    public IGenericRepository<AdditionalFeeAllocation> AdditionalFeeAllocations => _additionalFeeAllocations ??= new GenericRepository<AdditionalFeeAllocation>(_context);
-    public IGenericRepository<AdditionalFee> AdditionalFees => _additionalFees ??= new GenericRepository<AdditionalFee>(_context);
     public IGenericRepository<Party> Parties => _parties ??= new GenericRepository<Party>(_context);
     public IGenericRepository<Attachment> Attachments => _attachments ??= new GenericRepository<Attachment>(_context);
     public IGenericRepository<Notification> Notifications => _notifications ??= new GenericRepository<Notification>(_context);
@@ -162,9 +151,6 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     public IGenericRepository<CustomerContact> CustomerContacts => _customerContacts ??= new GenericRepository<CustomerContact>(_context);
     public IGenericRepository<SupplierContact> SupplierContacts => _supplierContacts ??= new GenericRepository<SupplierContact>(_context);
-
-    // Cheque repository
-    public IGenericRepository<Cheque> Cheques => _cheques ??= new GenericRepository<Cheque>(_context);
 
     // === New Inventory Module (v4.10+) ===
     public IGenericRepository<InventoryTransaction> InventoryTransactions => _inventoryTransactions ??= new GenericRepository<InventoryTransaction>(_context);

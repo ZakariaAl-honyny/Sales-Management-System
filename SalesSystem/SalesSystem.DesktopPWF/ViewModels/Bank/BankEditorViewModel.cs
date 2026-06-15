@@ -8,6 +8,10 @@ using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Bank;
 
+/// <summary>
+/// Editor ViewModel for creating and updating banks.
+/// Schema §4.4 Banks: Name, AccountId (int), AccountNumber, IBAN.
+/// </summary>
 public class BankEditorViewModel : ViewModelBase
 {
     private readonly IBankApiService _bankService;
@@ -17,7 +21,8 @@ public class BankEditorViewModel : ViewModelBase
     private int _bankId;
     private int? _accountId;
     private string _name = string.Empty;
-    private string? _accountName;
+    private string? _accountNumber;
+    private string? _iban;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -29,7 +34,8 @@ public class BankEditorViewModel : ViewModelBase
         _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
-        SaveCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ البنك...")));
+        SaveCommand = new AsyncRelayCommand(
+            (Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync, "جاري حفظ البنك...")));
         CancelCommand = new RelayCommand(Cancel);
     }
 
@@ -64,10 +70,16 @@ public class BankEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountId, value);
     }
 
-    public string? AccountName
+    public string? AccountNumber
     {
-        get => _accountName;
-        set => SetProperty(ref _accountName, value);
+        get => _accountNumber;
+        set => SetProperty(ref _accountNumber, value);
+    }
+
+    public string? Iban
+    {
+        get => _iban;
+        set => SetProperty(ref _iban, value);
     }
 
     public bool IsActive
@@ -97,8 +109,9 @@ public class BankEditorViewModel : ViewModelBase
     {
         _bankId = bank.Id;
         _accountId = bank.AccountId;
-        _accountName = bank.AccountName;
         _name = bank.Name;
+        _accountNumber = bank.AccountNumber;
+        _iban = bank.Iban;
         _isActive = bank.IsActive;
         _isEditMode = true;
     }
@@ -121,7 +134,10 @@ public class BankEditorViewModel : ViewModelBase
 
         if (IsEditMode)
         {
-            var request = new UpdateBankRequest(Name: Name, CurrencyId: 1);
+            var request = new UpdateBankRequest(
+                Name: Name,
+                AccountNumber: string.IsNullOrWhiteSpace(AccountNumber) ? null : AccountNumber.Trim(),
+                Iban: string.IsNullOrWhiteSpace(Iban) ? null : Iban.Trim());
             var result = await _bankService.UpdateAsync(_bankId, request);
 
             if (result.IsSuccess)
@@ -136,7 +152,11 @@ public class BankEditorViewModel : ViewModelBase
         }
         else
         {
-            var request = new CreateBankRequest(AccountId: _accountId, Name: Name, CurrencyId: 1);
+            var request = new CreateBankRequest(
+                AccountId: _accountId,
+                Name: Name,
+                AccountNumber: string.IsNullOrWhiteSpace(AccountNumber) ? null : AccountNumber.Trim(),
+                Iban: string.IsNullOrWhiteSpace(Iban) ? null : Iban.Trim());
             var result = await _bankService.CreateAsync(request);
 
             if (result.IsSuccess)

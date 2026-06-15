@@ -16,7 +16,6 @@ public class BranchEditorViewModel : ViewModelBase
 
     private int _branchId;
     private string _name = string.Empty;
-    private string? _code;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -57,12 +56,6 @@ public class BranchEditorViewModel : ViewModelBase
         }
     }
 
-    public string? Code
-    {
-        get => _code;
-        set => SetProperty(ref _code, value);
-    }
-
     public bool IsActive
     {
         get => _isActive;
@@ -90,7 +83,6 @@ public class BranchEditorViewModel : ViewModelBase
     {
         _branchId = branch.Id;
         _name = branch.Name;
-        _code = branch.Code;
         _isActive = branch.IsActive;
         _isEditMode = true;
     }
@@ -113,7 +105,7 @@ public class BranchEditorViewModel : ViewModelBase
 
         if (IsEditMode)
         {
-            var request = new UpdateBranchRequest(Name, Code);
+            var request = new UpdateBranchRequest(Name);
             var result = await _branchService.UpdateAsync(_branchId, request);
 
             if (result.IsSuccess)
@@ -128,7 +120,7 @@ public class BranchEditorViewModel : ViewModelBase
         }
         else
         {
-            var request = new CreateBranchRequest(Name, Code);
+            var request = new CreateBranchRequest(Name);
             var result = await _branchService.CreateAsync(request);
 
             if (result.IsSuccess)

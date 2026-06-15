@@ -233,7 +233,6 @@ public record PaymentVoucherReportDto(
     string AccountName,
     decimal TotalAmount,
     string? Notes,
-    string? SourceDocumentType,
     string StatusDisplay);
 
 // ═══════════════════════════════════════════════════════

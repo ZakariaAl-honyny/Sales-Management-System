@@ -92,21 +92,6 @@ public class CurrenciesController : ControllerBase
         return BadRequest(new { error = result.Error });
     }
 
-    [HttpPut("{id:int}/exchange-rate")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdateExchangeRate(int id, [FromBody] UpdateExchangeRateRequest request, CancellationToken ct)
-    {
-        var userId = GetUserId();
-        var result = await _currencyService.UpdateExchangeRateAsync(id, request.NewRate, userId, ct);
-        if (result.IsSuccess)
-            return Ok(new { message = "تم تحديث سعر الصرف بنجاح" });
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
-    }
-
     [HttpGet("by-code/{code}")]
     [Authorize(Policy = "AllStaff")]
     [ProducesResponseType(typeof(CurrencyDto), StatusCodes.Status200OK)]

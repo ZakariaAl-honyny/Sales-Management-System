@@ -205,7 +205,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             var defaultCashAccountId = cashResult.Value.AccountId;
 
             var journalRequest = new CreateJournalEntryRequest(
-                TransactionDate: voucher.VoucherDate,
+                EntryDate: voucher.VoucherDate,
                 Description: $"قيد سند قبض رقم {voucher.VoucherNo}",
                 EntryType: JournalEntryType.CustomerReceipt,
                 ReferenceType: "ReceiptVoucher",
@@ -269,7 +269,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
                 var defaultCashAccountId = cashResult.Value.AccountId;
 
                 var reverseRequest = new CreateJournalEntryRequest(
-                    TransactionDate: DateTime.UtcNow,
+                    EntryDate: DateTime.UtcNow,
                     Description: $"قيد عكس سند قبض رقم {voucher.VoucherNo}",
                     EntryType: JournalEntryType.Manual,
                     ReferenceType: "ReceiptVoucher",
@@ -329,7 +329,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             voucher.Currency?.Name,
             voucher.Currency?.Code,
             voucher.CashBoxId,
-            voucher.CashBox?.BoxName,
+            voucher.CashBox?.Name,
             voucher.AccountId,
             voucher.Account?.NameAr,
             voucher.TotalAmount,

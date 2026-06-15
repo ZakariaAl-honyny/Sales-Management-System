@@ -25,14 +25,8 @@ public class SystemAccountMappingConfiguration : IEntityTypeConfiguration<System
 
         // Composite unique index: one mapping per (Key, BranchId)
         builder.HasIndex(x => new { x.MappingKey, x.BranchId })
-            .IsUnique()
-            .HasFilter("[IsActive] = 1");
+            .IsUnique();
 
-        builder.Property(x => x.BranchId).IsRequired().HasDefaultValue(0);
-        builder.Property(x => x.DescriptionAr).HasMaxLength(200).IsRequired(false);
-        builder.Property(x => x.DescriptionEn).HasMaxLength(200).IsRequired(false);
-        builder.Property(x => x.IsActive).HasDefaultValue(true);
-
-        builder.HasQueryFilter(x => x.IsActive);
+        builder.Property(x => x.BranchId).IsRequired(false);
     }
 }

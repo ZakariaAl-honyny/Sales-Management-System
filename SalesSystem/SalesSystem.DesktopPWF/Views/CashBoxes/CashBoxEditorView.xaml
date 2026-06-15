@@ -58,10 +58,10 @@
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="0,0,0,6">
 
-                        <!-- Box Name -->
+                        <!-- Name -->
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="اسم الصندوق *" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding BoxName, UpdateSourceTrigger=PropertyChanged}"
+                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
                                      AutomationProperties.AutomationId="TxtCashBoxName"
                                      ToolTip="اسم الصندوق النقدي — هذا الحقل إلزامي"/>
@@ -79,43 +79,14 @@
                             </Border>
                         </StackPanel>
 
-                        <!-- Category -->
+                        <!-- Description -->
                         <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="الفئة" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding Categories}"
-                                      SelectedItem="{Binding SelectedCategory}"
-                                      DisplayMemberPath="Name"
-                                      Style="{StaticResource ModernComboBox}"
-                                      AutomationProperties.AutomationId="CmbCashBoxCategory"
-                                      ToolTip="اختيار فئة للصندوق (اختياري)"/>
-                        </StackPanel>
-
-                        <!-- Phone Number -->
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}"
-                                     AutomationProperties.AutomationId="TxtCashBoxPhone"
-                                     ToolTip="رقم الهاتف المسؤول عن الصندوق (اختياري)"/>
-                        </StackPanel>
-
-                        <!-- Tax Number -->
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="الرقم الضريبي" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}"
-                                     AutomationProperties.AutomationId="TxtCashBoxTaxNumber"
-                                     ToolTip="الرقم الضريبي للصندوق (اختياري)"/>
-                        </StackPanel>
-
-                        <!-- Address -->
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                            <TextBlock Text="الوصف" Style="{StaticResource LabelStyle}"/>
+                            <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
                                      AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="60"
-                                     AutomationProperties.AutomationId="TxtCashBoxAddress"
-                                     ToolTip="عنوان موقع الصندوق (اختياري)"/>
+                                     AutomationProperties.AutomationId="TxtCashBoxDescription"
+                                     ToolTip="وصف الصندوق النقدي (اختياري)"/>
                         </StackPanel>
 
                     </StackPanel>

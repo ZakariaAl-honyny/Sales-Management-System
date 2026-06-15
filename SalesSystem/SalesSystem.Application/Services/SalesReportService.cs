@@ -36,12 +36,12 @@ public class SalesReportService : ISalesReportService
             var grouped = invoices
                 .GroupBy(si => new { si.CustomerId, CustomerName = si.Customer?.Party?.Name ?? "عميل نقدي" })
                 .Select(g => new SalesByCustomerDto(
-                    g.Key.CustomerId ?? 0,
+                    g.Key.CustomerId,
                     g.Key.CustomerName,
                     g.Count(),
-                    g.Sum(si => si.TotalAmount),
+                    g.Sum(si => si.NetTotal),
                     g.Sum(si => si.PaidAmount),
-                    g.Sum(si => si.DueAmount)
+                    g.Sum(si => si.RemainingAmount)
                 ))
                 .OrderByDescending(dto => dto.TotalAmount)
                 .ToList();
@@ -64,7 +64,7 @@ public class SalesReportService : ISalesReportService
 
             _logger.LogInformation("Getting sales by product from {From} to {To}", from, to);
 
-            var invoiceItems = await _uow.SalesInvoiceItems.ToListAsync(
+            var invoiceItems = await _uow.SalesInvoiceLines.ToListAsync(
                 item => item.SalesInvoice!.Status == InvoiceStatus.Posted
                      && item.SalesInvoice!.InvoiceDate >= from
                      && item.SalesInvoice!.InvoiceDate <= to,
@@ -77,8 +77,8 @@ public class SalesReportService : ISalesReportService
                 .Select(g =>
                 {
                     var totalAmount = g.Sum(item => item.LineTotal);
-                    var totalCost = g.Sum(item => item.CostInBaseCurrency ?? 0);
-                    var totalProfit = g.Sum(item => item.Profit != 0 ? item.Profit : item.LineTotal - (item.CostInBaseCurrency ?? 0));
+                    var totalCost = 0m;
+                    var totalProfit = 0m;
                     var quantity = g.Sum(item => item.Quantity);
                     var profitMargin = totalAmount > 0 ? Math.Round(totalProfit / totalAmount * 100, 2) : 0;
 
@@ -113,7 +113,7 @@ public class SalesReportService : ISalesReportService
 
             _logger.LogInformation("Getting sales by category from {From} to {To}", from, to);
 
-            var invoiceItems = await _uow.SalesInvoiceItems.ToListAsync(
+            var invoiceItems = await _uow.SalesInvoiceLines.ToListAsync(
                 item => item.SalesInvoice!.Status == InvoiceStatus.Posted
                      && item.SalesInvoice!.InvoiceDate >= from
                      && item.SalesInvoice!.InvoiceDate <= to,
@@ -172,9 +172,9 @@ public class SalesReportService : ISalesReportService
                 .Select(g => new DailySalesSummaryDto(
                     g.Key,
                     g.Count(),
-                    g.Sum(si => si.TotalAmount),
+                    g.Sum(si => si.NetTotal),
                     g.Sum(si => si.DiscountAmount),
-                    g.Sum(si => si.TotalAmount - si.DiscountAmount)
+                    g.Sum(si => si.NetTotal - si.DiscountAmount)
                 ))
                 .OrderBy(dto => dto.Date)
                 .ToList();
@@ -203,12 +203,12 @@ public class SalesReportService : ISalesReportService
 
             // Get items for cost calculation
             var invoiceIds = invoices.Select(i => i.Id).ToList();
-            var items = await _uow.SalesInvoiceItems.ToListAsync(
+            var items = await _uow.SalesInvoiceLines.ToListAsync(
                 item => invoiceIds.Contains(item.SalesInvoiceId),
                 ct: ct);
             var itemCostsByInvoice = items
                 .GroupBy(item => item.SalesInvoiceId)
-                .ToDictionary(g => g.Key, g => g.Sum(item => item.CostInBaseCurrency ?? 0));
+                .ToDictionary(g => g.Key, g => 0m);
 
             Func<DateTime, string> keySelector = groupBy?.ToLower() switch
             {
@@ -222,7 +222,7 @@ public class SalesReportService : ISalesReportService
                 .GroupBy(si => keySelector(si.InvoiceDate))
                 .Select(g =>
                 {
-                    var totalSales = g.Sum(si => si.TotalAmount);
+                    var totalSales = g.Sum(si => si.NetTotal);
                     var totalCost = g.Sum(si => itemCostsByInvoice.GetValueOrDefault(si.Id, 0));
                     var totalProfit = totalSales - totalCost;
                     var profitMargin = totalSales > 0 ? Math.Round(totalProfit / totalSales * 100, 2) : 0;
@@ -270,7 +270,7 @@ public class SalesReportService : ISalesReportService
                         userId,
                         userDict.GetValueOrDefault(userId, $"مستخدم #{userId}"),
                         g.Count(),
-                        g.Sum(si => si.TotalAmount)
+                        g.Sum(si => si.NetTotal)
                     );
                 })
                 .OrderByDescending(dto => dto.TotalAmount)

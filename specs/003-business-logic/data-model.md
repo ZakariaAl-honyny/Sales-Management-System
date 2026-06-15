@@ -43,13 +43,13 @@ All entities below are **already defined in the Domain layer** and **fully migra
 
 ---
 
-## Entity: SalesInvoiceItem
+## Entity: SalesInvoiceLine
 
 **Purpose**: One line on a sales invoice.
 
 | Field | Type | Rules |
 |---|---|---|
-| `SalesInvoiceItemId` | `int` PK | Auto-generated |
+| `SalesInvoiceLineId` | `int` PK | Auto-generated |
 | `SalesInvoiceId` | `int` FK → SalesInvoices | Required |
 | `ProductId` | `int` FK → Products | Required |
 | `Quantity` | `decimal(18,3)` | > 0 |
@@ -87,11 +87,11 @@ All entities below are **already defined in the Domain layer** and **fully migra
 
 ---
 
-## Entity: PurchaseInvoiceItem
+## Entity: PurchaseInvoiceLine
 
 | Field | Type | Rules |
 |---|---|---|
-| `PurchaseInvoiceItemId` | `int` PK | Auto-generated |
+| `PurchaseInvoiceLineId` | `int` PK | Auto-generated |
 | `PurchaseInvoiceId` | `int` FK → PurchaseInvoices | Required |
 | `ProductId` | `int` FK → Products | Required |
 | `Quantity` | `decimal(18,3)` | > 0 |

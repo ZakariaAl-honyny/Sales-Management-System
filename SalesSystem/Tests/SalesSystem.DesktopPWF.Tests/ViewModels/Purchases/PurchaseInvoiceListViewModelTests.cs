@@ -135,9 +135,9 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<PurchaseInvoiceDto>
         {
-            CreatePurchaseInvoiceDto(1, 1000m, 2, "مورد 1"),
-            CreatePurchaseInvoiceDto(2, 2000m, 2, "مورد 2"),
-            CreatePurchaseInvoiceDto(3, 3000m, 2, "مورد 1")
+            CreatePurchaseInvoiceDto(1, 1000m, 2, "ï؟½ï؟½ï؟½ï؟½ 1"),
+            CreatePurchaseInvoiceDto(2, 2000m, 2, "ï؟½ï؟½ï؟½ï؟½ 2"),
+            CreatePurchaseInvoiceDto(3, 3000m, 2, "ï؟½ï؟½ï؟½ï؟½ 1")
         };
 
         _mockInvoiceService
@@ -155,7 +155,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
 
         await _viewModel.LoadInvoicesAsync();
 
-        _viewModel.SearchText = "مورد 1";
+        _viewModel.SearchText = "ï؟½ï؟½ï؟½ï؟½ 1";
 
         var filteredCount = 0;
         if (_viewModel.InvoicesView != null)
@@ -173,8 +173,8 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
     {
         var invoices = new List<PurchaseInvoiceDto>
         {
-            CreatePurchaseInvoiceDto(1, 1000m, 2, "مورد 1"),
-            CreatePurchaseInvoiceDto(2, 2000m, 2, "مورد 2")
+            CreatePurchaseInvoiceDto(1, 1000m, 2, "ï؟½ï؟½ï؟½ï؟½ 1"),
+            CreatePurchaseInvoiceDto(2, 2000m, 2, "ï؟½ï؟½ï؟½ï؟½ 2")
         };
 
         _mockInvoiceService
@@ -191,7 +191,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             .ReturnsAsync(Result<List<PurchaseInvoiceDto>>.Success(invoices));
 
         await _viewModel.LoadInvoicesAsync();
-        _viewModel.SearchText = "غير موجود";
+        _viewModel.SearchText = "ï؟½ï؟½ï؟½ ï؟½ï؟½ï؟½ï؟½ï؟½";
 
         var count = 0;
         if (_viewModel.InvoicesView != null)
@@ -221,7 +221,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.ErrorMessage = "خطأ في التحميل";
+        _viewModel.ErrorMessage = "ï؟½ï؟½ï؟½ ï؟½ï؟½ ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½";
 
         propertyChangedEvents.Should().Contain("ErrorMessage");
     }
@@ -244,7 +244,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.SearchText = "بحث";
+        _viewModel.SearchText = "ï؟½ï؟½ï؟½";
 
         propertyChangedEvents.Should().Contain("SearchText");
     }
@@ -449,7 +449,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
         int id,
         decimal totalAmount,
         byte status,
-        string supplierName = "مورد تجريبي")
+        string supplierName = "ï؟½ï؟½ï؟½ï؟½ ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½")
     {
         return new PurchaseInvoiceDto(
             Id: id,
@@ -457,9 +457,8 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             SupplierId: 1,
             SupplierName: supplierName,
             WarehouseId: 1,
-            WarehouseName: "المستودع الرئيسي",
+            WarehouseName: "ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½",
             InvoiceDate: DateTime.Today,
-            DueDate: null,
             PaymentType: 1,
             SubTotal: totalAmount,
             DiscountAmount: 0,
@@ -475,9 +474,10 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            AttachmentPath: null,
-            Items: new List<PurchaseInvoiceItemDto>());
+            Items: new List<PurchaseInvoiceLineDto>());
     }
 
     #endregion
 }
+
+

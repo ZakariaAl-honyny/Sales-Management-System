@@ -29,11 +29,11 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
             .HasDefaultValueSql("GETUTCDATE()")
             .HasComment("تاريخ التحويل");
 
-        builder.Property(x => x.SourceWarehouseId)
+        builder.Property(x => x.FromWarehouseId)
             .HasColumnType("smallint")
             .IsRequired();
 
-        builder.Property(x => x.DestinationWarehouseId)
+        builder.Property(x => x.ToWarehouseId)
             .HasColumnType("smallint")
             .IsRequired();
 
@@ -48,14 +48,14 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
             .HasDefaultValue(Domain.Enums.InvoiceStatus.Draft);
 
         // Relationships
-        builder.HasOne(x => x.SourceWarehouse)
+        builder.HasOne(x => x.FromWarehouse)
             .WithMany()
-            .HasForeignKey(x => x.SourceWarehouseId)
+            .HasForeignKey(x => x.FromWarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.DestinationWarehouse)
+        builder.HasOne(x => x.ToWarehouse)
             .WithMany()
-            .HasForeignKey(x => x.DestinationWarehouseId)
+            .HasForeignKey(x => x.ToWarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(x => x.Lines)
@@ -64,10 +64,10 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
             .OnDelete(DeleteBehavior.Restrict);
 
         // Indexes
-        builder.HasIndex(x => x.SourceWarehouseId)
+        builder.HasIndex(x => x.FromWarehouseId)
             .HasDatabaseName("IX_WarehouseTransfers_SourceWarehouseId");
 
-        builder.HasIndex(x => x.DestinationWarehouseId)
+        builder.HasIndex(x => x.ToWarehouseId)
             .HasDatabaseName("IX_WarehouseTransfers_DestWarehouseId");
 
         // Global query filter

@@ -4,21 +4,21 @@ using SalesSystem.Domain.Exceptions;
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
-/// Entity for system-wide logging and audit trail.
-/// Schema Module 8.2: SystemLogs table with bigint PK, Level as tinyint, Source, Message, Exception, CreatedAt.
-/// Extends BaseEntityLong for high-volume bigint Id.
+/// System-level logging for error tracking and monitoring.
+/// Schema 8.2: SystemLogs — bigint PK, high-volume log.
+/// Columns: Level (tinyint: 1=Info,2=Warning,3=Error,4=Critical), Source, Message, Exception (JSON), CreatedAt.
 /// </summary>
 public class SystemLog : LongEntity
 {
     /// <summary>
-    /// Log level as string (e.g. "Info", "Warning", "Error", "Fatal") for detailed filtering.
+    /// Log level: 1=Info, 2=Warning, 3=Error, 4=Critical.
     /// </summary>
-    public string LogLevel { get; private set; } = string.Empty;
+    public byte Level { get; private set; }
 
     /// <summary>
-    /// Log level as tinyint matching schema (1=Info, 2=Warning, 3=Error).
+    /// Component that produced the log entry (e.g., "API", "BackgroundService").
     /// </summary>
-    public byte? Level { get; private set; }
+    public string? Source { get; private set; }
 
     /// <summary>
     /// The log message content.
@@ -26,60 +26,29 @@ public class SystemLog : LongEntity
     public string Message { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Exception details if this log represents an error.
+    /// Serialized exception details (stack trace, etc.) as JSON or plain text.
     /// </summary>
     public string? Exception { get; private set; }
 
-    public string? StackTrace { get; private set; }
-
-    /// <summary>
-    /// Source of the log entry (e.g. "API", "Desktop", "BackgroundService").
-    /// </summary>
-    public string? Source { get; private set; }
-
-    /// <summary>
-    /// Context information (e.g. method name, screen name).
-    /// </summary>
-    public string? Context { get; private set; }
-
-    public string? MachineName { get; private set; }
-
-    private SystemLog() { }
+    private SystemLog() { } // EF Core
 
     public static SystemLog Create(
-        string logLevel,
+        byte level,
         string message,
-        string? exception = null,
-        string? stackTrace = null,
         string? source = null,
-        string? context = null,
-        int? userId = null,
-        string? machineName = null,
-        byte? level = null)
+        string? exception = null)
     {
-        if (string.IsNullOrWhiteSpace(logLevel))
-            throw new DomainException("مستوى السجل مطلوب.");
         if (string.IsNullOrWhiteSpace(message))
             throw new DomainException("رسالة السجل مطلوبة.");
+        if (level < 1 || level > 4)
+            throw new DomainException("مستوى السجل يجب أن يكون بين 1 و 4.");
 
-        var log = new SystemLog
+        return new SystemLog
         {
-            LogLevel = logLevel,
-            Level = level ?? logLevel.ToLowerInvariant() switch
-            {
-                "error" or "fatal" => (byte)3,
-                "warning" or "warn" => (byte)2,
-                _ => (byte)1
-            },
-            Message = message,
-            Exception = exception,
-            StackTrace = stackTrace,
+            Level = level,
             Source = source,
-            Context = context,
-            MachineName = machineName
+            Message = message,
+            Exception = exception
         };
-
-        if (userId.HasValue) log.SetCreatedBy(userId.Value);
-        return log;
     }
 }

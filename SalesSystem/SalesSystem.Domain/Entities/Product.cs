@@ -55,39 +55,12 @@ public class Product : ActivatableEntity
     /// </summary>
     public string? ImagePath { get; private set; }
 
-    /// <summary>
-    /// Internal notes about the product.
-    /// </summary>
-    public string? Notes { get; private set; }
-
-    /// <summary>
-    /// Pre-selected unit for purchase screens (optional).
-    /// When set, this unit is auto-selected when creating purchase invoices for this product.
-    /// </summary>
-    public short? DefaultPurchaseUnitId { get; private set; }
-
-    /// <summary>
-    /// Pre-selected unit for sales screens (optional).
-    /// When set, this unit is auto-selected when creating sales invoices for this product.
-    /// </summary>
-    public short? DefaultSalesUnitId { get; private set; }
-
     // ─── Navigation Properties ────────────────────────────
 
     /// <summary>
     /// The category this product belongs to.
     /// </summary>
     public virtual ProductCategory? ProductCategory { get; private set; }
-
-    /// <summary>
-    /// The default purchase unit (pre-selected in purchase screens).
-    /// </summary>
-    public virtual Unit? DefaultPurchaseUnit { get; private set; }
-
-    /// <summary>
-    /// The default sales unit (pre-selected in sales screens).
-    /// </summary>
-    public virtual Unit? DefaultSalesUnit { get; private set; }
 
     /// <summary>
     /// The tax rate override for this product.
@@ -200,9 +173,6 @@ public class Product : ActivatableEntity
     /// <param name="reorderLevel">Quantity threshold for reorder alert (default 0).</param>
     /// <param name="trackExpiry">Whether this product can expire (default false).</param>
     /// <param name="imagePath">Optional primary image path.</param>
-    /// <param name="notes">Optional internal notes.</param>
-    /// <param name="defaultPurchaseUnitId">Optional pre-selected unit for purchase screens.</param>
-    /// <param name="defaultSalesUnitId">Optional pre-selected unit for sales screens.</param>
     /// <param name="createdByUserId">User who created this record.</param>
     /// <returns>The newly created Product entity.</returns>
     public static Product Create(
@@ -214,9 +184,6 @@ public class Product : ActivatableEntity
         decimal reorderLevel = 0,
         bool trackExpiry = false,
         string? imagePath = null,
-        string? notes = null,
-        short? defaultPurchaseUnitId = null,
-        short? defaultSalesUnitId = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -236,9 +203,6 @@ public class Product : ActivatableEntity
             ReorderLevel = reorderLevel,
             TrackExpiry = trackExpiry,
             ImagePath = imagePath?.Trim(),
-            Notes = notes?.Trim(),
-            DefaultPurchaseUnitId = defaultPurchaseUnitId,
-            DefaultSalesUnitId = defaultSalesUnitId,
             IsActive = true
         };
         product.SetCreatedBy(createdByUserId);
@@ -257,9 +221,6 @@ public class Product : ActivatableEntity
         decimal reorderLevel = 0,
         bool trackExpiry = false,
         string? imagePath = null,
-        string? notes = null,
-        short? defaultPurchaseUnitId = null,
-        short? defaultSalesUnitId = null,
         int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -277,9 +238,6 @@ public class Product : ActivatableEntity
         ReorderLevel = reorderLevel;
         TrackExpiry = trackExpiry;
         ImagePath = imagePath?.Trim();
-        Notes = notes?.Trim();
-        DefaultPurchaseUnitId = defaultPurchaseUnitId;
-        DefaultSalesUnitId = defaultSalesUnitId;
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

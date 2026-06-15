@@ -4,153 +4,138 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
-public class SalesReturnItem : Entity
+/// <summary>
+/// A single line in a sales return — links back to the original invoice line.
+/// Schema 6.4: SalesReturnLines. Columns: SalesReturnId FK, SalesInvoiceLineId FK (NOT null),
+/// Quantity decimal(18,3), Amount decimal(18,2).
+/// </summary>
+public class SalesReturnLine : Entity
 {
     public int SalesReturnId { get; private set; }
-    public int ProductId { get; private set; }
-    public int? SalesInvoiceLineId { get; private set; }
+    public int SalesInvoiceLineId { get; private set; }
     public decimal Quantity { get; private set; }
-    public decimal UnitPrice { get; private set; }
-    public decimal DiscountAmount { get; private set; }
-    public decimal LineTotal { get; private set; }
-    public SaleMode Mode { get; private set; }
-    public string? Notes { get; private set; }
+    public decimal Amount { get; private set; }
 
+    // Navigation properties
     public virtual SalesReturn? SalesReturn { get; private set; }
-    public virtual Product? Product { get; private set; }
+    public virtual SalesInvoiceLine? SalesInvoiceLine { get; private set; }
 
-    private SalesReturnItem() { }
+    private SalesReturnLine() { } // EF Core
 
-    public static SalesReturnItem Create(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null, int? salesInvoiceLineId = null)
+    public static SalesReturnLine Create(int salesInvoiceLineId, decimal quantity, decimal amount)
     {
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب.");
+        if (salesInvoiceLineId <= 0)
+            throw new DomainException("رقم بند الفاتورة الأصلي مطلوب.");
         if (quantity <= 0)
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-        if (unitPrice < 0)
-            throw new DomainException("سعر الوحدة لا يمكن أن يكون سالباً.");
-        if (discountAmount < 0)
-            throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
+        if (amount < 0)
+            throw new DomainException("المبلغ لا يمكن أن يكون سالباً.");
 
-        var item = new SalesReturnItem
+        return new SalesReturnLine
         {
-            ProductId = productId,
+            SalesInvoiceLineId = salesInvoiceLineId,
             Quantity = quantity,
-            UnitPrice = unitPrice,
-            DiscountAmount = discountAmount,
-            Mode = mode,
-            Notes = notes,
-            SalesInvoiceLineId = salesInvoiceLineId
+            Amount = amount
         };
-        item.RecalculateLineTotal();
-        return item;
     }
-
-    public void RecalculateLineTotal() => LineTotal = (Quantity * UnitPrice) - DiscountAmount;
 }
 
+/// <summary>
+/// Represents a sales return (return of goods from a customer).
+/// Schema 6.3: SalesReturns. Status: Draft=1, Posted=2, Cancelled=3.
+/// </summary>
 public class SalesReturn : DocumentEntity
 {
-    public string ReturnNo { get; private set; } = string.Empty;
-    public int? SalesInvoiceId { get; private set; }
-    public int? CustomerId { get; private set; }
-    public short WarehouseId { get; private set; }
+    public int ReturnNo { get; private set; }
     public DateTime ReturnDate { get; private set; }
-    public string? Notes { get; private set; }
-    public decimal SubTotal { get; private set; }
+    public int SalesInvoiceId { get; private set; }
+    public int CustomerId { get; private set; }
+    public short WarehouseId { get; private set; }
+    public short CurrencyId { get; private set; }
     public decimal TotalAmount { get; private set; }
-    public short? CurrencyId { get; private set; }
-    public decimal? ExchangeRate { get; private set; }
+    public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
-    // ─── Phase 28: Refund Tracking ───────────────────────────────────────
-    /// <summary>
-    /// معرف الصندوق النقدي المستخدم لرد المبلغ
-    /// </summary>
-    public int? CashBoxId { get; private set; }
-
-    /// <summary>
-    /// المبلغ المسترد للعميل
-    /// </summary>
-    public decimal RefundAmount { get; private set; }
-
+    // Navigation properties
     public virtual SalesInvoice? SalesInvoice { get; private set; }
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual Currency? Currency { get; private set; }
-    public virtual List<SalesReturnItem> Items { get; private set; } = new();
 
-    private SalesReturn() { }
+    private readonly List<SalesReturnLine> _lines = new();
+    public IReadOnlyCollection<SalesReturnLine> Lines => _lines.AsReadOnly();
+
+    private SalesReturn() { } // EF Core
 
     public static SalesReturn Create(
-        string returnNo,
+        int returnNo,
+        int salesInvoiceId,
+        int customerId,
         short warehouseId,
-        int? customerId,
-        int? salesInvoiceId = null,
+        short currencyId,
         DateTime? returnDate = null,
         string? notes = null,
-        short? currencyId = null,
-        decimal? exchangeRate = null,
-        int? userId = null,
-        int? cashBoxId = null,
-        decimal refundAmount = 0)
+        int? createdByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(returnNo))
+        if (returnNo <= 0)
             throw new DomainException("رقم الإرجاع مطلوب.");
+        if (salesInvoiceId <= 0)
+            throw new DomainException("فاتورة المبيعات الأصلية مطلوبة.");
+        if (customerId <= 0)
+            throw new DomainException("العميل مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
-        if (currencyId.HasValue && !exchangeRate.HasValue)
-            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
-        if (refundAmount < 0)
-            throw new DomainException("المبلغ المسترد لا يمكن أن يكون سالباً.");
+        if (currencyId <= 0)
+            throw new DomainException("العملة مطلوبة.");
 
         var sr = new SalesReturn
         {
             ReturnNo = returnNo,
-            WarehouseId = warehouseId,
-            CustomerId = customerId,
             SalesInvoiceId = salesInvoiceId,
-            ReturnDate = returnDate ?? DateTime.UtcNow,
+            CustomerId = customerId,
+            WarehouseId = warehouseId,
             CurrencyId = currencyId,
-            ExchangeRate = exchangeRate,
+            ReturnDate = returnDate ?? DateTime.UtcNow,
             Notes = notes,
-            CashBoxId = cashBoxId,
-            RefundAmount = refundAmount,
             Status = InvoiceStatus.Draft
         };
-        sr.SetCreatedBy(userId);
+        sr.SetCreatedBy(createdByUserId);
         return sr;
     }
 
-    public void AddItem(int productId, decimal quantity, decimal unitPrice, decimal discountAmount = 0, SaleMode mode = SaleMode.Retail, string? notes = null, int? salesInvoiceLineId = null)
+    public void AddLine(SalesReturnLine line)
     {
-        var item = SalesReturnItem.Create(productId, quantity, unitPrice, discountAmount, mode, notes, salesInvoiceLineId);
-        Items.Add(item);
+        if (line == null)
+            throw new DomainException("صنف الإرجاع مطلوب.");
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن إضافة أصناف لمرتجع غير مسودة.");
+        _lines.Add(line);
         RecalculateTotals();
+        UpdateTimestamp();
     }
 
     public void RecalculateTotals()
     {
-        SubTotal = Items.Sum(i => i.LineTotal);
-        TotalAmount = SubTotal;
+        TotalAmount = _lines.Sum(l => l.Amount);
     }
 
     public void Post()
     {
         if (Status != InvoiceStatus.Draft)
-            throw new DomainException("فقط المرتجعات المسودة يمكن ترحيلها.");
-        if (!Items.Any())
+            throw new DomainException("فقط مرتجعات المبيعات المسودة يمكن ترحيلها.");
+        if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل مرتجع بدون أصناف.");
-
-        Status = InvoiceStatus.Posted;
         PostedAt = DateTime.UtcNow;
+        Status = InvoiceStatus.Posted;
+        UpdateTimestamp();
     }
 
     public void Cancel()
     {
         if (Status == InvoiceStatus.Cancelled)
-            throw new DomainException("المرتجع ملغى بالفعل.");
-        Status = InvoiceStatus.Cancelled;
+            throw new DomainException("مرتجع المبيعات ملغي بالفعل.");
         CancelledAt = DateTime.UtcNow;
+        Status = InvoiceStatus.Cancelled;
+        UpdateTimestamp();
     }
 }

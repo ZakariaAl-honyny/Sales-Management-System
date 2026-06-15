@@ -19,7 +19,7 @@ public class CurrencyEditorViewModel : ViewModelBase
     private string _name = string.Empty;
     private string _code = string.Empty;
     private string _symbol = string.Empty;
-    private decimal _exchangeRateToBase;
+
     private string? _fractionName;
     private int _decimalPlaces = 2;
     private string? _errorMessage;
@@ -58,7 +58,6 @@ public class CurrencyEditorViewModel : ViewModelBase
         Name = currency.Name;
         Code = currency.Code;
         Symbol = currency.Symbol;
-        ExchangeRateToBase = currency.ExchangeRateToBase;
         FractionName = currency.FractionName;
         DecimalPlaces = currency.DecimalPlaces;
         WindowTitle = $"تعديل العملة: {currency.Name} ({currency.Code})";
@@ -125,21 +124,6 @@ public class CurrencyEditorViewModel : ViewModelBase
         }
     }
 
-    public decimal ExchangeRateToBase
-    {
-        get => _exchangeRateToBase;
-        set
-        {
-            if (SetProperty(ref _exchangeRateToBase, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(ExchangeRateToBase), "سعر الصرف يجب أن يكون أكبر من صفر");
-                else
-                    ClearErrors(nameof(ExchangeRateToBase));
-            }
-        }
-    }
-
     public string? FractionName
     {
         get => _fractionName;
@@ -197,12 +181,12 @@ public class CurrencyEditorViewModel : ViewModelBase
         Result<CurrencyDto> result;
         if (_currencyDto == null)
         {
-            var request = new CreateCurrencyRequest(Name, Code, Symbol, ExchangeRateToBase, IsBaseCurrency: false, FractionName, DecimalPlaces);
+            var request = new CreateCurrencyRequest(Name, Code, Symbol, IsBaseCurrency: false, FractionName, DecimalPlaces);
             result = await _currencyService.CreateAsync(request);
         }
         else
         {
-            var request = new UpdateCurrencyRequest(Name, Symbol, ExchangeRateToBase, FractionName, DecimalPlaces);
+            var request = new UpdateCurrencyRequest(Name, Symbol, FractionName, DecimalPlaces);
             result = await _currencyService.UpdateAsync(_currencyDto.Id, request);
         }
 
@@ -237,9 +221,6 @@ public class CurrencyEditorViewModel : ViewModelBase
 
         if (string.IsNullOrWhiteSpace(Symbol))
             AddError(nameof(Symbol), "رمز العملة مطلوب");
-
-        if (ExchangeRateToBase <= 0)
-            AddError(nameof(ExchangeRateToBase), "سعر الصرف يجب أن يكون أكبر من صفر");
 
         if (DecimalPlaces < 0 || DecimalPlaces > 4)
             AddError(nameof(DecimalPlaces), "عدد المنازل العشرية يجب أن يكون بين 0 و 4");

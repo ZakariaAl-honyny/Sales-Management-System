@@ -1,7 +1,7 @@
 # Database Schema Design
 # Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 65 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
+# 64 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 

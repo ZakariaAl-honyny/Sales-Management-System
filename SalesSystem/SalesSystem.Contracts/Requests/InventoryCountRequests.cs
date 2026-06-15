@@ -1,7 +1,7 @@
 namespace SalesSystem.Contracts.Requests;
 
 public record CreateInventoryCountRequest(
-    int WarehouseId,
+    short WarehouseId,
     DateTime CountDate,
     string? Notes
 );
@@ -13,7 +13,6 @@ public record UpdateInventoryCountRequest(
 public record AddInventoryCountLineRequest(
     int InventoryCountId,
     int ProductId,
-    int ProductUnitId,
     decimal SystemQuantity,
     decimal ActualQuantity
 );

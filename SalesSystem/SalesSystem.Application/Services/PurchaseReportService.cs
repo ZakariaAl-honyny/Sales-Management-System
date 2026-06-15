@@ -64,7 +64,7 @@ public class PurchaseReportService : IPurchaseReportService
 
             _logger.LogInformation("Getting purchases by product from {From} to {To}", from, to);
 
-            var invoiceItems = await _uow.PurchaseInvoiceItems.ToListAsync(
+            var invoiceItems = await _uow.PurchaseInvoiceLines.ToListAsync(
                 item => item.PurchaseInvoice!.Status == InvoiceStatus.Posted
                      && item.PurchaseInvoice!.InvoiceDate >= from
                      && item.PurchaseInvoice!.InvoiceDate <= to,

@@ -71,7 +71,7 @@
 
 **Decision**: `ProductUnit` uses `DeleteStrategy`:
 - **Deactivate (soft)**: Mark `IsActive = false`. Unit disappears from new invoices but historical invoice items remain intact (FK preserved).
-- **Permanent**: Only allowed if the unit has zero references in `SalesInvoiceItems`, `PurchaseInvoiceItems`. Blocked if it is the last unit on the product (FR-005).
+- **Permanent**: Only allowed if the unit has zero references in `SalesInvoiceLines`, `PurchaseInvoiceLines`. Blocked if it is the last unit on the product (FR-005).
 
 **Rationale**: Soft delete preserves FK integrity on historical invoice lines (Constitution XIII). The "last unit" guard enforces FR-005.
 

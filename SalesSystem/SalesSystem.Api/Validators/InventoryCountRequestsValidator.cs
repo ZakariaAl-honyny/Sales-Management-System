@@ -8,7 +8,7 @@ public class CreateInventoryCountRequestValidator : AbstractValidator<CreateInve
     public CreateInventoryCountRequestValidator()
     {
         RuleFor(x => x.WarehouseId)
-            .GreaterThan(0).WithMessage("معرف المستودع مطلوب");
+            .GreaterThan((short)0).WithMessage("معرف المستودع مطلوب");
 
         RuleFor(x => x.CountDate)
             .NotEmpty().WithMessage("تاريخ الجرد مطلوب");
@@ -38,9 +38,6 @@ public class AddInventoryCountLineRequestValidator : AbstractValidator<AddInvent
 
         RuleFor(x => x.ProductId)
             .GreaterThan(0).WithMessage("معرف المنتج مطلوب");
-
-        RuleFor(x => x.ProductUnitId)
-            .GreaterThan(0).WithMessage("معرف وحدة المنتج مطلوب");
 
         RuleFor(x => x.SystemQuantity)
             .GreaterThanOrEqualTo(0).WithMessage("الكمية النظامية لا يمكن أن تكون سالبة");

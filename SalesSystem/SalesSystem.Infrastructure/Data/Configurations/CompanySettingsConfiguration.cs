@@ -24,7 +24,5 @@ public class CompanySettingsConfiguration : IEntityTypeConfiguration<CompanySett
             .WithMany()
             .HasForeignKey(c => c.DefaultCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasQueryFilter(c => c.IsActive);
     }
 }

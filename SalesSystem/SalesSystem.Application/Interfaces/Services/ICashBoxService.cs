@@ -33,5 +33,5 @@ public interface ICashBoxService
 
     // Invoice payment recording (called by payment services)
     Task<Result<ReceiptVoucherDto>> RecordInvoiceReceiptAsync(int cashBoxId, short currencyId, decimal amount, int accountId, string? notes = null, int? referenceId = null, string? referenceType = null, int userId = 0, CancellationToken ct = default);
-    Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(int cashBoxId, short currencyId, decimal amount, int accountId, string? notes = null, int? sourceDocumentId = null, string? sourceDocumentType = null, int userId = 0, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(int cashBoxId, short currencyId, decimal amount, int accountId, string? notes = null, int userId = 0, CancellationToken ct = default);
 }

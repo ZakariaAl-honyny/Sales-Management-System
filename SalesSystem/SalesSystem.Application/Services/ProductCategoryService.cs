@@ -56,20 +56,12 @@ public class ProductCategoryService : IProductCategoryService
     {
         try
         {
-            // Validate parent exists if provided
-            if (request.ParentId.HasValue)
-            {
-                var parentExists = await _uow.ProductCategories.AnyAsync(c => c.Id == request.ParentId.Value, ct);
-                if (!parentExists)
-                    return Result<ProductCategoryDto>.Failure("التصنيف الأب المحدد غير موجود", ErrorCodes.NotFound);
-            }
-
             // Check for duplicate name
             var duplicateName = await _uow.ProductCategories.AnyAsync(c => c.Name == request.Name, ct);
             if (duplicateName)
                 return Result<ProductCategoryDto>.Failure("اسم التصنيف مستخدم بالفعل", ErrorCodes.DuplicateEntry);
 
-            var category = ProductCategory.Create(name: request.Name, parentId: request.ParentId);
+            var category = ProductCategory.Create(name: request.Name);
 
             await _uow.ProductCategories.AddAsync(category, ct);
             await _uow.SaveChangesAsync(ct);
@@ -96,7 +88,7 @@ public class ProductCategoryService : IProductCategoryService
     {
         try
         {
-            var category = await _uow.ProductCategories.FirstOrDefaultAsync(c => c.Id == id, ct, "Parent");
+            var category = await _uow.ProductCategories.FirstOrDefaultAsync(c => c.Id == id, ct);
             if (category == null)
                 return Result<ProductCategoryDto>.Failure("التصنيف غير موجود", ErrorCodes.NotFound);
 
@@ -132,11 +124,6 @@ public class ProductCategoryService : IProductCategoryService
             if (category == null)
                 return Result.Failure("التصنيف غير موجود", ErrorCodes.NotFound);
 
-            // Check for child categories (defense-in-depth — entity also checks)
-            var hasChildren = await _uow.ProductCategories.AnyAsync(c => c.ParentId == id, ct);
-            if (hasChildren)
-                return Result.Failure("لا يمكن حذف تصنيف رئيسي — لديه تصنيفات فرعية", ErrorCodes.InvalidOperation);
-
             category.MarkAsDeleted();
             await _uow.SaveChangesAsync(ct);
 
@@ -160,8 +147,7 @@ public class ProductCategoryService : IProductCategoryService
         return new ProductCategoryDto(
             category.Id,
             category.Name,
-            category.ParentId,
-            category.Parent?.Name,
+            category.Description,
             category.IsActive
         );
     }

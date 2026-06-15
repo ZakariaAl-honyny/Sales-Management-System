@@ -10,10 +10,6 @@ public class CreateProductCategoryRequestValidator : AbstractValidator<CreatePro
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم التصنيف مطلوب")
             .MaximumLength(100).WithMessage("اسم التصنيف لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.ParentId)
-            .GreaterThan(0).When(x => x.ParentId.HasValue)
-            .WithMessage("معرف التصنيف الأب غير صالح");
     }
 }
 

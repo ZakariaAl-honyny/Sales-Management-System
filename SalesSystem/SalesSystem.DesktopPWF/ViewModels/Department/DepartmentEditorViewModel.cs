@@ -15,7 +15,6 @@ public class DepartmentEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toastService;
 
     private int _departmentId;
-    private int _branchId;
     private string _name = string.Empty;
     private bool _isActive = true;
     private bool _isEditMode;
@@ -57,12 +56,6 @@ public class DepartmentEditorViewModel : ViewModelBase
         }
     }
 
-    public int BranchId
-    {
-        get => _branchId;
-        set => SetProperty(ref _branchId, value);
-    }
-
     public bool IsActive
     {
         get => _isActive;
@@ -89,7 +82,6 @@ public class DepartmentEditorViewModel : ViewModelBase
     public void LoadDepartment(DepartmentDto department)
     {
         _departmentId = department.Id;
-        _branchId = department.BranchId;
         _name = department.Name;
         _isActive = department.IsActive;
         _isEditMode = true;
@@ -128,7 +120,7 @@ public class DepartmentEditorViewModel : ViewModelBase
         }
         else
         {
-            var request = new CreateDepartmentRequest(_branchId > 0 ? _branchId : 1, Name);
+            var request = new CreateDepartmentRequest(Name);
             var result = await _departmentService.CreateAsync(request);
 
             if (result.IsSuccess)

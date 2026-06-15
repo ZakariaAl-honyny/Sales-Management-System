@@ -1,9 +1,8 @@
 namespace SalesSystem.Domain.Common;
 
 /// <summary>
-/// Base class for entities that use a long (bigint) primary key.
-/// Used for high-volume tables like AuditLogs where int range may be exceeded.
-/// Has audit fields (CreatedAt, UpdatedAt, CreatedByUserId, UpdatedByUserId) and IsActive (soft-delete).
+/// Base class for high-volume entities using a long (bigint) primary key.
+/// Minimal fields — used for AuditLogs and SystemLogs which only need Id and CreatedAt.
 /// </summary>
 public abstract class LongEntity
 {
@@ -11,47 +10,8 @@ public abstract class LongEntity
 
     public DateTime CreatedAt { get; protected set; }
 
-    public DateTime? UpdatedAt { get; protected set; }
-
-    public bool IsActive { get; protected set; } = true;
-
-    /// <summary>
-    /// The ID of the user who created this entity. Null for system-initialized records.
-    /// </summary>
-    public int? CreatedByUserId { get; protected set; }
-
-    /// <summary>
-    /// The ID of the user who last updated this entity.
-    /// </summary>
-    public int? UpdatedByUserId { get; protected set; }
-
     protected LongEntity()
     {
         CreatedAt = DateTime.UtcNow;
-    }
-
-    public virtual void MarkAsDeleted()
-    {
-        IsActive = false;
-    }
-
-    public virtual void Restore()
-    {
-        IsActive = true;
-    }
-
-    public virtual void UpdateTimestamp()
-    {
-        UpdatedAt = DateTime.UtcNow;
-    }
-
-    public virtual void SetCreatedBy(int? userId)
-    {
-        CreatedByUserId = userId;
-    }
-
-    public virtual void SetUpdatedBy(int? userId)
-    {
-        UpdatedByUserId = userId;
     }
 }

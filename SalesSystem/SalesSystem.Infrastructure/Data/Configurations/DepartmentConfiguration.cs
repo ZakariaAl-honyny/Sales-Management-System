@@ -10,14 +10,8 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
     {
         builder.ToTable("Departments");
         builder.HasKey(d => d.Id);
-        builder.Property(d => d.Name).IsRequired().HasMaxLength(150);
+        builder.Property(d => d.Name).IsRequired().HasMaxLength(100);
         builder.Property(d => d.Description).HasMaxLength(300);
-
-        builder.HasOne(d => d.Branch)
-            .WithMany()
-            .HasForeignKey(d => d.BranchId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
 
         builder.HasQueryFilter(d => d.IsActive);
     }

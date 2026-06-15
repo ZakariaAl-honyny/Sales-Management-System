@@ -19,10 +19,10 @@ public class UnitOfWorkTests
 
     private async Task<int> CreatePartyAndCustomer(SalesDbContext context, string name, int accountId = 1)
     {
-        var party = Party.Create(name, PartyType.Customer, accountId);
+        var party = Party.Create(name, createdByUserId: accountId);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
         return customer.Id;
@@ -107,10 +107,10 @@ public class UnitOfWorkTests
         await using var context = CreateContext("UowDb6");
         var unitOfWork = new UnitOfWork(context);
 
-        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        var party = Party.Create("Test Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         await unitOfWork.Customers.AddAsync(customer);
 
         // Act
@@ -148,10 +148,10 @@ public class UnitOfWorkTests
         // Act
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var party = Party.Create("Test Customer", PartyType.Customer, 1);
+        var party = Party.Create("Test Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
@@ -172,10 +172,10 @@ public class UnitOfWorkTests
         // Act
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var party = Party.Create("Rollback Customer", PartyType.Customer, 1);
+        var party = Party.Create("Rollback Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
@@ -196,10 +196,10 @@ public class UnitOfWorkTests
         // Act - Test that InMemory can save and query data within transaction scope
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var party = Party.Create("Queryable Customer", PartyType.Customer, 1);
+        var party = Party.Create("Queryable Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
+        var customer = Customer.Create(party.Id, accountId: 1);
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.SaveChangesAsync();
         
@@ -220,11 +220,11 @@ public class UnitOfWorkTests
         var unitOfWork = new UnitOfWork(context);
 
         // Act - use multiple repositories in same unit of work
-        var party = Party.Create("Customer", PartyType.Customer, 1);
+        var party = Party.Create("Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
-        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse", code: "WH-01");
+        var customer = Customer.Create(party.Id, accountId: 1);
+        var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse");
         
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.Warehouses.AddAsync(warehouse);
@@ -275,15 +275,15 @@ public class UnitOfWorkTests
         // Simulate an operation that should fail mid-way
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var party1 = Party.Create("Customer 1", PartyType.Customer, 1);
+        var party1 = Party.Create("Customer 1", createdByUserId: 1);
         context.Parties.Add(party1);
         await context.SaveChangesAsync();
-        var customer1 = Customer.Create(party1.Id);
+        var customer1 = Customer.Create(party1.Id, accountId: 1);
         
-        var party2 = Party.Create("Customer 2", PartyType.Customer, 1);
+        var party2 = Party.Create("Customer 2", createdByUserId: 1);
         context.Parties.Add(party2);
         await context.SaveChangesAsync();
-        var customer2 = Customer.Create(party2.Id);
+        var customer2 = Customer.Create(party2.Id, accountId: 1);
         
         await unitOfWork.Customers.AddAsync(customer1);
         await unitOfWork.Customers.AddAsync(customer2);
@@ -307,11 +307,11 @@ public class UnitOfWorkTests
         // Act - Test multiple operations that commit successfully
         await using var transaction = await unitOfWork.BeginTransactionAsync();
         
-        var party = Party.Create("Multi Entity Customer", PartyType.Customer, 1);
+        var party = Party.Create("Multi Entity Customer", createdByUserId: 1);
         context.Parties.Add(party);
         await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id);
-        var warehouse = Warehouse.Create(branchId: 1, name: "Multi Entity Warehouse", code: "WH-ME");
+        var customer = Customer.Create(party.Id, accountId: 1);
+        var warehouse = Warehouse.Create(branchId: 1, name: "Multi Entity Warehouse");
         
         await unitOfWork.Customers.AddAsync(customer);
         await unitOfWork.Warehouses.AddAsync(warehouse);

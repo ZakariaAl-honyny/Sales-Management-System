@@ -40,10 +40,10 @@ public class WarehouseRequestValidatorTests
         }
 
         [Fact]
-        public void GivenNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
+        public void GivenNameExceeds150Chars_WhenValidating_ThenFailsWithMaxLengthError()
         {
             // Arrange
-            var longName = new string('م', 101);
+            var longName = new string('م', 151);
             var request = CreateValidRequest() with { Name = longName };
 
             // Act
@@ -51,14 +51,14 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Name)
-                .WithErrorMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
+                .WithErrorMessage("اسم المخزن لا يمكن أن يتجاوز 150 حرف");
         }
 
         [Fact]
-        public void GivenNameAt100Chars_WhenValidating_ThenPasses()
+        public void GivenNameAt150Chars_WhenValidating_ThenPasses()
         {
             // Arrange
-            var name = new string('م', 100);
+            var name = new string('م', 150);
             var request = CreateValidRequest() with { Name = name };
 
             // Act
@@ -70,39 +70,39 @@ public class WarehouseRequestValidatorTests
 
         #endregion
 
-        #region Location Validation
+        #region Address Validation
 
         [Theory]
         [InlineData(null, true)]
         [InlineData("", true)]
         [InlineData("Cairo, Egypt", true)]
         [InlineData("القاهرة، مصر", true)]
-        public void GivenLocation_WhenValidating_ThenCorrectResult(string? location, bool isValid)
+        public void GivenAddress_WhenValidating_ThenCorrectResult(string? Address, bool isValid)
         {
             // Arrange
-            var request = CreateValidRequest() with { Location = location };
+            var request = CreateValidRequest() with { Address = Address };
 
             // Act
             var result = _validator.TestValidate(request);
 
             // Assert
             if (isValid)
-                result.ShouldNotHaveValidationErrorFor(x => x.Location);
+                result.ShouldNotHaveValidationErrorFor(x => x.Address);
         }
 
         [Fact]
-        public void GivenLocationExceeds200Chars_WhenValidating_ThenFailsWithMaxLengthError()
+        public void GivenAddressExceeds200Chars_WhenValidating_ThenFailsWithMaxLengthError()
         {
             // Arrange
-            var longLocation = new string('ع', 201);
-            var request = CreateValidRequest() with { Location = longLocation };
+            var longAddress = new string('ع', 201);
+            var request = CreateValidRequest() with { Address = longAddress };
 
             // Act
             var result = _validator.TestValidate(request);
 
             // Assert
-            result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
+            result.ShouldHaveValidationErrorFor(x => x.Address)
+                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion
@@ -128,9 +128,8 @@ public class WarehouseRequestValidatorTests
             // Arrange
             var request = new CreateWarehouseRequest(
                 BranchId: 1,
-                Code: "WH-001",
                 Name: "مستودع - Warehouse",
-                Location: "القاهرة - Cairo"
+                Address: "القاهرة - Cairo"
             );
 
             // Act
@@ -144,9 +143,8 @@ public class WarehouseRequestValidatorTests
 
         private static CreateWarehouseRequest CreateValidRequest() => new(
             BranchId: 1,
-            Code: "WH-001",
             Name: "Main Warehouse",
-            Location: "Cairo, Egypt"
+            Address: "Cairo, Egypt"
         );
     }
 
@@ -184,10 +182,10 @@ public class WarehouseRequestValidatorTests
         }
 
         [Fact]
-        public void GivenNameExceeds100Chars_WhenValidating_ThenFailsWithMaxLengthError()
+        public void GivenNameExceeds150Chars_WhenValidating_ThenFailsWithMaxLengthError()
         {
             // Arrange
-            var longName = new string('م', 101);
+            var longName = new string('م', 151);
             var request = CreateValidRequest() with { Name = longName };
 
             // Act
@@ -195,42 +193,42 @@ public class WarehouseRequestValidatorTests
 
             // Assert
             result.ShouldHaveValidationErrorFor(x => x.Name)
-                .WithErrorMessage("اسم المخزن لا يمكن أن يتجاوز 100 حرف");
+                .WithErrorMessage("اسم المخزن لا يمكن أن يتجاوز 150 حرف");
         }
 
         #endregion
 
-        #region Location Validation
+        #region Address Validation
 
         [Theory]
         [InlineData(null, true)]
         [InlineData("", true)]
-        public void GivenLocation_WhenValidating_ThenCorrectResult(string? location, bool isValid)
+        public void GivenAddress_WhenValidating_ThenCorrectResult(string? Address, bool isValid)
         {
             // Arrange
-            var request = CreateValidRequest() with { Location = location };
+            var request = CreateValidRequest() with { Address = Address };
 
             // Act
             var result = _validator.TestValidate(request);
 
             // Assert
             if (isValid)
-                result.ShouldNotHaveValidationErrorFor(x => x.Location);
+                result.ShouldNotHaveValidationErrorFor(x => x.Address);
         }
 
         [Fact]
-        public void GivenLocationExceeds200Chars_WhenValidating_ThenFailsWithMaxLengthError()
+        public void GivenAddressExceeds200Chars_WhenValidating_ThenFailsWithMaxLengthError()
         {
             // Arrange
-            var longLocation = new string('ع', 201);
-            var request = CreateValidRequest() with { Location = longLocation };
+            var longAddress = new string('ع', 201);
+            var request = CreateValidRequest() with { Address = longAddress };
 
             // Act
             var result = _validator.TestValidate(request);
 
             // Assert
-            result.ShouldHaveValidationErrorFor(x => x.Location)
-                .WithErrorMessage("الموقع لا يمكن أن يتجاوز 200 حرف");
+            result.ShouldHaveValidationErrorFor(x => x.Address)
+                .WithErrorMessage("العنوان لا يمكن أن يتجاوز 200 حرف");
         }
 
         #endregion
@@ -254,9 +252,8 @@ public class WarehouseRequestValidatorTests
 
         private static UpdateWarehouseRequest CreateValidRequest() => new(
             BranchId: 1,
-            Code: "WH-001",
             Name: "Updated Warehouse",
-            Location: "Alexandria, Egypt",
+            Address: "Alexandria, Egypt",
             IsActive: true
         );
     }

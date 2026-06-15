@@ -189,7 +189,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenEmptyItems_WhenValidating_ThenFails()
     {
         // Arrange
-        var request = CreateValidRequest() with { Items = new List<CreatePurchaseInvoiceItemRequest>() };
+        var request = CreateValidRequest() with { Items = new List<CreatePurchaseInvoiceLineRequest>() };
 
         // Act
         var result = _validator.TestValidate(request);
@@ -234,7 +234,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithZeroProductId_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = 0 }
         };
@@ -252,7 +252,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithNegativeProductId_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = -1 }
         };
@@ -270,7 +270,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithValidProductId_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { ProductId = 1 }
         };
@@ -287,7 +287,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithSmallPositiveQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 0.01m }
         };
@@ -304,7 +304,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithUnitQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 1 }
         };
@@ -321,7 +321,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithLargeQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 1000m }
         };
@@ -338,7 +338,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithZeroQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 0 }
         };
@@ -356,7 +356,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithNegativeQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = -1 }
         };
@@ -374,7 +374,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenItemWithSmallNegativeQuantity_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = -0.01m }
         };
@@ -389,12 +389,12 @@ public class CreatePurchaseInvoiceValidatorTests
     }
 
     [Fact]
-    public void GivenItemWithZeroUnitCost_WhenValidating_ThenPasses()
+    public void GivenItemWithZeroUnitPrice_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
-            CreateValidItem() with { UnitCost = 0 }
+            CreateValidItem() with { UnitPrice = 0 }
         };
         var request = CreateValidRequest() with { Items = items };
 
@@ -402,16 +402,16 @@ public class CreatePurchaseInvoiceValidatorTests
         var result = _validator.TestValidate(request);
 
         // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].UnitCost");
+        result.ShouldNotHaveValidationErrorFor("Items[0].UnitPrice");
     }
 
     [Fact]
-    public void GivenItemWithPositiveUnitCost_WhenValidating_ThenPasses()
+    public void GivenItemWithPositiveUnitPrice_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
-            CreateValidItem() with { UnitCost = 80.25m }
+            CreateValidItem() with { UnitPrice = 80.25m }
         };
         var request = CreateValidRequest() with { Items = items };
 
@@ -419,16 +419,16 @@ public class CreatePurchaseInvoiceValidatorTests
         var result = _validator.TestValidate(request);
 
         // Assert
-        result.ShouldNotHaveValidationErrorFor("Items[0].UnitCost");
+        result.ShouldNotHaveValidationErrorFor("Items[0].UnitPrice");
     }
 
     [Fact]
-    public void GivenItemWithNegativeUnitCost_WhenValidating_ThenFails()
+    public void GivenItemWithNegativeUnitPrice_WhenValidating_ThenFails()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
-            CreateValidItem() with { UnitCost = -0.01m }
+            CreateValidItem() with { UnitPrice = -0.01m }
         };
         var request = CreateValidRequest() with { Items = items };
 
@@ -436,8 +436,8 @@ public class CreatePurchaseInvoiceValidatorTests
         var result = _validator.TestValidate(request);
 
         // Assert
-        result.ShouldHaveValidationErrorFor("Items[0].UnitCost")
-            .WithErrorMessage("التكلفة لا يمكن أن تكون سالبة");
+        result.ShouldHaveValidationErrorFor("Items[0].UnitPrice")
+            .WithErrorMessage("السعر لا يمكن أن يكون سالباً");
     }
 
 
@@ -450,7 +450,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenMultipleValidItems_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem(productId: 1),
             CreateValidItem(productId: 2),
@@ -469,7 +469,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenOneInvalidItemAmongValidItems_WhenValidating_ThenFailsForInvalidOnly()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem(productId: 1, quantity: 1),
             CreateValidItem(productId: 2, quantity: 0), // Invalid - zero quantity
@@ -515,7 +515,7 @@ public class CreatePurchaseInvoiceValidatorTests
     public void GivenVeryLargeQuantity_WhenValidating_ThenPasses()
     {
         // Arrange
-        var items = new List<CreatePurchaseInvoiceItemRequest>
+        var items = new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem() with { Quantity = 999999.999m }
         };
@@ -571,32 +571,30 @@ public class CreatePurchaseInvoiceValidatorTests
         SupplierId: 1,
         InvoiceNo: null,
         InvoiceDate: DateTime.UtcNow.AddDays(-1),
-        DueDate: null,
         PaymentType: PaymentType.Cash,
         DiscountAmount: 0,
-        DiscountType: null,
-        DiscountRate: null,
         TaxAmount: 0,
         OtherCharges: 0,
         PaidAmount: 100m,
         CurrencyId: null,
         ExchangeRate: null,
         Notes: "Test purchase invoice",
-        Items: new List<CreatePurchaseInvoiceItemRequest>
+        Items: new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem()
         }
     );
 
-    private static CreatePurchaseInvoiceItemRequest CreateValidItem(
+    private static CreatePurchaseInvoiceLineRequest CreateValidItem(
         int productId = 1,
         int productUnitId = 1,
         decimal quantity = 1,
-        decimal unitCost = 100m
+        decimal UnitPrice = 100m
     ) => new(
         ProductId: productId,
         ProductUnitId: productUnitId,
         Quantity: quantity,
-        UnitCost: unitCost
+        UnitPrice: UnitPrice
     );
 }
+

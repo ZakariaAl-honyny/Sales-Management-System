@@ -18,11 +18,6 @@ public class Unit : ActivatableEntity
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Unit display name (English, optional).
-    /// </summary>
-    public string? NameEn { get; private set; }
-
-    /// <summary>
     /// Optional symbol/abbreviation (e.g., "kg", "L", "pc").
     /// </summary>
     public string? Symbol { get; private set; }
@@ -39,14 +34,12 @@ public class Unit : ActivatableEntity
     /// Creates a new unit of measure.
     /// </summary>
     /// <param name="name">Unit name in Arabic (e.g., "حبة", "كجم", "لتر").</param>
-    /// <param name="nameEn">Optional unit name in English.</param>
     /// <param name="symbol">Optional symbol/abbreviation (e.g., "kg", "L").</param>
     /// <param name="isSystem">Whether this is a system-protected unit. Default false.</param>
     /// <param name="createdByUserId">User who created this record.</param>
     /// <returns>The newly created Unit entity.</returns>
     public static Unit Create(
         string name,
-        string? nameEn = null,
         string? symbol = null,
         bool isSystem = false,
         int? createdByUserId = null)
@@ -57,7 +50,6 @@ public class Unit : ActivatableEntity
         var unit = new Unit
         {
             Name = name,
-            NameEn = nameEn?.Trim(),
             Symbol = symbol,
             IsSystem = isSystem,
             IsActive = true
@@ -67,15 +59,14 @@ public class Unit : ActivatableEntity
     }
 
     /// <summary>
-    /// Updates the unit name, English name, and symbol.
+    /// Updates the unit name and symbol.
     /// </summary>
-    public void Update(string name, string? nameEn = null, string? symbol = null, int? updatedByUserId = null)
+    public void Update(string name, string? symbol = null, int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الوحدة مطلوب.");
 
         Name = name;
-        NameEn = nameEn?.Trim();
         Symbol = symbol;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

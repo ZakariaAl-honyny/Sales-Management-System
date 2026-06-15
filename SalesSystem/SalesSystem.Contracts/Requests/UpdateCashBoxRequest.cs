@@ -1,12 +1,13 @@
+using System.Text.Json.Serialization;
+
 namespace SalesSystem.Contracts.Requests;
 
+/// <summary>
+/// Request to update an existing cash box.
+/// Note: AccountId cannot be changed after creation — it is immutable.
+/// </summary>
 public record UpdateCashBoxRequest(
-    string? BoxName,
-    int? CategoryId,
-    int? BranchId,
-    int? AssignedUserId,
-    int? CurrencyId,
-    string? PhoneNumber,
-    string? TaxNumber,
-    string? Address,
-    string? Notes);
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("branchId")] short BranchId,
+    [property: JsonPropertyName("description")] string? Description = null
+);

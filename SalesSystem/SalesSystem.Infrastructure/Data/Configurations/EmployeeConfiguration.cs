@@ -17,7 +17,8 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsRequired();
 
         builder.Property(e => e.HireDate)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("date");
 
         builder.Property(e => e.Salary)
             .HasPrecision(18, 2)

@@ -1,16 +1,14 @@
 namespace SalesSystem.Contracts.Requests;
 
 public record CreateInventoryAdjustmentRequest(
-    int WarehouseId,
+    short WarehouseId,
     DateTime AdjustmentDate,
-    byte AdjustmentType,
-    int AccountId
+    byte AdjustmentType
 );
 
 public record AddInventoryAdjustmentLineRequest(
     int InventoryAdjustmentId,
     int ProductId,
-    int ProductUnitId,
     decimal Quantity,
     decimal UnitCost
 );

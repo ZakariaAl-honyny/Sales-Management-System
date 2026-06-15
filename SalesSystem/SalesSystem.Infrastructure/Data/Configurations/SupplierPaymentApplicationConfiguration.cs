@@ -15,7 +15,7 @@ public class SupplierPaymentApplicationConfiguration : IEntityTypeConfiguration<
 
         // FK back to SupplierPayment
         builder.HasOne(a => a.SupplierPayment)
-            .WithMany()
+            .WithMany(p => p.Applications)
             .HasForeignKey(a => a.SupplierPaymentId)
             .OnDelete(DeleteBehavior.Restrict);
 

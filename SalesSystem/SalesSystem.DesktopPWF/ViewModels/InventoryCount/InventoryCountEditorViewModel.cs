@@ -28,7 +28,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
 
     private int? _countId;
     private int _countNo;
-    private int _warehouseId;
+    private short _warehouseId;
     private string? _warehouseName;
     private DateTime _countDate = DateTime.Today;
     private string? _notes;
@@ -114,11 +114,10 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     Id = line.Id,
                     ProductId = line.ProductId,
                     ProductName = line.ProductName,
-                    ProductUnitId = line.ProductUnitId,
-                    ProductUnitName = line.ProductUnitName,
                     SystemQuantity = line.SystemQuantity,
                     IsCounted = line.ActualQuantity > 0
                 };
+                lineItem.SetInitialActualQuantity(line.ActualQuantity);
                 lineItem.SetInitialActualQuantity(line.ActualQuantity);
                 _lines.Add(lineItem);
             }
@@ -143,7 +142,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
         set => SetProperty(ref _countNo, value);
     }
 
-    public int WarehouseId
+    public short WarehouseId
     {
         get => _warehouseId;
         set
@@ -257,8 +256,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
-                    ProductUnitId = product.DefaultPurchaseUnitId ?? 0, // 0 = service layer auto-determines
-                    ProductUnitName = "حبة",
                     SystemQuantity = 0,
                     ActualQuantity = 0,
                     IsCounted = false
@@ -318,10 +315,9 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
                         line.ProductId,
-                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
-
+ 
                     var lineResult = await _countApiService.AddLineAsync(_countId.Value, lineRequest);
                     if (!lineResult.IsSuccess)
                     {
@@ -330,7 +326,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                         return;
                     }
                 }
-
+ 
                 // Update existing lines — update each line if its ActualQuantity changed
                 // (AddLineAsync with same ProductId should overwrite)
                 var existingLines = Lines.Where(l => l.Id > 0 && l.IsModified).ToList();
@@ -339,7 +335,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
                         line.ProductId,
-                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
 
@@ -381,10 +376,9 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
                         line.ProductId,
-                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
-
+ 
                     var lineResult = await _countApiService.AddLineAsync(_countId.Value, lineRequest);
                     if (!lineResult.IsSuccess)
                     {
@@ -393,7 +387,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                         return;
                     }
                 }
-
+ 
                 _eventBus.Publish(new InventoryCountChangedMessage(_countId.Value));
                 _toast.ShowSuccess("تم إنشاء الجرد بنجاح");
                 RequestClose();
@@ -434,10 +428,9 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
                         line.ProductId,
-                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
-
+ 
                     var lineResult = await _countApiService.AddLineAsync(_countId.Value, lineRequest);
                     if (!lineResult.IsSuccess)
                     {
@@ -456,7 +449,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
                         line.ProductId,
-                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
 
@@ -503,8 +495,6 @@ public class InventoryCountLineItem : ViewModelBase
     private int _id;
     private int _productId;
     private string? _productName;
-    private int _productUnitId;
-    private string? _productUnitName;
     private decimal _systemQuantity;
     private decimal _actualQuantity;
     private bool _isCounted;
@@ -527,18 +517,6 @@ public class InventoryCountLineItem : ViewModelBase
     {
         get => _productName;
         set => SetProperty(ref _productName, value);
-    }
-
-    public int ProductUnitId
-    {
-        get => _productUnitId;
-        set => SetProperty(ref _productUnitId, value);
-    }
-
-    public string? ProductUnitName
-    {
-        get => _productUnitName;
-        set => SetProperty(ref _productUnitName, value);
     }
 
     /// <summary>

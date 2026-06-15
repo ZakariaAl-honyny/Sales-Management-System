@@ -110,10 +110,10 @@ public record CreateSalesInvoiceRequest(
     decimal TaxRate,          // NEW: from clarification Q1
     bool IsTaxInclusive,      // NEW: from clarification Q1
     string? Notes,
-    List<SalesInvoiceItemRequest> Items
+    List<SalesInvoiceLineRequest> Items
 );
 
-public record SalesInvoiceItemRequest(
+public record SalesInvoiceLineRequest(
     int ProductId,
     decimal Quantity,
     decimal UnitPrice,
@@ -131,10 +131,10 @@ public record SalesInvoiceResponse(
     bool IsTaxInclusive,                  // NEW
     decimal TotalAmount, decimal PaidAmount, decimal DueAmount,
     DateTime InvoiceDate, string? Notes,
-    List<SalesInvoiceItemResponse> Items
+    List<SalesInvoiceLineResponse> Items
 );
 
-public record SalesInvoiceItemResponse(
+public record SalesInvoiceLineResponse(
     int Id, int ProductId, string ProductName, string ProductCode,
     decimal Quantity, decimal UnitPrice, decimal DiscountAmount, decimal LineTotal
 );
@@ -149,7 +149,7 @@ public record CreatePurchaseInvoiceRequest(
     int SupplierId, int WarehouseId,
     PaymentType PaymentType, decimal PaidAmount,
     decimal InvoiceDiscount, decimal TaxRate, bool IsTaxInclusive,
-    string? Notes, List<PurchaseInvoiceItemRequest> Items
+    string? Notes, List<PurchaseInvoiceLineRequest> Items
 );
 ```
 

@@ -21,16 +21,16 @@ public class SystemAccountService : ISystemAccountService
         _logger = logger;
     }
 
-    public async Task<Result<SystemAccountMappingDto>> GetMappingAsync(SystemAccountKey key, int? branchId = null, CancellationToken ct = default)
+    public async Task<Result<SystemAccountMappingDto>> GetMappingAsync(SystemAccountKey key, short? branchId = null, CancellationToken ct = default)
     {
         try
         {
             Expression<Func<SystemAccountMapping, bool>> predicate;
 
             if (branchId.HasValue)
-                predicate = m => m.MappingKey == key && m.BranchId == branchId.Value && m.IsActive;
+                predicate = m => m.MappingKey == key && m.BranchId == branchId.Value;
             else
-                predicate = m => m.MappingKey == key && m.BranchId == 0 && m.IsActive;
+                predicate = m => m.MappingKey == key && m.BranchId == null;
 
             var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(predicate, ct, "Account");
 
@@ -46,15 +46,15 @@ public class SystemAccountService : ISystemAccountService
         }
     }
 
-    public async Task<Result<List<SystemAccountMappingDto>>> GetAllMappingsAsync(int? branchId = null, CancellationToken ct = default)
+    public async Task<Result<List<SystemAccountMappingDto>>> GetAllMappingsAsync(short? branchId = null, CancellationToken ct = default)
     {
         try
         {
             Expression<Func<SystemAccountMapping, bool>> predicate;
             if (branchId.HasValue)
-                predicate = m => m.BranchId == branchId.Value && m.IsActive;
+                predicate = m => m.BranchId == branchId.Value;
             else
-                predicate = m => m.IsActive;
+                predicate = m => true;
 
             var mappings = await _uow.SystemAccountMappings.ToListAsync(predicate, ct: ct, includePaths: "Account");
 
@@ -74,7 +74,7 @@ public class SystemAccountService : ISystemAccountService
         {
             // Check for duplicate key + branch combination
             var existing = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                m => m.MappingKey == request.MappingKey && m.BranchId == request.BranchId && m.IsActive, ct: ct);
+                m => m.MappingKey == request.MappingKey && m.BranchId == request.BranchId, ct: ct);
 
             if (existing != null)
                 return Result<SystemAccountMappingDto>.Failure("يوجد تعيين نشط لنفس المفتاح والفرع");
@@ -82,9 +82,7 @@ public class SystemAccountService : ISystemAccountService
             var mapping = SystemAccountMapping.Create(
                 request.MappingKey,
                 request.AccountId,
-                request.BranchId,
-                request.DescriptionAr,
-                request.DescriptionEn);
+                request.BranchId);
 
             await _uow.SystemAccountMappings.AddAsync(mapping, ct);
             await _uow.SaveChangesAsync(ct);
@@ -109,7 +107,7 @@ public class SystemAccountService : ISystemAccountService
             if (mapping == null)
                 return Result<SystemAccountMappingDto>.Failure("حساب النظام غير موجود", ErrorCodes.NotFound);
 
-            mapping.Update(request.AccountId, request.DescriptionAr, request.DescriptionEn);
+            mapping.Update(request.AccountId);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Updated system account mapping {Id}: AccountId={AccountId}", id, request.AccountId);
@@ -131,7 +129,7 @@ public class SystemAccountService : ISystemAccountService
             if (mapping == null)
                 return Result.Failure("حساب النظام غير موجود", ErrorCodes.NotFound);
 
-            mapping.MarkAsDeleted();
+            _uow.SystemAccountMappings.DeleteRange(new[] { mapping });
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Deleted system account mapping {Id}", id);
@@ -153,10 +151,6 @@ public class SystemAccountService : ISystemAccountService
             AccountId: mapping.AccountId,
             AccountName: mapping.Account?.NameAr,
             AccountCode: mapping.Account?.AccountCode,
-            BranchId: mapping.BranchId,
-            DescriptionAr: mapping.DescriptionAr,
-            DescriptionEn: mapping.DescriptionEn,
-            IsActive: mapping.IsActive
-        );
+            BranchId: mapping.BranchId);
     }
 }

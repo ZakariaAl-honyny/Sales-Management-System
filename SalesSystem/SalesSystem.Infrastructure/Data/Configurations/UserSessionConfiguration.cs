@@ -14,9 +14,9 @@ public class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
         // UserId — non-nullable FK to Users
         builder.Property(s => s.UserId).IsRequired();
 
-        // Token — required, max 500 (matches schema nvarchar(500))
-        builder.Property(s => s.Token).IsRequired().HasMaxLength(500);
-        builder.HasIndex(s => s.Token).IsUnique();
+        // SessionToken — required, max 200 (schema: nvarchar(200))
+        builder.Property(s => s.SessionToken).IsRequired().HasMaxLength(200);
+        builder.HasIndex(s => s.SessionToken).IsUnique();
 
         // Device tracking
         builder.Property(s => s.DeviceName).IsRequired(false).HasMaxLength(200);
@@ -24,7 +24,6 @@ public class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
         builder.Property(s => s.UserAgent).IsRequired(false).HasMaxLength(500);
 
         // Timestamps
-        builder.Property(s => s.LoginAt).IsRequired();
         builder.Property(s => s.LastActivityAt).IsRequired();
         builder.Property(s => s.ExpiresAt).IsRequired();
 

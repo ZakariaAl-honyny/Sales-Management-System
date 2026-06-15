@@ -17,8 +17,6 @@ public record PaymentVoucherDto(
     decimal TotalAmount,
     string? Notes,
     byte Status,
-    int? SourceDocumentId,
-    string? SourceDocumentType,
     DateTime CreatedAt,
     DateTime? PostedAt,
     DateTime? CancelledAt

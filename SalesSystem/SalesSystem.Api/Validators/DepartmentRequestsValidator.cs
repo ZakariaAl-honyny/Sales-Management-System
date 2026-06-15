@@ -7,9 +7,6 @@ public class CreateDepartmentRequestValidator : AbstractValidator<CreateDepartme
 {
     public CreateDepartmentRequestValidator()
     {
-        RuleFor(x => x.BranchId)
-            .GreaterThan(0).WithMessage("معرف الفرع مطلوب");
-
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("اسم القسم مطلوب")
             .MaximumLength(150).WithMessage("اسم القسم لا يمكن أن يتجاوز 150 حرف");

@@ -11,6 +11,7 @@ using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels;
+using SalesSystem.DesktopPWF.Common;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models.Printing;
 using Microsoft.Win32;
@@ -394,6 +395,33 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         new PaymentTypeItem { Value = 3, Display = "مختلط" }
     };
 
+    // Discount fields
+    private byte _selectedDiscountType;
+    public byte SelectedDiscountType
+    {
+        get => _selectedDiscountType;
+        set
+        {
+            if (SetProperty(ref _selectedDiscountType, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
+    private decimal? _discountRate;
+    public decimal? DiscountRate
+    {
+        get => _discountRate;
+        set
+        {
+            if (SetProperty(ref _discountRate, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
     // Currency properties
     public ObservableCollection<CurrencyDto> Currencies
     {
@@ -562,17 +590,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 SelectedCurrencyId = invoice.CurrencyId;
                 ExchangeRate = invoice.ExchangeRate;
 
-                // Restore attachment
-                if (!string.IsNullOrEmpty(invoice.AttachmentPath))
-                {
-                    _attachmentPath = invoice.AttachmentPath;
-                    _attachmentFileName = System.IO.Path.GetFileName(invoice.AttachmentPath);
-                    _hasAttachment = true;
-                    OnPropertyChanged(nameof(AttachmentPath));
-                    OnPropertyChanged(nameof(AttachmentFileName));
-                    OnPropertyChanged(nameof(HasAttachment));
-                }
-
                 if (invoice.Status != (byte)InvoiceStatus.Draft)
                 {
                     IsReadOnly = true;
@@ -584,16 +601,11 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     var lineVm = new PurchaseInvoiceLineViewModel(Products);
                     lineVm.ProductId = item.ProductId;
                     lineVm.Quantity = item.Quantity;
-                    lineVm.UnitCost = item.UnitCost;
+                    lineVm.UnitCost = item.UnitPrice;
                     lineVm.SelectedProduct = Products.FirstOrDefault(p => p.Id == item.ProductId);
                     lineVm.ProductUnitId = item.ProductUnitId;
-                    if (item.DiscountType.HasValue) lineVm.DiscountType = item.DiscountType.Value;
-                    lineVm.DiscountRate = item.DiscountRate;
-                    lineVm.CostInBaseCurrency = item.CostInBaseCurrency;
-                    lineVm.AdditionalFeesAmount = item.AdditionalFeesAmount;
-                    lineVm.Notes = item.Notes;
-                    
-                    lineVm.PropertyChanged += (s, e) =>
+                         
+                        lineVm.PropertyChanged += (s, e) =>
                     {
                         if (e.PropertyName == nameof(PurchaseInvoiceLineViewModel.LineTotal))
                         {
@@ -830,7 +842,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     {
         var items = Items
             .Where(i => i.SelectedProduct != null && i.Quantity > 0)
-            .Select(i => new CreatePurchaseInvoiceItemRequest(
+            .Select(i => new CreatePurchaseInvoiceLineRequest(
                 i.SelectedProduct!.Id,
                 i.ProductUnitId > 0 ? i.ProductUnitId : 1,
                 i.Quantity,
@@ -841,13 +853,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             SelectedWarehouseId,
             SelectedSupplierId ?? 0,
             InvoiceDate,
-            null,
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
             TaxAmount,
             OtherCharges,
             PaidAmount,
-            SelectedCurrencyId,
+            (short?)SelectedCurrencyId,
             ExchangeRate,
             Notes,
             items);
@@ -857,7 +868,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     {
         var items = Items
             .Where(i => i.SelectedProduct != null && i.Quantity > 0)
-            .Select(i => new CreatePurchaseInvoiceItemRequest(
+            .Select(i => new CreatePurchaseInvoiceLineRequest(
                 i.SelectedProduct!.Id,
                 i.ProductUnitId > 0 ? i.ProductUnitId : 1,
                 i.Quantity,
@@ -869,15 +880,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             SelectedSupplierId ?? 0,
             InvoiceNo > 0 ? InvoiceNo : null,
             InvoiceDate,
-            null,
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
-            SelectedDiscountType > 0 ? SelectedDiscountType : (byte?)null,
-            DiscountRate,
             TaxAmount,
             OtherCharges,
             PaidAmount,
-            SelectedCurrencyId,
+            (short?)SelectedCurrencyId,
             ExchangeRate,
             Notes,
             items);
@@ -1187,8 +1195,6 @@ public class AdditionalFeeInputViewModel : ViewModelBase
         new EnumDisplayItem { Value = 2, Display = "حسب الكمية" }
     };
 
-    public AdditionalFeeDto? Result { get; private set; }
-
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
 
@@ -1199,7 +1205,7 @@ public class AdditionalFeeInputViewModel : ViewModelBase
             _ = _dialogService.ShowWarningAsync("بيانات غير مكتملة", "• المبلغ يجب أن يكون أكبر من صفر");
             return;
         }
-        Result = new AdditionalFeeDto(0, 0, string.Empty, FeeAmount, DistributionMethod, null);
+
         RequestClose();
     }
 }
@@ -1261,12 +1267,9 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
             if (SetProperty(ref _selectedProduct, value) && value != null)
             {
                 ProductId = value.Id;
-                ProductUnitId = Mode == (byte)SaleMode.Wholesale
-                    ? (value.WholesaleUnitId ?? value.RetailUnitId ?? 0)
-                    : (value.RetailUnitId ?? value.WholesaleUnitId ?? 0);
                 ClearErrors(nameof(ProductName));
                 _oldCostInDatabase = 0m;
-                ProductUnitId = value.DefaultPurchaseUnitId ?? 0; // DefaultPurchaseUnitId is on ProductDto; fallback 0 = service auto-determines
+                ProductUnitId = 0; // 0 = service auto-determines
                 OnPropertyChanged(nameof(CostChangedFromDatabase));
                 OnPropertyChanged(nameof(PriceDifferenceIndicator));
                 // Phase 25: TODO — set UnitCost from ProductDto.AverageCost when added to DTO
@@ -1411,23 +1414,6 @@ public class PurchaseInvoiceLineViewModel : ViewModelBase
         }
     }
 
-    private void ValidateDiscountType()
-    {
-        ClearErrors(nameof(DiscountType));
-        if (DiscountType > 1)
-        {
-            AddError(nameof(DiscountType), "نوع الخصم غير صالح");
-        }
-    }
-
-    private void ValidateDiscountRate()
-    {
-        ClearErrors(nameof(DiscountRate));
-        if (DiscountType == 1 && (!DiscountRate.HasValue || DiscountRate.Value < 0 || DiscountRate.Value > 100))
-        {
-            AddError(nameof(DiscountRate), "نسبة الخصم يجب أن تكون بين 0 و 100");
-        }
-    }
 }
 
 public class PaymentTypeItem

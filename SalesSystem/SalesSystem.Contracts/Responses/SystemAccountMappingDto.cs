@@ -12,8 +12,4 @@ public record SystemAccountMappingDto(
     int AccountId,
     string? AccountName,
     string? AccountCode,
-    int BranchId,
-    string? DescriptionAr,
-    string? DescriptionEn,
-    bool IsActive
-);
+    short? BranchId);

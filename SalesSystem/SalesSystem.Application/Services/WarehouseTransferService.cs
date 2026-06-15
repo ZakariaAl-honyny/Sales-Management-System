@@ -36,8 +36,8 @@ public class WarehouseTransferService : IWarehouseTransferService
 
             var transfer = WarehouseTransfer.Create(
                 transferNo,
-                request.SourceWarehouseId,
-                request.DestinationWarehouseId,
+                request.FromWarehouseId,
+                request.ToWarehouseId,
                 request.TransferDate,
                 request.Notes,
                 userId);
@@ -49,10 +49,9 @@ public class WarehouseTransferService : IWarehouseTransferService
                     var line = WarehouseTransferLine.Create(
                         transfer.Id,
                         lineReq.ProductId,
-                        lineReq.ProductUnitId,
+                        lineReq.BatchId ?? 0,
                         lineReq.Quantity,
-                        lineReq.UnitCost,
-                        lineReq.BatchId);
+                        lineReq.UnitCost);
                     transfer.AddLine(line);
                 }
             }
@@ -99,17 +98,17 @@ public class WarehouseTransferService : IWarehouseTransferService
     }
 
     public async Task<Result<PagedResult<WarehouseTransferDto>>> GetAllAsync(
-        int? sourceWarehouseId, int? destinationWarehouseId, int page, int pageSize, CancellationToken ct)
+        int? fromWarehouseId, int? toWarehouseId, int page, int pageSize, CancellationToken ct)
     {
         try
         {
             System.Linq.Expressions.Expression<Func<WarehouseTransfer, bool>>? predicate = null;
 
-            if (sourceWarehouseId.HasValue || destinationWarehouseId.HasValue)
+            if (fromWarehouseId.HasValue || toWarehouseId.HasValue)
             {
                 predicate = t =>
-                    (!sourceWarehouseId.HasValue || t.SourceWarehouseId == sourceWarehouseId.Value) &&
-                    (!destinationWarehouseId.HasValue || t.DestinationWarehouseId == destinationWarehouseId.Value);
+                    (!fromWarehouseId.HasValue || t.FromWarehouseId == fromWarehouseId.Value) &&
+                    (!toWarehouseId.HasValue || t.ToWarehouseId == toWarehouseId.Value);
             }
 
             var (items, totalCount) = await _uow.WarehouseTransfers.GetPagedAsync(
@@ -118,7 +117,7 @@ public class WarehouseTransferService : IWarehouseTransferService
                 page,
                 pageSize,
                 ct,
-                includePaths: new[] { "SourceWarehouse", "DestinationWarehouse", "Lines", "Lines.Product", "Lines.ProductUnit" });
+                includePaths: new[] { "FromWarehouse", "ToWarehouse", "Lines", "Lines.Product", "Lines.Batch" });
 
             var dtos = items.Select(MapToDto).ToList();
             var result = PagedResult<WarehouseTransferDto>.Create(dtos, totalCount, page, pageSize);
@@ -147,7 +146,7 @@ public class WarehouseTransferService : IWarehouseTransferService
             foreach (var line in transfer.Lines)
             {
                 var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                    ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
+                    ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
 
                 var availableQty = sourceStock?.Quantity ?? 0;
                 if (availableQty < line.Quantity)
@@ -169,7 +168,7 @@ public class WarehouseTransferService : IWarehouseTransferService
                 {
                     // 1. Deduct from source warehouse
                     var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
+                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
 
                     if (sourceStock != null)
                     {
@@ -178,22 +177,20 @@ public class WarehouseTransferService : IWarehouseTransferService
 
                     // 2. Add to destination warehouse
                     var destStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.DestinationWarehouseId, ct);
+                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.ToWarehouseId, ct);
 
                     if (destStock == null)
                     {
                         destStock = WarehouseStock.Create(
-                            transfer.DestinationWarehouseId,
+                            transfer.ToWarehouseId,
                             line.ProductId,
                             line.Quantity,
-                            line.UnitCost,
                             userId);
                         await _uow.WarehouseStocks.AddAsync(destStock, ct);
                     }
                     else
                     {
                         destStock.IncreaseQuantity(line.Quantity);
-                        destStock.UpdateAvgCost(0, 0); // Keep existing AvgCost, just update timestamp
                     }
 
                 }
@@ -242,7 +239,7 @@ public class WarehouseTransferService : IWarehouseTransferService
                     {
                         // 1. Add back to source warehouse
                         var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
+                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
 
                         if (sourceStock != null)
                         {
@@ -251,7 +248,7 @@ public class WarehouseTransferService : IWarehouseTransferService
 
                         // 2. Deduct from destination warehouse
                         var destStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.DestinationWarehouseId, ct);
+                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.ToWarehouseId, ct);
 
                         if (destStock != null)
                         {
@@ -292,8 +289,8 @@ public class WarehouseTransferService : IWarehouseTransferService
     {
         return await _uow.WarehouseTransfers.FirstOrDefaultAsync(
             t => t.Id == id, ct,
-            "SourceWarehouse", "DestinationWarehouse",
-            "Lines", "Lines.Product", "Lines.ProductUnit", "Lines.Batch");
+            "FromWarehouse", "ToWarehouse",
+            "Lines", "Lines.Product", "Lines.Batch");
     }
 
     private static WarehouseTransferDto MapToDto(WarehouseTransfer transfer)
@@ -301,10 +298,10 @@ public class WarehouseTransferService : IWarehouseTransferService
         return new WarehouseTransferDto(
             transfer.Id,
             transfer.TransferNo,
-            transfer.SourceWarehouseId,
-            transfer.SourceWarehouse?.Name,
-            transfer.DestinationWarehouseId,
-            transfer.DestinationWarehouse?.Name,
+            transfer.FromWarehouseId,
+            transfer.FromWarehouse?.Name,
+            transfer.ToWarehouseId,
+            transfer.ToWarehouse?.Name,
             transfer.TransferDate,
             transfer.Notes,
             (byte)transfer.Status,
@@ -312,12 +309,11 @@ public class WarehouseTransferService : IWarehouseTransferService
                 l.Id,
                 l.ProductId,
                 l.Product?.Name,
-                l.ProductUnitId,
-                l.ProductUnit?.Unit?.Name,
+                l.BatchId,
+                l.Batch?.BatchNo,
                 l.Quantity,
                 l.UnitCost,
-                l.TotalCost,
-                l.BatchId
+                l.TotalCost
             )).ToList()
         );
     }

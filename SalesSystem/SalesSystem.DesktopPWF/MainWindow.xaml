@@ -119,9 +119,6 @@
             <DataTemplate DataType="{x:Type vmPurchases:PurchaseInvoiceListViewModel}">
                 <viewsPurchases:PurchaseInvoicesListView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type vmPurchases:PurchaseOrderListViewModel}">
-                <viewsPurchases:PurchaseOrdersListView />
-            </DataTemplate>
             <DataTemplate DataType="{x:Type vmReturns:PurchaseReturnListViewModel}">
                 <viewsReturns:PurchaseReturnsListView />
             </DataTemplate>

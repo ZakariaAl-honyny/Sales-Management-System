@@ -22,10 +22,12 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
             .HasComment("السعر");
 
         builder.Property(x => x.EffectiveFrom)
+            .HasColumnType("date")
             .IsRequired()
             .HasComment("تاريخ بدء السريان");
 
         builder.Property(x => x.EffectiveTo)
+            .HasColumnType("date")
             .IsRequired(false)
             .HasComment("تاريخ انتهاء السريان (اختياري)");
 
@@ -39,6 +41,11 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
             .WithMany()
             .HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // CHECK constraints
+        builder.ToTable(t => t.HasCheckConstraint(
+            "CHK_ProductPrices_Price_NonNegative",
+            "[Price] >= 0"));
 
         // Indexes
         builder.HasIndex(x => new { x.ProductUnitId, x.CurrencyId, x.EffectiveFrom })

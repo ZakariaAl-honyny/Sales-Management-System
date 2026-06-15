@@ -8,16 +8,13 @@ public class CreateInventoryAdjustmentRequestValidator : AbstractValidator<Creat
     public CreateInventoryAdjustmentRequestValidator()
     {
         RuleFor(x => x.WarehouseId)
-            .GreaterThan(0).WithMessage("معرف المستودع مطلوب");
+            .GreaterThan((short)0).WithMessage("معرف المستودع مطلوب");
 
         RuleFor(x => x.AdjustmentDate)
             .NotEmpty().WithMessage("تاريخ التسوية مطلوب");
 
         RuleFor(x => x.AdjustmentType)
-            .InclusiveBetween((byte)1, (byte)3).WithMessage("نوع التسوية غير صالح");
-
-        RuleFor(x => x.AccountId)
-            .GreaterThan(0).WithMessage("معرف الحساب المحاسبي مطلوب");
+            .InclusiveBetween((byte)1, (byte)4).WithMessage("نوع التسوية غير صالح");
     }
 }
 
@@ -31,13 +28,10 @@ public class AddInventoryAdjustmentLineRequestValidator : AbstractValidator<AddI
         RuleFor(x => x.ProductId)
             .GreaterThan(0).WithMessage("معرف المنتج مطلوب");
 
-        RuleFor(x => x.ProductUnitId)
-            .GreaterThan(0).WithMessage("معرف وحدة المنتج مطلوب");
-
         RuleFor(x => x.Quantity)
             .GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
 
         RuleFor(x => x.UnitCost)
-            .GreaterThan(0).WithMessage("تكلفة الوحدة يجب أن تكون أكبر من صفر");
+            .GreaterThanOrEqualTo(0).WithMessage("تكلفة الوحدة لا يمكن أن تكون سالبة");
     }
 }

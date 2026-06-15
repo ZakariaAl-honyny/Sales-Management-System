@@ -1,30 +1,29 @@
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
-namespace SalesSystem.Domain.Entities;
+namespace SalesSystem.Domain.Entities; 
 
-public class PurchaseInvoiceItem : Entity
+public class PurchaseInvoiceLine : Entity
 {
     public int PurchaseInvoiceId { get; private set; }
     public int ProductId { get; private set; }
     public int ProductUnitId { get; private set; }
     public decimal Quantity { get; private set; }
-    public decimal UnitCost { get; private set; }
+    public decimal UnitPrice { get; private set; }
     public decimal LineTotal { get; private set; }
-    public decimal AdditionalFeesAmount { get; private set; }
 
     // Navigation properties
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual Product? Product { get; private set; }
     public virtual ProductUnit? ProductUnit { get; private set; }
 
-    private PurchaseInvoiceItem() { }
+    private PurchaseInvoiceLine() { }
 
-    public static PurchaseInvoiceItem Create(
+    public static PurchaseInvoiceLine Create(
         int productId,
         int productUnitId,
         decimal quantity,
-        decimal unitCost)
+        decimal unitPrice)
     {
         if (productId <= 0)
             throw new DomainException("المنتج مطلوب.");
@@ -32,15 +31,15 @@ public class PurchaseInvoiceItem : Entity
             throw new DomainException("الوحدة مطلوبة.");
         if (quantity <= 0)
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-        if (unitCost < 0)
-            throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
+        if (unitPrice < 0)
+            throw new DomainException("سعر الوحدة لا يمكن أن يكون سالباً.");
 
-        var item = new PurchaseInvoiceItem
+        var item = new PurchaseInvoiceLine
         {
             ProductId = productId,
             ProductUnitId = productUnitId,
             Quantity = quantity,
-            UnitCost = unitCost,
+            UnitPrice = unitPrice,
         };
 
         item.RecalculateLineTotal();
@@ -49,13 +48,6 @@ public class PurchaseInvoiceItem : Entity
 
     public void RecalculateLineTotal()
     {
-        LineTotal = Quantity * UnitCost;
-    }
-
-    public void SetAdditionalFeesAmount(decimal amount)
-    {
-        if (amount < 0)
-            throw new DomainException("مبلغ الرسوم الإضافية لا يمكن أن يكون سالباً.");
-        AdditionalFeesAmount = amount;
+        LineTotal = Quantity * UnitPrice;
     }
 }

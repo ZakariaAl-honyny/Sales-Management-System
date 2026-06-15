@@ -12,11 +12,16 @@ namespace SalesSystem.Application.Services;
 public class InventoryBatchService : IInventoryBatchService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<InventoryBatchService> _logger;
 
-    public InventoryBatchService(IUnitOfWork uow, ILogger<InventoryBatchService> logger)
+    public InventoryBatchService(
+        IUnitOfWork uow,
+        IDocumentSequenceService sequenceService,
+        ILogger<InventoryBatchService> logger)
     {
         _uow = uow;
+        _sequenceService = sequenceService;
         _logger = logger;
     }
 
@@ -73,13 +78,19 @@ public class InventoryBatchService : IInventoryBatchService
             if (warehouse == null)
                 return Result<InventoryBatchDto>.Failure("المستودع غير موجود", ErrorCodes.NotFound);
 
+            // Generate system batch number
+            var seqResult = await _sequenceService.GetNextIntAsync("InventoryBatch", ct);
+            if (!seqResult.IsSuccess)
+                return Result<InventoryBatchDto>.Failure(seqResult.Error ?? "فشل في توليد رقم الدفعة.");
+
             var batch = InventoryBatch.Create(
-                request.ProductId,
-                (short)request.WarehouseId,
-                request.Quantity,
-                request.UnitCost,
+                batchNo: seqResult.Value,
+                productId: request.ProductId,
+                warehouseId: request.WarehouseId,
+                quantityReceived: request.Quantity,
+                unitCost: request.UnitCost,
                 purchaseInvoiceId: request.PurchaseInvoiceId,
-                batchNo: request.BatchNo,
+                supplierBatchNo: request.BatchNo,
                 expiryDate: request.ExpiryDate,
                 createdByUserId: userId);
 
@@ -134,9 +145,9 @@ public class InventoryBatchService : IInventoryBatchService
         batch.PurchaseInvoiceId,
         batch.WarehouseId,
         batch.Warehouse?.Name,
-        batch.Quantity,
+        batch.QuantityRemaining,
         batch.UnitCost,
-        batch.BatchNo,
+        batch.BatchNo.ToString(),
         batch.ExpiryDate,
-        batch.Quantity > 0);
+        batch.QuantityRemaining > 0);
 }

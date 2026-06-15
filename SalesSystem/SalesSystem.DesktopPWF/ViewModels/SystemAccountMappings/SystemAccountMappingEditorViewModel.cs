@@ -35,7 +35,6 @@ public class SystemAccountMappingEditorViewModel : ViewModelBase
         _accountId = existing.AccountId;
         _accountName = existing.AccountName ?? string.Empty;
         _accountCode = existing.AccountCode ?? string.Empty;
-        _description = existing.DescriptionAr ?? string.Empty;
 
         SaveCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(SaveOperationAsync)));
@@ -76,13 +75,6 @@ public class SystemAccountMappingEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountCode, value);
     }
 
-    private string _description = string.Empty;
-    public string Description
-    {
-        get => _description;
-        set => SetProperty(ref _description, value);
-    }
-
     private string? _errorMessage;
     public string? ErrorMessage
     {
@@ -118,11 +110,7 @@ public class SystemAccountMappingEditorViewModel : ViewModelBase
             return;
         }
 
-        var request = new UpdateSystemAccountMappingRequest(
-            AccountId,
-            Description,
-            null // DescriptionEn — keep as is
-        );
+        var request = new UpdateSystemAccountMappingRequest(AccountId);
 
         var result = await _mappingApi.UpdateAsync(_dto.Id, request);
         if (result.IsSuccess)

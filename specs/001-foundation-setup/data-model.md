@@ -168,7 +168,7 @@
 | UpdatedBy | string? | MaxLength(150) |
 
 **Domain Logic**:
-- `LineTotal = (Quantity * UnitCost) - DiscountAmount` (in PurchaseInvoiceItem)
+- `LineTotal = (Quantity * UnitCost) - DiscountAmount` (in PurchaseInvoiceLine)
 - `SubTotal = Items.Sum(i => i.LineTotal)`
 - `TotalAmount = SubTotal - DiscountAmount + TaxAmount`
 - `DueAmount = TotalAmount - PaidAmount`
@@ -178,11 +178,11 @@
 
 ---
 
-## 10. PurchaseInvoiceItem
+## 10. PurchaseInvoiceLine
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| PurchaseInvoiceItemId | int | PK |
+| PurchaseInvoiceLineId | int | PK |
 | PurchaseInvoiceId | int | FK → PurchaseInvoices (Restrict) |
 | ProductId | int | FK → Products (Restrict) |
 | Quantity | decimal(18,3) | Required |
@@ -205,11 +205,11 @@ Same structure as PurchaseInvoice with:
 
 ---
 
-## 12. SalesInvoiceItem
+## 12. SalesInvoiceLine
 
 | Field | Type | Constraints |
 |-------|------|-------------|
-| SalesInvoiceItemId | int | PK |
+| SalesInvoiceLineId | int | PK |
 | SalesInvoiceId | int | FK → SalesInvoices (Restrict) |
 | ProductId | int | FK → Products (Restrict) |
 | Quantity | decimal(18,3) | Required |
@@ -355,18 +355,18 @@ User ──< InventoryMovement (CreatedByUserId)
 Category ──< Product
 Unit ──< Product
 Product ──< WarehouseStock >── Warehouse
-Product ──< SalesInvoiceItem
-Product ──< PurchaseInvoiceItem
+Product ──< SalesInvoiceLine
+Product ──< PurchaseInvoiceLine
 Product ──< SalesReturnItem
 Product ──< PurchaseReturnItem
 Product ──< StockTransferItem
 Product ──< InventoryMovement
 
-Customer ──< SalesInvoice ──< SalesInvoiceItem
+Customer ──< SalesInvoice ──< SalesInvoiceLine
 Customer ──< SalesReturn ──< SalesReturnItem
 Customer ──< CustomerPayment
 
-Supplier ──< PurchaseInvoice ──< PurchaseInvoiceItem
+Supplier ──< PurchaseInvoice ──< PurchaseInvoiceLine
 Supplier ──< PurchaseReturn ──< PurchaseReturnItem
 Supplier ──< SupplierPayment
 

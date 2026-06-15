@@ -27,9 +27,9 @@ public class UserReportService : IUserReportService
             _logger.LogInformation("Getting user activity for user {UserId} from {From} to {To}", userId, from, to);
 
             var auditLogs = await _uow.AuditLogs.ToListAsync(
-                al => al.Timestamp >= from && al.Timestamp <= to
+                al => al.CreatedAt >= from && al.CreatedAt <= to
                    && (!userId.HasValue || al.UserId == userId.Value),
-                q => q.OrderByDescending(al => al.Timestamp),
+                q => q.OrderByDescending(al => al.CreatedAt),
                 ct);
 
             // Get user names
@@ -39,15 +39,19 @@ public class UserReportService : IUserReportService
                 : new List<Domain.Entities.User>();
             var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
 
-            var result = auditLogs.Select(al => new UserActivityReportDto(
-                al.UserId ?? 0,
-                userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
-                al.Timestamp,
-                al.Action,
-                al.EntityType,
-                al.EntityId,
-                al.Details
-            )).ToList();
+            var result = auditLogs.Select(al =>
+            {
+                int? parsedEntityId = al.EntityId != null && int.TryParse(al.EntityId, out var eid) ? eid : null;
+                return new UserActivityReportDto(
+                    al.UserId ?? 0,
+                    userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
+                    al.CreatedAt,
+                    al.Action,
+                    al.EntityName ?? string.Empty,
+                    parsedEntityId,
+                    al.Details
+                );
+            }).ToList();
 
             return Result<List<UserActivityReportDto>>.Success(result);
         }
@@ -70,9 +74,9 @@ public class UserReportService : IUserReportService
             // Get audit logs related to login actions
             var loginLogs = await _uow.AuditLogs.ToListAsync(
                 al => (al.Action == "LoginSuccess" || al.Action == "LoginFailed" || al.Action == "LoginBlocked_Locked")
-                   && al.Timestamp >= from && al.Timestamp <= to
+                   && al.CreatedAt >= from && al.CreatedAt <= to
                    && (!userId.HasValue || al.UserId == userId.Value),
-                q => q.OrderByDescending(al => al.Timestamp),
+                q => q.OrderByDescending(al => al.CreatedAt),
                 ct);
 
             var distinctUserIds = loginLogs.Where(al => al.UserId.HasValue).Select(al => al.UserId!.Value).Distinct().ToList();
@@ -84,7 +88,7 @@ public class UserReportService : IUserReportService
             var result = loginLogs.Select(al => new LoginHistoryDto(
                 al.UserId ?? 0,
                 userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
-                al.Timestamp,
+                al.CreatedAt,
                 al.Action == "LoginSuccess",
                 al.Action == "LoginSuccess" ? null : (al.Details ?? al.Action)
             )).ToList();
@@ -108,8 +112,8 @@ public class UserReportService : IUserReportService
             _logger.LogInformation("Getting audit trail summary from {From} to {To}", from, to);
 
             var auditLogs = await _uow.AuditLogs.ToListAsync(
-                al => al.Timestamp >= from && al.Timestamp <= to,
-                q => q.OrderByDescending(al => al.Timestamp),
+                al => al.CreatedAt >= from && al.CreatedAt <= to,
+                q => q.OrderByDescending(al => al.CreatedAt),
                 ct);
 
             var distinctUserIds = auditLogs.Where(al => al.UserId.HasValue).Select(al => al.UserId!.Value).Distinct().ToList();
@@ -119,11 +123,11 @@ public class UserReportService : IUserReportService
             var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
 
             var result = auditLogs.Select(al => new AuditTrailSummaryDto(
-                al.Timestamp,
+                al.CreatedAt,
                 userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
                 al.Action,
-                al.EntityType,
-                al.EntityId?.ToString(),
+                al.EntityName ?? string.Empty,
+                al.EntityId,
                 al.Details
             )).ToList();
 

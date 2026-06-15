@@ -7,8 +7,13 @@ namespace SalesSystem.Domain.Entities;
 /// Single-row table storing company-wide settings (name, contact, logo, default currency).
 /// Id is always 1 — enforced at the database level.
 /// </summary>
-public class CompanySettings : ActivatableEntity
+public class CompanySettings : AuditableEntity
 {
+    /// <summary>
+    /// Schema: tinyint PK (byte).
+    /// </summary>
+    public new byte Id { get; private set; }
+
     /// <summary>
     /// Company legal name (required, max 200 characters).
     /// </summary>

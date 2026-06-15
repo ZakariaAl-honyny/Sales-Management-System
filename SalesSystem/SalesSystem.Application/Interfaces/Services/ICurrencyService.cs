@@ -14,5 +14,4 @@ public interface ICurrencyService
     Task<Result<CurrencyDto>> UpdateAsync(int id, UpdateCurrencyRequest request, int userId, CancellationToken ct = default);
     Task<Result> DeleteAsync(int id, int userId, CancellationToken ct = default);
     Task<Result> DeletePermanentlyAsync(int id, int userId, CancellationToken ct = default);
-    Task<Result> UpdateExchangeRateAsync(int id, decimal newRate, int userId, CancellationToken ct = default);
 }

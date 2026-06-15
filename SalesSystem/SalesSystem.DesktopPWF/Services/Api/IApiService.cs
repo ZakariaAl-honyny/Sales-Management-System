@@ -449,7 +449,6 @@ public interface ICurrencyApiService
     Task<Result<CurrencyDto>> UpdateAsync(int id, UpdateCurrencyRequest request);
     Task<Result> DeleteAsync(int id);
     Task<Result> DeletePermanentlyAsync(int id);
-    Task<Result> UpdateExchangeRateAsync(int id, decimal newRate);
 }
 
 public interface IFinancialReportApiService

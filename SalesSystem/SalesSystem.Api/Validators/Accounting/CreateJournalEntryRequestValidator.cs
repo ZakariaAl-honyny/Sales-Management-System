@@ -12,7 +12,7 @@ public class CreateJournalEntryRequestValidator : AbstractValidator<CreateJourna
 {
     public CreateJournalEntryRequestValidator()
     {
-        RuleFor(x => x.TransactionDate)
+        RuleFor(x => x.EntryDate)
             .NotEmpty().WithMessage("تاريخ القيد المحاسبي مطلوب")
             .LessThanOrEqualTo(DateTime.Today.AddDays(1))
             .WithMessage("تاريخ القيد المحاسبي لا يمكن أن يكون في المستقبل البعيد");
@@ -30,19 +30,6 @@ public class CreateJournalEntryRequestValidator : AbstractValidator<CreateJourna
 
         RuleFor(x => x.ReferenceNumber)
             .MaximumLength(100).WithMessage("رقم المرجع لا يمكن أن يتجاوز 100 حرف");
-
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).When(x => x.CurrencyId.HasValue)
-            .WithMessage("معرف العملة يجب أن يكون أكبر من صفر");
-
-        RuleFor(x => x.ExchangeRate)
-            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر")
-            .LessThanOrEqualTo(1000000).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف كبير جداً");
-
-        RuleFor(x => x.AttachmentPath)
-            .MaximumLength(500).WithMessage("مسار المرفق لا يمكن أن يتجاوز 500 حرف");
 
         RuleFor(x => x.Lines)
             .NotNull().WithMessage("بنود القيد المحاسبي مطلوبة")

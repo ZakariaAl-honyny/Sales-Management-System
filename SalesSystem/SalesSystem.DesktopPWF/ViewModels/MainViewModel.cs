@@ -326,9 +326,6 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى مرتجعات المشتريات</summary>
     public ICommand NavigateToPurchaseReturnsCommand { get; }
 
-    /// <summary>نقل إلى أوامر الشراء — غير متاحة (قيد التطوير)</summary>
-    public ICommand NavigateToPurchaseOrdersCommand { get; }
-
     // ═══════════════════════════════════════════════════════════════
     // Finance Section Commands
     // ═══════════════════════════════════════════════════════════════
@@ -766,7 +763,7 @@ public class MainViewModel : ViewModelBase
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
             nameof(PurchaseInvoiceListViewModel)    => "Purchases",
-            nameof(PurchaseOrderListViewModel)      => "PurchaseOrders",
+            // PurchaseOrderListViewModel removed — V1-deferred
             nameof(PurchaseReturnListViewModel)     => "PurchaseReturns",
             nameof(SupplierPaymentsListViewModel)   => "SupplierPayments",
             nameof(CashBoxesListViewModel)          => "CashBoxes",

@@ -71,7 +71,7 @@ The Sales Module is divided into **4 sub-modules**:
           │                 │                 │
 ┌─────────▼─────────────────▼─────────────────▼────────┐
 │                   SQL Server                          │
-│  SalesInvoices │ SalesInvoiceItems │ SalesQuotations │
+│  SalesInvoices │ SalesInvoiceLines │ SalesQuotations │
 │  SalesQuotationItems │ SalesReturns │ SalesReturnItems│
 │  InventoryMovements │ JournalEntries │ CustomerPayments│
 └──────────────────────────────────────────────────────┘
@@ -94,7 +94,7 @@ Sales Return:     Draft (1) → Posted (2) → Cancelled (3)
 | Entity | File | Lines | Status |
 |--------|------|-------|--------|
 | `SalesInvoice` | `Domain/Entities/SalesInvoice.cs` | 165 | ✅ Exists |
-| `SalesInvoiceItem` | `Domain/Entities/SalesInvoiceItem.cs` | 58 | ✅ Exists |
+| `SalesInvoiceLine` | `Domain/Entities/SalesInvoiceLine.cs` | 58 | ✅ Exists |
 | `SalesReturn` | `Domain/Entities/SalesReturn.cs` | 126 | ✅ Exists (SalesReturn + SalesReturnItem) |
 
 ### 2.2 EF Core Configurations ✅
@@ -102,18 +102,18 @@ Sales Return:     Draft (1) → Posted (2) → Cancelled (3)
 | Configuration | File | Status |
 |--------------|------|--------|
 | `SalesInvoiceConfiguration` | `Infrastructure/Data/Configurations/SalesInvoiceConfiguration.cs` | ✅ Exists |
-| `SalesInvoiceItemConfiguration` | `Infrastructure/Data/Configurations/SalesInvoiceItemConfiguration.cs` | ✅ Exists |
+| `SalesInvoiceLineConfiguration` | `Infrastructure/Data/Configurations/SalesInvoiceLineConfiguration.cs` | ✅ Exists |
 
 ### 2.3 Contracts ✅
 
 | Type | File | Status |
 |------|------|--------|
 | `SalesInvoiceDto` | `Contracts/DTOs/AllDtos.cs` | ✅ Exists |
-| `SalesInvoiceItemDto` | `Contracts/DTOs/AllDtos.cs` | ✅ Exists |
+| `SalesInvoiceLineDto` | `Contracts/DTOs/AllDtos.cs` | ✅ Exists |
 | `SalesReturnDto` | `Contracts/DTOs/AllDtos.cs` | ✅ Exists |
 | `SalesReturnItemDto` | `Contracts/DTOs/AllDtos.cs` | ✅ Exists |
 | `SalesInvoiceResponse` | `Contracts/Responses/SalesInvoiceResponses.cs` | ✅ Exists |
-| `SalesInvoiceItemResponse` | `Contracts/Responses/SalesInvoiceResponses.cs` | ✅ Exists |
+| `SalesInvoiceLineResponse` | `Contracts/Responses/SalesInvoiceResponses.cs` | ✅ Exists |
 | `CreateSalesInvoiceRequest` | `Contracts/Requests/` | ✅ Likely exists |
 | `UpdateSalesInvoiceRequest` | `Contracts/Requests/` | ✅ Likely exists |
 
@@ -221,14 +221,14 @@ Sales Return:     Draft (1) → Posted (2) → Cancelled (3)
 | # | File | Change |
 |---|------|--------|
 | 1 | `Domain/Entities/SalesInvoice.cs` | Add CurrencyId, ExchangeRate, EnhancedDiscountType/DiscountValue, AdditionalCharges, Items list with batch allocation |
-| 2 | `Domain/Entities/SalesInvoiceItem.cs` | Add ProductUnitId, CostPrice, ProfitAmount, BatchAllocation tracking |
+| 2 | `Domain/Entities/SalesInvoiceLine.cs` | Add ProductUnitId, CostPrice, ProfitAmount, BatchAllocation tracking |
 | 3 | `Domain/Entities/SalesReturn.cs` | Add TaxAmount, DiscountAmount, TotalAmount, AdditionalCharges, CurrencyId, ExchangeRate, CashBoxId, batch return tracking |
 | 4 | `Domain/Entities/SalesReturnItem.cs` | Add ProductUnitId, UnitCost (at time of sale), BatchId for return |
-| 5 | `Contracts/DTOs/AllDtos.cs` | Extend SalesInvoiceDto, SalesInvoiceItemDto, SalesReturnDto with new fields |
+| 5 | `Contracts/DTOs/AllDtos.cs` | Extend SalesInvoiceDto, SalesInvoiceLineDto, SalesReturnDto with new fields |
 | 6 | `Contracts/Responses/SalesInvoiceResponses.cs` | Add currency, profit, enhanced fields |
 | 7 | `Contracts/Requests/SalesInvoiceRequests.cs` | Add CurrencyId, ExchangeRate, price override fields |
 | 8 | `SalesInvoiceConfiguration.cs` | Add new column configs + FK |
-| 9 | `SalesInvoiceItemConfiguration.cs` | Add new column configs |
+| 9 | `SalesInvoiceLineConfiguration.cs` | Add new column configs |
 | 10 | `SalesInvoiceService.cs` (Application) | Add: currency handling, price override approval, auto-journal, auto-payment, enhanced profit calc |
 | 11 | `SalesReturnService.cs` | Add: FIFO batch return, auto refund, discount on return, enhanced journal |
 | 12 | `SalesInvoicesController.cs` | Add new endpoints (Quotation convert, batch allocation info) |
@@ -282,10 +282,10 @@ These 4 issues were identified during analysis as **blocking** — they must be 
 - When selling BELOW cost (AllowBelowCostSale setting), a warning must appear
 - Manager approval required for below-cost sales
 
-Currently, there is NO approval workflow. The price field on `SalesInvoiceItem` is freely editable with no validation or approval gate.
+Currently, there is NO approval workflow. The price field on `SalesInvoiceLine` is freely editable with no validation or approval gate.
 
 **Fix**:
-1. Add `PriceOverrideApprovedBy` (int? UserId) and `PriceOverrideReason` (string?) to SalesInvoiceItem
+1. Add `PriceOverrideApprovedBy` (int? UserId) and `PriceOverrideReason` (string?) to SalesInvoiceLine
 2. Create `PriceOverrideDialog` — styled WPF dialog showing:
    - Current official price
    - Proposed override price
@@ -296,9 +296,9 @@ Currently, there is NO approval workflow. The price field on `SalesInvoiceItem` 
    - `AllowBelowCostSale` (bool, default false) — warn or block
 4. `SalesInvoiceService` checks override on Post — if price < official, requires approval record
 
-> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/SalesInvoiceItem.cs` for the canonical `SetPriceOverride()` method.
+> See `docs/AGENTS.md` for domain entity patterns. See `Domain/Entities/SalesInvoiceLine.cs` for the canonical `SetPriceOverride()` method.
 
-**Files changed**: `SalesInvoiceItem.cs`, `SalesInvoiceItemConfiguration.cs`, `SalesInvoiceService.cs`, `SalesInvoiceEditorViewModel.cs`, `SalesInvoiceEditorView.xaml`, `PriceOverrideDialog.xaml` (NEW)
+**Files changed**: `SalesInvoiceLine.cs`, `SalesInvoiceLineConfiguration.cs`, `SalesInvoiceService.cs`, `SalesInvoiceEditorViewModel.cs`, `SalesInvoiceEditorView.xaml`, `PriceOverrideDialog.xaml` (NEW)
 
 **Estimate**: ~2 hours
 
@@ -342,13 +342,13 @@ Currently, existing `SalesInvoiceService.PostAsync()` calls `_inventoryService.D
 
 **Fix**:
 1. Batch allocation must exist and return cost allocation per item
-2. `SalesInvoiceItem` must store batch allocation records: `List<SalesInvoiceBatchAllocation>`
+2. `SalesInvoiceLine` must store batch allocation records: `List<SalesInvoiceBatchAllocation>`
 3. `InventoryService.DecreaseStockAsync()` must accept batch selection strategy (FIFO/FEFO)
 4. Return list of `(batchId, quantity, unitCost)` for COGS calculation
 
 > See `docs/AGENTS.md` §2.7 (Stock Integrity, RULE-028/029) and §2.25 (Costing Strategy). See `Application/Services/InventoryService.cs` for the canonical batch allocation implementation.
 
-**Files changed**: `InventoryService.cs`, `IInventoryService.cs`, `SalesInvoiceItem.cs` (add batch allocations), `SalesInvoiceService.cs` (use batch allocation)
+**Files changed**: `InventoryService.cs`, `IInventoryService.cs`, `SalesInvoiceLine.cs` (add batch allocations), `SalesInvoiceService.cs` (use batch allocation)
 
 **Estimate**: ~3 hours
 
@@ -388,7 +388,7 @@ Currently, existing `SalesInvoiceService.PostAsync()` calls `_inventoryService.D
 | `**TotalProfit**` | `**decimal(18,2)**` | `**0**` | ❌ | **NEW**: TotalAmount - TotalCost |
 | `CreatedByUserId` | `int? FK` | — | ❌ | Audit (BaseEntity) |
 
-### 4.2 SalesInvoiceItem Entity — ENHANCED
+### 4.2 SalesInvoiceLine Entity — ENHANCED
 
 | Field | Type | Default | Required | Notes |
 |-------|------|---------|----------|-------|
@@ -726,12 +726,12 @@ All tasks include:
 |------|--------|
 | `Domain/Entities/SalesInvoice.cs` | Add `int? CurrencyId`, `decimal ExchangeRate`, `decimal BaseCurrencyTotal`, nav property `Currency` |
 | `Domain/Entities/SalesInvoice.cs` | Add `SetCurrency(int? currencyId, decimal exchangeRate)` method |
-| `Domain/Entities/SalesInvoiceItem.cs` | Add `int? ProductUnitId`, `decimal UnitCost`, `decimal ProfitAmount` |
+| `Domain/Entities/SalesInvoiceLine.cs` | Add `int? ProductUnitId`, `decimal UnitCost`, `decimal ProfitAmount` |
 | `Infrastructure/Data/Configurations/SalesInvoiceConfiguration.cs` | Add FK config for CurrencyId: `DeleteBehavior.Restrict` (RULE-214) |
-| `Infrastructure/Data/Configurations/SalesInvoiceItemConfiguration.cs` | Add ProductUnitId FK config, `HasPrecision(18,2)` for UnitCost/ProfitAmount |
+| `Infrastructure/Data/Configurations/SalesInvoiceLineConfiguration.cs` | Add ProductUnitId FK config, `HasPrecision(18,2)` for UnitCost/ProfitAmount |
 | `Infrastructure/Data/Migrations/` | NEW migration: ALTER TABLE SalesInvoices ADD + FKs |
 | `Contracts/DTOs/AllDtos.cs` | Add `CurrencyId`, `CurrencyName`, `ExchangeRate`, `BaseCurrencyTotal`, `TotalCost`, `TotalProfit` to SalesInvoiceDto |
-| `Contracts/DTOs/AllDtos.cs` | Add `ProductUnitId`, `ProductUnitName`, `UnitCost`, `ProfitAmount` to SalesInvoiceItemDto |
+| `Contracts/DTOs/AllDtos.cs` | Add `ProductUnitId`, `ProductUnitName`, `UnitCost`, `ProfitAmount` to SalesInvoiceLineDto |
 | `Contracts/Responses/SalesInvoiceResponses.cs` | Add currency fields |
 | `Contracts/Requests/SalesInvoiceRequests.cs` | Add `int? CurrencyId`, `decimal ExchangeRate` to requests |
 | `Application/Services/SalesInvoiceService.cs` | Map currency fields in DTO conversion |
@@ -773,10 +773,10 @@ All tasks include:
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/SalesInvoiceItem.cs` | Add `int? PriceOverrideApprovedBy`, `string? PriceOverrideReason`, `decimal? OfficialPrice` |
-| `Domain/Entities/SalesInvoiceItem.cs` | Add `SetPriceOverride(decimal newPrice, int? approvedBy, string? reason)` |
-| `Infrastructure/Data/Configurations/SalesInvoiceItemConfiguration.cs` | Add HasMaxLength for reason |
-| `Contracts/DTOs/AllDtos.cs` | Add override fields to SalesInvoiceItemDto |
+| `Domain/Entities/SalesInvoiceLine.cs` | Add `int? PriceOverrideApprovedBy`, `string? PriceOverrideReason`, `decimal? OfficialPrice` |
+| `Domain/Entities/SalesInvoiceLine.cs` | Add `SetPriceOverride(decimal newPrice, int? approvedBy, string? reason)` |
+| `Infrastructure/Data/Configurations/SalesInvoiceLineConfiguration.cs` | Add HasMaxLength for reason |
+| `Contracts/DTOs/AllDtos.cs` | Add override fields to SalesInvoiceLineDto |
 | `DesktopPWF/Views/Dialogs/PriceOverrideDialog.xaml` | **NEW**: Styled WPF dialog with warning level, price comparison, reason text |
 | `DesktopPWF/Views/Dialogs/PriceOverrideDialog.xaml.cs` | Dialog logic |
 | `DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` | Add price validation on item add/edit |
@@ -797,9 +797,9 @@ All tasks include:
 | File | Change |
 |------|--------|
 | `Domain/Entities/SalesInvoice.cs` | Add `TotalCost` and `TotalProfit` computed properties |
-| `Domain/Entities/SalesInvoiceItem.cs` | Add `UnitCost` and `ProfitAmount` |
+| `Domain/Entities/SalesInvoiceLine.cs` | Add `UnitCost` and `ProfitAmount` |
 | `Application/Services/SalesInvoiceService.cs` | Compute costs from batch allocation during Post |
-| `Contracts/DTOs/AllDtos.cs` | Add `UnitCost`, `ProfitAmount` to SalesInvoiceItemDto; `TotalCost`, `TotalProfit` to SalesInvoiceDto |
+| `Contracts/DTOs/AllDtos.cs` | Add `UnitCost`, `ProfitAmount` to SalesInvoiceLineDto; `TotalCost`, `TotalProfit` to SalesInvoiceDto |
 | `DesktopPWF/ViewModels/Sales/SalesInvoiceEditorViewModel.cs` | Add profit display properties + visibility toggle (based on ShowProfitInInvoice setting) |
 | `DesktopPWF/Views/Sales/SalesInvoiceEditorView.xaml` | Add profit columns in DataGrid (green/red) |
 
@@ -1274,8 +1274,8 @@ All tasks include:
 | T17.15 | `SalesQuotation.IsExpired()` when ValidUntil < UtcNow → true | Boolean check |
 | T17.16 | `SalesReturn.Create()` with valid args → status Draft, references original invoice | No exception |
 | T17.17 | `SalesReturnItem.ValidateReturnQuantity()` > original sold → `DomainException` | Arabic message |
-| T17.18 | `SalesInvoiceItem.CalculateLineTotal()` = `(Qty * UnitPrice) - DiscountAmount` | Correct decimal math |
-| T17.19 | `SalesInvoiceItem.CalculateLineTotal()` with zero discount = `Qty * UnitPrice` | Correct decimal math |
+| T17.18 | `SalesInvoiceLine.CalculateLineTotal()` = `(Qty * UnitPrice) - DiscountAmount` | Correct decimal math |
+| T17.19 | `SalesInvoiceLine.CalculateLineTotal()` with zero discount = `Qty * UnitPrice` | Correct decimal math |
 | T17.20 | `SalesInvoice.TotalAmount` = `SubTotal - InvoiceDiscount + TaxAmount` | Correct decimal math |
 | T17.21 | `SalesInvoice.DueAmount` = `TotalAmount - PaidAmount` | Correct decimal math |
 | T17.22 | `SalesInvoice.PaidAmount > TotalAmount` → `DomainException("المبلغ المدفوع أكبر من الإجمالي")` | Arabic message |
@@ -1326,8 +1326,8 @@ All tasks include:
 | ID | Test | Expected |
 |----|------|----------|
 | T20.01 | `SalesInvoiceConfiguration` → `InvoiceNo` has `.HasColumnType("int")` NOT string | Correct type |
-| T20.02 | `SalesInvoiceItemConfiguration` → `UnitPrice` has `.HasPrecision(18, 2)` | Precision = (18,2) |
-| T20.03 | `SalesInvoiceItemConfiguration` → `Quantity` has `.HasPrecision(18, 3)` | Precision = (18,3) |
+| T20.02 | `SalesInvoiceLineConfiguration` → `UnitPrice` has `.HasPrecision(18, 2)` | Precision = (18,2) |
+| T20.03 | `SalesInvoiceLineConfiguration` → `Quantity` has `.HasPrecision(18, 3)` | Precision = (18,3) |
 | T20.04 | `SalesInvoiceConfiguration` → FK `CreatedByUserId` is `DeleteBehavior.Restrict` | Restrict |
 | T20.05 | `SalesInvoiceConfiguration` → FK `CustomerId` is `DeleteBehavior.Restrict` | Restrict |
 | T20.06 | `SalesInvoiceConfiguration` → FK `CashBoxId` is `DeleteBehavior.Restrict` | Restrict |

@@ -51,16 +51,6 @@ public class PaymentVoucher : DocumentEntity
     public string? Notes { get; private set; }
 
     /// <summary>
-    /// FK to related source document (optional). e.g., PurchaseInvoice, Expense.
-    /// </summary>
-    public int? SourceDocumentId { get; private set; }
-
-    /// <summary>
-    /// Type of source document (optional).
-    /// </summary>
-    public string? SourceDocumentType { get; private set; }
-
-    /// <summary>
     /// Document status: 1=Draft, 2=Posted, 3=Cancelled.
     /// </summary>
     public byte Status { get; private set; }
@@ -78,8 +68,6 @@ public class PaymentVoucher : DocumentEntity
         int accountId,
         decimal totalAmount,
         string? notes = null,
-        int? sourceDocumentId = null,
-        string? sourceDocumentType = null,
         int? createdByUserId = null)
     {
         if (voucherNo <= 0)
@@ -106,8 +94,6 @@ public class PaymentVoucher : DocumentEntity
             AccountId = accountId,
             TotalAmount = totalAmount,
             Notes = notes?.Trim(),
-            SourceDocumentId = sourceDocumentId,
-            SourceDocumentType = sourceDocumentType?.Trim(),
             Status = (byte)InvoiceStatus.Draft,
             CreatedAt = DateTime.UtcNow,
         };
@@ -151,8 +137,6 @@ public class PaymentVoucher : DocumentEntity
     public void Update(
         DateTime? voucherDate = null,
         string? notes = null,
-        int? sourceDocumentId = null,
-        string? sourceDocumentType = null,
         int? updatedByUserId = null)
     {
         if (Status != (byte)InvoiceStatus.Draft)
@@ -163,12 +147,6 @@ public class PaymentVoucher : DocumentEntity
 
         if (notes != null)
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
-
-        if (sourceDocumentId.HasValue)
-            SourceDocumentId = sourceDocumentId.Value;
-
-        if (sourceDocumentType != null)
-            SourceDocumentType = string.IsNullOrWhiteSpace(sourceDocumentType) ? null : sourceDocumentType.Trim();
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

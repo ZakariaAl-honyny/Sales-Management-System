@@ -51,14 +51,14 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
         var suppliers = new List<SupplierDto>
         {
-            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1),
-            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1)
+            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, PartyId: 1, AccountId: 1),
+            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, PartyId: 1, AccountId: 1)
         };
 
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Code: "", Name: "المستودع الرئيسي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true),
-            new WarehouseDto(Id: 2, Code: "", Name: "المستودع الفرعي", Type: 1, Location: null, Phone: null, Address: null, ManagerName: null, IsActive: true)
+            new WarehouseDto(Id: 1, Name: "������ 1", Phone: null, Address: null, Notes: null, IsActive: true),
+            new WarehouseDto(Id: 2, Name: "������ 2", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         var products = new List<ProductDto>
@@ -122,7 +122,6 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             WarehouseId: 1,
             WarehouseName: "المستودع الرئيسي",
             InvoiceDate: DateTime.Today,
-            DueDate: null,
             PaymentType: 1,
             SubTotal: 1000m,
             DiscountAmount: 0,
@@ -138,10 +137,9 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
-            AttachmentPath: null,
-            Items: new List<PurchaseInvoiceItemDto>
+            Items: new List<PurchaseInvoiceLineDto>
         {
-            new PurchaseInvoiceItemDto(1, 1, "منتج 1", 1, null, 10, 100m, 1000m)
+            new PurchaseInvoiceLineDto(1, 1, "منتج 1", 1, null, 10, 100m, 1000m)
         });
 
         _mockInvoiceService.Setup(s => s.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(Result<PurchaseInvoiceDto>.Success(invoice));
@@ -191,6 +189,9 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
     private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, Notes: null, DefaultPurchaseUnitId: null, DefaultSalesUnitId: null, IsActive: true);
+        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, IsActive: true);
     }
 }
+
+
+

@@ -190,7 +190,7 @@ BEGIN
             DECLARE @Price DECIMAL(18, 2) = (ABS(CHECKSUM(NEWID())) % 100) + 10;
             DECLARE @ItemTotal DECIMAL(18, 2) = @Qty * @Price;
 
-            INSERT INTO SalesInvoiceItems
+            INSERT INTO SalesInvoiceLines
                 (SalesInvoiceId, ProductId, Quantity, UnitPrice, DiscountAmount, LineTotal, Mode, Notes, CreatedAt, CreatedByUserId)
             VALUES (
                 @InvoiceId, @ProductId, @Qty, @Price, 0, @ItemTotal, 1, NULL,
@@ -257,7 +257,7 @@ BEGIN
             DECLARE @PCost DECIMAL(18, 2) = (ABS(CHECKSUM(NEWID())) % 30) + 5;
             DECLARE @PItemTotal DECIMAL(18, 2) = @PQty * @PCost;
 
-            INSERT INTO PurchaseInvoiceItems
+            INSERT INTO PurchaseInvoiceLines
                 (PurchaseInvoiceId, ProductId, Quantity, UnitCost, DiscountAmount, LineTotal, Notes, CreatedAt, CreatedByUserId)
             VALUES (
                 @InvoiceId, @ProductId, @PQty, @PCost, 0, @PItemTotal, NULL,
@@ -291,6 +291,6 @@ SELECT
     (SELECT COUNT(*) FROM Suppliers) AS Suppliers,
     (SELECT COUNT(*) FROM WarehouseStocks) AS WarehouseStocks,
     (SELECT COUNT(*) FROM SalesInvoices) AS SalesInvoices,
-    (SELECT COUNT(*) FROM SalesInvoiceItems) AS SalesInvoiceItems,
+    (SELECT COUNT(*) FROM SalesInvoiceLines) AS SalesInvoiceLines,
     (SELECT COUNT(*) FROM PurchaseInvoices) AS PurchaseInvoices,
-    (SELECT COUNT(*) FROM PurchaseInvoiceItems) AS PurchaseInvoiceItems;
+    (SELECT COUNT(*) FROM PurchaseInvoiceLines) AS PurchaseInvoiceLines;

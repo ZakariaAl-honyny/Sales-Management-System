@@ -133,7 +133,7 @@ public class SalesServiceTests : IDisposable
             DiscountType = null,
             DiscountRate = null,
             Notes = "Walk-in sale",
-            Items = new List<CreateSalesInvoiceItemRequest>
+            Items = new List<CreateSalesInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 2m, UnitPrice = 150m, DiscountAmount = 0m, Notes = null }
             }
@@ -163,7 +163,7 @@ public class SalesServiceTests : IDisposable
             DueDate = null,
             DiscountAmount = 20m,
             Notes = null,
-            Items = new List<CreateSalesInvoiceItemRequest>
+            Items = new List<CreateSalesInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 2m, UnitPrice = 150m, DiscountAmount = 0m, Notes = null }
             }
@@ -194,7 +194,7 @@ public class SalesServiceTests : IDisposable
             DueDate = null,
             DiscountAmount = 0m,
             Notes = null,
-            Items = new List<CreateSalesInvoiceItemRequest>
+            Items = new List<CreateSalesInvoiceLineRequest>
             {
                 new() { ProductId = 1, ProductUnitId = 1, Quantity = 0m, UnitPrice = 150m, DiscountAmount = 0m, Notes = null }
             }
@@ -235,7 +235,7 @@ public class SalesServiceTests : IDisposable
             dueDate: null,
             notes: null
         );
-        invoice.AddItem(SalesInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 2m, unitPrice: 150m, discountAmount: 0m));
+        invoice.AddItem(SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 2m, unitPrice: 150m, discountAmount: 0m));
         invoice.SetPaidAmount(300m);
         _dbContext.SalesInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
@@ -295,7 +295,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = SalesInvoice.Create(customerId: 1, warehouseId: 1, invoiceNo: 1, invoiceDate: DateTime.Now, paymentType: DomainPaymentType.Credit, discountAmount: 0m, dueDate: DateOnly.FromDateTime(DateTime.Now.AddDays(30)), notes: null);
-        invoice.AddItem(SalesInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 5m, unitPrice: 100m, discountAmount: 0m));
+        invoice.AddItem(SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 5m, unitPrice: 100m, discountAmount: 0m));
         invoice.SetPaidAmount(0m);
         invoice.Post();
         _dbContext.SalesInvoices.Add(invoice);
@@ -334,7 +334,7 @@ public class SalesServiceTests : IDisposable
         await _dbContext.SaveChangesAsync();
 
         var invoice = SalesInvoice.Create(customerId: 1, warehouseId: 1, invoiceNo: 1, invoiceDate: DateTime.Now, paymentType: DomainPaymentType.Cash, discountAmount: 0m, dueDate: null, notes: null);
-        invoice.AddItem(SalesInvoiceItem.Create(productId: 1, productUnitId: 1, quantity: 2m, unitPrice: 150m, discountAmount: 0m));
+        invoice.AddItem(SalesInvoiceLine.Create(productId: 1, productUnitId: 1, quantity: 2m, unitPrice: 150m, discountAmount: 0m));
         invoice.SetPaidAmount(300m);
         _dbContext.SalesInvoices.Add(invoice);
         await _dbContext.SaveChangesAsync();
@@ -392,7 +392,7 @@ public class SalesServiceTests : IDisposable
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
         public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
-        public DbSet<SalesInvoiceItem> SalesInvoiceItems => Set<SalesInvoiceItem>();
+        public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
         public DbSet<Customer> Customers => Set<Customer>();
         public DbSet<Warehouse> Warehouses => Set<Warehouse>();
         public DbSet<Product> Products => Set<Product>();

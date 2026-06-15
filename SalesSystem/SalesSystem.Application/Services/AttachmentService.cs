@@ -67,7 +67,6 @@ public class AttachmentService : IAttachmentService
         try
         {
             var attachment = Attachment.Create(
-                request.EntityType,
                 request.ReferenceId,
                 request.FileName,
                 request.FilePath,
@@ -130,15 +129,14 @@ public class AttachmentService : IAttachmentService
             if (attachment == null)
                 return Result.Failure("المرفق غير موجود", ErrorCodes.NotFound);
 
-            attachment.MarkAsDeleted();
-            await _uow.SaveChangesAsync(ct);
+            await _uow.Attachments.HardDeleteAsync(id, ct);
 
-            _logger.LogInformation("Attachment deactivated: (ID: {Id})", id);
+            _logger.LogInformation("Attachment permanently deleted: (ID: {Id})", id);
             return Result.Success();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deactivating attachment {Id}", id);
+            _logger.LogError(ex, "Error deleting attachment {Id}", id);
             return Result.Failure("حدث خطأ أثناء حذف المرفق");
         }
     }

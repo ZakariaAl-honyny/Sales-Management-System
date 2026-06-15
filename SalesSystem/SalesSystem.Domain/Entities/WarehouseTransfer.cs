@@ -7,23 +7,21 @@ namespace SalesSystem.Domain.Entities;
 /// <summary>
 /// Represents a stock transfer between two warehouses.
 /// Maps to "WarehouseTransfers" table.
+/// Schema: TransferNo (int unique), FromWarehouseId (smallint FK),
+/// ToWarehouseId (smallint FK), TransferDate (date), Notes, Status (tinyint), audit.
 /// </summary>
 public class WarehouseTransfer : DocumentEntity
 {
-    /// <summary>
-    /// Transfer status (Draft=1, Posted=2, Cancelled=3).
-    /// </summary>
-    public InvoiceStatus Status { get; private set; }
-
     public int TransferNo { get; private set; }
     public DateTime TransferDate { get; private set; }
-    public short SourceWarehouseId { get; private set; }
-    public short DestinationWarehouseId { get; private set; }
+    public short FromWarehouseId { get; private set; }
+    public short ToWarehouseId { get; private set; }
     public string? Notes { get; private set; }
+    public InvoiceStatus Status { get; private set; }
 
     // Navigation properties
-    public virtual Warehouse? SourceWarehouse { get; private set; }
-    public virtual Warehouse? DestinationWarehouse { get; private set; }
+    public virtual Warehouse? FromWarehouse { get; private set; }
+    public virtual Warehouse? ToWarehouse { get; private set; }
     private readonly List<WarehouseTransferLine> _lines = new();
     public IReadOnlyCollection<WarehouseTransferLine> Lines => _lines.AsReadOnly();
 
@@ -31,27 +29,27 @@ public class WarehouseTransfer : DocumentEntity
 
     public static WarehouseTransfer Create(
         int transferNo,
-        short sourceWarehouseId,
-        short destinationWarehouseId,
+        short fromWarehouseId,
+        short toWarehouseId,
         DateTime? transferDate = null,
         string? notes = null,
         int? createdByUserId = null)
     {
         if (transferNo <= 0)
             throw new DomainException("رقم التحويل مطلوب.");
-        if (sourceWarehouseId <= 0)
+        if (fromWarehouseId <= 0)
             throw new DomainException("المستودع المصدر مطلوب.");
-        if (destinationWarehouseId <= 0)
+        if (toWarehouseId <= 0)
             throw new DomainException("المستودع الوجهة مطلوب.");
-        if (sourceWarehouseId == destinationWarehouseId)
+        if (fromWarehouseId == toWarehouseId)
             throw new DomainException("المستودع المصدر والوجهة يجب أن يكونا مختلفين.");
 
         var t = new WarehouseTransfer
         {
             Status = InvoiceStatus.Draft,
             TransferNo = transferNo,
-            SourceWarehouseId = sourceWarehouseId,
-            DestinationWarehouseId = destinationWarehouseId,
+            FromWarehouseId = fromWarehouseId,
+            ToWarehouseId = toWarehouseId,
             TransferDate = transferDate ?? DateTime.UtcNow,
             Notes = notes
         };

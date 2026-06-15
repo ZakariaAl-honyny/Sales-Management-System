@@ -12,10 +12,10 @@ public record SalesInvoiceResponse(
     bool IsTaxInclusive,
     decimal TotalAmount, decimal PaidAmount, decimal DueAmount,
     DateTime InvoiceDate, string? Notes,
-    List<SalesInvoiceItemResponse> Items
+    List<SalesInvoiceLineResponse> Items
 );
 
-public record SalesInvoiceItemResponse(
+public record SalesInvoiceLineResponse(
     int Id, int ProductId, string ProductName,
     decimal Quantity, decimal UnitPrice, decimal DiscountAmount, decimal LineTotal
 );

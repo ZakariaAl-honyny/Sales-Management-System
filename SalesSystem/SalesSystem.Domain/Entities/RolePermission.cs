@@ -9,14 +9,14 @@ namespace SalesSystem.Domain.Entities;
 /// </summary>
 public class RolePermission : Entity
 {
-    public int RoleId { get; private set; }
+    public short RoleId { get; private set; }
     public Role Role { get; private set; } = null!;
     public int PermissionId { get; private set; }
     public Permission Permission { get; private set; } = null!;
 
     protected RolePermission() { } // EF Core
 
-    public static RolePermission Create(int roleId, int permissionId)
+    public static RolePermission Create(short roleId, int permissionId)
     {
         return new RolePermission
         {

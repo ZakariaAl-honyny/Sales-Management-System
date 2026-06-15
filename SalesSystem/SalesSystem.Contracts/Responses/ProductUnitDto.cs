@@ -6,6 +6,5 @@ public record ProductUnitDto(
     int UnitId,
     string? UnitName,
     decimal ConversionFactor,
-    bool IsBaseUnit,
-    bool IsActive
+    bool IsBaseUnit
 );

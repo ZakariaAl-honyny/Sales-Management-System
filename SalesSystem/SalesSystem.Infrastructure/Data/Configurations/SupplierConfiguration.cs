@@ -10,25 +10,37 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     {
         builder.ToTable("Suppliers");
 
-        // Id is both PK and FK to Parties(Id) — shared primary key pattern
+        // Supplier.Id is auto-increment PK (separate from Party.Id)
         builder.HasKey(s => s.Id);
-
         builder.Property(s => s.Id)
-            .ValueGeneratedNever(); // Id is assigned from Party.Id, not auto-generated
+            .ValueGeneratedOnAdd();
 
-        // Properties
-        builder.Property(s => s.PaymentTerms)
-            .HasMaxLength(200);
-
-        builder.Property(s => s.Notes)
-            .HasMaxLength(500);
-
-        // 1:1 relationship with Party via shared PK
+        // FK to Party
         builder.HasOne(s => s.Party)
-            .WithOne()
-            .HasForeignKey<Supplier>(s => s.Id)
+            .WithMany()
+            .HasForeignKey(s => s.PartyId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
+
+        // FK to Account
+        builder.HasOne(s => s.Account)
+            .WithMany()
+            .HasForeignKey(s => s.AccountId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired();
+
+        // CategoryId is a lookup — no FK constraint (type mismatch with smallint PK)
+        builder.Property(s => s.CategoryId).IsRequired(false);
+
+        // Indexes
+        builder.HasIndex(s => s.PartyId)
+            .HasDatabaseName("IX_Suppliers_PartyId");
+
+        builder.HasIndex(s => s.AccountId)
+            .HasDatabaseName("IX_Suppliers_AccountId");
+
+        builder.HasIndex(s => s.CategoryId)
+            .HasDatabaseName("IX_Suppliers_CategoryId");
 
         // Global query filter — soft delete
         builder.HasQueryFilter(s => s.IsActive);

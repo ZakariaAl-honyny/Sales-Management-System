@@ -8,16 +8,12 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateSystemAccountMappingRequest(
     SystemAccountKey MappingKey,
     int AccountId,
-    int BranchId = 0,
-    string? DescriptionAr = null,
-    string? DescriptionEn = null
+    short? BranchId = null
 );
 
 /// <summary>
 /// Request to update an existing system account mapping.
 /// </summary>
 public record UpdateSystemAccountMappingRequest(
-    int AccountId,
-    string? DescriptionAr = null,
-    string? DescriptionEn = null
+    int AccountId
 );

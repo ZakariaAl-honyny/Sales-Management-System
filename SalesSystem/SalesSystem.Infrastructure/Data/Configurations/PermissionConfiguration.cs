@@ -15,8 +15,8 @@ public class PermissionConfiguration : IEntityTypeConfiguration<Permission>
         builder.Property(p => p.Code).IsRequired().HasMaxLength(100);
         builder.HasIndex(p => p.Code).IsUnique();
 
-        // DisplayName (was DisplayNameAr) — required, max 200
-        builder.Property(p => p.DisplayName).IsRequired().HasMaxLength(200);
+        // DisplayName — required, max 150 (schema: nvarchar(150))
+        builder.Property(p => p.DisplayName).IsRequired().HasMaxLength(150);
 
         // Category — now non-nullable, required, max 100
         builder.Property(p => p.Category).IsRequired().HasMaxLength(100);

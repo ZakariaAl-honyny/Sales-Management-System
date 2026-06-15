@@ -8,7 +8,7 @@ namespace SalesSystem.Domain.Entities;
 /// Supports multi-currency pricing with effective date ranges.
 /// Maps to "ProductPrices" table — ProductUnitId FK, CurrencyId (smallint FK), Price, EffectiveFrom/To.
 /// </summary>
-public class ProductPrice : ActivatableEntity
+public class ProductPrice : AuditableEntity
 {
     /// <summary>
     /// FK to ProductUnit — identifies which unit this price applies to.
@@ -73,7 +73,6 @@ public class ProductPrice : ActivatableEntity
             Price = Math.Round(price, 2),
             EffectiveFrom = effectiveFrom,
             EffectiveTo = effectiveTo,
-            IsActive = true
         };
         productPrice.SetCreatedBy(createdByUserId);
         return productPrice;

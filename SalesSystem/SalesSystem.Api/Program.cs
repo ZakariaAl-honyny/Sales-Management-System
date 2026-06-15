@@ -179,9 +179,7 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 builder.Services.AddScoped<IInventoryBatchService, InventoryBatchService>();
 builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
-builder.Services.AddScoped<IProductImageService, ProductImageService>();
-builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
-builder.Services.AddScoped<IAdditionalFeeService, AdditionalFeeService>();
+// REMOVED: PurchaseOrderService (V1-deferred)
 // REMOVED: ProductImageService (implementation not yet created)
 // REMOVED: AssemblyService (BillOfMaterials deferred to V2)
 
@@ -219,8 +217,6 @@ builder.Services.AddScoped<IReceiptVoucherService, ReceiptVoucherService>();
 builder.Services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
 builder.Services.AddScoped<IWarehouseTransferService, WarehouseTransferService>();
 
-// ─── Cheque Service (Phase 29) ───────────────────────────────
-builder.Services.AddScoped<IChequeService, ChequeService>();
 
 builder.Services.AddSingleton(jwtSettings);
 
@@ -327,7 +323,7 @@ builder.Services.AddScoped<IValidator<CreateCustomerRequest>, CreateCustomerRequ
 builder.Services.AddScoped<IValidator<UpdateCustomerRequest>, UpdateCustomerRequestValidator>();
 
 // REMOVED: BillOfMaterials/Assembly validators (deferred to V2)
-builder.Services.AddScoped<IValidator<UpdateAllocationsRequest>, UpdateAllocationsRequestValidator>();
+// REMOVED: PaymentAllocation validators (V1-deferred)
 builder.Services.AddScoped<IValidator<CreateReceiptVoucherRequest>, CreateReceiptVoucherRequestValidator>();
 builder.Services.AddScoped<IValidator<UpdateReceiptVoucherRequest>, UpdateReceiptVoucherRequestValidator>();
 builder.Services.AddScoped<IValidator<CreatePaymentVoucherRequest>, CreatePaymentVoucherRequestValidator>();

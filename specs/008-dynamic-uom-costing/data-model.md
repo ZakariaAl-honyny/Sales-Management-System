@@ -57,6 +57,6 @@ Immutable audit log of price and cost changes.
 #### `SystemSettings`
 - Add: `CostingMethod` (byte/enum: 1 = WeightedAverage, 2 = LastPurchasePrice, 3 = SupplierPrice). Default = 1.
 
-#### `SalesInvoiceItem` & `PurchaseInvoiceItem`
+#### `SalesInvoiceLine` & `PurchaseInvoiceLine`
 - Modify: Link to `ProductId` but store `TransactionUnitId` (or unit name/factor) to freeze the unit details at the time of the transaction.
-- Add: `SaleMode` (Retail/Wholesale) on `SalesInvoiceItem`.
+- Add: `SaleMode` (Retail/Wholesale) on `SalesInvoiceLine`.

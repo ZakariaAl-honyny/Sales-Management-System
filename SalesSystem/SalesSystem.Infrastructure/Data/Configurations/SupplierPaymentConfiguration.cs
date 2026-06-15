@@ -12,14 +12,10 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.PaymentNo)
-            .HasMaxLength(50)
             .IsRequired();
 
         builder.Property(x => x.SupplierId)
             .IsRequired();
-
-        builder.Property(x => x.PurchaseInvoiceId)
-            .IsRequired(false);
 
         builder.Property(x => x.PaymentDate)
             .IsRequired();
@@ -33,14 +29,10 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .IsRequired();
 
         builder.Property(x => x.CashBoxId)
-            .IsRequired(false);
+            .IsRequired();
 
         builder.Property(x => x.CurrencyId)
-            .IsRequired(false);
-
-        builder.Property(x => x.ExchangeRate)
-            .HasPrecision(18, 2)
-            .IsRequired(false);
+            .IsRequired();
 
         builder.Property(x => x.ReferenceNo)
             .HasMaxLength(100)
@@ -51,17 +43,12 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .IsRequired(false);
 
         builder.Property(x => x.Status)
-            .HasConversion<int>()
+            .HasConversion<byte>()
             .IsRequired();
 
         builder.HasOne(x => x.Supplier)
             .WithMany()
             .HasForeignKey(x => x.SupplierId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(x => x.PurchaseInvoice)
-            .WithMany()
-            .HasForeignKey(x => x.PurchaseInvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.CashBox)

@@ -24,7 +24,7 @@ public class DepartmentService : IDepartmentService
     {
         try
         {
-            var departments = await _uow.Departments.ToListAsync(ct, "Branch");
+            var departments = await _uow.Departments.ToListAsync(ct);
             var dtos = departments.Select(MapToDto).ToList();
             return Result<List<DepartmentDto>>.Success(dtos);
         }
@@ -39,7 +39,7 @@ public class DepartmentService : IDepartmentService
     {
         try
         {
-            var department = await _uow.Departments.FirstOrDefaultAsync(d => d.Id == id, ct, "Branch");
+            var department = await _uow.Departments.FirstOrDefaultAsync(d => d.Id == id, ct);
             if (department == null)
                 return Result<DepartmentDto>.Failure("القسم غير موجود", ErrorCodes.NotFound);
 
@@ -56,19 +56,14 @@ public class DepartmentService : IDepartmentService
     {
         try
         {
-            // Validate branch exists
-            var branchExists = await _uow.Branches.AnyAsync(b => b.Id == request.BranchId, ct);
-            if (!branchExists)
-                return Result<DepartmentDto>.Failure("الفرع المحدد غير موجود", ErrorCodes.NotFound);
-
-            var department = Department.Create((short)request.BranchId, request.Name);
+            var department = Department.Create(request.Name);
 
             await _uow.Departments.AddAsync(department, ct);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Department created: {Name} (ID: {Id}, BranchId: {BranchId})",
-                department.Name, department.Id, request.BranchId);
+                "Department created: {Name} (ID: {Id})",
+                department.Name, department.Id);
 
             return Result<DepartmentDto>.Success(MapToDto(department));
         }
@@ -88,7 +83,7 @@ public class DepartmentService : IDepartmentService
     {
         try
         {
-            var department = await _uow.Departments.FirstOrDefaultAsync(d => d.Id == id, ct, "Branch");
+            var department = await _uow.Departments.FirstOrDefaultAsync(d => d.Id == id, ct);
             if (department == null)
                 return Result<DepartmentDto>.Failure("القسم غير موجود", ErrorCodes.NotFound);
 
@@ -136,8 +131,6 @@ public class DepartmentService : IDepartmentService
     {
         return new DepartmentDto(
             department.Id,
-            department.BranchId,
-            department.Branch?.Name,
             department.Name,
             department.IsActive
         );

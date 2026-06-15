@@ -4,32 +4,30 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
 
-public class SalesInvoiceItemTests
+public class SalesInvoiceLineTests
 {
     [Fact]
     public void Create_GivenValidData_ShouldCreateItem()
     {
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 2,
-            unitPrice: 100m,
-            discountAmount: 10m,
-            notes: "Test item"
+            unitPrice: 100m
         );
 
         item.ProductId.Should().Be(1);
         item.Quantity.Should().Be(2);
         item.UnitPrice.Should().Be(100m);
-        item.DiscountAmount.Should().Be(10m);
-        item.Notes.Should().Be("Test item");
-        item.LineTotal.Should().Be(190m); // (2 * 100) - 10
+        item.LineTotal.Should().Be(200m); // 2 * 100
     }
 
     [Fact]
     public void Create_GivenProductIdIsZero_ShouldThrowDomainException()
     {
-        var action = () => SalesInvoiceItem.Create(
+        var action = () => SalesInvoiceLine.Create(
             productId: 0,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -41,8 +39,9 @@ public class SalesInvoiceItemTests
     [Fact]
     public void Create_GivenProductIdIsNegative_ShouldThrowDomainException()
     {
-        var action = () => SalesInvoiceItem.Create(
+        var action = () => SalesInvoiceLine.Create(
             productId: -1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
@@ -57,8 +56,9 @@ public class SalesInvoiceItemTests
     [InlineData(-100)]
     public void Create_GivenInvalidQuantity_ShouldThrowDomainException(decimal invalidQuantity)
     {
-        var action = () => SalesInvoiceItem.Create(
+        var action = () => SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: invalidQuantity,
             unitPrice: 100m
         );
@@ -72,8 +72,9 @@ public class SalesInvoiceItemTests
     [InlineData(-100)]
     public void Create_GivenNegativeUnitPrice_ShouldThrowDomainException(decimal negativePrice)
     {
-        var action = () => SalesInvoiceItem.Create(
+        var action = () => SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: negativePrice
         );
@@ -82,27 +83,12 @@ public class SalesInvoiceItemTests
             .WithMessage("*سعر الوحدة لا يمكن أن يكون سالباً*");
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(-100)]
-    public void Create_GivenNegativeDiscountAmount_ShouldThrowDomainException(decimal negativeDiscount)
-    {
-        var action = () => SalesInvoiceItem.Create(
-            productId: 1,
-            quantity: 1,
-            unitPrice: 100m,
-            discountAmount: negativeDiscount
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("*الخصم لا يمكن أن يكون سالباً*");
-    }
-
     [Fact]
     public void Create_GivenZeroUnitPrice_ShouldSucceed()
     {
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 0m
         );
@@ -112,55 +98,43 @@ public class SalesInvoiceItemTests
     }
 
     [Fact]
-    public void Create_GivenNoDiscount_ShouldHaveZeroDiscount()
+    public void Create_GivenNoDiscount_ShouldHaveLineTotalAsQuantityTimesUnitPrice()
     {
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1,
             unitPrice: 100m
         );
 
-        item.DiscountAmount.Should().Be(0m);
         item.LineTotal.Should().Be(100m);
-    }
-
-    [Fact]
-    public void Create_GivenNoNotes_ShouldHaveNullNotes()
-    {
-        var item = SalesInvoiceItem.Create(
-            productId: 1,
-            quantity: 1,
-            unitPrice: 100m
-        );
-
-        item.Notes.Should().BeNull();
     }
 
     [Fact]
     public void RecalculateLineTotal_ShouldUpdateLineTotal()
     {
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 3,
-            unitPrice: 50m,
-            discountAmount: 25m
+            unitPrice: 50m
         );
 
         item.RecalculateLineTotal();
 
-        item.LineTotal.Should().Be(125m); // (3 * 50) - 25
+        item.LineTotal.Should().Be(150m); // 3 * 50
     }
 
     [Fact]
     public void Create_GivenLargeQuantity_ShouldCalculateCorrectly()
     {
-        var item = SalesInvoiceItem.Create(
+        var item = SalesInvoiceLine.Create(
             productId: 1,
+            productUnitId: 1,
             quantity: 1000m,
-            unitPrice: 10m,
-            discountAmount: 5m
+            unitPrice: 10m
         );
 
-        item.LineTotal.Should().Be(9995m); // (1000 * 10) - 5
+        item.LineTotal.Should().Be(10000m); // 1000 * 10
     }
 }

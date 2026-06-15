@@ -167,7 +167,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb1");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", code: "WH-MAIN");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse");
 
         // Act
         await repository.AddAsync(warehouse);
@@ -185,7 +185,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb2");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse", code: "WH-TEST");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse");
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -209,8 +209,8 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb3");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse1 = Warehouse.Create(branchId: 1, name: "Warehouse 1", code: "WH-01");
-        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2", code: "WH-02");
+        var warehouse1 = Warehouse.Create(branchId: 1, name: "Warehouse 1");
+        var warehouse2 = Warehouse.Create(branchId: 1, name: "Warehouse 2");
 
         await repository.AddAsync(warehouse1);
         await repository.AddAsync(warehouse2);
@@ -230,20 +230,20 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb4");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "Original Name", code: "WH-ORIG", location: "Old Location");
+        var warehouse = Warehouse.Create(branchId: 1, name: "Original Name", address: "Old Location");
         warehouse.SetCreatedBy(1);
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
         // Act
-        warehouse.Update(branchId: 1, name: "Updated Warehouse", code: "WH-ORIG", type: Domain.Enums.WarehouseType.Main, location: "New Location", updatedByUserId: 1);
+        warehouse.Update(branchId: 1, name: "Updated Warehouse", address: "New Location", updatedByUserId: 1);
         await repository.UpdateAsync(warehouse);
         await context.SaveChangesAsync();
 
         // Assert
         var updated = await context.Warehouses.FirstOrDefaultAsync(w => w.Id == warehouse.Id);
         updated!.Name.Should().Be("Updated Warehouse");
-        updated.Location.Should().Be("New Location");
+        updated.Address.Should().Be("New Location");
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("WarehouseDb5");
         var repository = new GenericRepository<Warehouse>(context);
 
-        var warehouse = Warehouse.Create(branchId: 1, name: "To Delete", code: "WH-DEL");
+        var warehouse = Warehouse.Create(branchId: 1, name: "To Delete");
         await repository.AddAsync(warehouse);
         await context.SaveChangesAsync();
 
@@ -283,11 +283,11 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb1");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Test Supplier", PartyType.Supplier, 1);
+        var party = Party.Create("Test Supplier");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var supplier = Supplier.Create(partyId: party.Id);
+        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
 
         // Act
         await repository.AddAsync(supplier);
@@ -308,11 +308,11 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb2");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Supplier to Find", PartyType.Supplier, 1);
+        var party = Party.Create("Supplier to Find");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var supplier = Supplier.Create(partyId: party.Id);
+        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 
@@ -331,11 +331,11 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb3");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Test Supplier", PartyType.Supplier, 1);
+        var party = Party.Create("Test Supplier");
         context.Parties.Add(party);
         await context.SaveChangesAsync();
 
-        var supplier = Supplier.Create(partyId: party.Id);
+        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 

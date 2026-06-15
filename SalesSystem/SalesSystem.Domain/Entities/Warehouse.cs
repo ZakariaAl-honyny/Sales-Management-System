@@ -1,6 +1,5 @@
 using SalesSystem.Domain.Accounting.Entities;
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
@@ -18,11 +17,6 @@ public class Warehouse : ActivatableEntity
     public new short Id { get; private set; }
 
     /// <summary>
-    /// Unique warehouse code (varchar 10).
-    /// </summary>
-    public string Code { get; private set; } = string.Empty;
-
-    /// <summary>
     /// Warehouse name in Arabic (e.g. "المستودع الرئيسي").
     /// </summary>
     public string Name { get; private set; } = string.Empty;
@@ -38,16 +32,6 @@ public class Warehouse : ActivatableEntity
     public Branch Branch { get; private set; } = null!;
 
     /// <summary>
-    /// Warehouse type: Main, Store, or Showroom.
-    /// </summary>
-    public WarehouseType Type { get; private set; } = WarehouseType.Main;
-
-    /// <summary>
-    /// Physical location description (e.g. "مبنى أ — الطابق الثاني").
-    /// </summary>
-    public string? Location { get; private set; }
-
-    /// <summary>
     /// Contact phone number for the warehouse.
     /// </summary>
     public string? Phone { get; private set; }
@@ -58,9 +42,9 @@ public class Warehouse : ActivatableEntity
     public string? Address { get; private set; }
 
     /// <summary>
-    /// Name of the warehouse manager.
+    /// Additional notes about the warehouse.
     /// </summary>
-    public string? ManagerName { get; private set; }
+    public string? Notes { get; private set; }
 
     /// <summary>
     /// Private constructor required by EF Core.
@@ -73,31 +57,23 @@ public class Warehouse : ActivatableEntity
     public static Warehouse Create(
         short branchId,
         string name,
-        string code,
-        WarehouseType type = WarehouseType.Main,
-        string? location = null,
         string? phone = null,
         string? address = null,
-        string? managerName = null,
+        string? notes = null,
         int? createdByUserId = null)
     {
         if (branchId <= 0)
             throw new DomainException("يجب اختيار الفرع التابع له المستودع.");
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المستودع مطلوب.");
-        if (string.IsNullOrWhiteSpace(code))
-            throw new DomainException("كود المستودع مطلوب.");
 
         var warehouse = new Warehouse
         {
             BranchId = branchId,
             Name = name.Trim(),
-            Code = code.Trim().ToUpperInvariant(),
-            Type = type,
-            Location = location?.Trim(),
             Phone = phone?.Trim(),
             Address = address?.Trim(),
-            ManagerName = managerName?.Trim()
+            Notes = notes?.Trim()
         };
         warehouse.SetCreatedBy(createdByUserId);
         return warehouse;
@@ -109,29 +85,21 @@ public class Warehouse : ActivatableEntity
     public void Update(
         short branchId,
         string name,
-        string code,
-        WarehouseType type = WarehouseType.Main,
-        string? location = null,
         string? phone = null,
         string? address = null,
-        string? managerName = null,
+        string? notes = null,
         int? updatedByUserId = null)
     {
         if (branchId <= 0)
             throw new DomainException("يجب اختيار الفرع التابع له المستودع.");
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المستودع مطلوب.");
-        if (string.IsNullOrWhiteSpace(code))
-            throw new DomainException("كود المستودع مطلوب.");
 
         BranchId = branchId;
         Name = name.Trim();
-        Code = code.Trim().ToUpperInvariant();
-        Type = type;
-        Location = location?.Trim();
         Phone = phone?.Trim();
         Address = address?.Trim();
-        ManagerName = managerName?.Trim();
+        Notes = notes?.Trim();
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

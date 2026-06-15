@@ -174,7 +174,7 @@ public class DetailedStockLedgerViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Products.Clear();
-                    Products.Add(new ProductDto(0, "جميع المنتجات", 0, null, null, null, 0, false, null, null, null, null, true));
+                    Products.Add(new ProductDto(0, "جميع المنتجات", 0, null, null, null, 0, false, null, true));
                     foreach (var p in result.Value)
                         Products.Add(p);
                 });
@@ -196,7 +196,7 @@ public class DetailedStockLedgerViewModel : ViewModelBase
                 InvokeOnUIThread(() =>
                 {
                     Warehouses.Clear();
-                    Warehouses.Add(new WarehouseDto(0, string.Empty, "جميع المخازن", (byte)1, null, null, null, null, true));
+                    Warehouses.Add(new WarehouseDto(0, "جميع المخازن", null, null, null, true));
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);
                 });

@@ -11,20 +11,9 @@ public class CreatePartyRequestValidator : AbstractValidator<CreatePartyRequest>
             .NotEmpty().WithMessage("اسم الطرف مطلوب")
             .MaximumLength(200).WithMessage("اسم الطرف لا يمكن أن يتجاوز 200 حرف");
 
-        RuleFor(x => x.PartyType)
-            .InclusiveBetween((byte)1, (byte)2).WithMessage("نوع الطرف غير صالح");
-
-        RuleFor(x => x.NameAr)
-            .MaximumLength(200).When(x => x.NameAr != null)
-            .WithMessage("الاسم العربي لا يمكن أن يتجاوز 200 حرف");
-
         RuleFor(x => x.Phone)
             .MaximumLength(30).When(x => x.Phone != null)
             .WithMessage("رقم الهاتف لا يمكن أن يتجاوز 30 حرف");
-
-        RuleFor(x => x.Mobile)
-            .MaximumLength(30).When(x => x.Mobile != null)
-            .WithMessage("رقم الجوال لا يمكن أن يتجاوز 30 حرف");
 
         RuleFor(x => x.Email)
             .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
@@ -39,6 +28,10 @@ public class CreatePartyRequestValidator : AbstractValidator<CreatePartyRequest>
         RuleFor(x => x.TaxNumber)
             .MaximumLength(50).When(x => x.TaxNumber != null)
             .WithMessage("الرقم الضريبي لا يمكن أن يتجاوز 50 حرف");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
     }
 }
 
@@ -50,17 +43,9 @@ public class UpdatePartyRequestValidator : AbstractValidator<UpdatePartyRequest>
             .NotEmpty().WithMessage("اسم الطرف مطلوب")
             .MaximumLength(200).WithMessage("اسم الطرف لا يمكن أن يتجاوز 200 حرف");
 
-        RuleFor(x => x.NameAr)
-            .MaximumLength(200).When(x => x.NameAr != null)
-            .WithMessage("الاسم العربي لا يمكن أن يتجاوز 200 حرف");
-
         RuleFor(x => x.Phone)
             .MaximumLength(30).When(x => x.Phone != null)
             .WithMessage("رقم الهاتف لا يمكن أن يتجاوز 30 حرف");
-
-        RuleFor(x => x.Mobile)
-            .MaximumLength(30).When(x => x.Mobile != null)
-            .WithMessage("رقم الجوال لا يمكن أن يتجاوز 30 حرف");
 
         RuleFor(x => x.Email)
             .EmailAddress().WithMessage("البريد الإلكتروني غير صحيح")
@@ -75,5 +60,9 @@ public class UpdatePartyRequestValidator : AbstractValidator<UpdatePartyRequest>
         RuleFor(x => x.TaxNumber)
             .MaximumLength(50).When(x => x.TaxNumber != null)
             .WithMessage("الرقم الضريبي لا يمكن أن يتجاوز 50 حرف");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
     }
 }

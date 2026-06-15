@@ -4,12 +4,22 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
+/// <summary>
+/// Represents a payment made to a supplier.
+/// Schema 7.5: SupplierPayments. Columns: PaymentNo (int unique), PaymentDate, SupplierId FK,
+/// CashBoxId FK (int NOT null), CurrencyId FK (smallint NOT null), Amount, Notes, Status, audit fields.
+/// </summary>
 public class SupplierPayment : DocumentEntity
 {
-    public string PaymentNo { get; private set; } = string.Empty;
-    public int SupplierId { get; private set; }
-    public int? PurchaseInvoiceId { get; private set; }
+    /// <summary>
+    /// User-facing payment number (int, unique per table).
+    /// </summary>
+    public int PaymentNo { get; private set; }
+
     public DateTime PaymentDate { get; private set; }
+    public int SupplierId { get; private set; }
+    public int CashBoxId { get; private set; }
+    public short CurrencyId { get; private set; }
     public decimal Amount { get; private set; }
 
     /// <summary>
@@ -18,59 +28,56 @@ public class SupplierPayment : DocumentEntity
     public PaymentMethod PaymentMethod { get; private set; }
 
     /// <summary>
-    /// FK to CashBox when payment is made from a cash register.
+    /// An optional external reference number (e.g., bank transfer ref).
     /// </summary>
-    public int? CashBoxId { get; private set; }
-
-    public short? CurrencyId { get; private set; }
-    public decimal? ExchangeRate { get; private set; }
-    public Currency? Currency { get; private set; }
     public string? ReferenceNo { get; private set; }
+
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
-    // Navigation
+    // Navigation properties
     public virtual Supplier? Supplier { get; private set; }
-    public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
+    public virtual Currency? Currency { get; private set; }
 
-    private SupplierPayment() { }
+    private readonly List<SupplierPaymentApplication> _applications = new();
+    public IReadOnlyCollection<SupplierPaymentApplication> Applications => _applications.AsReadOnly();
+
+    private SupplierPayment() { } // EF Core
 
     public static SupplierPayment Create(
-        string paymentNo,
+        int paymentNo,
         int supplierId,
+        int cashBoxId,
+        short currencyId,
         decimal amount,
         PaymentMethod paymentMethod,
-        int? purchaseInvoiceId = null,
         string? referenceNo = null,
         string? notes = null,
-        short? currencyId = null,
-        decimal? exchangeRate = null,
-        int? cashBoxId = null,
         int? createdByUserId = null,
         DateTime? paymentDate = null)
     {
-        if (string.IsNullOrWhiteSpace(paymentNo))
+        if (paymentNo <= 0)
             throw new DomainException("رقم السداد مطلوب.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
+        if (cashBoxId <= 0)
+            throw new DomainException("الصندوق مطلوب.");
+        if (currencyId <= 0)
+            throw new DomainException("العملة مطلوبة.");
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-        if (currencyId.HasValue && !exchangeRate.HasValue)
-            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var payment = new SupplierPayment
         {
             PaymentNo = paymentNo,
             SupplierId = supplierId,
+            CashBoxId = cashBoxId,
+            CurrencyId = currencyId,
             Amount = amount,
             PaymentMethod = paymentMethod,
-            PurchaseInvoiceId = purchaseInvoiceId,
-            CurrencyId = currencyId,
-            ExchangeRate = exchangeRate,
             ReferenceNo = referenceNo,
             Notes = notes,
-            CashBoxId = cashBoxId,
             PaymentDate = paymentDate ?? DateTime.UtcNow,
             Status = InvoiceStatus.Draft
         };
@@ -78,13 +85,12 @@ public class SupplierPayment : DocumentEntity
         return payment;
     }
 
-    public void Post(DateTime? postedAt = null)
+    public void Post()
     {
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("فقط سندات الصرف المسودة يمكن ترحيلها.");
-
+        PostedAt = DateTime.UtcNow;
         Status = InvoiceStatus.Posted;
-        PostedAt = postedAt ?? DateTime.UtcNow;
         UpdateTimestamp();
     }
 
@@ -92,7 +98,7 @@ public class SupplierPayment : DocumentEntity
     {
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("سند الصرف ملغي بالفعل.");
-
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
         UpdateTimestamp();
     }
@@ -102,19 +108,32 @@ public class SupplierPayment : DocumentEntity
         PaymentMethod paymentMethod,
         DateTime? paymentDate,
         string? notes,
-        int? cashBoxId = null,
         int? updatedByUserId = null)
     {
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
-
         Amount = amount;
         PaymentMethod = paymentMethod;
-        CashBoxId = cashBoxId;
         if (paymentDate.HasValue)
-            PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc ? paymentDate.Value : paymentDate.Value.ToUniversalTime();
+            PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc
+                ? paymentDate.Value
+                : paymentDate.Value.ToUniversalTime();
         if (notes != null) Notes = notes;
         SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Adds an application of this payment amount to a specific purchase invoice.
+    /// Only allowed while the payment is in Draft status.
+    /// </summary>
+    public void AddApplication(SupplierPaymentApplication application)
+    {
+        if (application == null)
+            throw new DomainException("التخصيص مطلوب.");
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن إضافة تخصيصات لسند غير مسود.");
+        _applications.Add(application);
         UpdateTimestamp();
     }
 }

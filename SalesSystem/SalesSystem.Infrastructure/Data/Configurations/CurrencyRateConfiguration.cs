@@ -19,7 +19,7 @@ public class CurrencyRateConfiguration : IEntityTypeConfiguration<CurrencyRate>
         // === Properties ===
 
         builder.Property(cr => cr.RateToBase)
-            .HasPrecision(18, 6)
+            .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(cr => cr.EffectiveFrom)

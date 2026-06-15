@@ -11,7 +11,7 @@ public record UserDto(int Id, string UserName, string FullName, byte Role,
 }
 
 public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
-    string EntityType, int? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
+    string EntityType, string? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
 
 public record RoleDto(int Id, string Name, string? Description, bool IsActive);
 
@@ -22,7 +22,7 @@ public record UserSessionDto(
     string FullName,
     string? DeviceName,
     string? IpAddress,
-    DateTime LoginAt,
+    DateTime CreatedAt,
     DateTime LastActivityAt,
     DateTime ExpiresAt,
     bool IsRevoked)
@@ -55,9 +55,6 @@ public record ProductDto(
     decimal ReorderLevel,
     bool TrackExpiry,
     string? ImagePath,
-    string? Notes,
-    short? DefaultPurchaseUnitId,
-    short? DefaultSalesUnitId,
     bool IsActive,
     decimal CurrentStock = 0)
 {
@@ -68,13 +65,10 @@ public record ProductDto(
 
 public record WarehouseDto(
     int Id,
-    string Code,
     string Name,
-    byte Type,
-    string? Location,
     string? Phone,
     string? Address,
-    string? ManagerName,
+    string? Notes,
     bool IsActive);
 
 public record WarehouseStockDto(
@@ -87,11 +81,11 @@ public record WarehouseStockDto(
     decimal AvgCost);
 
 public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address,
-    string? TaxNumber, bool IsActive,
-    int AccountId, string? AccountName = null, string? PaymentTerms = null, string? Notes = null);
+    string? TaxNumber, bool IsActive, int PartyId,
+    int AccountId, string? AccountName = null, int? CategoryId = null);
 public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address,
-    string? TaxNumber, decimal CreditLimit, bool IsActive,
-    int AccountId, string? AccountName = null, DateTime? CustomerSince = null, byte? PriceLevel = null, string? Notes = null)
+    string? TaxNumber, decimal CreditLimit, bool IsActive, int PartyId,
+    int AccountId, string? AccountName = null, int? CategoryId = null)
 {
     public bool HasCreditLimit => CreditLimit > 0;
 }
@@ -100,70 +94,11 @@ public record CustomerDto(int Id, string Name, string? Phone, string? Email, str
 public record SalesInvoiceDto(
     int Id,
     int InvoiceNo,
-    int? CustomerId,
+    int CustomerId,
     string? CustomerName,
     int WarehouseId,
     string WarehouseName,
     DateTime InvoiceDate,
-    DateOnly? DueDate,
-    byte PaymentType,
-    decimal SubTotal,
-    decimal DiscountAmount,
-    decimal TaxAmount,
-    decimal OtherCharges,
-    decimal TotalAmount,
-    decimal PaidAmount,
-    decimal DueAmount,
-    string? Notes,
-    byte Status,
-    int? TaxId,
-    string? TaxName,
-    decimal? TaxRate,
-    int? CurrencyId,
-    decimal? ExchangeRate,
-    int? CashBoxId,
-    string? CashBoxName,
-    decimal? TotalCost,
-    decimal? TotalProfit,
-    IReadOnlyList<SalesInvoiceItemDto> Items)
-{
-    public string PaymentTypeDisplay => PaymentType switch
-    {
-        1 => "نقدي",
-        2 => "آجل",
-        3 => "مختلط",
-        _ => "غير معروف"
-    };
-
-    public string StatusDisplay => Status switch
-    {
-        1 => "مسودة",
-        2 => "تم الترحيل",
-        3 => "ملغي",
-        _ => "غير معروف"
-    };
-}
-
-public record SalesInvoiceItemDto(int Id, int ProductId, string ProductName,
-    decimal Quantity,
-    decimal UnitPrice,
-    decimal DiscountAmount,
-    decimal LineTotal,
-    byte Mode,
-    decimal? CostInBaseCurrency = null,
-    decimal? Profit = null,
-    bool IsPriceOverridden = false,
-    int? ProductUnitId = null);
-
-public record PurchaseInvoiceDto(
-    int Id,
-    int InvoiceNo,
-    int SupplierId,
-    string SupplierName,
-    int WarehouseId,
-    string WarehouseName,
-    DateTime InvoiceDate,
-    DateOnly? DueDate,
     byte PaymentType,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -177,10 +112,11 @@ public record PurchaseInvoiceDto(
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
-    int? CurrencyId,
+    short? CurrencyId,
     decimal? ExchangeRate,
-    string? AttachmentPath,
-    IReadOnlyList<PurchaseInvoiceItemDto> Items)
+    int? CashBoxId,
+    string? CashBoxName,
+    IReadOnlyList<SalesInvoiceLineDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
     {
@@ -199,11 +135,59 @@ public record PurchaseInvoiceDto(
     };
 }
 
-public record PurchaseInvoiceItemDto(int Id, int ProductId, string ProductName,
+public record SalesInvoiceLineDto(int Id, int ProductId, string ProductName,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal LineTotal,
+    int ProductUnitId);
+
+public record PurchaseInvoiceDto(
+    int Id,
+    int InvoiceNo,
+    int SupplierId,
+    string SupplierName,
+    int WarehouseId,
+    string WarehouseName,
+    DateTime InvoiceDate,
+    byte PaymentType,
+    decimal SubTotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal OtherCharges,
+    decimal NetTotal,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string? Notes,
+    byte Status,
+    int? TaxId,
+    string? TaxName,
+    decimal? TaxRate,
+    short? CurrencyId,
+    decimal? ExchangeRate,
+    IReadOnlyList<PurchaseInvoiceLineDto> Items)
+{
+    public string PaymentTypeDisplay => PaymentType switch
+    {
+        1 => "نقدي",
+        2 => "آجل",
+        3 => "مختلط",
+        _ => "غير معروف"
+    };
+
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "تم الترحيل",
+        3 => "ملغي",
+        _ => "غير معروف"
+    };
+}
+
+public record PurchaseInvoiceLineDto(int Id, int ProductId, string ProductName,
     int ProductUnitId,
     string? ProductUnitName,
     decimal Quantity,
-    decimal UnitCost,
+    decimal UnitPrice,
     decimal LineTotal);
 
 public record SalesReturnDto(
@@ -333,10 +317,10 @@ public record InventoryTransactionLineDto(
 public record WarehouseTransferDto(
     int Id,
     int TransferNo,
-    short SourceWarehouseId,
-    string? SourceWarehouseName,
-    short DestinationWarehouseId,
-    string? DestinationWarehouseName,
+    short FromWarehouseId,
+    string? FromWarehouseName,
+    short ToWarehouseId,
+    string? ToWarehouseName,
     DateTime TransferDate,
     string? Notes,
     byte Status,
@@ -355,12 +339,11 @@ public record WarehouseTransferLineDto(
     int Id,
     int ProductId,
     string? ProductName,
-    int ProductUnitId,
-    string? ProductUnitName,
+    int BatchId,
+    int? BatchNo,
     decimal Quantity,
     decimal UnitCost,
-    decimal TotalCost,
-    int? BatchId);
+    decimal TotalCost);
 
 // ═══════════════════════════════════════════════════════════════
 
@@ -594,7 +577,6 @@ public record CurrencyDto(
     string Name,
     string Code,
     string Symbol,
-    decimal ExchangeRateToBase,
     bool IsBaseCurrency,
     string? FractionName,
     int DecimalPlaces,
@@ -622,21 +604,16 @@ public record AccountDto(
     int Id,
     string AccountCode,
     string NameAr,
-    string NameEn,
-    byte AccountType,
-    int Level,
-    int? ParentAccountId,
+    string? NameEn,
+    byte Nature,
+    bool IsLeaf,
+    int? ParentId,
     string? ParentAccountName,
-    bool IsSystemAccount,
+    bool IsSystem,
     bool IsActive,
-    string? Description,
-    string? ColorCode,
-    bool AllowTransactions,
-    decimal? OpeningBalance,
-    string? Explanation,
-    string? Notes)
+    short? CategoryId)
 {
-    public string AccountTypeDisplay => AccountType switch
+    public string NatureDisplay => Nature switch
     {
         1 => "أصل",
         2 => "خصم",
@@ -646,27 +623,38 @@ public record AccountDto(
         _ => "غير معروف"
     };
 
-    public string LevelDisplay => Level switch
-    {
-        1 => "رئيسي (مجموعة)",
-        2 => "فرعي",
-        3 => "فرعي فرعي",
-        4 => "تفصيلي",
-        _ => "غير معروف"
-    };
+    public string LevelDisplay => IsLeaf ? "تفصيلي" : "مجموعة";
+
+    // Backward-compatible property for code using AccountType
+    public byte AccountType => Nature;
+    public bool AllowTransactions => IsLeaf;
+    public string? Description => null;
+    public string? ColorCode => null;
+    public decimal? OpeningBalance => null;
+    public string? Explanation => null;
+    public string? Notes => null;
+    public int Level => IsLeaf ? 4 : 2;
+    public int? ParentAccountId => ParentId;
+    public bool IsSystemAccount => IsSystem;
 }
 
 public record AccountTreeNodeDto(
     int Id,
     string AccountCode,
     string NameAr,
-    byte AccountType,
-    int Level,
-    string? ColorCode,
-    bool AllowTransactions,
-    decimal? OpeningBalance,
-    string? Explanation,
-    List<AccountTreeNodeDto> Children);
+    byte Nature,
+    bool IsLeaf,
+    short? CategoryId,
+    List<AccountTreeNodeDto> Children)
+{
+    // Backward-compatible properties
+    public byte AccountType => Nature;
+    public int Level => IsLeaf ? 4 : 2;
+    public string? ColorCode => null;
+    public bool AllowTransactions => IsLeaf;
+    public decimal? OpeningBalance => null;
+    public string? Explanation => null;
+}
 
 // ═══════════════════════════════════════════════════════
 // Customer/Supplier Contact DTOs
@@ -683,12 +671,15 @@ public record AccountBalanceDto(
     int AccountId,
     string AccountCode,
     string AccountNameAr,
-    AccountType AccountType,
+    byte Nature,
     decimal TotalDebit,
     decimal TotalCredit,
     decimal Balance,
     bool IsDebitNormal
-);
+)
+{
+    public AccountType AccountType => (AccountType)Nature;
+}
 
 public record AccountLedgerDto(
     string AccountCode,
@@ -715,7 +706,7 @@ public record AccountLedgerLineDto(
 public record JournalEntryListDto(
     int Id,
     string EntryNumber,
-    DateTime TransactionDate,
+    DateTime EntryDate,
     string Description,
     string EntryType,
     string? ReferenceType,
@@ -725,9 +716,6 @@ public record JournalEntryListDto(
     decimal TotalCredit,
     int Status,
     string? StatusDisplay,
-    int? CurrencyId,
-    decimal? ExchangeRate,
-    string? AttachmentPath,
     DateTime CreatedAt,
     int? CreatedByUserId
 );
@@ -735,7 +723,7 @@ public record JournalEntryListDto(
 public record JournalEntryDetailDto(
     int Id,
     string EntryNumber,
-    DateTime TransactionDate,
+    DateTime EntryDate,
     string Description,
     string EntryType,
     string? ReferenceType,
@@ -743,9 +731,6 @@ public record JournalEntryDetailDto(
     string? ReferenceNumber,
     int Status,
     string? StatusDisplay,
-    int? CurrencyId,
-    decimal? ExchangeRate,
-    string? AttachmentPath,
     int? ReversedByEntryId,
     DateTime CreatedAt,
     int? CreatedByUserId,
@@ -755,8 +740,6 @@ public record JournalEntryDetailDto(
 public record JournalEntryLineDetailDto(
     int Id,
     int AccountId,
-    string AccountCode,
-    string AccountNameAr,
     decimal Debit,
     decimal Credit,
     string? Description
