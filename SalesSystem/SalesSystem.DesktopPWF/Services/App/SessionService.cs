@@ -43,12 +43,19 @@ public class SessionService : ISessionService
         // Calculate permissions based on primary role
         var primaryRoleId = _roleIds.Count > 0 ? _roleIds[0] : 0;
         _permissions = primaryRoleId.GetPermissionsForRole();
-        // Determine view mode based on role: Admin(1) and Manager(2) get Advanced, others get Basic
+        // Determine view mode based on role: Admin(1), Manager(2), Accountant(3), BranchManager(9) get Advanced, others get Basic
         _viewMode = primaryRoleId switch
         {
             1 => ViewMode.Advanced,  // Admin
             2 => ViewMode.Advanced,  // Manager
-            _ => ViewMode.Basic      // Cashier, Observer, BranchManager
+            3 => ViewMode.Advanced,  // Accountant (needs accounting screens)
+            4 => ViewMode.Basic,     // Treasurer
+            5 => ViewMode.Basic,     // Cashier
+            6 => ViewMode.Basic,     // Warehouse Supervisor
+            7 => ViewMode.Basic,     // Sales Employee
+            8 => ViewMode.Basic,     // Observer
+            9 => ViewMode.Advanced,  // Branch Manager (needs accounting)
+            _ => ViewMode.Basic
         };
     }
 
@@ -75,5 +82,19 @@ public class SessionService : ISessionService
     /// Get all permissions for current user
     /// </summary>
     public Permission GetPermissions() => _permissions;
+
+    /// <summary>
+    /// Updates session with API-loaded permissions from CurrentUserDto.
+    /// Called after MainViewModel.LoadCurrentUserAsync() succeeds.
+    /// Overrides the initial hardcoded role-based permissions with actual DB-driven permissions.
+    /// </summary>
+    public void SetApiPermissions(Permission permissions)
+    {
+        _permissions = permissions;
+        // Update view mode based on whether the user has accounting permissions
+        _viewMode = permissions.HasPermission(Permission.ChartOfAccounts)
+            ? ViewMode.Advanced
+            : ViewMode.Basic;
+    }
 }
 

@@ -553,7 +553,8 @@
 
                             <!-- Purchases Expander -->
                             <Expander Header="المشتريات" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderPurchases">
+                                      AutomationProperties.AutomationId="SidebarExpanderPurchases"
+                                      Visibility="{Binding HasPurchasesAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="فواتير الشراء" 
                                             Command="{Binding NavigateToPurchasesCommand}" 
@@ -575,7 +576,8 @@
 
                             <!-- Finance Expander -->
                             <Expander Header="المالية" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderFinance">
+                                      AutomationProperties.AutomationId="SidebarExpanderFinance"
+                                      Visibility="{Binding HasCashBoxesAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="مدفوعات الموردين" 
                                             Command="{Binding NavigateToSupplierPaymentsCommand}" 
@@ -621,7 +623,8 @@
 
                             <!-- Reports Expander -->
                             <Expander Header="التقارير" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderReports">
+                                      AutomationProperties.AutomationId="SidebarExpanderReports"
+                                      Visibility="{Binding HasReportsAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="التقارير" 
                                             Command="{Binding NavigateToReportsCommand}" 
@@ -790,7 +793,8 @@
 
                             <!-- Products Expander -->
                             <Expander Header="الأصناف" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderProducts">
+                                      AutomationProperties.AutomationId="SidebarExpanderProducts"
+                                      Visibility="{Binding HasInventoryAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
 
                                     <Button Content="الأصناف" 
@@ -983,7 +987,8 @@
 
                             <!-- Currencies Expander -->
                             <Expander Header="العملات" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderCurrencies">
+                                      AutomationProperties.AutomationId="SidebarExpanderCurrencies"
+                                      Visibility="{Binding HasCurrenciesAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="العملات" 
                                             Command="{Binding NavigateToCurrenciesCommand}" 
@@ -1000,7 +1005,8 @@
 
                             <!-- Inventory Operations Expander -->
                             <Expander Header="عمليات المخزون" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderInventoryOps">
+                                      AutomationProperties.AutomationId="SidebarExpanderInventoryOps"
+                                      Visibility="{Binding HasInventoryAccess, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
                                     <Button Content="صرف مخزني" 
                                             Command="{Binding NavigateToInventoryIssueCommand}" 

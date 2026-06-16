@@ -193,6 +193,11 @@ public interface ISessionService
     bool IsAdmin { get; }
     bool IsManagerOrAbove { get; }
     void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName);
+    /// <summary>
+    /// Updates the session with API-loaded permission codes after fetching CurrentUserDto.
+    /// Overrides the hardcoded role-based permissions with actual DB-driven permissions.
+    /// </summary>
+    void SetApiPermissions(Permission permissions);
     void ClearSession();
     bool IsAuthenticated { get; }
     bool CanAccess(Permission permission);

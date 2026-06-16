@@ -30,8 +30,12 @@ public enum Permission : int
     CashBoxes = 1 << 16,           // Cash Boxes access
     Currencies = 1 << 17,          // Currencies (view-only for Cashier/Observer)
     FiscalYear = 1 << 18,          // Fiscal Year management
+    AuditLog = 1 << 19,             // Audit Log viewing
+    Roles = 1 << 20,                // Role management
 
     // Admin only
+    InventoryCount = 1 << 21,       // Inventory count
+    InventoryAdjust = 1 << 22,      // Inventory adjustment
     WarehouseManagement = 1 << 10,  // Warehouses CRUD
     Settings = 1 << 11,            // Settings
     UserManagement = 1 << 12,       // User Management
@@ -65,7 +69,7 @@ public static class PermissionExtensions
     {
         return roleId switch
         {
-            1 => Permission.SalesInvoice          // Admin
+            1 => Permission.SalesInvoice          // Admin (مدير النظام)
                 | Permission.SalesReturn
                 | Permission.CustomerView
                 | Permission.CustomerManagement
@@ -83,9 +87,11 @@ public static class PermissionExtensions
                 | Permission.WarehouseManagement
                 | Permission.Settings
                 | Permission.UserManagement
-                | Permission.Backup,
+                | Permission.Backup
+                | Permission.AuditLog
+                | Permission.Roles,
 
-            2 => Permission.SalesInvoice          // Manager
+            2 => Permission.SalesInvoice          // Manager (مدير)
                 | Permission.SalesReturn
                 | Permission.CustomerView
                 | Permission.CustomerManagement
@@ -98,21 +104,49 @@ public static class PermissionExtensions
                 | Permission.ChartOfAccounts
                 | Permission.JournalEntries
                 | Permission.CashBoxes
-                | Permission.Currencies,
+                | Permission.Currencies
+                | Permission.AuditLog,
 
-            3 => Permission.SalesInvoice          // Cashier
+            3 => Permission.PurchaseInvoice        // Accountant (محاسب)
+                | Permission.Reports
+                | Permission.ChartOfAccounts
+                | Permission.JournalEntries
+                | Permission.CashBoxes
+                | Permission.Currencies
+                | Permission.AuditLog
+                | Permission.SalesInvoice          // View-only
+                | Permission.CustomerView
+                | Permission.CustomerManagement
+                | Permission.SupplierManagement
+                | Permission.ProductManagement,
+
+            4 => Permission.CashBoxes              // Treasurer (أمين صندوق)
+                | Permission.CustomerView
+                | Permission.SalesInvoice,          // View-only sales
+
+            5 => Permission.SalesInvoice          // Cashier (كاشير)
+                | Permission.SalesReturn
+                | Permission.CustomerView
+                | Permission.CashBoxes,
+
+            6 => Permission.WarehouseTransfer      // Warehouse Supervisor (مشرف مخزن)
+                | Permission.Reports
+                | Permission.ProductManagement
+                | Permission.SalesInvoice          // View-only
+                | Permission.InventoryCount
+                | Permission.InventoryAdjust,
+
+            7 => Permission.SalesInvoice          // Sales Employee (موظف مبيعات)
                 | Permission.SalesReturn
                 | Permission.CustomerView
                 | Permission.CashBoxes
-                | Permission.Currencies,
+                | Permission.ProductManagement,    // View-only products
 
-            4 => Permission.SalesInvoice          // Observer (view only)
-                | Permission.SalesReturn
+            8 => Permission.SalesInvoice          // Observer (مراقب — view only)
                 | Permission.CustomerView
-                | Permission.CashBoxes
-                | Permission.Currencies,
+                | Permission.Reports,
 
-            5 => Permission.SalesInvoice          // BranchManager
+            9 => Permission.SalesInvoice          // Branch Manager (مدير فرع)
                 | Permission.SalesReturn
                 | Permission.CustomerView
                 | Permission.CustomerManagement
@@ -121,13 +155,95 @@ public static class PermissionExtensions
                 | Permission.ProductManagement
                 | Permission.SupplierManagement
                 | Permission.Reports
-                | Permission.ChartOfAccounts
-                | Permission.JournalEntries
                 | Permission.CashBoxes
-                | Permission.Currencies,
+                | Permission.WarehouseTransfer,
 
             _ => Permission.None
         };
+    }
+
+    /// <summary>
+    /// Converts API permission code strings (e.g., "Sales.View", "Customers.Create")
+    /// to Desktop Permission flags enum. Used to sync API-driven permissions with
+    /// the Desktop's UI access control.
+    /// </summary>
+    public static Permission FromApiCodes(this List<string> apiCodes)
+    {
+        var codeSet = new HashSet<string>(apiCodes);
+        var flags = Permission.None;
+
+        // Sales — any sales code grants SalesInvoice access
+        if (codeSet.Any(c => c.StartsWith("Sales.")))
+            flags |= Permission.SalesInvoice;
+        if (codeSet.Contains("Sales.Return"))
+            flags |= Permission.SalesReturn;
+
+        // Customers
+        if (codeSet.Contains("Customers.View"))
+            flags |= Permission.CustomerView;
+        if (codeSet.Contains("Customers.Create") || codeSet.Contains("Customers.Edit"))
+            flags |= Permission.CustomerManagement;
+
+        // Purchases
+        if (codeSet.Any(c => c.StartsWith("Purchases.")))
+            flags |= Permission.PurchaseInvoice;
+        if (codeSet.Contains("Purchases.Return"))
+            flags |= Permission.PurchaseReturn;
+
+        // Products
+        if (codeSet.Any(c => c.StartsWith("Products.")))
+            flags |= Permission.ProductManagement;
+
+        // Suppliers
+        if (codeSet.Any(c => c.StartsWith("Suppliers.")))
+            flags |= Permission.SupplierManagement;
+
+        // Inventory
+        if (codeSet.Contains("Inventory.View") || codeSet.Contains("Inventory.Transfer"))
+            flags |= Permission.InventoryCount | Permission.InventoryAdjust;
+        if (codeSet.Contains("Inventory.Transfer"))
+            flags |= Permission.WarehouseTransfer;
+
+        // Reports
+        if (codeSet.Contains("Reports.View"))
+            flags |= Permission.Reports;
+
+        // Accounting
+        if (codeSet.Contains("Accounting.View") || codeSet.Contains("Accounting.Manage"))
+        {
+            flags |= Permission.ChartOfAccounts;
+            flags |= Permission.JournalEntries;
+        }
+        if (codeSet.Contains("FiscalYear.Manage"))
+            flags |= Permission.FiscalYear;
+
+        // Currencies
+        if (codeSet.Any(c => c.StartsWith("Currencies.")))
+            flags |= Permission.Currencies;
+
+        // Cashbox/Operations
+        if (codeSet.Contains("Operations.Cashbox"))
+            flags |= Permission.CashBoxes;
+
+        // Warehouse management
+        if (codeSet.Contains("Warehouse.Manage"))
+            flags |= Permission.WarehouseManagement;
+
+        // System
+        if (codeSet.Contains("System.Settings"))
+            flags |= Permission.Settings;
+        if (codeSet.Contains("System.Users"))
+            flags |= Permission.UserManagement;
+        if (codeSet.Contains("Backup.Manage"))
+            flags |= Permission.Backup;
+        if (codeSet.Contains("Audit.Log"))
+            flags |= Permission.AuditLog;
+
+        // Employees
+        if (codeSet.Any(c => c.StartsWith("Employees.")))
+            flags |= Permission.UserManagement; // Employees managed via same permission group
+
+        return flags;
     }
 
     /// <summary>

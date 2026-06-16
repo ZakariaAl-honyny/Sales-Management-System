@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using SalesSystem.Contracts.DTOs;
@@ -255,6 +256,14 @@ public class MainViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 CurrentUser = result.Value;
+                // Apply API-driven permissions to the session — overrides hardcoded role-based defaults.
+                // This ensures the Desktop sidebar and navigation respect the actual DB-stored permissions.
+                var permissions = CurrentUser.Permissions ?? new List<string>();
+                if (permissions.Count > 0)
+                {
+                    var flags = permissions.FromApiCodes();
+                    _sessionService.SetApiPermissions(flags);
+                }
             }
         });
         _ = LoadUserBranchesAsync();
@@ -292,6 +301,53 @@ public class MainViewModel : ViewModelBase
     /// This is the inverse of <see cref="IsAdvancedMode"/>.
     /// </summary>
     public bool IsBasicMode => !IsAdvancedMode;
+
+    // ═══════════════════════════════════════════════════════════════
+    // Permission Properties (for XAML sidebar visibility binding)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>صلاحية الوصول إلى شاشات المبيعات ونقطة البيع</summary>
+    public bool HasSalesAccess => _sessionService.CanAccess(Permission.SalesInvoice);
+
+    /// <summary>صلاحية الوصول إلى شاشات المشتريات وأوامر الشراء</summary>
+    public bool HasPurchasesAccess => _sessionService.CanAccess(Permission.PurchaseInvoice);
+
+    /// <summary>صلاحية الوصول إلى شاشات المخزون والمنتجات</summary>
+    public bool HasInventoryAccess => _sessionService.CanAccess(Permission.ProductManagement);
+
+    /// <summary>صلاحية الوصول إلى شاشات العملاء وإدارة العملاء</summary>
+    public bool HasCustomersAccess => _sessionService.CanAccess(Permission.CustomerView);
+
+    /// <summary>صلاحية الوصول إلى شاشات الموردين</summary>
+    public bool HasSuppliersAccess => _sessionService.CanAccess(Permission.SupplierManagement);
+
+    /// <summary>صلاحية الوصول إلى شاشات الخزينة والصناديق</summary>
+    public bool HasCashBoxesAccess => _sessionService.CanAccess(Permission.CashBoxes);
+
+    /// <summary>صلاحية الوصول إلى شاشات المحاسبة (دليل الحسابات، قيود يومية، سنوات مالية)</summary>
+    public bool HasAccountingAccess => _sessionService.CanAccess(Permission.ChartOfAccounts)
+                                    || _sessionService.CanAccess(Permission.JournalEntries)
+                                    || _sessionService.CanAccess(Permission.FiscalYear);
+
+    /// <summary>صلاحية الوصول إلى شاشة التقارير</summary>
+    public bool HasReportsAccess => _sessionService.CanAccess(Permission.Reports);
+
+    /// <summary>صلاحية الوصول إلى شاشات إدارة النظام (المستخدمين، الصلاحيات، الإعدادات)</summary>
+    public bool HasSystemAccess => _sessionService.CanAccess(Permission.Settings)
+                                || _sessionService.CanAccess(Permission.UserManagement);
+
+    /// <summary>صلاحية الوصول إلى شاشات إدارة المؤسسة (الفروع، الأقسام، الموظفين، البنوك، الجهات، المصروفات)</summary>
+    public bool HasOrganizationAccess => _sessionService.CanAccess(Permission.Settings)
+                                      || _sessionService.CanAccess(Permission.UserManagement);
+
+    /// <summary>صلاحية الوصول إلى العملات</summary>
+    public bool HasCurrenciesAccess => _sessionService.CanAccess(Permission.Currencies);
+
+    /// <summary>صلاحية الوصول إلى النسخ الاحتياطي</summary>
+    public bool HasBackupAccess => _sessionService.CanAccess(Permission.Backup);
+
+    /// <summary>صلاحية الوصول إلى سجل الأحداث</summary>
+    public bool HasAuditLogAccess => _sessionService.CanAccess(Permission.AuditLog);
 
     // ═══════════════════════════════════════════════════════════════
     // Dashboard Command
@@ -704,38 +760,90 @@ public class MainViewModel : ViewModelBase
     /// identified by the given <paramref name="tag"/>.
     /// Mirrors the permission logic from <c>MainWindow.xaml.cs</c>.
     /// </summary>
+    /// <summary>
+    /// Checks whether the current user has permission to navigate to the given screen tag.
+    /// Returns true if permitted, false otherwise (deny-by-default for unknown tags).
+    /// </summary>
     private bool CanNavigate(string tag)
     {
         return tag switch
         {
+            // ════ Sales ════
+            "Sales"            => _sessionService.CanAccess(Permission.SalesInvoice),
+            "SalesReturns"     => _sessionService.CanAccess(Permission.SalesReturn),
+            "Pos"              => _sessionService.CanAccess(Permission.SalesInvoice),
+            "Customers"        => _sessionService.CanAccess(Permission.CustomerView),
+            "CustomerPayments" => _sessionService.CanAccess(Permission.CustomerView),
+
+            // ════ Purchases ════
             "Purchases"        => _sessionService.CanAccess(Permission.PurchaseInvoice),
             "PurchaseOrders"   => _sessionService.CanAccess(Permission.PurchaseInvoice),
             "PurchaseReturns"  => _sessionService.CanAccess(Permission.PurchaseReturn),
-            "Products"         => _sessionService.CanAccess(Permission.ProductManagement),
             "Suppliers"        => _sessionService.CanAccess(Permission.SupplierManagement),
             "SupplierPayments" => _sessionService.CanAccess(Permission.SupplierManagement),
-            "WarehouseTransfers"   => _sessionService.CanAccess(Permission.WarehouseTransfer),
-            "Reports"          => _sessionService.CanAccess(Permission.Reports),
-            "ExpiredProducts"  => _sessionService.CanAccess(Permission.Reports),
-            "LowStock"         => _sessionService.CanAccess(Permission.Reports),
-            "Warehouses"       => _sessionService.CanAccess(Permission.WarehouseManagement),
-            "Users"            => _sessionService.CanAccess(Permission.UserManagement),
-            "Settings"         => _sessionService.CanAccess(Permission.Settings),
-            "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
+
+            // ════ Finance ════
+            "CashBoxes"        => _sessionService.CanAccess(Permission.CashBoxes),
+            "ReceiptVouchers"  => _sessionService.CanAccess(Permission.CashBoxes),
+            "PaymentVouchers"  => _sessionService.CanAccess(Permission.CashBoxes),
+
+            // ════ Accounting ════
+            "ChartOfAccounts"  => _sessionService.CanAccess(Permission.ChartOfAccounts),
+            "JournalEntries"   => _sessionService.CanAccess(Permission.JournalEntries),
+            "FiscalYears"      => _sessionService.CanAccess(Permission.FiscalYear),
+            "AccountCategories" => _sessionService.CanAccess(Permission.ChartOfAccounts),
+            "SystemAccountMappings" => _sessionService.CanAccess(Permission.Settings),
+
+            // ════ Products & Inventory ════
+            "Products"         => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductUnits"     => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductImport"    => _sessionService.CanAccess(Permission.ProductManagement),
-            "Taxes"            => _sessionService.CanAccess(Permission.Settings),
-            "Currencies"       => _sessionService.CanAccess(Permission.Currencies),
-            "Dashboard"        => true,  // Everyone can see dashboard
-            "Sales"            => _sessionService.CanAccess(Permission.SalesInvoice),
-            "SalesReturns"     => _sessionService.CanAccess(Permission.SalesReturn),
-            "Customers"        => _sessionService.CanAccess(Permission.CustomerView),
-            "CashBoxes"        => _sessionService.CanAccess(Permission.CashBoxes),
+            "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
             "Inventory"        => _sessionService.CanAccess(Permission.ProductManagement),
             "InventoryActivity" => _sessionService.CanAccess(Permission.ProductManagement),
-            "Pos"              => _sessionService.CanAccess(Permission.SalesInvoice),
-            "CustomerPayments" => _sessionService.CanAccess(Permission.CustomerView),
-            _ => false // Deny by default — unknown screens require explicit permission
+            "WarehouseTransfers"   => _sessionService.CanAccess(Permission.WarehouseTransfer),
+            "Warehouses"       => _sessionService.CanAccess(Permission.WarehouseManagement),
+            "InventoryCounts"  => _sessionService.CanAccess(Permission.ProductManagement),
+            "InventoryAdjustments" => _sessionService.CanAccess(Permission.ProductManagement),
+
+            // ════ Reports ════
+            "Reports"          => _sessionService.CanAccess(Permission.Reports),
+            "LowStock"         => _sessionService.CanAccess(Permission.Reports),
+            "ExpiredProducts"  => _sessionService.CanAccess(Permission.Reports),
+
+            // ════ System Settings ════
+            "Settings"         => _sessionService.CanAccess(Permission.Settings),
+            "SystemLogs"       => _sessionService.CanAccess(Permission.Settings),
+            "Taxes"            => _sessionService.CanAccess(Permission.Settings),
+            "CompanySettings"  => _sessionService.CanAccess(Permission.Settings),
+            "DocumentSequences" => _sessionService.CanAccess(Permission.Settings),
+            "Backup"           => _sessionService.CanAccess(Permission.Backup),
+            "Notifications"    => _sessionService.CanAccess(Permission.Settings),
+            "Attachments"      => _sessionService.CanAccess(Permission.Settings),
+
+            // ════ Users & Permissions ════
+            "Users"            => _sessionService.CanAccess(Permission.UserManagement),
+            "AuditLog"         => _sessionService.CanAccess(Permission.AuditLog),
+            "Permissions"      => _sessionService.CanAccess(Permission.Roles),
+            "Roles"            => _sessionService.CanAccess(Permission.Roles),
+            "Sessions"         => _sessionService.CanAccess(Permission.UserManagement),
+
+            // ════ Currencies ════
+            "Currencies"       => _sessionService.CanAccess(Permission.Currencies),
+
+            // ════ Organization Management ════
+            "Branches"         => _sessionService.CanAccess(Permission.Settings),
+            "Departments"      => _sessionService.CanAccess(Permission.Settings),
+            "Employees"        => _sessionService.CanAccess(Permission.UserManagement),
+            "Banks"            => _sessionService.CanAccess(Permission.Settings),
+            "Parties"          => _sessionService.CanAccess(Permission.Settings),
+            "Expenses"         => _sessionService.CanAccess(Permission.Settings),
+
+            // ════ Dashboard — always accessible ════
+            "Dashboard"        => true,
+
+            // Deny by default — unknown screens require explicit permission
+            _ => false
         };
     }
 
@@ -789,13 +897,13 @@ public class MainViewModel : ViewModelBase
             nameof(WarehouseListViewModel)          => "Warehouses",
             nameof(UnitListViewModel)               => "Units",
             nameof(UserListViewModel)               => "Users",
-            nameof(AuditLogListViewModel)           => "Settings",
-            nameof(PermissionManagementViewModel)   => "Settings",
-            nameof(RoleListViewModel)               => "Settings",
-            nameof(RoleEditorViewModel)              => "Settings",
-            nameof(RolePermissionViewModel)          => "Settings",
-            nameof(UserSessionListViewModel)         => "Settings",
-            nameof(SystemLogListViewModel)           => "Settings",
+            nameof(AuditLogListViewModel)           => "AuditLog",
+            nameof(PermissionManagementViewModel)   => "Permissions",
+            nameof(RoleListViewModel)               => "Roles",
+            nameof(RoleEditorViewModel)              => "Roles",
+            nameof(RolePermissionViewModel)          => "Roles",
+            nameof(UserSessionListViewModel)         => "Sessions",
+            nameof(SystemLogListViewModel)           => "SystemLogs",
             nameof(SettingsViewModel)               => "Settings",
             nameof(SystemSettingsViewModel)         => "Settings",
             nameof(BackupViewModel)                 => "Settings",
@@ -809,28 +917,28 @@ public class MainViewModel : ViewModelBase
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(CurrencyRatesViewModel)          => "Currencies",
-            nameof(AccountsListViewModel)           => "Settings",
-            nameof(JournalEntriesListViewModel)     => "Settings",
-            nameof(FiscalYearListViewModel)         => "Settings",
+            nameof(AccountsListViewModel)           => "ChartOfAccounts",
+            nameof(JournalEntriesListViewModel)     => "JournalEntries",
+            nameof(FiscalYearListViewModel)         => "FiscalYears",
             // Organization Management
-            nameof(BranchListViewModel)               => "Settings",
-            nameof(DepartmentListViewModel)           => "Settings",
-            nameof(EmployeeListViewModel)             => "Settings",
-            nameof(BankListViewModel)                 => "Settings",
-            nameof(PartyListViewModel)                => "Settings",
-            nameof(ExpenseListViewModel)              => "Settings",
+            nameof(BranchListViewModel)               => "Branches",
+            nameof(DepartmentListViewModel)           => "Departments",
+            nameof(EmployeeListViewModel)             => "Employees",
+            nameof(BankListViewModel)                 => "Banks",
+            nameof(PartyListViewModel)                => "Parties",
+            nameof(ExpenseListViewModel)              => "Expenses",
             // Customer Receipts
             nameof(CustomerReceiptListViewModel)      => "CustomerPayments",
             // Accounting - Receipt Vouchers
-            nameof(ReceiptVoucherListViewModel)       => "Settings",
+            nameof(ReceiptVoucherListViewModel)       => "ReceiptVouchers",
             // Payment Vouchers
-            nameof(PaymentVoucherListViewModel)       => "Settings",
+            nameof(PaymentVoucherListViewModel)       => "PaymentVouchers",
             // Inventory Operations
-            nameof(InventoryCountListViewModel)       => "Inventory",
-            nameof(InventoryAdjustmentListViewModel)  => "Inventory",
+            nameof(InventoryCountListViewModel)       => "InventoryCounts",
+            nameof(InventoryAdjustmentListViewModel)  => "InventoryAdjustments",
             // Notifications & Attachments
-            nameof(NotificationListViewModel)         => "Settings",
-            nameof(AttachmentListViewModel)           => "Settings",
+            nameof(NotificationListViewModel)         => "Notifications",
+            nameof(AttachmentListViewModel)           => "Attachments",
             // Phase 31 — Reports
             nameof(BalanceSheetViewModel)           => "Reports",
             nameof(TrialBalanceViewModel)           => "Reports",
@@ -844,6 +952,11 @@ public class MainViewModel : ViewModelBase
             nameof(CashBoxSummaryViewModel)         => "Reports",
             nameof(UserActivityViewModel)           => "Reports",
             nameof(LoginHistoryViewModel)           => "Reports",
+            // System management
+            nameof(CompanySettingsViewModel)        => "CompanySettings",
+            nameof(DocumentSequenceListViewModel)   => "DocumentSequences",
+            nameof(AccountCategoryListViewModel)    => "AccountCategories",
+            nameof(SystemAccountMappingListViewModel) => "SystemAccountMappings",
             _                                        => viewModelType.Name
         };
     }
