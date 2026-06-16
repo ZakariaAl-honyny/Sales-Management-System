@@ -408,11 +408,13 @@ Get product by ID.
 
 ## Role Policies
 
-| Policy | Roles | Description |
-|--------|-------|-------------|
-| `AdminOnly` | Admin (1) | Full system access |
-| `ManagerAndAbove` | Admin, Manager | Create, edit, delete |
-| `AllStaff` | Admin, Manager, Cashier | View and create |
+Roles are **DB-driven** — there is no `UserRole` enum. The `Role` entity stores 9 seeded roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager). API policies are assigned by role ID.
+
+| Policy | Role IDs | Roles |
+|--------|----------|-------|
+| `AdminOnly` | 1 | Admin |
+| `ManagerAndAbove` | 1, 2 | Admin, Manager |
+| `AllStaff` | 1-9 | All roles |
 
 ---
 

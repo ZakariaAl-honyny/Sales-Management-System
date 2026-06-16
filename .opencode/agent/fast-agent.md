@@ -128,19 +128,19 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete.
 
 **Key facts:**
 - `User.Create()` uses passwordless creation (`PasswordHash = null`, `MustChangePassword = true`)
-- `UserStatus` enum: Active=1, Inactive=2, Locked=3
-- 5 failed logins → Status = Locked; `RecordLoginAttempt()` manages counter
+- No `UserStatus` enum — User uses `IsActive` (bool, for soft-delete) + `IsLocked` (bool, for lockout)
+- 5 failed logins → `IsLocked = true`; `RecordLoginAttempt()` manages `LoginAttempts` counter
 - `Permission.IsSystem = true` prevents deletion/modification of system permissions
-- 33 permissions seeded across 9 categories with 4-role assignments
+- 45 permissions seeded across 12 categories with 9-role assignments (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager)
 - `AuditLog` uses `long Id` (bigint) with indexes on (UserId, Timestamp), (EntityType, EntityId), (Timestamp)
 - All new FKs use `DeleteBehavior.Restrict`
 - Default admin user seeded passwordless (`MustChangePassword = true`)
 
 **Common fix patterns when touching Users & Permissions code:**
 1. `User.Create()` — NEVER accept or hash password here; use `SetInitialPassword()` separately
-2. `UserStatus` — Use `.HasConversion<int>()` in EF config; query filter on `Status == UserStatus.Active`
+2. `IsActive` + `IsLocked` — No `UserStatus` enum; toggle soft-delete via `IsActive`, lockout via `IsLocked`
 3. `AuditLog` — Use `long` for PK, not `int`
-4. `PermissionService.UpdateRolePermissionsAsync()` — Use `_uow.ExecuteTransactionAsync()` for atomic remove+add
+4. `PermissionService.UpdateRolePermissionsAsync()` — Use `_uow.ExecuteTransactionAsync()` for atomic remove+add; use `byte roleId` (not `UserRole` enum)
 
 ## v4.6.9 — Phase 20 BUG-008 Quick Check
 - CurrencyCode validation uses `code.Trim().Length != 3` (not `> 10`).

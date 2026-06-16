@@ -51,7 +51,7 @@ Phase 19: Architecture Alignment & Code Quality Remediation (v4.6.3) → Costing
 Phase 20: Security Hardening & Code Quality (v4.6.4) → Rate limiting, user hard-delete guard, connection string security, FluentValidator enhancements, FallbackErrorDialog, build warning fixes
 Phase 21: UI Compacting — Mobile-Ready Density (v4.6.6) → Global UI resize (63 views), Styles.xaml token compaction (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted ~25-30%, PurchaseInvoiceEditorView catch-up, MainWindow sidebar 220→200, touch views preserved, future mobile-ready foundation
 Phase 22: v4.6.8 Code Review Remediations → Fix Phase 18 + Phase 20 critical bugs (atomic transactions via CreateExecutionStrategy, nav property mappings on SystemAccountMappings/JournalEntryLine, CHECK constraints CHK_DebitOrCredit/CHK_NoNegativeValues, ReversedByEntryId FK with Restrict, Controller HTTP 404 vs 400 differentiation, Currency.Create() isSystem param, filtered unique index IsActive guard, ListVM IDisposable, remove CanExecute predicates, toast for minor success, AllStaff policy on read endpoints)
-Phase 23: Users & Permissions (v4.6.9) → 4 roles (Admin/Manager/Cashier/Observer), 33 permission codes, UserStatus enum (Active/Inactive/Locked), passwordless creation (MustChangePassword=true), lockout after 5 failed logins, AuditLog (bigint PK), Permission/RolePermission entities, 33 seeded permissions with 4-role matrix, All FK Restrict, DbSeeder updates
+Phase 21: Users & Permissions (v4.10.4) → 9 DB-driven roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager), 45 permission codes across 12 categories, IsActive+IsLocked booleans (not UserStatus enum), UserRole enum removed, UserService uses request.Password if provided, passwordless creation (MustChangePassword=true), lockout at 5 attempts, AuditLog (bigint PK with OldValues/NewValues/ChangedColumns), Permission/RolePermission entities (DB-driven), DbSeeder seeds 45 permissions with 9-role assignments, Desktop screens all exist (PasswordChange, AuditLog, PermissionManagement)
 Phase 24: Accounting Engine Automation + CashBox Refactoring (v4.6.9+) → Automatic journal entries for all money operations: Customer/Supplier OpeningBalance (Dr/Cr AR/AP ↔ OpeningBalanceEquity), Sales Post (Revenue + COGS sides), Purchase Post (Inventory + VAT), Payments (Cash ↔ AR/AP), Cancellation reversals. Payment Update/Delete reversal entries. Security: JWT-derived CreatedBy, no hardcoded userId, InvoiceNo via DocumentSequenceService, COGS uses AverageCost, netRevenue validation, composite index on JournalEntry(ReferenceType, ReferenceId). CashBox refactored: removed OpeningBalance/CurrentBalance/Deposit/Withdraw, added AccountId FK, auto-account creation under "1110 — النقدية", CashTransaction uses RunningBalance, CashTransaction.Create() made public, CategoryId/Phone/TaxNumber/Address metadata added. 18 new rules (RULE-371→388).
 ```
 
@@ -198,33 +198,41 @@ Phase 24: Accounting Engine Automation + CashBox Refactoring (v4.6.9+) → Autom
 - BUG-008 (Accounting): JournalEntryLine.Account nav mapping fix
 - BUG-009 (Accounting): SystemAccountMappings nav mapping fix
 
-### Phase 21 (PRD Alignment): Users & Permissions Module (v4.6.9)
+### Phase 21 (PRD Alignment): Users & Permissions Module (v4.10.4)
 
-**Goal**: Implement user management with 4 roles, 33 permission codes, lockout protection, audit logging, and user session tracking.
+**Goal**: Implement user management with 9 DB-driven roles, 45 permission codes across 12 categories, lockout protection, audit logging, and user session tracking. UserRole enum removed — roles are DB-driven via Role entity.
 
 **Key Changes:**
 - `User.Create()` — Passwordless creation (`PasswordHash = null`, `MustChangePassword = true`)
-- `UserStatus` enum replaces `IsActive` boolean: Active=1, Inactive=2, Locked=3
-- `RecordLoginAttempt()` — Success resets counter, failure increments; at 5 failures → Status = Locked
+- `IsActive` (bool, soft-delete) + `IsLocked` (bool) — NOT `UserStatus` enum (removed)
+- `UserService.CreateAsync()` — Uses `request.Password` if provided (BCrypt work factor 12), else defaults to "12345678"
+- `RecordLoginAttempt()` — Success resets counter (0), failure increments; at 5 failures → `IsLocked = true`
 - `SetInitialPassword()` — Guards against `MustChangePassword == false`
 - `Permission` entity — `IsSystem = true` protects system permissions from deletion
+- `Role` entity — DB-driven (9 roles), NOT an enum; `UserRole` enum removed entirely
 - `RolePermission` entity — Many-to-many between Role and Permission
-- `AuditLog` entity — `long Id` (bigint) for high-volume audit; indexes on `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
+- `AuditLog` entity — `long Id` (bigint) for high-volume audit; includes `OldValues/NewValues/ChangedColumns` for change tracking; indexes on `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
 - `UserSession` entity — Tracks active user sessions
-- `DbSeeder` — Seeds 33 permissions across 9 categories with 4-role assignments; default admin user passwordless
+- `DbSeeder` — Seeds 45 permissions across 12 categories with 9-role assignments; default admin user passwordless
 - All FK Restrict — No cascade delete on any new entity
 - `PermissionService.UpdateRolePermissionsAsync()` — Uses `_uow.ExecuteTransactionAsync()` for atomic updates
+- Desktop screens all exist: PasswordChangeView (first-login flow), AuditLogListView (audit browser), PermissionManagementView (admin role-permission grid)
 
 **Rules Added:**
-- RULE-305 to RULE-320: User creation, status management, login flow, permission protection, audit logging, session tracking, DbSeeder seeding
+- RULE-305 to RULE-322: User creation, lockout, login flow, permission protection, audit logging, session tracking, DbSeeder seeding, password change, no UserRole enum
 
 **Verification:**
 - [ ] User created with `PasswordHash = null`, `MustChangePassword = true`
-- [ ] 5 failed logins locks account
+- [ ] `UserService.CreateAsync()` uses `request.Password` if provided (never hardcodes hash)
+- [ ] 5 failed logins locks account (`IsLocked = true`)
+- [ ] `UserRole` enum NOT referenced anywhere in Domain/Contracts
+- [ ] `PermissionService` queries DB `Role` entity (not `Enum.GetValues`)
 - [ ] Permission.IsSystem prevents deletion/modification
-- [ ] AuditLog created for every login success/failure
-- [ ] DbSeeder seeds 33 permissions with correct role assignments
+- [ ] AuditLog created for every login success/failure (with OldValues/NewValues/ChangedColumns)
+- [ ] DbSeeder seeds 45 permissions with correct 9-role assignments
 - [ ] All FK Restrict enforced on all new entities
+- [ ] Desktop PermissionManagementView, AuditLogListView, PasswordChangeView all registered in DI
+- [ ] Password change screen shown on first login (`MustChangePassword=true`)
 - [ ] Build: 0 errors, 0 warnings
 
 ### Phase 24 — Chart of Accounts Module (v4.6.9+)

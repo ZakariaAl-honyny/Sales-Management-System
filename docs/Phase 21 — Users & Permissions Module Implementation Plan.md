@@ -37,7 +37,7 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 
 | Component | Current State | Target State |
 |-----------|---------------|--------------|
-| Roles | 3 fixed (Admin=1, Manager=2, Cashier=3) | **4 roles** (Admin=1, Accountant=2, Cashier=3, Observer=4) per analysis |
+| Roles | 3 fixed (Admin=1, Manager=2, Cashier=3) | **9 roles** (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) per AGENTS.md Section 6 |
 | UI Permissions | `Permission` flags enum in DesktopPWF (14 flags via `[Flags]`) | Move to DB-backed `Permission` entity + `RolePermission` join table (Roles+Permissions model per analysis recommendation) |
 | API Authorization | Policy-based: `AdminOnly`, `ManagerAndAbove`, `AllStaff` | Dynamic permission check from DB using exact permission codes |
 | Admin UI | No permission configuration screen | Admin grid with checkboxes showing Roles × Permissions matrix |
@@ -330,13 +330,13 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 
 ## 4. Design Catalog
 
-### 4.1 UserStatus Enum (NEW)
+### 4.1 User Status Tracking
 
-**File**: `Domain/Enums/UserStatus.cs`
+**Note**: The initial plan specified a `UserStatus` enum (Active=1, Inactive=2, Locked=3), but the **actual implementation** uses two booleans inherited from `ActivatableEntity`:
+- `IsActive` (bool) — controls soft-delete via global query filter
+- `IsLocked` (bool) — controls account lockout after 5 failed login attempts
 
-> See `docs/AGENTS.md` Section 3 for the UserStatus enum values (Active=1, Inactive=2, Locked=3).
-
-Note: Replaces the simple `IsActive` bool per analysis requirement (lines 5007-5018 of Analysis Part 5 — Active/Inactive/Locked states).
+This avoids the dual-state problem of maintaining both `BaseEntity.IsActive` and a separate `UserStatus` enum. The `RecordLoginAttempt()` domain method handles the lockout logic: 5 failures → `IsLocked = true`. Admin unlock sets `IsLocked = false` and `LoginAttempts = 0`.
 
 ### 4.2 User Entity (Extended — Default Password Flow)
 
@@ -356,15 +356,15 @@ Note: Replaces the simple `IsActive` bool per analysis requirement (lines 5007-5
 
 > See `docs/database-schema.md` Module 1.9 for the canonical User Fluent API configuration and `docs/AGENTS.md` §2.16 for EF Core conventions.
 
-Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte)UserStatus.Active)`
+Updated query filter: `HasQueryFilter(u => u.IsActive)` — user status is tracked via `IsActive` (soft delete) + `IsLocked` (lockout). No `UserStatus` enum was implemented; the simpler dual-boolean approach avoids EF Core value converter complexity.
 
 ### 4.4 Permission Entity (NEW — Using exact codes from Analysis Part 5 lines 3981-4022)
 
 > See `docs/database-schema.md` Module 1.10 (Permissions table) for the canonical Permission entity definition and `docs/AGENTS.md`/`CONSTITUTION.md` for entity patterns (private set, Guard Clauses, domain methods).
 
-### 4.5 RolePermission Join Entity (NEW — 4-role model per analysis)
+### 4.5 RolePermission Join Entity (NEW — 9-role model per AGENTS.md Section 6)
 
-> See `docs/database-schema.md` Module 1.11 (RolePermissions table) for the canonical definition and `docs/AGENTS.md` Section 3 for the extended UserRole enum (Admin=1, Accountant=2, Cashier=3, Observer=4).
+> See `docs/database-schema.md` Module 1.11 (RolePermissions table) for the canonical definition. Roles are DB-driven via the `Role` entity — there is NO `UserRole` enum. The 9 seeded roles (Id=1..9) are: Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager.
 
 ### 4.6 AuditLog Entity (NEW)
 
@@ -419,9 +419,9 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 
 **File**: `Infrastructure/Data/DbSeeder.cs`
 
-**Note**: These are the EXACT 33 permission codes from Analysis Part 5 (lines 3981-4022). Each follows `Domain.Action` dot-notation. The CRUD + Post + Cancel model (analysis lines 4200-4243) separates View/Create/EditDraft/Post/Cancel as distinct permissions.
+**Note**: The final implementation seeds **45 permission codes** across 12 categories per the AGENTS.md Section 6 matrix. Each follows `Domain.Action` dot-notation. The CRUD + Post + Cancel model separates View/Create/Edit/Delete/Cancel/Return/Print as distinct permissions.
 
-> See `Infrastructure/Data/DbSeeder.cs` for the canonical seeder implementation and `docs/AGENTS.md` Section 1.2 for the 33 permission codes matrix.
+> See `Infrastructure/Data/DbSeeder.cs` for the canonical seeder implementation and `docs/AGENTS.md` Section 6 for the 45 permission codes matrix and 9-role assignments.
 
 ### 4.9.1 Seed Data — Default Admin User
 
@@ -506,13 +506,13 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 
 | Feature | Current | Required | Action |
 |---------|---------|----------|--------|
-| Roles | 3 (Admin/Manager/Cashier) + DB Role entity | **4+** (Admin/Manager/Cashier/Observer) | **ADD** Observer role (4). Roles are DB-driven via `Role` entity + `UserRole` join table — NOT a UserRole enum on User. |
-| Permission model | 22 DB-backed permissions with dot-notation codes | **33** per analysis | **EXTEND** — add missing permissions (Sales.ViewProfit, Inventory.Adjust, Backup.Manage, etc.) |
+| Roles | 3 (Admin/Manager/Cashier) + DB Role entity | **9** (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) | **EXTEND** to 9 roles. Roles are DB-driven via `Role` entity + `UserRole` join table — NOT a UserRole enum on User. |
+| Permission model | 22 DB-backed permissions with dot-notation codes | **45** per AGENTS.md Section 6 | **EXTEND** — add missing permissions across 12 categories |
 | CRUD + Post + Cancel | Not fully separated | **Separate** per operation | **EXTEND** — Sales and Purchase domains need separate Create/EditDraft/Post/Cancel permissions |
 | Permission codes | Dot-notation codes | **Dot-notation** | **KEEP** — `Sales.View`, `Purchase.Create`, etc. are correct. Add missing codes. |
 | DB model | Permission + RolePermission entities | **Same** | **KEEP** — already implemented |
 | SQL Server table | Permissions + RolePermissions | ✅ | Already created |
-| Seed data | 22 permissions + 4-role mappings | **33** | **EXTEND** — add 11 more permissions |
+| Seed data | 22 permissions + 4-role mappings | **45** | **EXTEND** — add 23 more permissions across 12 categories |
 | Admin configuration UI | ❌ | ✅ | CREATE Permission Management screen |
 | API permission check | ✅ (policies) | ✅ | Same + `UserHasPermissionAsync()` via `IPermissionService` |
 | Observer role (reports only) | ❌ | ✅ | **ADD** — Reports.View + AuditLog.View + View-only permissions |
@@ -563,13 +563,13 @@ The old `[Flags] Permission` enum in DesktopPWF has been **replaced** by **DB-ba
 **Current state**:
 - **Permission codes** use `Domain.Action` format: `Sales.View`, `Purchase.Create`, etc.
 - **22 permissions currently seeded** across Sales, Purchases, Inventory, Customers, Suppliers, Products, Reports, Accounting, System, Operations, and Audit categories
-- **4-role model** — Admin (1), Manager (2), Cashier (3), Observer (4) via `Role` entity with `Id = 1..4`
+- **9-role model** — Admin (1), Manager (2), Accountant (3), Treasurer (4), Cashier (5), Warehouse Supervisor (6), Sales Employee (7), Observer (8), Branch Manager (9) via `Role` entity with `Id = 1..9`
 - `SessionService` loads `List<string> UserPermissions` from API on login via `IPermissionService.GetUserPermissionsAsync(userId)`, cached as `HashSet<string>`
 - `HasPermission("Sales.View")` = `_permissionNames.Contains("Sales.View")`
 - **Observer role** gets only View permissions + `Reports.View` + `AuditLog.View`
 
 **Future work**:
-- **EXTEND** from 22 to 33 permissions covering all operations from the analysis matrix
+- **EXTEND** from 22 to 45 permissions covering all operations from the AGENTS.md Section 6 matrix
 - **ADD** CRUD + Post + Cancel separation for Sales and Purchase domains
 - **CREATE** Permission Management screen (Admin grid with Roles × Permissions checkboxes)
 - **API endpoints**: `GET /api/v1/permissions`, `GET /api/v1/permissions/roles`, `PUT /api/v1/permissions/roles/{role}`
@@ -605,22 +605,25 @@ The old `[Flags] Permission` enum in DesktopPWF has been **replaced** by **DB-ba
 - Tracked via `UserSession` table + JWT expiry claim
 - Desktop: `SessionService` checks `IsAuthenticated` and token expiry
 
-### 6.6 4-Role Model (per Analysis Part 5 lines 3721-3737)
+### 6.6 9-Role Model (per AGENTS.md Section 6)
 
-The analysis specifies **4 roles** with clear separation of duties:
+The final system uses **9 DB-driven roles** with clear separation of duties:
 
 ```text
-Admin (1)      = مدير النظام     → Full access (all 30 permissions)
-Accountant (2) = محاسب          → Sales, Purchases, Inventory, Customers, Suppliers,
-                                   Products, Reports, Journal Entries, Audit Logs
-Cashier (3)    = كاشير          → Sales only (view/create, customer view), cashbox close
-Observer (4)   = مراقب          → Reports only (view sales/purchases/inventory/reports/audit)
+Admin (1)              = مدير النظام       → Full system access (ALL 45 permissions)
+Manager (2)            = مدير              → Full operational access except System/Users
+Accountant (3)         = محاسب             → Accounting, reports, financial operations
+Treasurer (4)          = أمين صندوق        → Cashbox, banking, expenses operations
+Cashier (5)            = كاشير             → Sales transactions, customer payments
+Warehouse Supervisor (6) = مشرف مخازن     → Inventory management, transfers, adjustments
+Sales Employee (7)     = مندوب مبيعات     → Sales invoices, customers, returns
+Observer (8)           = مراقب             → View-only access
+Branch Manager (9)     = مدير فرع          → Branch-scoped full access
 ```
 
-**Note**: The old `Manager` role (2) is **replaced** by `Accountant` (2). The `Observer` role (4) is **new**. Any existing user with `Role=2 (Manager)` must be **migrated** to `Role=2 (Accountant)` — same value, new name. Role-based authorization policies (AGENTS.md Section 6) must be updated to reflect these 4 roles.
-```
+**Note**: Roles are fully DB-driven via the `Role` entity + `UserRole` join table. There is NO `UserRole` enum anywhere in the codebase. Permissions use dot-notation codes (e.g., `Sales.View`, `Purchase.Create`) stored in the `Permission` entity with 45 seeded codes across 12 categories. The `RolePermission` join table seeds role-permission mappings for all 9 roles per AGENTS.md Section 6 matrix.
 
-**Decision**: Keep the existing **flat role-permission mapping**. It is simpler, more flexible, and admin-configurable. No role hierarchy complexity in V1.
+**Decision**: Keep the existing **flat role-permission mapping**. It is simpler, more flexible, and admin-configurable via the Permission Management screen. No role hierarchy complexity in V1.
 
 ### 6.7 Why NOT Two-Factor Authentication (2FA)
 
@@ -651,7 +654,7 @@ The original plan specified **passwordless user creation** — admin creates use
 | Two-Factor Authentication (2FA/TOTP) | Complex UX, low retail demand |
 | LDAP / Active Directory Integration | Enterprise feature, out of scope |
 | IP-based access restriction | Requires network infrastructure |
-| User group management | Over-engineering for V1 — fixed 4 roles suffice |
+| User group management | Over-engineering for V1 — fixed 9 roles suffice |
 | Role inheritance hierarchy | Current flat mapping is simpler and sufficient |
 | Bulk user import/export (Excel/CSV) | Low priority — admin can create individually |
 | SSO (Single Sign-On) | Enterprise feature |
@@ -667,7 +670,7 @@ The original plan specified **passwordless user creation** — admin creates use
 
 All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), ToolTips (RULE-185-190), and UI Compact styles (RULE-262-274).
 
-### Task 1 — Rebuild User Entity (Default Password + UserStatus + MustChangePassword + Phone/Email/Avatar/DefaultCashBox) + Migration
+### Task 1 — Rebuild User Entity (Default Password + IsActive/IsLocked + MustChangePassword + EmployeeId) + Migration
 
 **Files**:
 
@@ -1054,15 +1057,20 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 | `App.xaml.cs` | DI registrations + navigation entry |
 
 **PermissionManagementViewModel**:
-> See `docs/AGENTS.md` for ViewModel patterns (AdminOnlyViewModel RULE-130, ExecuteAsync RULE-141, DialogService RULE-054, EventBus RULE-012/013). The 4-role selector and permission checkboxes follow the permission matrix in Section 1.2 above.
+> See `docs/AGENTS.md` for ViewModel patterns (AdminOnlyViewModel RULE-130, ExecuteAsync RULE-141, DialogService RULE-054, EventBus RULE-012/013). The 9-role selector and permission checkboxes follow the permission matrix in AGENTS.md Section 6 above.
 
 **XAML structure**:
 ```xml
-<!-- 4-role selector tabs (Analysis Part 5 lines 3721-3737) -->
+<!-- 9-role selector tabs (per AGENTS.md Section 6 matrix) -->
 <RadioButton Content="مدير النظام" IsChecked="{Binding IsAdminSelected}"/>
+<RadioButton Content="مدير" IsChecked="{Binding IsManagerSelected}"/>
 <RadioButton Content="محاسب" IsChecked="{Binding IsAccountantSelected}"/>
+<RadioButton Content="أمين صندوق" IsChecked="{Binding IsTreasurerSelected}"/>
 <RadioButton Content="كاشير" IsChecked="{Binding IsCashierSelected}"/>
+<RadioButton Content="مشرف مخازن" IsChecked="{Binding IsWhseSupervisorSelected}"/>
+<RadioButton Content="مندوب مبيعات" IsChecked="{Binding IsSalesEmployeeSelected}"/>
 <RadioButton Content="مراقب" IsChecked="{Binding IsObserverSelected}"/>
+<RadioButton Content="مدير فرع" IsChecked="{Binding IsBranchManagerSelected}"/>
 
 <!-- Grouped by category -->
 <ItemsControl ItemsSource="{Binding Categories}">
@@ -1188,7 +1196,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 
 #### 1. Domain Entity Tests
 
-**User.Create()** — Test with valid inputs creates entity with `Status = UserStatus.Active`, `MustChangePassword = true`, `PasswordHash` is non-null (BCrypt hash of default "12345678"). Test with empty `userName` → `DomainException("اسم المستخدم مطلوب.")`. Test with empty `fullName` → `DomainException("الاسم الكامل مطلوب.")`. Test `RecordLoginAttempt(true)` resets `LoginAttempts` to 0 and sets `LastLoginAt` (does NOT set Status = Active). Test `RecordLoginAttempt(false)` increments counter; after 5 failures → `Status = UserStatus.Locked`. Test `ChangePassword()` sets hash, sets `MustChangePassword = false`. Test `ChangePassword()` with null/empty hash → `DomainException`. Test `ResetPassword()` sets password back to hash of "12345678" and sets `MustChangePassword = true`. Test `Lock()`, `Unlock()`, `Deactivate()`, `Activate()` — status transitions, BaseEntity.IsActive stays in sync.
+**User.Create()** — Test with valid inputs creates entity with `IsActive = true`, `IsLocked = false`, `MustChangePassword = true`, `PasswordHash` is BCrypt hash of default "12345678". Test with empty `userName` → `DomainException("اسم المستخدم مطلوب.")`. Test `RecordLoginAttempt(true)` resets `LoginAttempts` to 0 and sets `LastLoginAt`. Test `RecordLoginAttempt(false)` increments counter; after 5 failures → `IsLocked = true`. Test `ChangePassword()` sets hash, sets `MustChangePassword = false`. Test `ChangePassword()` with null/empty hash → `DomainException`. Test `ResetPassword()` sets password back to hash of "12345678" and sets `MustChangePassword = true`. Test `Lock()`, `Unlock()`, `MarkAsDeleted()`, `Restore()` — status transitions, `IsActive` stays in sync.
 
 **Permission.Create()** — Valid inputs create entity. Empty `name` → `DomainException("اسم الصلاحية مطلوب")`. Empty `displayNameAr` → `DomainException("الاسم العربي للصلاحية مطلوب")`. `IsSystem = true` locks permissions.
 
@@ -1233,7 +1241,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 
 #### 4. Database Configuration Tests
 
-**UserConfiguration**: Verify `HasQueryFilter` translates `(byte)u.Status == (byte)UserStatus.Active`. Verify unique index on `UserName`. Verify `PasswordHash` nullable (no `IsRequired()`). Verify `DefaultCashBoxId` FK uses `DeleteBehavior.Restrict`.
+**UserConfiguration**: Verify `HasQueryFilter(u => u.IsActive)` applies soft-delete filter. Verify unique index on `UserName`. Verify `PasswordHash` uses `IsRequired()`. Verify `EmployeeId` FK uses `DeleteBehavior.Restrict`.
 
 **PermissionConfiguration**: Verify unique index on `Name`. Verify FK to `RolePermission` uses `DeleteBehavior.Restrict`.
 
@@ -1241,13 +1249,12 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Too
 
 #### 5. Phase-specific Tests
 
-- 33 permission codes match seed data exactly — check each against Section 1.2 table
-- EF Core query filter: `(byte)u.Status == (byte)UserStatus.Active` translates to correct SQL
+- 45 permission codes match seed data exactly — check each against AGENTS.md Section 6 matrix
+- User entity uses `IsActive` + `IsLocked` booleans (no `UserStatus` enum) — verify `HasQueryFilter(u => u.IsActive)` and `RecordLoginAttempt()` lockout logic
 - MustChangePassword flow: login with default password succeeds with `RequiresPasswordChange = true`; desktop shows mandatory password change; after `ChangePasswordAsync()`, `MustChangePassword = false`; admin reset sets password back to hash of "12345678" and `MustChangePassword = true`
-- Account lockout: 5 failed attempts → `UserStatus.Locked`; admin unlock → `LoginAttempts = 0`, `Status = UserStatus.Active`
-- `DefaultCashBoxId` FK integrity: delete CashBox → Restrict prevents if user references it
-- AuditLog: all audit events recorded correctly (LoginSuccess, LoginFailed, PasswordChanged, InitialPasswordSet, LoginBlocked_Locked)
-- Permission matrix: all 4 roles (Admin/Manager/Cashier/Observer) with correct CRUD per Section 1.2 table values
+- Account lockout: 5 failed attempts → `IsLocked = true`; admin unlock → `LoginAttempts = 0`, `IsLocked = false`
+- AuditLog: all audit events recorded correctly (LoginSuccess, LoginFailed, PasswordChanged, LoginBlocked_Locked)
+- Permission matrix: all 9 roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) with correct permission assignments per AGENTS.md Section 6 matrix
 - `UserSession.Terminate()` works across concurrent sessions
 - Avatar upload: extension validation, size limit, resize behavior
 

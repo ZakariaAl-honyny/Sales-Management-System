@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.10.3+ — Inventory Operations Complete: BLOCKER #1-3 Fixed, Desktop ViewModels Rewritten, 0 Build Errors)
+# AGENTS.md — Sales Management System (v4.10.4+ — Phase 21 Users & Permissions Complete: 9 DB-driven Roles, 45 Permissions, Schema-Aligned)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -1391,26 +1391,28 @@ Following the Phase 20 currencies review, 3 additional enhancements were applied
 | RULE-303 | `Currency` entity MUST have `SetAsBaseCurrency()` and `UnsetBaseCurrency()` domain methods that set `IsBaseCurrency` and call `UpdateTimestamp()` — NEVER toggle `IsBaseCurrency` directly from service code. These methods are SYSTEM-ONLY (used during seeding/setup) — NEVER user-callable after initialization. |
 | RULE-304 | `InvokeOnUIThreadAsync` callbacks MUST NOT use `async` keyword when the lambda contains no `await` — unnecessary `async` creates a fire-and-forget `Task` inside the dispatcher. |
 
-### 2.71 Phase 21 — Users & Permissions Module Rules (v4.6.9)
+### 2.71 Phase 21 — Users & Permissions Module Rules (v4.10.4 — Schema-Aligned, DB-Driven Roles)
 
 | RULE | DIRECTIVE |
 |------|-----------|
 | RULE-305 | `User.Create()` MUST use passwordless creation — `PasswordHash = null`, `MustChangePassword = true`. NEVER accept or hash a password in the factory method. |
-| RULE-306 | `UserStatus` enum MUST replace `IsActive` boolean — Active=1, Inactive=2, Locked=3. EF Core query filter changes from `u.IsActive` to `u.Status == UserStatus.Active`. |
-| RULE-307 | `RecordLoginAttempt()` MUST be used for ALL login attempts — success resets counter, failure increments; at 5 failures sets `Status = UserStatus.Locked`. |
-| RULE-308 | `SetInitialPassword()` MUST be used for first-login password set — guards against `MustChangePassword == false`. |
+| RULE-306 | User entity uses `IsActive` (bool from ActivatableEntity) + `IsLocked` (bool) — NOT `UserStatus` enum. `IsActive` controls soft-delete, `IsLocked` controls lockout. |
+| RULE-307 | `RecordLoginAttempt()` MUST be used for ALL login attempts — success resets counter to 0, failure increments; at 5 failures sets `IsLocked = true`. |
+| RULE-308 | `UserService.CreateAsync()` MUST accept `request.Password` if provided (hash with BCrypt work factor 12), or fall back to default "12345678". NEVER hardcode password hashing. |
 | RULE-309 | `Permission` entity MUST use `IsSystem` flag to protect system permissions — `IsSystem = true` permissions MUST NOT be deletable or modifiable. |
 | RULE-310 | `AuditLog` entity MUST use `long Id` (bigint) for high-volume audit tables — NEVER `int`. |
-| RULE-311 | `AuditLog` MUST have indexes on `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, and `(Timestamp DESC)` for query performance. |
-| RULE-312 | ALL new entities (Permission, RolePermission, AuditLog, UserSession) MUST use `DeleteBehavior.Restrict` on ALL foreign keys. |
-| RULE-313 | Login flow MUST check `MustChangePassword` before password verification — if true, return `RequiresPasswordSetup` error and redirect to password set screen. |
-| RULE-314 | `AuthService.SetPasswordAsync()` MUST validate `MustChangePassword == true` before allowing password set — prevents re-setting already-set password. |
-| RULE-315 | `AuthService.ChangePasswordAsync()` MUST verify current password via `BCrypt.Verify` before allowing change — NEVER skip current password validation. |
-| RULE-316 | Every login success/failure MUST create an `AuditLog` entry — `LoginSuccess`, `LoginFailed` (with attempt count), `LoginBlocked_Locked`. |
-| RULE-317 | `PermissionService.UpdateRolePermissionsAsync()` MUST use `_uow.ExecuteTransactionAsync()` for atomic role-permission updates — NEVER direct `SaveChangesAsync()` for remove+add operations. |
-| RULE-318 | Desktop UI permission filtering MUST use API-based permission checks (`CurrentUserDto.Permissions`) — NEVER hardcoded role-to-permission mappings in XAML. |
-| RULE-319 | `DbSeeder` MUST seed 33 permissions across 9 categories (Sales=7, Purchases=5, Inventory=3, Customers=3, Suppliers=3, Products=3, Reports=1, Accounting=2, System=2, Operations=3, Audit=1) with 4-role assignments. |
-| RULE-320 | Default admin user MUST be seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`) — NEVER seed with a hardcoded password hash. |
+| RULE-311 | `AuditLog` MUST have indexes on `(UserId, CreatedAt DESC)`, `(EntityType, EntityId)`, and `(CreatedAt DESC)` for query performance. |
+| RULE-312 | ALL entities (Permission, RolePermission, AuditLog, UserSession) MUST use `DeleteBehavior.Restrict` on ALL foreign keys. |
+| RULE-313 | Login flow MUST check `MustChangePassword` before password verification — if true, return `RequiresPasswordSetup` error and redirect to password change screen. |
+| RULE-314 | `AuthService.ChangePasswordAsync()` MUST verify current password via `BCrypt.Verify` before allowing change — NEVER skip current password validation. |
+| RULE-315 | Every login success/failure MUST create an `AuditLog` entry — `LoginSuccess`, `LoginFailed` (with attempt count), `LoginBlocked_Locked`. |
+| RULE-316 | `PermissionService.UpdateRolePermissionsAsync()` MUST use `_uow.ExecuteTransactionAsync()` for atomic role-permission updates — NEVER direct `SaveChangesAsync()` for remove+add operations. |
+| RULE-317 | Desktop UI permission filtering MUST use API-based permission checks (`CurrentUserDto.Permissions`) — NEVER hardcoded role-to-permission mappings in XAML. |
+| RULE-318 | Roles are DB-driven via `Role` entity + `UserRole` join table — the `UserRole` enum (`Domain/Enums/UserRole.cs` and `Contracts/Enums/CoreEnums.cs`) MUST NOT exist. Use `byte` role IDs throughout. |
+| RULE-319 | `DbSeeder` MUST seed 45 permissions across 12 categories with 9-role assignments: Admin (ALL 45), Manager (43, excluding System.Settings/Users), Accountant (accounting+reports), Treasurer (cashbox+banking), Cashier (sales+customers), Warehouse Supervisor (inventory+products), Sales Employee (sales+customers), Observer (view-only), Branch Manager (branch-scoped). |
+| RULE-320 | Default admin user MUST be seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`) — NEVER seed with a hardcoded password hash. Password set on first login via `SetInitialPassword()`. |
+| RULE-321 | `UserService.PermanentDeleteAsync()` MUST return `Result.Failure` — NEVER hard-delete users (soft-delete only via `IsActive = false`). |
+| RULE-322 | Desktop screens already exist for: PasswordChangeView (first-login password change), AuditLogListView (audit log browser), PermissionManagementView (admin role-permission grid). These are NOT missing — the plan was already implemented. |
 
 ### 2.72 Phase 22 — Chart of Accounts Module Rules (v4.6.9+)
 
@@ -1623,6 +1625,16 @@ Add these NEW checklist items at the end of the existing checklist:
 - [ ] SecurityAudit has production-callable method?
 - [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
 - [ ] No orphaned ViewModel DI registrations after UI removal?
+- [ ] UserService.CreateAsync uses request.Password if provided (never hardcodes password hash)?
+- [ ] UserRole enum NOT referenced anywhere (Domain/Enums/UserRole.cs deleted, Contracts/Enums/CoreEnums.cs cleaned)?
+- [ ] PermissionService queries DB Role entity (not Enum.GetValues)?
+- [ ] At least 45 permissions seeded in DbSeeder?
+- [ ] All 9 roles seeded with appropriate permissions?
+- [ ] Desktop PermissionManagementView registered in DI?
+- [ ] Desktop AuditLogListView registered in DI?
+- [ ] Desktop PasswordChangeView registered in DI?
+- [ ] Password change screen shown on first login (MustChangePassword=true)?
+- [ ] Account lockout after 5 failed attempts?
 
 Phase 24: Accounting Engine Automation → Automatic journal entries for all money operations
 Phase 25: Payment Update/Delete Reversal Entries → Fix C-2/C-3: Reversal entries for payment update/delete
@@ -1756,7 +1768,6 @@ Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, C
 ## 3. Enums (Use These EXACT Values)
 
 ```csharp
-public enum UserRole : byte { Admin = 1, Manager = 2, Cashier = 3 }
 public enum InvoiceStatus : byte { Draft = 1, Posted = 2, Cancelled = 3 }
 public enum PaymentType : byte { Cash = 1, Credit = 2, Mixed = 3 }
 public enum MovementType : byte
@@ -2022,6 +2033,13 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ Missing composite index on JournalEntryLine(JournalEntryId, AccountId)
 ❌ Orphaned ViewModel registrations after DataTemplate removal (DailyClosureReportViewModel)
 ❌ Feature-level-only permissions without operation-level granularity
+❌ UserRole enum in Domain or Contracts (replaced by DB-driven Role entity)
+❌ Hardcoded 3-role model (Admin/Manager/Cashier) — must use 9 DB-driven roles
+❌ UserService.CreateAsync always hashing "12345678" without checking request.Password
+❌ PermissionService.GetRolePermissionsAsync using Enum.GetValues (must query DB Role entity)
+❌ User entity with FullName/Phone/Email/Status/PasswordChangedAt fields (not in schema)
+❌ User entity without IsLocked/LoginAttempts (lockout tracking mandatory)
+❌ DbSeeder with hardcoded permission count 33 (must be 45 now)
 ```
 
 
@@ -2055,25 +2073,53 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 
 ## 6. Permissions Matrix
 
-| Feature | Admin (1) | Accountant (2) | Cashier (3) | Observer (4) | API Policy |
-|---------|-----------|----------------|-------------|--------------|------------|
-| Sales Invoice | ✅ | ✅ | ✅ | View Only | AllStaff |
-| Sales Return | ✅ | ✅ | ✅ | View Only | AllStaff |
-| Purchase Invoice | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
-| Purchase Return | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
-| Products CRUD | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
-| Customers CRUD | ✅ | ✅ | View Only | View Only | AllStaff |
-| Suppliers CRUD | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
-| Warehouses CRUD | ✅ | ❌ | ❌ | ❌ | AdminOnly |
-| Stock Transfer | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
-| Reports | ✅ | ✅ | ❌ | View Only | ManagerAndAbove |
-| Settings | ✅ | ❌ | ❌ | ❌ | AdminOnly |
-| User Management | ✅ | ❌ | ❌ | ❌ | AdminOnly |
-| Chart of Accounts | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
-| Journal Entries | ✅ | ✅ | ❌ | ❌ | ManagerAndAbove |
-| Fiscal Year | ✅ | ❌ | ❌ | ❌ | AdminOnly |
-| Cash Boxes | ✅ | ✅ | ✅ | ❌ | AllStaff |
-| Currencies | ✅ | ✅ | View Only | View Only | AllStaff |
+| Feature | Admin (1) | Manager (2) | Accountant (3) | Treasurer (4) | Cashier (5) | Whse Supervisor (6) | Sales Employee (7) | Observer (8) | Branch Manager (9) | API Policy |
+|---------|:---------:|:-----------:|:--------------:|:-------------:|:-----------:|:-------------------:|:------------------:|:------------:|:------------------:|------------|
+| Sales View | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | AllStaff |
+| Sales Create | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | AllStaff |
+| Sales Edit | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ManagerAndAbove |
+| Sales Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | AdminOnly |
+| Sales Cancel | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Sales Return | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ManagerAndAbove |
+| Sales Print | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | AllStaff |
+| Purchases View | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | ManagerAndAbove |
+| Purchases Create | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Purchases Edit | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Purchases Cancel | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Purchases Return | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Purchases Print | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Inventory View | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | AllStaff |
+| Inventory Transfer | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Inventory Adjust | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Inventory Count | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Warehouse Manage | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Customers View | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | AllStaff |
+| Customers Create | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ManagerAndAbove |
+| Customers Edit | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ManagerAndAbove |
+| Customers Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Suppliers View | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ManagerAndAbove |
+| Suppliers Create | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Suppliers Edit | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Suppliers Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Products View | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ | AllStaff |
+| Products Create | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Products Edit | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Products Delete | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Reports View | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ | ✅ | ❌ | ManagerAndAbove |
+| Accounting View | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ManagerAndAbove |
+| Accounting Manage | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Currencies View | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Currencies Manage | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| FiscalYear Manage | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Employees View | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Employees Manage | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| System Settings | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| System Users | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Backup Manage | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
+| Operations Cashbox | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | AllStaff |
+| Operations Banking | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Operations Expenses | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ManagerAndAbove |
+| Audit Log | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | AdminOnly |
 
 ---
 
@@ -2401,3 +2447,13 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] SecurityAudit has production-callable method?
 - [ ] Composite index on JournalEntryLine(JournalEntryId, AccountId) exists?
 - [ ] No orphaned ViewModel DI registrations after UI removal?
+- [ ] UserService.CreateAsync uses request.Password if provided (never hardcodes password hash)?
+- [ ] UserRole enum NOT referenced anywhere (Domain/Enums/UserRole.cs deleted, Contracts/Enums/CoreEnums.cs cleaned)?
+- [ ] PermissionService queries DB Role entity (not Enum.GetValues)?
+- [ ] At least 45 permissions seeded in DbSeeder?
+- [ ] All 9 roles seeded with appropriate permissions?
+- [ ] Desktop PermissionManagementView registered in DI?
+- [ ] Desktop AuditLogListView registered in DI?
+- [ ] Desktop PasswordChangeView registered in DI?
+- [ ] Password change screen shown on first login (MustChangePassword=true)?
+- [ ] Account lockout after 5 failed attempts?

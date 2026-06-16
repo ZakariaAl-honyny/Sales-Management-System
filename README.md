@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>v4.10.4 — Deep Review Complete: 42+ Structural Fixes, 0 Build Errors, 1,574 Passing Tests</em>
+  <em>v4.10.4 — Phase 21 Complete: 9 DB-driven Roles, 45 Permissions, Schema-Aligned</em>
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.4%20Deep%20Review%20Complete-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.4%20Phase%2021%20Complete-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
@@ -72,7 +72,7 @@ The API-first architecture is designed to support **future web and mobile client
 - 📦 **Inventory Operations Complete (v4.10.3)**: All 3 BLOCKER bugs fixed — TransactionNo auto-generation via DocumentSequenceService, InventoryAdjustment stock updates via IInventoryService (atomic + audit), InventoryCount creates single Adjustment per Post (not per line). Desktop ViewModels rewritten (InventoryAdjustmentEditor, InventoryCountEditor, WarehouseTransferEditor) — full INotifyDataErrorInfo, IDisposable, EventBus cleanup. AdjustmentType validator range fixed (1-3). ReportsController CancellationToken position fixed. **0 build errors across all 11 projects.**
 - 🔍 **Accounts.md Deep Review Complete (v4.10.3)**: Systematic review of `Accounts.md` against the full AGENTS.md constitution — **43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed**. CRITICAL fixes: ReportExportController stub elimination, Permission.cs alignment (21 flags vs Section 6 matrix), CanNavigate() deny-by-default security, IsAdvancedMode guard for org/accounting screens. Major/minor fixes: Keyboard shortcuts (F3/F4/F5/F8), InvoicePrintDto + FooterNote + return print endpoints, ThermalReceiptGenerator code page parameter, JWT `jti` claim + secret length validation, SecurityAudit production endpoint, composite index on JournalEntryLine(JournalEntryId, AccountId), orphaned ViewModel registration cleanup. **0 build errors maintained.**
 - 🏛️ **Complete Deep Review — All 8 Modules Aligned to Schema (v4.10.4)**: Exhaustive structural deep review of all 59 Domain entities + 60+ EF configurations against `docs/database-schema.md` — **42+ mismatches fixed across Core, Organization, Products, Accounting, Inventory, Sales, Purchases, and Infrastructure modules**. CRITICAL fixes: SalesReturn/PurchaseReturn base class corrected from `AuditableEntity` to `DocumentEntity` (missing Status lifecycle + PostedAt/CancelledAt timestamps), `[IsActive]` filter removed from ReceiptVoucher/PaymentVoucher indexes (would have caused SQL runtime crash), missing `BranchId` FK on Warehouse configuration, `HasConversion<byte>()` + `.HasColumnType("tinyint")` for all enum columns (was `int`), `.HasColumnType("date")` for all date columns (was default `datetime2`), bare `.WithMany()` shadow FK (`SupplierPaymentId1`) fixed, `HasConversion<int>()` → `HasConversion<byte>()` for enum properties, `.HasColumnType("tinyint")` for all enum columns, `AuditLog` index direction corrected. **Old database dropped, 3 previous migrations removed, fresh `InitialCreate_v2` migration generated and applied — clean schema with zero pending changes. Build: 0 errors, 0 warnings across all 10 projects. Test suite: 1,574 passed, 0 failed.**
-- 👤 **Users & Permissions (Phase 21)**: 4-role model (Admin/Accountant/Cashier/Observer), 33 permission codes, MustChangePassword, lockout
+- 👤 **Users & Permissions (Phase 21)**: 9 DB-driven roles (System Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager), 45 granular permissions across 12 categories, UserRole enum removed, lockout at 5 attempts, AuditLog (bigint PK), PermissionManagementView
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
 - 📋 **Critical Business Rules (Phase 16)**: Standardized transaction protocol (ExecuteTransactionAsync replacing BeginTransactionAsync), 15 transaction scenarios covering the full invoice lifecycle, FIFO/COGS on sale, cancellation reversal protocol, payment lifecycle (create/update/delete with JE reversal), stock integrity rules, buyer/supplier balance protocol
@@ -93,7 +93,7 @@ The API-first architecture is designed to support **future web and mobile client
 - 🔢 **InvoiceNo Strategy (v4.6.7)**: InvoiceNo = int, UNIQUE per document type, thread-safe auto-generation via DocumentSequenceService.GetNextIntAsync() with SemaphoreSlim lock
 - 💱 **Currency Module Stabilization (v4.6.8)**: Removed manual transactions conflicting with SqlServerRetryingExecutionStrategy, ExchangeRate precision (18,2) on payments, fixed JournalEntryLine shadow FK, standardized editor validation pattern
 - 📑 **Reports (Phase 31)**: 35+ report DTOs, Hierarchical Income Statement + Balance Sheet, Excel export via ClosedXML
-- 👥 **Role-based access** — Admin, Manager, and Cashier with granular permissions
+- 👥 **Role-based access** — 9 DB-driven roles (System Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) with 45 granular permissions
 - 📊 **Full audit trail** — Every stock change, price change, and financial transaction is tracked
 - 🌐 **API-first design** — RESTful API ready for web/mobile clients in future phases
 
@@ -192,7 +192,7 @@ Desktop → (HttpClient) → API → Application → Infrastructure → SQL Serv
 - Automatic stock reversal on return posting
 
 ### 👥 User Management
-- Three roles: **Admin**, **Manager**, **Cashier**
+- Nine roles: **مدير النظام (Admin)**, **مدير (Manager)**, **محاسب (Accountant)**, **أمين صندوق (Treasurer)**, **كاشير (Cashier)**, **مشرف مخزن (Warehouse Supervisor)**, **موظف مبيعات (Sales Employee)**, **مراقب (Observer)**, **مدير فرع (Branch Manager)** — DB-driven via `Role` entity + `UserRole` join table
 - JWT Bearer authentication
 - Role-based API policies (`AdminOnly`, `ManagerAndAbove`, `AllStaff`)
 - BCrypt password hashing (work factor: 12)
@@ -639,7 +639,7 @@ dotnet run
 | **Phase 18** | **Accounting Foundation** — Chart of Accounts (Account entity, 4 levels), Journal Entries (double-entry, manual creation), Journal Entry Lines (debit/credit), System Account Mappings (13 default account bindings), Fiscal Year Closure (revenue/expense zeroing, retained earnings transfer), Annual Closing Service (net income calculation), Account Balances/Ledger queries, FiscalYearClosure tracking | ✅ **Completed** |
 | **Phase 19** | **Settings Module** — SystemSetting key-value store (8 categories, 29 seeded settings), Tax Module (Tax entity, CRUD service, API, Desktop UI), Tax on Invoices (TaxId FK, SetTax(), GetTaxAmount()), Memory Caching (IMemoryCache + ConcurrentDictionary, 5-min sliding expiration), Store Settings (company info, deprecation strategy), Costing Method switcher (WeightedAverage/LastPurchasePrice/SupplierPrice), Print Settings (printer name, logo, receipt header/footer), Backup Settings (path, schedule, retention), Admin-only endpoints | ✅ **Completed** |
 | **Phase 20** | **Currencies Module** — Currency entity (name, code, symbol, exchange rate, base currency), Exchange Rate History (effective dated, change tracking), Multi-currency support for invoices, Currency conversion service, Currency Editor + List ViewModels with full CRUD, Exchange rate change events, GetByCode + GetBaseCurrency API endpoints, AllStaff policy for read endpoints (non-admin users can view rates) | ✅ **Completed** |
-| Phase 21 | **Users & Permissions Module** — 4 roles, 33 permissions, passwordless creation, lockout, AuditLog, Permission management UI | ✅ **Completed** |
+| Phase 21 | Users & Permissions — 9 DB-driven roles, 45 permissions across 12 categories, UserRole enum removed, AuditLog (bigint PK), UserService creates with default password, lockout at 5 attempts, 4 Desktop screens (UserEditor, PasswordChange, AuditLog, PermissionManagement) | ✅ **Completed** |
 | **v4.6.8** | **Currency Module Stabilization & EF Core Transaction Strategy** — Fixed BeginTransactionAsync conflict (3 methods). ExchangeRate precision (18,2). JournalEntry shadow FK. CurrencyEditorViewModel: RULE-229 validation, toast, dual constructor. Deep code review: fixed 14 bugs + 3 enhancements across Domain, API, Infrastructure, Desktop — including isSystem param, MarkAsDeleted guard, GetByCode/GetBaseCurrency endpoints, includeInactive passthrough, controller 404/400, filtered indexes, OldRate validation, UpdateExchangeRateRequestValidator, IDisposable, CanExecute removal, composite index, AllStaff policy, N6 display | ✅ **Completed** |
 | **v4.6.6** | **UI Compacting — Mobile-Ready Density** — Global UI resize (63 views) for more content per screen: Styles.xaml compact tokens (button 36→28, font 13→11, DataGrid 34→24), all list/editor/dialog views compacted by ~25-30%, PurchaseInvoiceEditorView size reduction, MainWindow sidebar 220→200, touch control sizes preserved. Future mobile-ready foundation | ✅ **Completed** |
 | Phase 25 | **Products Module** — Multi-currency pricing (ProductPrices), FIFO batches (InventoryBatches), PriceLevel enum (Retail/Wholesale/VIP/Distributor), product images, opening stock on creation | ✅ **Completed** |
@@ -960,7 +960,7 @@ dotnet run
 | **CashBox OpeningBalance Fix** | `CashBox.Create()` now sets `OpeningBalance = initialBalance` — was always `0` regardless of initial balance (ENH-005) |
 | **Currency Domain Methods** | Added `SetAsBaseCurrency()` and `UnsetBaseCurrency()` on `Currency` entity — both call `UpdateTimestamp()` for audit trail (ENH-007) |
 | **Removed Unnecessary async** | `CurrencyEditorViewModel.LoadRateHistoryAsync()` removed unnecessary `async` from `InvokeOnUIThreadAsync` lambda — no `await` inside (ENH-012) |
-| **Phase 21 Users & Permissions** | Full Users & Permissions module — 16 tasks, 22 gaps closed. User entity rebuilt (UserStatus, passwordless creation, lockout 5 attempts, Phone/Email/Avatar/DefaultCashBoxId), Permission+RolePermission DB-backed system (33 permissions, 4 roles), AuditLog (long Id, indexed, paginated browser), UserSession, AuthService (SetPassword/ChangePassword/audit trail), API endpoints (10 new), Desktop UI (PasswordChangeScreen, AuditLog browser, PermissionManagement, enhanced UserEditor, StatusBar avatar/role badge/logout) |
+| **Phase 21 Users & Permissions** | Full Users & Permissions module — 16 tasks, 22 gaps closed. User entity rebuilt (UserStatus, passwordless creation, lockout 5 attempts, Phone/Email/Avatar/DefaultCashBoxId), Permission+RolePermission DB-backed system (45 permissions, 9 DB-driven roles), AuditLog (long Id, indexed, paginated browser), UserSession, AuthService (SetPassword/ChangePassword/audit trail), API endpoints (10 new), Desktop UI (PasswordChangeScreen, AuditLog browser, PermissionManagement with 9 role tabs, enhanced UserEditor, StatusBar avatar/role badge/logout) |
 
 ### Key Rules Added to AGENTS.md
 - RULE-291 to RULE-301 covering Phase 19 settings module remediations
@@ -1451,15 +1451,15 @@ Phase 24 added RULE-371 through RULE-388 (18 rules) covering:
 | **Passwordless User Creation** | Admin creates users WITHOUT a password — user sets password on first login via `MustChangePassword` flow. `User.Create()` factory method never accepts a password. |
 | **UserStatus Enum** | `UserStatus` (Active=1, Inactive=2, Locked=3) replaces plain `IsActive` boolean. User overrides `MarkAsDeleted()`/`Restore()` for dual-state integrity. |
 | **Account Lockout** | 5 failed login attempts locks the account (`UserStatus.Locked`). Admin-only unlock via `Unlock()` method. `RecordLoginAttempt()` tracks all attempts. |
-| **Permission Entity (DB-backed)** | 33 granular permissions across 9 categories (Sales, Purchases, Inventory, Customers, Suppliers, Products, Reports, Accounting, System, Operations, Audit). `IsSystem` flag protects system permissions. |
+| **Permission Entity (DB-backed)** | 45 granular permissions across 12 categories (Sales, Sales Returns, Customers, Suppliers, Products, Purchases, Purchases Returns, Inventory, Reports, Accounting, System, Audit). `IsSystem` flag protects system permissions. |
 | **RolePermission Join Entity** | Many-to-many mapping between `UserRole` and `Permission`. `PermissionService.UpdateRolePermissionsAsync()` uses `ExecuteTransactionAsync()` for atomic updates. |
-| **4-Role Model** | Admin (1), Accountant (2), Cashier (3), Observer (4) — replaces old Admin/Manager/Cashier. Every role has precisely defined permissions. |
+| **9-Role Model** | System Admin (1), Manager (2), Accountant (3), Treasurer (4), Cashier (5), Warehouse Supervisor (6), Sales Employee (7), Observer (8), Branch Manager (9) — DB-driven via `Role` entity + `UserRole` join table. Every role has precisely defined permissions across 45 flags. |
 | **AuditLog System** | High-volume audit logging with `long Id` (bigint). Indexed on `(UserId, Timestamp)`, `(EntityType, EntityId)`, `(Timestamp)`. `AuditLogService` supports paginated/filtered queries. |
 | **UserSession Tracking** | `UserSession` entity tracks JWT sessions with `TokenHash`, `ExpiresAt`, and `IsActive`. Foundation for future session management. |
 | **AuthService Enhancements** | `SetPasswordAsync()` for first-login password set, `ChangePasswordAsync()` with current password verification, login audit trail (Success/Failed/Locked), `MustChangePassword` redirect. |
-| **33 Seed Permissions** | `DbSeeder` seeds 33 permissions with 4-role assignments. Default admin seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`). |
+| **45 Seed Permissions** | `DbSeeder` seeds 45 permissions with 9-role assignments across all feature areas. Default admin seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`). |
 | **New API Endpoints** | `POST /auth/set-password`, `POST /auth/change-password`, `GET /users/current`, `POST /users/{id}/reset-password`, `GET /audit-logs`, `GET /audit-logs/user/{id}`, `GET /audit-logs/login-history`, `GET /permissions`, `GET /permissions/roles`, `PUT /permissions/roles/{role}` |
-| **Desktop Permission Management** | `PermissionManagementView` with 4 role tabs, category expanders with checkboxes, grouped permission display. Changes saved via API. |
+| **Desktop Permission Management** | `PermissionManagementView` with 9 role tabs, category expanders with checkboxes, grouped permission display (45 flags). Changes saved via API. |
 | **Desktop AuditLog Browser** | `AuditLogListView` with paginated DataGrid, filters by action/entity/date range, user history and login history views. |
 | **Desktop Password Change** | `PasswordChangeScreen` with 3 fields (current, new, confirm), `INotifyDataErrorInfo` validation, AuthService API integration. |
 | **Enhanced User Editor** | `UserEditorView` with avatar display (80×80), Phone/Email fields, role selector, status badge. |
@@ -1482,8 +1482,11 @@ Phase 21 added RULE-305 through RULE-320 covering:
 - RULE-316: Every login creates AuditLog entry
 - RULE-317: PermissionService uses ExecuteTransactionAsync
 - RULE-318: Desktop uses API-based permission checks
-- RULE-319: DbSeeder seeds 33 permissions with 4-role assignments
+- RULE-319: DbSeeder seeds 45 permissions with 9-role assignments
 - RULE-320: Admin user seeded passwordless
+- RULE-321: User has IsActive (soft-delete) + IsLocked (lockout) — NOT UserStatus enum
+- RULE-322: Desktop PermissionManagementView shows 9 role tabs with 45 permission flags
+- RULE-323: All 9 roles seeded with appropriate permissions matching AGENTS.md §6 matrix
 
 ---
 

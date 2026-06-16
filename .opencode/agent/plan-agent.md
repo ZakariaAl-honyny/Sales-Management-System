@@ -31,7 +31,7 @@ Service Layer pattern (NO CQRS/MediatR) — all business logic in Application Se
 - Accounting Foundation: 60-account Chart of Accounts, JournalEntries, FiscalYears, Annual Closing
 - FIFO/FEFO batch tracking via PurchaseLot entity
 - Multi-currency: Currency entity with exchange rates; CurrencyId FK on invoices/payments/journal entries
-- 4 user roles (Admin/Manager/Cashier/Accountant) with 33 permission codes
+- 9 DB-driven user roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) with 45 permission codes across 12 categories
 ```
 
 ## Behaviors
@@ -85,9 +85,9 @@ Phase 30 (Journal):    FiscalYear → Annual Closing → Multi-currency JE
 Phase 31 (Reports):    Financial DTOs → Inventory DTOs → Sales/Purchase DTOs → Excel export
 ```
 
-## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+## Phase 21: Users & Permissions Module — COMPLETE (v4.10.4)
 
-Phase 21 (PRD alignment) — Users & Permissions is now complete. Implementation order for similar modules: Domain entities → Infrastructure configs + seed data → Application services → API controllers + validators → Desktop ViewModels + Views → Tests → EF Migration. Key architectural decisions: 1) Passwordless creation (admin creates user, user sets password on first login), 2) DB-backed permissions replacing hardcoded enum, 3) AuditLog with long PK (bigint) for high-volume data.
+Phase 21 (PRD alignment) — Users & Permissions is now complete. 9 DB-driven roles, 45 permissions across 12 categories, UserRole enum removed. Implementation order for similar modules: Domain entities → Infrastructure configs + seed data → Application services → API controllers + validators → Desktop ViewModels + Views → Tests → EF Migration. Key architectural decisions: 1) Passwordless creation (admin creates user, user sets password on first login), 2) DB-backed Role entity replacing hardcoded enum (UserRole enum removed), 3) AuditLog with long PK (bigint) with OldValues/NewValues/ChangedColumns, 4) IsActive+IsLocked booleans instead of UserStatus enum.
 
 ---
 

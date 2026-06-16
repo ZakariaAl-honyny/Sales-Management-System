@@ -25,7 +25,7 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 ## 2. Scope
 
 ### In Scope
-- User authentication with role-based access (Admin/Manager/Cashier) â€” JWT with BCrypt
+- User authentication with 9 DB-driven roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager) â€” JWT with BCrypt
 - **Dynamic Unit of Measure (v4.10)**: Units as independent table (seed + user-addable); ProductUnits junction (Factor, IsBaseUnit); ProductPrices per (unit × currency); barcode on Products table
 - **Costing Strategy (v4.10)**: FIFO Only via InventoryBatches — WeightedAverage/LastPurchasePrice/SupplierPrice removed
 - **Cash Box Management (v4.9)**: CashBox linked to Account (balance lives on Account, NOT CashBox); ReceiptVouchers/PaymentVouchers replace CashTransactions
@@ -52,7 +52,7 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - **Accounting Foundation (Phase 18)**: JournalEntry, Account, FiscalYear entities with multi-currency support; Simple Mode UX; Annual Closing workflow
 - **Chart of Accounts (Phase 22)**: 60-account hierarchical seed data with 5 account types (Asset/Liability/Equity/Revenue/Expense)
 - **Currencies Module (Phase 20)**: Multi-currency CRUD with exchange rate history, FractionName, IsSystem delete guard
-- **Users & Permissions (Phase 21)**: 4-role model (Admin/Manager/Cashier/Accountant), 33 permission codes, MustChangePassword, lockout policy
+- **Users & Permissions (Phase 21)**: 9-role model (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager), 45 permission codes, UserRole enum removed, DB-driven Role entity, MustChangePassword, lockout policy
 - **Journal Entries (Phase 30)**: Auto-journal entries from all financial operations; manual entry; Annual Closing
 - **Reports (Phase 31)**: 35+ report DTOs; Hierarchical Income Statement + Balance Sheet; Excel via ClosedXML
 - **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: InventoryBatches entity with batch-level FIFO cost allocation and FEFO expiry-based inventory deduction
@@ -75,7 +75,7 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - Login with username + password
 - JWT token issued on successful login (expires: 8 hours)
 - Refresh token for session continuity
-- Role stored in JWT claims: Admin=1, Manager=2, Cashier=3
+- Role stored in JWT claims: role ID (byte) — roles are DB-driven via Role entity; no UserRole enum
 - Failed login attempts logged
 - Login rate limiting: 5 attempts per 15 minutes per IP
 - Logout clears token from Desktop memory
@@ -602,7 +602,7 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 | **18** | **Accounting Foundation** | JournalEntry, Account, FiscalYear entities; Simple Mode UX toggle; 19 tooltips; 7 auto-journal entry providers; Annual Closing workflow |
 | **19** | **Settings Module** | 13 system settings per analysis; CostingMethod RadioButton; Print/Notification/Tax/Security settings; 8 seed entities |
 | **20** | **Currencies Module** | Multi-currency CRUD with exchange rate history; FractionName field; IsSystem delete guard; YER/USD/SAR seed |
-| **21** | **Users & Permissions** | 4 roles (Admin/Manager/Cashier/Accountant); 33 permission codes; default admin with MustChangePassword; lockout policy |
+| **21** | **Users & Permissions** | 9 roles (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager); 45 permission codes; UserRole enum removed; DB-driven roles; default admin with MustChangePassword; lockout policy |
 | **22** | **Chart of Accounts** | 60-account hierarchical seed; 5 account types; Level validation (max 10); tooltip per account |
 | **23** | **Customers Module** | Party entity shared with Supplier; AccountId mandatory (auto-created under 1210); NO CustomerType; NO OpeningBalance on entity — via Journal Entry |
 | **24** | **Suppliers Module** | Party entity shared with Customer; AccountId mandatory (auto-created under 2100); NO OpeningBalance on entity — via Journal Entry |
@@ -644,12 +644,16 @@ The current implementation follows Phases 18-31, corresponding to the post-MVP f
 - Validation: base currency exchange rate must be 1
 
 ### Phase 21: Users & Permissions
-- User entity: Status(Active/Inactive/Locked), MustChangePassword, LoginAttempts, IsLocked, DefaultCashBoxId, Email, Phone
-- 4 roles: Admin(1), Manager(2), Cashier(3), Accountant(4)
-- 33 permission codes by module (Products, Customers, Suppliers, Sales, Purchases, Accounting, Reports, Settings, Users)
-- Default admin seed: username="admin", name="ظ…ط¯ظٹط± ط§ظ„ظ†ط¸ط§ظ…", MustChangePassword=true
+- User entity: IsActive (soft delete), IsLocked, LoginAttempts, EmployeeId (optional), MustChangePassword
+- 9 DB-driven roles: Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager — stored in Role entity (not UserRole enum)
+- 45 permission codes across 12 categories with dot-notation format (Sales.View, Purchase.Create, etc.)
+- Role-permission mappings seeded via RolePermission join table; Admin-only Permission Management screen
+- UserService.CreateAsync() hashes default password "12345678" (BCrypt, work factor 12), sets MustChangePassword=true
 - Password policy: BCrypt work factor 12, min 8 chars, complexity
-- Lockout after 5 failed attempts
+- Lockout after 5 failed login attempts (IsLocked=true)
+- AuditLog entity (long PK = bigint) with indexes on (UserId, CreatedAt DESC), (EntityType, EntityId), (CreatedAt DESC)
+- Default admin seed: username="admin", name="ظ…ط¯ظٹط± ط§ظ„ظ†ط¸ط§ظ…", MustChangePassword=true
+- Desktop screens: PasswordChangeView (mandatory first-login change), AuditLogListView, PermissionManagementView
 
 ### Phase 22: Chart of Accounts
 - 60 accounts seeded in hierarchical tree (max depth 10)

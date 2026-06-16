@@ -300,7 +300,7 @@ public class ProductUnit
 - Passwords: BCrypt hash, work factor = 12 — NEVER plain text
 - Connection strings: environment variables or encrypted config
 - JWT token expiry: 8 hours
-- JWT claims: `UserId`, `UserName`, `FullName`, `role` (numeric: 1/2/3)
+- JWT claims: `UserId`, `UserName`, `FullName`, `roleId` (byte, DB-driven — no UserRole enum), `permissions` (list of permission codes)
 - Token storage (Desktop): in-memory ONLY — never persisted to disk
 - NO sensitive data in logs
 
@@ -671,23 +671,46 @@ public enum CashTransactionType : byte
 
 ## 4. User Roles & Permissions
 
-**Enum:** `Admin = 1, Manager = 2, Cashier = 3`
+Roles are **DB-driven** — there is no `UserRole` enum. Roles are stored in the `Roles` table seeded with 9 roles. Users are assigned roles via the `UserRole` join table. Permissions use dot-notation codes (e.g., `Sales.View`, `Purchase.Create`) stored in the `Permissions` table, mapped to roles via `RolePermission` join table.
 
-| Feature | Admin (1) | Manager (2) | Cashier (3) | API Policy |
-|---------|-----------|-------------|-------------|------------|
-| Sales Invoice | ✅ | ✅ | ✅ | AllStaff |
-| Sales Return | ✅ | ✅ | ✅ | AllStaff |
-| Purchase Invoice | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Purchase Return | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Products CRUD | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Customers CRUD | ✅ | ✅ | View Only | AllStaff |
-| Suppliers CRUD | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Warehouses CRUD | ✅ | ❌ | ❌ | AdminOnly |
-| Stock Transfer | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Reports | ✅ | ✅ | ❌ | ManagerAndAbove |
-| Settings | ✅ | ❌ | ❌ | AdminOnly |
-| User Management | ✅ | ❌ | ❌ | AdminOnly |
-| Backup/Restore | ✅ | ❌ | ❌ | AdminOnly |
+### Seeded Roles
+
+| Id | Role Name (Arabic) | Role Name (English) | Description |
+|:--:|--------------------|---------------------|-------------|
+| 1 | مدير النظام | Admin | Full system access — all 45 permissions |
+| 2 | مدير | Manager | Full operational access except System settings & user management |
+| 3 | محاسب | Accountant | Accounting, reports, and financial operations |
+| 4 | أمين صندوق | Treasurer | Cashbox operations, banking, payments |
+| 5 | كاشير | Cashier | Sales transactions, customer payments, cashbox operations |
+| 6 | مشرف مخازن | Warehouse Supervisor | Inventory management, transfers, adjustments, counts |
+| 7 | مندوب مبيعات | Sales Employee | Sales invoices, customer management, returns |
+| 8 | مراقب | Observer | View-only access to sales, purchases, inventory, reports, audit |
+| 9 | مدير فرع | Branch Manager | Branch-scoped full access (sales, purchases, inventory, customers) |
+
+### Permission Categories
+
+| # | Category | Permissions |
+|---|----------|-------------|
+| 1 | Sales | Sales.View, Sales.Create, Sales.Edit, Sales.Delete, Sales.Cancel, Sales.Return, Sales.Print |
+| 2 | Purchases | Purchase.View, Purchase.Create, Purchase.Edit, Purchase.Cancel, Purchase.Return, Purchase.Print |
+| 3 | Inventory | Inventory.View, Inventory.Transfer, Inventory.Adjust, Inventory.Count, Warehouse.Manage |
+| 4 | Customers | Customer.View, Customer.Create, Customer.Edit, Customer.Delete |
+| 5 | Suppliers | Supplier.View, Supplier.Create, Supplier.Edit, Supplier.Delete |
+| 6 | Products | Product.View, Product.Create, Product.Edit, Product.Delete |
+| 7 | Reports | Reports.View |
+| 8 | Accounting | Accounting.View, Accounting.Manage |
+| 9 | Currencies | Currencies.View, Currencies.Manage |
+| 10 | System | Settings.Manage, UserManagement, Backup.Manage, FiscalYear.Manage, AuditLog.View |
+| 11 | Operations | Cashbox.Operations, Banking.Operations, Expenses.Operations |
+| 12 | Employees | Employees.View, Employees.Manage |
+
+### API Authorization Policies
+
+| Policy | Role IDs | Roles |
+|--------|----------|-------|
+| `AdminOnly` | 1 | Admin |
+| `ManagerAndAbove` | 1, 2 | Admin, Manager |
+| `AllStaff` | 1, 2, 3, 4, 5, 6, 7, 8, 9 | All roles |
 
 ---
 

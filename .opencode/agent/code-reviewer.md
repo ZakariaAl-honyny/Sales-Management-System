@@ -273,16 +273,16 @@ Code quality and convention enforcement for the Sales Management System.
 
 ### Phase 21 Users & Permissions — Complete Checklist (v4.6.9)
 - [ ] `User.Create()` uses passwordless creation — `PasswordHash = null`, `MustChangePassword = true`
-- [ ] `UserStatus` enum replaces `IsActive` bool — EF query filter on `Status == UserStatus.Active`
-- [ ] `RecordLoginAttempt()` used for ALL login attempts — lockout at 5 failures
+- [ ] No `UserStatus` enum — User uses `IsActive` (bool, for soft-delete) + `IsLocked` (bool, for lockout)
+- [ ] `RecordLoginAttempt()` used for ALL login attempts — success resets `IsLocked = false`, 5 failures → `IsLocked = true`
 - [ ] `Permission` entity has `IsSystem` guard — system permissions never modifiable
 - [ ] `AuditLog` uses `long Id` with 3 performance indexes
 - [ ] All new entities use `DeleteBehavior.Restrict` on ALL FKs
-- [ ] `AuthService.LoginAsync` checks `MustChangePassword` before password verification
+- [ ] `AuthService.LoginAsync` checks `IsLocked`/`IsActive` before password verification; checks `MustChangePassword` after
 - [ ] `AuthService.ChangePasswordAsync` validates current password via BCrypt
 - [ ] Login audit entries created for every success/failure/lockout
-- [ ] `PermissionService.UpdateRolePermissionsAsync` uses `ExecuteTransactionAsync`
-- [ ] DbSeeder seeds 33 permissions across 9 categories with 4-role assignments
+- [ ] `PermissionService.UpdateRolePermissionsAsync` uses `ExecuteTransactionAsync` with `byte roleId` (no `UserRole` enum)
+- [ ] DbSeeder seeds 45 permissions across 12 categories with 9-role assignments (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager)
 - [ ] Default admin seeded passwordless (`PasswordHash = null`, `MustChangePassword = true`)
 
 ### Key Checkpoints
@@ -515,7 +515,7 @@ These checks ARE REQUIRED for any code touching Domain entities or EF configurat
 
 ### Column Type Integrity (MUST match schema)
 - [ ] ALL enum Status/Types use `HasConversion<byte>()` + `.HasColumnType("tinyint")` — NOT `HasConversion<int>()`?
-  - Check: InvoiceStatus, PaymentType, MovementType, AdjustmentType, AccountType, UserRole, JournalEntryType, CashTransactionType, ChequeStatus, POStatus, QuotationStatus, etc.
+  - Check: InvoiceStatus, PaymentType, MovementType, AdjustmentType, AccountType, JournalEntryType, CashTransactionType, ChequeStatus, POStatus, QuotationStatus, etc. (UserRole enum removed — use DB-driven Role entity)
 - [ ] ALL date columns use `.HasColumnType("date")` — NOT default `datetime2`?
   - Check: InvoiceDate, CreatedAt, UpdatedAt, EntryDate, BirthDate, HireDate, EffectiveFrom/To, ExpiryDate, etc.
 - [ ] SortOrder columns use `short` (smallint) — NOT `int`?

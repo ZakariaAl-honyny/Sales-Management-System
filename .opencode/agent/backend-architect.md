@@ -254,26 +254,28 @@ The database has been refactored from ~82 tables to **65 tables** across 8 modul
 - **tinyint** for SystemLog.Level and all enum status columns
 - **65 tables**: Core & Security (9), Accounting (4), Customers/Suppliers (7), Products/Inventory (14), Sales/Purchases (12), Payments/Boxes (7), Settings (4), Logs (2), System (6)
 
-## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
+## Phase 21: Users & Permissions Module — COMPLETE (v4.10.4)
 
-Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User management with 4 roles, 33 permission codes, lockout, and audit logging.
+Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User management with 9 DB-driven roles, 45 permission codes, lockout, audit logging, and UserRole enum removal.
 
 ### Key Backend Changes
 
 #### User Entity
 - `User.Create()` — Passwordless: `PasswordHash = null`, `MustChangePassword = true`
-- `UserStatus` enum (Active=1, Inactive=2, Locked=3) replaces `IsActive` boolean
-- `RecordLoginAttempt(bool success)` — success resets `FailedLoginAttempts = 0`; failure increments counter, at 5 sets `Status = UserStatus.Locked`
+- `UserService.CreateAsync()` — Uses `request.Password` if provided (BCrypt work factor 12), else defaults to "12345678"
+- `IsActive` (bool, soft-delete) + `IsLocked` (bool) — NOT `UserStatus` enum (removed)
+- `RecordLoginAttempt(bool success)` — success resets `FailedLoginAttempts = 0`; failure increments counter, at 5 sets `IsLocked = true`
 - `SetInitialPassword(string passwordHash)` — guards `MustChangePassword == true`
 - `ChangePassword(string currentPasswordHash, string newPasswordHash)` — verifies current via BCrypt
 
 #### Permission & RolePermission
 - `Permission` entity with `IsSystem` flag — system permissions (`IsSystem = true`) blocked from deletion/modification
-- `RolePermission` join entity linking `UserRole` (byte) to `Permission`
+- `RolePermission` join entity linking `Role` entity (byte roleId, DB-driven, no enum) to `Permission`
 - `PermissionService.UpdateRolePermissionsAsync(int role, List<int> permissionIds)` — uses `_uow.ExecuteTransactionAsync()` for atomic remove+add
 
 #### AuditLog
 - `long Id` (bigint) — required for high-volume audit logging
+- Includes `OldValues`, `NewValues`, `ChangedColumns` for change tracking
 - Indexes: `(UserId, Timestamp DESC)`, `(EntityType, EntityId)`, `(Timestamp DESC)`
 
 ---
@@ -310,13 +312,13 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User
 4. Creates `UserSession` — tracks JWT token, expiration, IP address
 
 #### DbSeeder
-- Seeds 33 permissions across 9 categories with 4-role matrix
+- Seeds 45 permissions across 12 categories with 9-role matrix (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager)
 - Default admin user: `username = "admin"`, `PasswordHash = null`, `MustChangePassword = true`
 - All FK Restrict on Permission, RolePermission, AuditLog, UserSession
 
 #### Key Rules
 - RULE-305: Passwordless creation
-- RULE-306: UserStatus enum replaces IsActive
+- RULE-306: IsActive+IsLocked booleans (not UserStatus enum)
 - RULE-307: RecordLoginAttempt() for all login attempts
 - RULE-308: SetInitialPassword() guards MustChangePassword
 - RULE-309: Permission.IsSystem protects system permissions
@@ -329,8 +331,10 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds User
 - RULE-316: Every login creates AuditLog entry
 - RULE-317: PermissionService uses ExecuteTransactionAsync
 - RULE-318: Desktop permission filtering via API-based checks
-- RULE-319: DbSeeder seeds all 33 permissions
+- RULE-319: DbSeeder seeds all 45 permissions with 9-role assignments
 - RULE-320: Default admin user seeded passwordless
+- RULE-321: UserService.CreateAsync uses request.Password if provided (never hardcodes hash)
+- RULE-322: UserRole enum NOT referenced anywhere (Domain + Contracts cleaned)
 
 ### Phase 23 — Customers Module (Refactored: Parties + Accounts, No CustomerGroup/SupplierType)
 

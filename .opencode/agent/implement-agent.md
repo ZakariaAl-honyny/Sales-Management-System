@@ -1710,28 +1710,22 @@ await InvokeOnUIThreadAsync(async () => { /* no await */ });  // ❌
 
 ## v4.6.9 — Phase 21 Users & Permissions Module Patterns
 
-### Passwordless User Creation
+### Passwordless User Creation (No Role — DB-driven via UserRole join table)
 ```csharp
-public static User Create(string userName, string fullName, UserRole role,
-    string? phone = null, string? email = null, int? defaultCashBoxId = null,
+public static User Create(string userName, int? defaultCashBoxId = null,
     int? createdByUserId = null)
 {
     if (string.IsNullOrWhiteSpace(userName))
         throw new DomainException("اسم المستخدم مطلوب.");
-    if (string.IsNullOrWhiteSpace(fullName))
-        throw new DomainException("الاسم الكامل مطلوب.");
     return new User
     {
         UserName = userName.Trim(),
-        FullName = fullName.Trim(),
-        Role = role,
-        Status = UserStatus.Active,
-        Phone = phone?.Trim(),
-        Email = email?.Trim(),
         DefaultCashBoxId = defaultCashBoxId,
         MustChangePassword = true,
         PasswordHash = null,
         LoginAttempts = 0,
+        IsActive = true,
+        IsLocked = false,
         CreatedByUserId = createdByUserId,
         CreatedAt = DateTime.UtcNow
     };
@@ -1745,21 +1739,21 @@ public void RecordLoginAttempt(bool success)
     if (success)
     {
         LoginAttempts = 0;
-        Status = UserStatus.Active;
+        IsLocked = false;
         LastLoginAt = DateTime.UtcNow;
     }
     else
     {
         LoginAttempts++;
         if (LoginAttempts >= 5)
-            Status = UserStatus.Locked;
+            IsLocked = true;
     }
 }
 ```
 
-### AuthService Login — MustChangePassword + Lockout
+### AuthService Login — IsLocked + MustChangePassword
 ```csharp
-if (user.Status == UserStatus.Locked)
+if (user.IsLocked || !user.IsActive)
     return Result<LoginResponse>.Failure("الحساب مغلق مؤقتاً", ErrorCodes.AccountLocked);
 
 if (user.MustChangePassword || string.IsNullOrWhiteSpace(user.PasswordHash))
@@ -1787,17 +1781,17 @@ public class Permission : BaseEntity
 }
 ```
 
-### PermissionService Transactional Update
+### PermissionService Transactional Update (byte roleId — DB-driven Role entity)
 ```csharp
-public async Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct)
+public async Task<Result> UpdateRolePermissionsAsync(byte roleId, List<int> permissionIds, CancellationToken ct)
 {
     await _uow.ExecuteTransactionAsync(async () =>
     {
         var existing = await _uow.RolePermissions.GetQueryable()
-            .Where(rp => rp.Role == role).ToListAsync(ct);
+            .Where(rp => rp.RoleId == roleId).ToListAsync(ct);
         _uow.RolePermissions.RemoveRange(existing);
         foreach (var permId in permissionIds)
-            await _uow.RolePermissions.AddAsync(RolePermission.Create(role, permId), ct);
+            await _uow.RolePermissions.AddAsync(RolePermission.Create(roleId, permId), ct);
     }, ct);
     return Result.Success();
 }
@@ -2715,3 +2709,18 @@ When you encounter any code related to these areas, apply fixes automatically:
 58. `Customer.CategoryId`/`Supplier.CategoryId` (`int?`) without FK ??? Document as loose property (int does not match AccountCategory's smallint PK). Consider `HasColumnType("int")` override.
 59. Entity configurations lacking explicit column type for tinyint enums ??? ADD `.HasColumnType("tinyint")` to ALL enum properties. EF Core defaults to `int` SQL type.
 60. Missing HasQueryFilter(IsActive) on ActivatableEntity configurations ??? VERIFY every ActivatableEntity has `.HasQueryFilter(x => x.IsActive)` in its EF configuration. Missing this filter means soft-deleted records appear in queries.
+
+## Auto-Fix Rules (Phase 21 — Users & Permissions)
+
+When implementing code in the Users & Permissions domain, ALWAYS apply these fixes automatically:
+
+1. **UserService.CreateAsync**: MUST check `request.Password` if provided (hash with BCrypt work factor 12), fall back to "12345678" if null. NEVER hardcode only "12345678".
+2. **No UserRole enum**: Use DB-driven `Role` entity. `PermissionService.GetRolePermissionsAsync()` must query `_uow.Roles.ToListAsync()` — NEVER use `Enum.GetValues<UserRole>()`.
+3. **No UserStatus enum**: User uses `IsActive` (bool, for soft-delete) + `IsLocked` (bool, for lockout). NEVER add `Status` enum.
+4. **No FullName/Phone/Email/AvatarPath on User**: Profile fields live on linked Employee/Party entity.
+5. **LoginAttempts**: Use `short` type (smallint in DB). Track with `RecordLoginAttempt()`.
+6. **AuditLog**: Use `long Id` (bigint). Split Details into `OldValues`/`NewValues`/`ChangedColumns` (not single Details field).
+7. **UserSession**: Use `AuditableEntity` (not `ActivatableEntity`). Use `SessionToken` + `IsRevoked`.
+8. **RolePermission**: Use `ExecuteTransactionAsync()` for atomic update operations.
+9. **Desktop screens exist**: PasswordChangeView, AuditLogListView, PermissionManagementView — all already implemented. Don't create duplicates.
+10. **45 permissions minimum**: DbSeeder must seed at least 45 permissions across 12+ categories with 9-role assignments.
