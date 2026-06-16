@@ -282,6 +282,7 @@ public static class DbSeeder
             ("Currencies.Manage",    "إدارة العملات",       "Accounting"),
             ("Warehouse.Manage",     "إدارة المخازن",       "Inventory"),
             ("Inventory.Count",      "جرد المخزون",         "Inventory"),
+            ("Roles.Manage",         "إدارة الأدوار",       "System"),
         };
 
         foreach (var (code, displayName, category) in permissionDefs)

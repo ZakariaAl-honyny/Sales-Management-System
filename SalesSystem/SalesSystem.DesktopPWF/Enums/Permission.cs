@@ -199,7 +199,8 @@ public static class PermissionExtensions
             flags |= Permission.SupplierManagement;
 
         // Inventory
-        if (codeSet.Contains("Inventory.View") || codeSet.Contains("Inventory.Transfer"))
+        if (codeSet.Contains("Inventory.View") || codeSet.Contains("Inventory.Transfer")
+            || codeSet.Contains("Inventory.Count") || codeSet.Contains("Inventory.Adjust"))
             flags |= Permission.InventoryCount | Permission.InventoryAdjust;
         if (codeSet.Contains("Inventory.Transfer"))
             flags |= Permission.WarehouseTransfer;
@@ -238,6 +239,10 @@ public static class PermissionExtensions
             flags |= Permission.Backup;
         if (codeSet.Contains("Audit.Log"))
             flags |= Permission.AuditLog;
+
+        // Roles
+        if (codeSet.Contains("Roles.Manage"))
+            flags |= Permission.Roles;
 
         // Employees
         if (codeSet.Any(c => c.StartsWith("Employees.")))

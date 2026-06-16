@@ -84,13 +84,16 @@ public class SessionService : ISessionService
     public Permission GetPermissions() => _permissions;
 
     /// <summary>
-    /// Updates session with API-loaded permissions from CurrentUserDto.
-    /// Called after MainViewModel.LoadCurrentUserAsync() succeeds.
-    /// Overrides the initial hardcoded role-based permissions with actual DB-driven permissions.
+    /// Merges API-loaded permissions into the current session permissions.
+    /// Called after MainViewModel.LoadCurrentUserAsync() succeeds with the CurrentUserDto.Permissions.
+    /// Uses OR merge (|=) to preserve role-based Desktop-only flags (e.g., Roles, InventoryCount)
+    /// that have no direct API permission code counterpart.
+    /// The initial role-based mapping from GetPermissionsForRole() acts as the baseline safety net;
+    /// API-driven codes from FromApiCodes() layer on top for fine-grained control.
     /// </summary>
     public void SetApiPermissions(Permission permissions)
     {
-        _permissions = permissions;
+        _permissions |= permissions;
         // Update view mode based on whether the user has accounting permissions
         _viewMode = permissions.HasPermission(Permission.ChartOfAccounts)
             ? ViewMode.Advanced
