@@ -78,7 +78,7 @@ REQ-INV-002: Perpetual Inventory system
   - WarehouseStock.Quantity updated in real-time (CHECK Quantity >= 0)
 ```
 
-- 4 roles: `Admin=1, Manager=2, Cashier=3, Accountant=4`
+- 9 DB-driven roles: `Admin=1, Manager=2, Accountant=3, Treasurer=4, Cashier=5, Warehouse Supervisor=6, Sales Employee=7, Observer=8, Branch Manager=9` — no `UserRole` enum
 - Invoice statuses: `Draft=1, Posted=2, Cancelled=3`
 - Payment types: `Cash=1, Credit=2, Mixed=3`
 - 12 inventory transaction types: Purchase=1, PurchaseReturn=2, Sale=3, SaleReturn=4, TransferOut=5, TransferIn=6, Count=7, Adjustment=8, Damage=9, OpeningBalance=10, InternalIssue=11, InternalReceipt=12
@@ -86,7 +86,7 @@ REQ-INV-002: Perpetual Inventory system
 - Accounting: 60-account Chart of Accounts, JournalEntries, FiscalYears, 7 auto-journal entry providers
 - FIFO/FEFO: InventoryBatches batch tracking with expiry-based deduction
 - Multi-currency: Currency entity with exchange rates, FractionName, immutable IsBaseCurrency
-- 33 permission codes across 9 modules
+- 45 permission codes across 12 categories (see AGENTS.md Section 6 for full matrix)
 - Removed: CustomerGroup, SupplierType, SalesQuotation, PurchaseOrder, Cheque, DailyClosure, InventoryMovement, StockTransfer
 
 ## Behaviors
@@ -104,7 +104,7 @@ REQ-INV-002: Perpetual Inventory system
 
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
-Phase 21 (PRD alignment) — Users & Permissions is now complete. Spec details for this module: 4 roles (Admin/Accountant/Cashier/Observer), 33 permission codes in dot notation (e.g., "Sales.Create", "Inventory.View"), passwordless user creation flow, account lockout at 5 failed attempts, AuditLog with long PK and 3 performance indexes, UserSession for JWT tracking. Key spec decision: All FK relationships use DeleteBehavior.Restrict — no cascade.
+Phase 21 (PRD alignment) — Users & Permissions is now complete. Spec details for this module: 9 DB-driven roles (Admin=1, Manager=2, Accountant=3, Treasurer=4, Cashier=5, Warehouse Supervisor=6, Sales Employee=7, Observer=8, Branch Manager=9), 45 permission codes in dot notation (e.g., "Sales.Create", "Inventory.View"), UserRole enum removed (replaced by DB Role entity), UserStatus enum removed (replaced by IsActive+IsLocked booleans), passwordless user creation flow, account lockout at 5 failed attempts using IsLocked flag, AuditLog with long PK and 3 performance indexes, UserSession for JWT tracking. Key spec decision: All FK relationships use DeleteBehavior.Restrict — no cascade.
 
 ---
 

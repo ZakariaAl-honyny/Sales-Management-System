@@ -45,7 +45,7 @@ Response:
 ClaimTypes.NameIdentifier  → UserId
 ClaimTypes.Name            → UserName
 ClaimTypes.GivenName       → FullName
-"role"                     → Role number (1/2/3)
+"role"                     → Role number (1-9, DB-driven via Role entity — Admin=1, Manager=2, Accountant=3, Treasurer=4, Cashier=5, Warehouse Supervisor=6, Sales Employee=7, Observer=8, Branch Manager=9)
 ```
 
 ### Token Storage in Desktop
@@ -58,9 +58,15 @@ public class AuthState
     public int Role { get; private set; }
     public DateTime ExpiresAt { get; private set; }
 
-    public bool IsAdmin    => Role == 1;
-    public bool IsManager  => Role == 2;
-    public bool IsCashier  => Role == 3;
+    public bool IsAdmin              => Role == 1;
+    public bool IsManager            => Role == 2;
+    public bool IsAccountant         => Role == 3;
+    public bool IsTreasurer          => Role == 4;
+    public bool IsCashier            => Role == 5;
+    public bool IsWarehouseSupervisor => Role == 6;
+    public bool IsSalesEmployee      => Role == 7;
+    public bool IsObserver           => Role == 8;
+    public bool IsBranchManager      => Role == 9;
     public bool IsExpired  => DateTime.UtcNow >= ExpiresAt;
 
     public void SetToken(LoginResponse response) { /* ... */ }
@@ -80,7 +86,7 @@ builder.Services.AddAuthorization(options =>
         p => p.RequireClaim("role", "1", "2"));
 
     options.AddPolicy("AllStaff",
-        p => p.RequireClaim("role", "1", "2", "3"));
+        p => p.RequireClaim("role", "1", "2", "3", "4", "5", "6", "7", "8", "9"));
 });
 
 // Usage on Controllers:
@@ -261,14 +267,16 @@ Verify no sensitive data in logs.
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 (PRD alignment) — Users & Permissions is now complete. Security implications to verify:
-1. **Passwordless creation**: Admin creates user WITHOUT password — user sets password on first login via SetPassword. The SetPassword endpoint requires a valid JWT from the MustChangePassword login flow (not AllowAnonymous).
-2. **Account lockout**: 5 failed login attempts → UserStatus.Locked. Admin-only Unlock(). RecordLoginAttempt() logs every attempt.
-3. **Permission.IsSystem**: System permissions (IsSystem = true) are protected from deletion/modification at both application and DB level.
-4. **AuditLog**: Every login success/failure creates an AuditLog entry. AuditLog uses long Id for high volume.
-5. **BCrypt work factor 12**: All password hashing uses BCrypt with work factor 12.
-6. **All FK Restrict**: Permission, RolePermission, AuditLog, UserSession all use DeleteBehavior.Restrict.
-7. **Rate limiting**: Login endpoint has [EnableRateLimiting("LoginPolicy")] — 5 attempts per 15 minutes per IP.
-8. **JWT**: 8-hour expiry, in-memory only on Desktop, never persisted to disk.
+1. **UserRole enum removed**: Roles are DB-driven via Role entity (9 roles, smallint PK) — no hardcoded enum in code. Permission checks query the DB Role entity, not `Enum.GetValues()`.
+2. **UserStatus enum removed**: Replaced by `IsActive` (ActivatableEntity, soft-delete) + `IsLocked` (bool, lockout) booleans. No `Status` column or `UserStatus` enum anywhere.
+3. **Passwordless creation**: Admin creates user WITHOUT password — user sets password on first login via SetPassword. The SetPassword endpoint requires a valid JWT from the MustChangePassword login flow (not AllowAnonymous).
+4. **Account lockout**: 5 failed login attempts → `IsLocked = true`. Admin-only unlock via `SetIsLocked(false)`. `RecordLoginAttempt()` logs every attempt.
+5. **Permission.IsSystem**: System permissions (IsSystem = true) are protected from deletion/modification at both application and DB level.
+6. **AuditLog**: Every login success/failure creates an AuditLog entry. AuditLog uses long Id for high volume.
+7. **BCrypt work factor 12**: All password hashing uses BCrypt with work factor 12.
+8. **All FK Restrict**: Permission, RolePermission, AuditLog, UserSession all use DeleteBehavior.Restrict.
+9. **Rate limiting**: Login endpoint has [EnableRateLimiting("LoginPolicy")] — 5 attempts per 15 minutes per IP.
+10. **JWT**: 8-hour expiry, in-memory only on Desktop, never persisted to disk. JWT includes `jti` claim for token identification.
 
 ---
 

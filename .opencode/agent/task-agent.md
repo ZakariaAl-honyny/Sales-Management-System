@@ -23,7 +23,7 @@ Break plans into granular executable tasks, ordered by PRD implementation phases
 Phase 18: Accounting Foundation (JournalEntry, Account, FiscalYear)
 Phase 19: Settings Module (13 system settings, CostingMethod, Print/Tax settings)
 Phase 20: Currencies Module (multi-currency, exchange rates, FractionName)
-Phase 21: Users & Permissions (4 roles, 33 permission codes) — COMPLETE ✓
+Phase 21: Users & Permissions (9 DB-driven roles, 45 permission codes, UserRole enum removed, UserStatus enum removed) — COMPLETE ✓
 Phase 22: Chart of Accounts (60 accounts, 5 types, SystemAccountMappings)
 Phase 23: Customers Module (Account auto-creation, CreditLimit)
 Phase 24: Suppliers Module (Account auto-creation, OpeningBalance JE)

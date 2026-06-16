@@ -103,7 +103,7 @@ Overall: 🟢 GOOD / 🟡 PARTIAL / 🔴 BLOCKED
 
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
-Phase 21 added User entity rebuild (UserStatus, passwordless creation, lockout), Permission+RolePermission DB-backed system (33 permissions, 4 roles), AuditLog (long Id, indexed), and UserSession. When analyzing consistency, verify: 1) UserStatus enum values match AGENTS.md (Active=1, Inactive=2, Locked=3), 2) All 33 permissions are seeded with correct role assignments matching the matrix, 3) AuditLog uses long Id not int.
+Phase 21 added User entity rebuild (IsActive+IsLocked booleans replace UserStatus enum, passwordless creation, lockout via IsLocked), Permission+RolePermission DB-backed system (45 permissions, 9 DB-driven roles), AuditLog (long Id, indexed), and UserSession. UserRole enum is removed — roles are DB-driven via Role entity. When analyzing consistency, verify: 1) UserRole enum is NOT referenced anywhere (removed — DB-driven Role entity replaces it), 2) UserStatus enum is NOT referenced anywhere (removed — IsActive+IsLocked booleans replace it), 3) All 45 permissions are seeded with correct role assignments matching the 9-role matrix in AGENTS.md Section 6, 4) AuditLog uses long Id not int.
 
 ---
 

@@ -432,6 +432,13 @@ public static class DbSeeder
             mustChangePassword: true
         );
         db.Users.Add(adminUser);
+        await db.SaveChangesAsync(); // Save to get admin user ID
+
+        // Assign admin user to the "مدير النظام" role (CRITICAL — without this, admin has zero permissions)
+        var adminRoleEntity = await db.Set<Role>().FirstAsync(r => r.Name == "مدير النظام");
+        db.Set<UserRole>().Add(UserRole.Create(adminUser.Id, adminRoleEntity.Id));
+        await db.SaveChangesAsync();
+        logger?.LogInformation("Assigned admin user to role '{Role}'.", adminRoleEntity.Name);
 
         var warehouse = Warehouse.Create(
             branchId: 1,

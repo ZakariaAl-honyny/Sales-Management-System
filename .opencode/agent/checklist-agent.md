@@ -78,7 +78,7 @@ Enforces AGENTS.md rules and Clean Architecture constraints.
 - [ ] `SystemLogs.Level` = tinyint (not nvarchar)
 
 ## smallint FK Type Checklist
-- [ ] `Roles.Id` = smallint → UserRoles.RoleId = smallint, RolePermissions.RoleId = smallint
+- [ ] `Roles.Id` = smallint → UserRoles.RoleId = smallint, RolePermissions.RoleId = smallint (DB-driven — values 1-9, no UserRole enum)
 - [ ] `Departments.Id` = smallint → Employees.DepartmentId = smallint
 - [ ] `Branches.Id` = smallint → UserBranches.BranchId = smallint, Warehouses.BranchId = smallint
 - [ ] `Warehouses.Id` = smallint → all FK references use smallint
@@ -171,14 +171,15 @@ Summary: `X/Y checks passed`
 ## Phase 21: Users & Permissions Module — COMPLETE (v4.6.9)
 
 Phase 21 is complete. Key checklist items for this module:
-- [ ] UserStatus enum: Active=1, Inactive=2, Locked=3
-- [ ] Passwordless User.Create() — no password parameter
-- [ ] RecordLoginAttempt() logic: success resets counter, failure increments (lock at 5)
+- [ ] User uses IsActive (bool) + IsLocked (bool) — NO UserStatus enum
+- [ ] UserRole enum is REMOVED — roles are DB-driven via Role entity (smallint PK, values 1-9)
+- [ ] Passwordless User.Create() — no password parameter, MustChangePassword=true
+- [ ] RecordLoginAttempt() logic: success resets counter, failure increments (IsLocked=true at 5)
 - [ ] Permission.IsSystem = true blocks deletion/modification
 - [ ] AuditLog uses long Id (bigint) with 3 indexes
 - [ ] All FK on Permission, RolePermission, AuditLog, UserSession use Restrict
 - [ ] PermissionService.UpdateRolePermissionsAsync() uses ExecuteTransactionAsync
-- [ ] DbSeeder seeds 33 permissions with 4-role assignments
+- [ ] DbSeeder seeds 45 permissions with 9-role assignments (Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager)
 - [ ] Admin user seeded passwordless (PasswordHash = null)
 
 ---

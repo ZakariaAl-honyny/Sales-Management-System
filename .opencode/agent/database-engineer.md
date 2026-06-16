@@ -310,7 +310,7 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds 4 ne
 - FK: none
 
 #### RolePermissions
-- `RoleId` tinyint NOT NULL — FK to `UserRole` enum value (1=Admin, 2=Manager, 3=Cashier)
+- `RoleId` tinyint NOT NULL — FK to Role entity (DB-driven — values 1-9: Admin=1, Manager=2, Accountant=3, Treasurer=4, Cashier=5, Warehouse Supervisor=6, Sales Employee=7, Observer=8, Branch Manager=9)
 - `PermissionId` int NOT NULL — FK to Permissions with Restrict
 - Composite PK: `(RoleId, PermissionId)`
 - FK: `DeleteBehavior.Restrict` on both FKs
@@ -344,22 +344,22 @@ Phase 21 (PRD alignment) — Users & Permissions is now complete. This adds 4 ne
 ### Modified Tables
 
 #### Users (modified)
-- **REMOVED**: `IsActive` bit column
-- **ADDED**: `Status` tinyint NOT NULL default 1 — maps to `UserStatus` enum (Active=1, Inactive=2, Locked=3)
+- **PRESERVED**: `IsActive` bit column (from ActivatableEntity — standard soft-delete, UserStatus enum removed)
+- **ADDED**: `IsLocked` bit NOT NULL default 0 (replaces UserStatus.Locked — true when account locked after 5 failed attempts)
 - **ADDED**: `FailedLoginAttempts` int NOT NULL default 0
 - **ADDED**: `MustChangePassword` bit NOT NULL default 1 (true for new passwordless users)
 - **CHANGED**: `PasswordHash` nvarchar(255) NULL — nullable for passwordless creation
-- **CHANGED**: Global query filter: `.HasQueryFilter(u => u.Status == UserStatus.Active)` replaces `u.IsActive`
+- **CHANGED**: Global query filter: `.HasQueryFilter(u => u.IsActive)` — standard soft-delete filter (no longer uses UserStatus)
 
 ### Fluent API Config Rules
 
 #### UserConfiguration
 ```csharp
-builder.Property(u => u.Status).HasConversion<int>().IsRequired().HasDefaultValue(1);
 builder.Property(u => u.PasswordHash).HasMaxLength(255).IsRequired(false);
+builder.Property(u => u.IsLocked).IsRequired().HasDefaultValue(false);
 builder.Property(u => u.FailedLoginAttempts).IsRequired().HasDefaultValue(0);
 builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);
-builder.HasQueryFilter(u => u.Status == UserStatus.Active);
+builder.HasQueryFilter(u => u.IsActive);  // Standard soft-delete filter (UserStatus enum removed)
 ```
 
 #### PermissionConfiguration
@@ -374,7 +374,7 @@ builder.HasIndex(p => p.Name).IsUnique().HasFilter("[IsSystem] = 0");
 ```csharp
 builder.HasKey(rp => new { rp.RoleId, rp.PermissionId });
 builder.HasOne(rp => rp.Permission).WithMany().HasForeignKey(rp => rp.PermissionId).OnDelete(DeleteBehavior.Restrict);
-// RoleId is a value object (UserRole enum) — no FK navigation to a Roles table
+// RoleId is a foreign key to the Role entity (DB-driven, no enum) — Role entity is in the Domain layer for DB-driven role management
 ```
 
 #### AuditLogConfiguration
@@ -566,22 +566,23 @@ private async Task UpdateSystemAccountMappingsAsync(SalesDbContext context, Canc
 
 ### Seeded Data
 
-**Admin User:** Passwordless, MustChangePassword=true, Status=Active
+**Admin User:** Passwordless, MustChangePassword=true, IsActive=true, IsLocked=false
 
-**33 Permissions across 9 categories:**
+**45 Permissions across 12 categories** (see AGENTS.md Section 6 for full matrix):
 - Sales (7): Create, Edit, Delete, View, Post, Cancel, Print
-- Purchases (5): Create, Edit, Delete, View, Post
-- Inventory (3): Adjust, Transfer, View
-- Customers (3): Create, Edit, View
-- Suppliers (3): Create, Edit, View
-- Products (3): Create, Edit, View
+- Purchases (5): Create, Edit, Delete, View, Post, Cancel, Print
+- Inventory (5): View, Transfer, Adjust, Count, WarehouseManage
+- Customers (4): View, Create, Edit, Delete
+- Suppliers (4): View, Create, Edit, Delete
+- Products (4): View, Create, Edit, Delete
 - Reports (1): ViewAll
 - Accounting (2): ViewJournal, PostJournal
 - System (2): ManageUsers, ManageSettings
 - Operations (3): ManagePrinters, ManageBackup, ViewAuditLog
-- Audit (1): ViewAuditLog
+- Currencies (2): View, Manage
+- Organization (3): EmployeesView, EmployeesManage, FiscalYearManage
 
-**4-Role Matrix:** Admin=ALL, Manager=subset (no System/Accounting post), Cashier=sales+customers view+inventory view
+**9-Role Matrix:** Admin=ALL, Manager=most (no System.Settings/Users/Backup), Accountant=accounting+reports, Treasurer=cash+banking, Cashier=sales+customers, Warehouse Supervisor=inventory+products, Sales Employee=sales+customers, Observer=view-only, Branch Manager=branch-scoped. Full matrix in AGENTS.md Section 6.
 
 ---
 
