@@ -7,16 +7,12 @@ public class CreateWarehouseTransferValidator : AbstractValidator<CreateWarehous
 {
     public CreateWarehouseTransferValidator()
     {
-        RuleFor(x => x.FromWarehouseId)
+        RuleFor(x => x.SourceWarehouseId)
             .Must(id => id > 0).WithMessage("يجب اختيار المستودع المصدر");
 
-        RuleFor(x => x.ToWarehouseId)
+        RuleFor(x => x.DestinationWarehouseId)
             .Must(id => id > 0).WithMessage("يجب اختيار المستودع الوجهة")
-            .NotEqual(x => x.FromWarehouseId).WithMessage("المستودع الوجهة لا يمكن أن يكون نفس المستودع المصدر");
-
-        RuleFor(x => x.TransferDate)
-            .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.TransferDate.HasValue)
-            .WithMessage("تاريخ التحويل لا يمكن أن يكون في المستقبل");
+            .NotEqual(x => x.SourceWarehouseId).WithMessage("المستودع الوجهة لا يمكن أن يكون نفس المستودع المصدر");
 
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)
@@ -27,7 +23,7 @@ public class CreateWarehouseTransferValidator : AbstractValidator<CreateWarehous
 
         RuleForEach(x => x.Lines).ChildRules(item =>
         {
-            item.RuleFor(i => i.ProductId).GreaterThan(0).WithMessage("يجب اختيار المنتج");
+            item.RuleFor(i => i.ProductUnitId).GreaterThan(0).WithMessage("يجب اختيار المنتج");
             item.RuleFor(i => i.Quantity).GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من صفر");
         });
     }

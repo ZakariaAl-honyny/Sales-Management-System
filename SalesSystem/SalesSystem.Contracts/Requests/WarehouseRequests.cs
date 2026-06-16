@@ -26,10 +26,9 @@ public record UpdateWarehouseRequest(
 /// Request to create a new inventory transaction.
 /// </summary>
 public record CreateInventoryTransactionRequest(
-    int TransactionNo,
-    byte TransactionType,
+    string? TransactionNo,
+    byte MovementType,
     short WarehouseId,
-    DateTime? TransactionDate = null,
     byte? ReferenceType = null,
     int? ReferenceId = null,
     string? Notes = null,
@@ -39,20 +38,20 @@ public record CreateInventoryTransactionRequest(
 /// A single line in an inventory transaction.
 /// </summary>
 public record CreateInventoryTransactionLineRequest(
-    int ProductId,
     int ProductUnitId,
     decimal Quantity,
     decimal UnitCost,
-    int? BatchId = null);
+    string? BatchNo = null,
+    DateOnly? ExpiryDate = null,
+    short? WarehouseId = null);
 
 /// <summary>
 /// Request to create a new warehouse transfer.
 /// </summary>
 public record CreateWarehouseTransferRequest(
-    int TransferNo,
-    short FromWarehouseId,
-    short ToWarehouseId,
-    DateTime? TransferDate = null,
+    string? TransferNo,
+    short SourceWarehouseId,
+    short DestinationWarehouseId,
     string? Notes = null,
     List<CreateWarehouseTransferLineRequest>? Lines = null);
 
@@ -60,8 +59,6 @@ public record CreateWarehouseTransferRequest(
 /// A single line in a warehouse transfer.
 /// </summary>
 public record CreateWarehouseTransferLineRequest(
-    int ProductId,
     int ProductUnitId,
     decimal Quantity,
-    decimal UnitCost,
-    int? BatchId = null);
+    string? BatchNo = null);

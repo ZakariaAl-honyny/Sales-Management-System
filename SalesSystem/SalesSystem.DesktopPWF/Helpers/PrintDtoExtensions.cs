@@ -65,7 +65,7 @@ public static class PrintDtoExtensions
         return new InvoicePrintDto
         {
             InvoiceNumber = invoice.Id.ToString(),
-            InvoiceDate = invoice.InvoiceDate,
+            InvoiceDate = invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue),
             TypeName = "فاتورة مشتريات",
             CashierName = string.Empty,
             CustomerOrSupplierName = invoice.SupplierName,
@@ -146,7 +146,7 @@ public static class PrintDtoExtensions
         return new InvoicePrintDto
         {
             InvoiceNumber = @return.ReturnNo.ToString(),
-            InvoiceDate = @return.ReturnDate,
+            InvoiceDate = @return.ReturnDate.ToDateTime(TimeOnly.MinValue),
             TypeName = "مرتجع مشتريات",
             CashierName = string.Empty,
             CustomerOrSupplierName = @return.SupplierName,
@@ -186,7 +186,7 @@ public static class PrintDtoExtensions
         return new PaymentPrintDto
         {
             PaymentNumber = payment.PaymentNo,
-            Date = payment.PaymentDate,
+            Date = payment.PaymentDate.ToDateTime(TimeOnly.MinValue),
             Name = payment.SupplierName,
             Amount = payment.Amount,
             AmountWord = PrintHelper.ToWord(payment.Amount),
@@ -200,10 +200,10 @@ public static class PrintDtoExtensions
     {
         return new TransferPrintDto
         {
-            TransferNumber = transfer.TransferNo.ToString(),
-            Date = transfer.TransferDate,
-            FromWarehouse = transfer.FromWarehouseName ?? "غير معروف",
-            ToWarehouse = transfer.ToWarehouseName ?? "غير معروف",
+            TransferNumber = transfer.TransferNo,
+            Date = transfer.CreatedAt,
+            FromWarehouse = transfer.SourceWarehouseName ?? "غير معروف",
+            ToWarehouse = transfer.DestinationWarehouseName ?? "غير معروف",
             Notes = transfer.Notes ?? string.Empty
         };
     }
@@ -212,7 +212,7 @@ public static class PrintDtoExtensions
     {
         return lines.Select(i => new InvoiceItemPrintDto
         {
-            ProductName = i.ProductName ?? string.Empty,
+            ProductName = i.ProductUnitName ?? string.Empty,
             Quantity = i.Quantity,
             UnitPrice = 0,
             Discount = 0,

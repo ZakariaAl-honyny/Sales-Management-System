@@ -238,7 +238,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
             {
                 var payment = result.Value!;
                 SelectedSupplierId = payment.SupplierId;
-                PaymentDate = payment.PaymentDate;
+                PaymentDate = payment.PaymentDate.ToDateTime(TimeOnly.MinValue);
                 Amount = payment.Amount;
                 PaymentMethod = (PaymentMethod)payment.PaymentMethod;
                 Notes = payment.Notes ?? string.Empty;

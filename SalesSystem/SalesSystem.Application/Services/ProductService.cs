@@ -133,13 +133,16 @@ public class ProductService : IProductService
                             batchSeqResult.Error ?? "فشل في توليد رقم الدفعة.");
 
                     // ── Create InventoryBatch (OPENING) ────────────────
+                    DateOnly? openingExpiryDateOnly = request.OpeningExpiryDate.HasValue
+                        ? DateOnly.FromDateTime(request.OpeningExpiryDate.Value)
+                        : null;
                     var batch = InventoryBatch.Create(
-                        batchNo: batchSeqResult.Value,
+                        batchNo: batchSeqResult.Value.ToString(),
                         productId: product.Id,
                         warehouseId: (short)warehouse.Id,
                         quantityReceived: openingQuantity,
                         unitCost: openingUnitCost,
-                        expiryDate: request.OpeningExpiryDate);
+                        expiryDate: openingExpiryDateOnly);
                     await _uow.InventoryBatches.AddAsync(batch, ct);
 
                     // ── Update/create WarehouseStock ────────────────────
@@ -167,8 +170,8 @@ public class ProductService : IProductService
 
                     // ── Create InventoryTransaction ─────────────────────
                     var invTx = InventoryTransaction.Create(
-                        transactionNo: seqResult.Value,
-                        transactionType: InventoryTransactionType.OpeningBalance,
+                        transactionNo: seqResult.Value.ToString(),
+                        movementType: InventoryTransactionType.OpeningBalance,
                         warehouseId: (short)warehouse.Id,
                         referenceType: null,
                         referenceId: null,
@@ -186,13 +189,11 @@ public class ProductService : IProductService
                     // ── Create InventoryTransactionLine ─────────────────
                     var txLine = InventoryTransactionLine.Create(
                         inventoryTransactionId: invTx.Id,
-                        productId: product.Id,
                         productUnitId: baseProductUnit.Id,
                         quantity: openingQuantity,
                         unitCost: openingUnitCost,
-                        batchId: batch.Id);
+                        batchNo: batch.BatchNo);
                     invTx.AddLine(txLine);
-                    invTx.Post();
 
                     // ── Create journal entry for opening stock ──────────
                     var totalValue = openingQuantity * openingUnitCost;

@@ -13,8 +13,8 @@ using SalesSystem.Domain.Enums;
 namespace SalesSystem.Application.Services;
 
 /// <summary>
-/// Inventory management service using the new v4.10+ schema:
-/// InventoryTransactions (document-based) and WarehouseTransfers replace old InventoryMovement, StockTransfer, etc.
+/// Inventory management service using the v4.10+ schema:
+/// InventoryTransactions (immutable, no Status lifecycle) and WarehouseTransfers (Draft/Posted/Cancelled).
 /// </summary>
 public class InventoryService : IInventoryService
 {
@@ -160,7 +160,7 @@ public class InventoryService : IInventoryService
             s.Product?.Name ?? "غير معروف",
             null,
             s.Quantity,
-            0m // AvgCost no longer stored on WarehouseStock
+            0m
         )).ToList();
 
         return Result<PagedResult<WarehouseStockDto>>.Success(
@@ -169,7 +169,7 @@ public class InventoryService : IInventoryService
 
     #endregion
 
-    #region Inventory Transaction
+    #region Inventory Transaction (immutable — written once, no Status)
 
     public async Task<Result<InventoryTransactionDto>> CreateTransactionAsync(
         CreateInventoryTransactionRequest request, int userId, CancellationToken ct)
@@ -177,132 +177,81 @@ public class InventoryService : IInventoryService
         if (request.Lines == null || request.Lines.Count == 0)
             return Result<InventoryTransactionDto>.Failure("يجب إضافة أصناف للمعاملة");
 
-        var transactionType = (InventoryTransactionType)request.TransactionType;
+        var movementType = (InventoryTransactionType)request.MovementType;
 
         // Auto-generate TransactionNo if not provided
-        int transactionNo;
-        if (request.TransactionNo > 0)
-        {
-            transactionNo = request.TransactionNo;
-        }
-        else
+        var transactionNo = request.TransactionNo;
+        if (string.IsNullOrWhiteSpace(transactionNo))
         {
             var seqResult = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
             if (!seqResult.IsSuccess)
                 return Result<InventoryTransactionDto>.Failure("فشل في توليد رقم المعاملة");
-            transactionNo = seqResult.Value;
+            transactionNo = seqResult.Value.ToString("D6");
         }
 
         var tx = InventoryTransaction.Create(
             transactionNo,
-            transactionType,
+            movementType,
             request.WarehouseId,
-            request.TransactionDate,
             request.ReferenceType.HasValue ? (InventoryReferenceType?)request.ReferenceType.Value : null,
             request.ReferenceId,
             request.Notes,
             userId);
 
+        // Process lines
         foreach (var lineReq in request.Lines)
         {
             var line = InventoryTransactionLine.Create(
                 tx.Id,
-                lineReq.ProductId,
                 lineReq.ProductUnitId,
                 lineReq.Quantity,
                 lineReq.UnitCost,
-                lineReq.BatchId);
+                lineReq.BatchNo,
+                lineReq.ExpiryDate,
+                lineReq.WarehouseId);
             tx.AddLine(line);
+
+            // Update stock immediately (transaction is immutable — no Draft/Posted lifecycle)
+            var warehouseId = lineReq.WarehouseId ?? request.WarehouseId;
+            var productUnit = await _uow.ProductUnits.GetByIdAsync(lineReq.ProductUnitId, ct);
+            if (productUnit == null)
+                return Result<InventoryTransactionDto>.Failure($"وحدة المنتج {lineReq.ProductUnitId} غير موجودة");
+
+            if (IsOutgoingMovement(movementType))
+            {
+                await DecreaseStockAsync(productUnit.ProductId, warehouseId, lineReq.Quantity, lineReq.UnitCost, userId, ct);
+            }
+            else
+            {
+                await IncreaseStockAsync(productUnit.ProductId, warehouseId, lineReq.Quantity, lineReq.UnitCost, userId, ct);
+            }
         }
 
         await _uow.InventoryTransactions.AddAsync(tx, ct);
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation("Inventory Transaction created: #{No}, Type: {Type}",
-            tx.TransactionNo, tx.TransactionType);
+            tx.TransactionNo, tx.MovementType);
 
         return await GetTransactionByIdAsync(tx.Id, ct);
     }
 
+    /// <summary>
+    /// InventoryTransactions are immutable — creation IS posting. This is a no-op returning the existing transaction.
+    /// </summary>
     public async Task<Result<InventoryTransactionDto>> PostTransactionAsync(
         int transactionId, int userId, CancellationToken ct)
     {
-        var tx = await _uow.InventoryTransactions.FirstOrDefaultAsync(
-            t => t.Id == transactionId, ct, "Lines");
-
-        if (tx == null)
-            return Result<InventoryTransactionDto>.Failure("المعاملة غير موجودة", ErrorCodes.NotFound);
-
-        if (tx.Status != InvoiceStatus.Draft)
-            return Result<InventoryTransactionDto>.Failure("فقط المعاملات المسودة يمكن ترحيلها");
-
-        // Validate stock for outgoing transactions
-        var allowNegativeStock = await _systemSettingsRepo.GetBoolAsync("AllowNegativeStock", false, ct);
-        foreach (var line in tx.Lines)
-        {
-            if (IsOutgoingTransaction(tx.TransactionType))
-            {
-                var validation = await ValidateStockAsync(line.ProductId, tx.WarehouseId, line.Quantity, allowNegativeStock, ct);
-                if (!validation.IsSuccess) return Result<InventoryTransactionDto>.Failure(validation.Error!);
-            }
-        }
-
-        tx.Post();
-
-        // Update stock levels based on transaction type
-        foreach (var line in tx.Lines)
-        {
-            if (IsOutgoingTransaction(tx.TransactionType))
-            {
-                await DecreaseStockAsync(line.ProductId, tx.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
-            }
-            else
-            {
-                await IncreaseStockAsync(line.ProductId, tx.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
-            }
-        }
-
-        await _uow.SaveChangesAsync(ct);
-
-        _logger.LogInformation("Inventory Transaction Posted: #{No}", tx.TransactionNo);
-        return await GetTransactionByIdAsync(tx.Id, ct);
+        return await GetTransactionByIdAsync(transactionId, ct);
     }
 
+    /// <summary>
+    /// InventoryTransactions are immutable and cannot be cancelled.
+    /// </summary>
     public async Task<Result<InventoryTransactionDto>> CancelTransactionAsync(
         int transactionId, int userId, CancellationToken ct)
     {
-        var tx = await _uow.InventoryTransactions.FirstOrDefaultAsync(
-            t => t.Id == transactionId, ct, "Lines");
-
-        if (tx == null)
-            return Result<InventoryTransactionDto>.Failure("المعاملة غير موجودة", ErrorCodes.NotFound);
-
-        if (tx.Status == InvoiceStatus.Cancelled)
-            return Result<InventoryTransactionDto>.Failure("المعاملة ملغاة بالفعل");
-
-        bool wasPosted = tx.Status == InvoiceStatus.Posted;
-        tx.Cancel();
-
-        // Reverse stock if it was posted
-        if (wasPosted)
-        {
-            foreach (var line in tx.Lines)
-            {
-                if (IsOutgoingTransaction(tx.TransactionType))
-                {
-                    await IncreaseStockAsync(line.ProductId, tx.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
-                }
-                else
-                {
-                    await DecreaseStockAsync(line.ProductId, tx.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
-                }
-            }
-        }
-
-        await _uow.SaveChangesAsync(ct);
-
-        _logger.LogInformation("Inventory Transaction Cancelled: #{No}", tx.TransactionNo);
-        return await GetTransactionByIdAsync(tx.Id, ct);
+        return Result<InventoryTransactionDto>.Failure("المعاملة غير قابلة للإلغاء — المعاملات غير قابلة للتعديل");
     }
 
     public async Task<Result<InventoryTransactionDto>> GetTransactionByIdAsync(int id, CancellationToken ct)
@@ -317,16 +266,16 @@ public class InventoryService : IInventoryService
     }
 
     public async Task<Result<PagedResult<InventoryTransactionDto>>> GetAllTransactionsAsync(
-        int? warehouseId, int? transactionType, int page, int pageSize, CancellationToken ct)
+        int? warehouseId, int? movementType, int page, int pageSize, CancellationToken ct)
     {
         Expression<Func<InventoryTransaction, bool>> predicate = t =>
             (!warehouseId.HasValue || t.WarehouseId == warehouseId.Value) &&
-            (!transactionType.HasValue || (int)t.TransactionType == transactionType.Value);
+            (!movementType.HasValue || (int)t.MovementType == movementType.Value);
 
         var totalItems = await _uow.InventoryTransactions.CountAsync(predicate, ct);
         var items = await _uow.InventoryTransactions.ToListAsync(
             predicate,
-            q => q.OrderByDescending(t => t.TransactionDate).Skip((page - 1) * pageSize).Take(pageSize),
+            q => q.OrderByDescending(t => t.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize),
             ct, false, "Warehouse");
 
         var dtos = items.Select(MapTransactionToDto).ToList();
@@ -337,7 +286,7 @@ public class InventoryService : IInventoryService
 
     #endregion
 
-    #region Warehouse Transfer
+    #region Warehouse Transfer (has Draft/Posted/Cancelled lifecycle)
 
     public async Task<Result<WarehouseTransferDto>> CreateTransferAsync(
         CreateWarehouseTransferRequest request, int userId, CancellationToken ct)
@@ -345,11 +294,20 @@ public class InventoryService : IInventoryService
         if (request.Lines == null || request.Lines.Count == 0)
             return Result<WarehouseTransferDto>.Failure("يجب إضافة أصناف للتحويل");
 
+        // Auto-generate TransferNo if not provided
+        var transferNo = request.TransferNo;
+        if (string.IsNullOrWhiteSpace(transferNo))
+        {
+            var seqResult = await _sequenceService.GetNextIntAsync("WarehouseTransfer", ct);
+            if (!seqResult.IsSuccess)
+                return Result<WarehouseTransferDto>.Failure("فشل في توليد رقم التحويل");
+            transferNo = seqResult.Value.ToString("D6");
+        }
+
         var transfer = WarehouseTransfer.Create(
-            0, // transferNo auto-generated by service
-            (short)request.FromWarehouseId,
-            (short)request.ToWarehouseId,
-            request.TransferDate,
+            transferNo,
+            request.SourceWarehouseId,
+            request.DestinationWarehouseId,
             request.Notes,
             userId);
 
@@ -357,10 +315,9 @@ public class InventoryService : IInventoryService
         {
             var line = WarehouseTransferLine.Create(
                 transfer.Id,
-                lineReq.ProductId,
-                lineReq.BatchId ?? 0,
+                lineReq.ProductUnitId,
                 lineReq.Quantity,
-                lineReq.UnitCost);
+                lineReq.BatchNo);
             transfer.AddLine(line);
         }
 
@@ -387,7 +344,11 @@ public class InventoryService : IInventoryService
         var allowNegativeStock = await _systemSettingsRepo.GetBoolAsync("AllowNegativeStock", false, ct);
         foreach (var line in transfer.Lines)
         {
-            var validation = await ValidateStockAsync(line.ProductId, transfer.FromWarehouseId, line.Quantity, allowNegativeStock, ct);
+            var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+            if (productUnit == null)
+                return Result<WarehouseTransferDto>.Failure($"وحدة المنتج {line.ProductUnitId} غير موجودة");
+
+            var validation = await ValidateStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, allowNegativeStock, ct);
             if (!validation.IsSuccess) return Result<WarehouseTransferDto>.Failure(validation.Error!);
         }
 
@@ -396,8 +357,11 @@ public class InventoryService : IInventoryService
         // Decrease from source, increase to destination
         foreach (var line in transfer.Lines)
         {
-            await DecreaseStockAsync(line.ProductId, transfer.FromWarehouseId, line.Quantity, line.UnitCost, userId, ct);
-            await IncreaseStockAsync(line.ProductId, transfer.ToWarehouseId, line.Quantity, line.UnitCost, userId, ct);
+            var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+            if (productUnit == null) continue;
+
+            await DecreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
+            await IncreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
         }
 
         await _uow.SaveChangesAsync(ct);
@@ -426,8 +390,11 @@ public class InventoryService : IInventoryService
             // Reverse: increase back to source, decrease from destination
             foreach (var line in transfer.Lines)
             {
-                await IncreaseStockAsync(line.ProductId, transfer.FromWarehouseId, line.Quantity, line.UnitCost, userId, ct);
-                await DecreaseStockAsync(line.ProductId, transfer.ToWarehouseId, line.Quantity, line.UnitCost, userId, ct);
+                var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                if (productUnit == null) continue;
+
+                await IncreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
+                await DecreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
             }
         }
 
@@ -440,7 +407,7 @@ public class InventoryService : IInventoryService
     public async Task<Result<WarehouseTransferDto>> GetTransferByIdAsync(int id, CancellationToken ct)
     {
         var transfer = await _uow.WarehouseTransfers.FirstOrDefaultAsync(
-            t => t.Id == id, ct, "FromWarehouse", "ToWarehouse", "Lines");
+            t => t.Id == id, ct, "SourceWarehouse", "DestinationWarehouse", "Lines");
 
         if (transfer == null)
             return Result<WarehouseTransferDto>.Failure("التحويل غير موجود", ErrorCodes.NotFound);
@@ -449,17 +416,17 @@ public class InventoryService : IInventoryService
     }
 
     public async Task<Result<PagedResult<WarehouseTransferDto>>> GetAllTransfersAsync(
-        int? fromWarehouseId, int? toWarehouseId, int page, int pageSize, CancellationToken ct)
+        int? sourceWarehouseId, int? destinationWarehouseId, int page, int pageSize, CancellationToken ct)
     {
         Expression<Func<WarehouseTransfer, bool>> predicate = t =>
-            (!fromWarehouseId.HasValue || t.FromWarehouseId == fromWarehouseId.Value) &&
-            (!toWarehouseId.HasValue || t.ToWarehouseId == toWarehouseId.Value);
+            (!sourceWarehouseId.HasValue || t.SourceWarehouseId == sourceWarehouseId.Value) &&
+            (!destinationWarehouseId.HasValue || t.DestinationWarehouseId == destinationWarehouseId.Value);
 
         var totalItems = await _uow.WarehouseTransfers.CountAsync(predicate, ct);
         var items = await _uow.WarehouseTransfers.ToListAsync(
             predicate,
-            q => q.OrderByDescending(t => t.TransferDate).Skip((page - 1) * pageSize).Take(pageSize),
-            ct, false, "FromWarehouse", "ToWarehouse");
+            q => q.OrderByDescending(t => t.CreatedAt).Skip((page - 1) * pageSize).Take(pageSize),
+            ct, false, "SourceWarehouse", "DestinationWarehouse");
 
         var dtos = items.Select(MapTransferToDto).ToList();
 
@@ -472,10 +439,10 @@ public class InventoryService : IInventoryService
     #region Movement History
 
     public async Task<Result<PagedResult<InventoryTransactionDto>>> GetMovementsAsync(
-        int? productId, int? warehouseId, int? transactionType, int page, int pageSize, CancellationToken ct)
+        int? productId, int? warehouseId, int? movementType, int page, int pageSize, CancellationToken ct)
     {
-        // Reuse GetAllTransactionsAsync with same signature
-        return await GetAllTransactionsAsync(warehouseId, transactionType, page, pageSize, ct);
+        // Reuse GetAllTransactionsAsync
+        return await GetAllTransactionsAsync(warehouseId, movementType, page, pageSize, ct);
     }
 
     #endregion
@@ -487,24 +454,24 @@ public class InventoryService : IInventoryService
         return new InventoryTransactionDto(
             tx.Id,
             tx.TransactionNo,
-            tx.TransactionDate,
-            (byte)tx.TransactionType,
+            (byte)tx.MovementType,
             tx.WarehouseId,
             tx.Warehouse?.Name ?? "غير معروف",
             tx.ReferenceId,
             tx.ReferenceType.HasValue ? (byte?)tx.ReferenceType.Value : null,
             tx.Notes,
-            (byte)tx.Status,
+            tx.CreatedAt,
+            tx.CreatedByUserId,
             tx.Lines.Select(l => new InventoryTransactionLineDto(
                 l.Id,
-                l.ProductId,
-                null,
+                l.InventoryTransactionId,
                 l.ProductUnitId,
                 null,
                 l.Quantity,
                 l.UnitCost,
-                l.TotalCost,
-                l.BatchId
+                l.BatchNo,
+                l.ExpiryDate,
+                l.WarehouseId
             )).ToList()
         );
     }
@@ -514,27 +481,26 @@ public class InventoryService : IInventoryService
         return new WarehouseTransferDto(
             t.Id,
             t.TransferNo,
-            t.FromWarehouseId,
-            t.FromWarehouse?.Name ?? "غير معروف",
-            t.ToWarehouseId,
-            t.ToWarehouse?.Name ?? "غير معروف",
-            t.TransferDate,
+            t.SourceWarehouseId,
+            t.SourceWarehouse?.Name ?? "غير معروف",
+            t.DestinationWarehouseId,
+            t.DestinationWarehouse?.Name ?? "غير معروف",
             t.Notes,
             (byte)t.Status,
+            t.CreatedAt,
+            t.CreatedByUserId,
             t.Lines.Select(l => new WarehouseTransferLineDto(
                 l.Id,
-                l.ProductId,
+                l.WarehouseTransferId,
+                l.ProductUnitId,
                 null,
-                l.BatchId,
-                l.Batch?.BatchNo,
                 l.Quantity,
-                l.UnitCost,
-                l.TotalCost
+                l.BatchNo
             )).ToList()
         );
     }
 
-    private static bool IsOutgoingTransaction(InventoryTransactionType type) => type switch
+    private static bool IsOutgoingMovement(InventoryTransactionType type) => type switch
     {
         InventoryTransactionType.Sale => true,
         InventoryTransactionType.PurchaseReturn => true,

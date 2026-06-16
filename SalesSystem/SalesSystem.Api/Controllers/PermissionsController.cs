@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -44,7 +43,7 @@ public class PermissionsController : ControllerBase
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns role-permission mappings.</returns>
     [HttpGet("roles")]
-    [ProducesResponseType(typeof(Dictionary<UserRole, List<int>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Dictionary<byte, List<int>>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> GetRolePermissions(CancellationToken ct)
     {
@@ -68,10 +67,7 @@ public class PermissionsController : ControllerBase
         if (role < 1 || role > 5)
             return BadRequest(new { error = "رقم الصلاحية غير صحيح" });
 
-        if (!Enum.IsDefined(typeof(UserRole), role))
-            return BadRequest(new { error = "دور غير صالح. يجب أن يكون 1 (مدير النظام), 2 (مدير), أو 3 (كاشير)" });
-
-        var result = await _permissionService.UpdateRolePermissionsAsync((UserRole)role, permissionIds, ct);
+        var result = await _permissionService.UpdateRolePermissionsAsync((byte)role, permissionIds, ct);
         if (result.IsSuccess)
             return Ok(new { message = "تم تحديث الصلاحيات بنجاح" });
         return BadRequest(new { error = result.Error });

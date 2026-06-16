@@ -10,6 +10,9 @@ public class TaxConfiguration : IEntityTypeConfiguration<Tax>
     {
         builder.ToTable("Taxes");
         builder.HasKey(t => t.Id);
+        builder.Property(t => t.Id)
+            .HasColumnType("smallint")
+            .ValueGeneratedOnAdd();
         builder.Property(t => t.Name).IsRequired().HasMaxLength(100);
         builder.Property(t => t.Code).IsRequired().HasMaxLength(20);
         builder.Property(t => t.Rate).HasPrecision(5, 2);

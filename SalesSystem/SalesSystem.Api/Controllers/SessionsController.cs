@@ -86,7 +86,6 @@ public class SessionsController : ControllerBase
             Id: s.Id,
             UserId: s.UserId,
             UserName: s.User?.UserName,
-            FullName: s.User?.FullName ?? "",
             DeviceName: s.DeviceName,
             IpAddress: s.IpAddress,
             CreatedAt: s.CreatedAt,

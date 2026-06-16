@@ -12,10 +12,10 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 5,
             warehouseId: (short)1,
             currencyId: (short)1,
+            purchaseInvoiceId: 20,
             notes: "Supplier return"
         );
 
@@ -34,7 +34,6 @@ public class PurchaseReturnTests
     {
         var action = () => PurchaseReturn.Create(
             returnNo: invalidReturnNo,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1);
@@ -48,7 +47,6 @@ public class PurchaseReturnTests
     {
         var action = () => PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: 0,
             currencyId: (short)1);
@@ -62,7 +60,6 @@ public class PurchaseReturnTests
     {
         var action = () => PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 0,
             warehouseId: (short)1,
             currencyId: (short)1);
@@ -76,13 +73,12 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
         );
 
-        var line = PurchaseReturnLine.Create(purchaseInvoiceLineId: 5, quantity: 2m, amount: 200m);
+        var line = PurchaseReturnLine.Create(productId: 1, productUnitId: 1, quantity: 2m, amount: 200m, purchaseInvoiceLineId: 5);
         pr.AddLine(line);
 
         pr.Lines.Should().HaveCount(1);
@@ -94,14 +90,13 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
         );
 
-        pr.AddLine(PurchaseReturnLine.Create(purchaseInvoiceLineId: 1, quantity: 1m, amount: 100m));
-        pr.AddLine(PurchaseReturnLine.Create(purchaseInvoiceLineId: 2, quantity: 2m, amount: 100m));
+        pr.AddLine(PurchaseReturnLine.Create(productId: 1, productUnitId: 1, quantity: 1m, amount: 100m, purchaseInvoiceLineId: 1));
+        pr.AddLine(PurchaseReturnLine.Create(productId: 2, productUnitId: 1, quantity: 2m, amount: 100m, purchaseInvoiceLineId: 2));
 
         pr.Lines.Should().HaveCount(2);
         pr.TotalAmount.Should().Be(200m);
@@ -112,7 +107,6 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
@@ -128,13 +122,12 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
         );
 
-        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
+        pr.AddLine(PurchaseReturnLine.Create(productId: 1, productUnitId: 1, quantity: 1m, amount: 100m));
         pr.Post();
 
         pr.Status.Should().Be(InvoiceStatus.Posted);
@@ -145,7 +138,6 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
@@ -162,13 +154,12 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
         );
 
-        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
+        pr.AddLine(PurchaseReturnLine.Create(productId: 1, productUnitId: 1, quantity: 1m, amount: 100m));
         pr.Post();
 
         var action = () => pr.Post();
@@ -182,7 +173,6 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
@@ -198,13 +188,12 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
         );
 
-        pr.AddLine(PurchaseReturnLine.Create(1, 1m, 100m));
+        pr.AddLine(PurchaseReturnLine.Create(productId: 1, productUnitId: 1, quantity: 1m, amount: 100m));
         pr.Post();
         pr.Cancel();
 
@@ -216,7 +205,6 @@ public class PurchaseReturnTests
     {
         var pr = PurchaseReturn.Create(
             returnNo: 1,
-            purchaseInvoiceId: 20,
             supplierId: 1,
             warehouseId: (short)1,
             currencyId: (short)1
@@ -237,27 +225,46 @@ public class PurchaseReturnLineTests
     public void Create_GivenValidData_ShouldCreateLine()
     {
         var line = PurchaseReturnLine.Create(
-            purchaseInvoiceLineId: 5,
+            productId: 1,
+            productUnitId: 1,
             quantity: 2m,
-            amount: 200m
+            amount: 200m,
+            purchaseInvoiceLineId: 5
         );
 
+        line.ProductId.Should().Be(1);
+        line.ProductUnitId.Should().Be(1);
         line.PurchaseInvoiceLineId.Should().Be(5);
         line.Quantity.Should().Be(2m);
         line.Amount.Should().Be(200m);
     }
 
     [Fact]
-    public void Create_GivenPurchaseInvoiceLineIdIsZero_ShouldThrowDomainException()
+    public void Create_GivenProductIdIsZero_ShouldThrowDomainException()
     {
         var action = () => PurchaseReturnLine.Create(
-            purchaseInvoiceLineId: 0,
+            productId: 0,
+            productUnitId: 1,
             quantity: 1m,
             amount: 100m
         );
 
         action.Should().Throw<DomainException>()
-            .WithMessage("رقم بند فاتورة الشراء الأصلي مطلوب.");
+            .WithMessage("المنتج مطلوب.");
+    }
+
+    [Fact]
+    public void Create_GivenProductUnitIdIsZero_ShouldThrowDomainException()
+    {
+        var action = () => PurchaseReturnLine.Create(
+            productId: 1,
+            productUnitId: 0,
+            quantity: 1m,
+            amount: 100m
+        );
+
+        action.Should().Throw<DomainException>()
+            .WithMessage("الوحدة مطلوبة.");
     }
 
     [Theory]
@@ -267,7 +274,8 @@ public class PurchaseReturnLineTests
     public void Create_GivenInvalidQuantity_ShouldThrowDomainException(decimal invalidQuantity)
     {
         var action = () => PurchaseReturnLine.Create(
-            purchaseInvoiceLineId: 1,
+            productId: 1,
+            productUnitId: 1,
             quantity: invalidQuantity,
             amount: 100m
         );
@@ -282,7 +290,8 @@ public class PurchaseReturnLineTests
     public void Create_GivenNegativeAmount_ShouldThrowDomainException(decimal negativeAmount)
     {
         var action = () => PurchaseReturnLine.Create(
-            purchaseInvoiceLineId: 1,
+            productId: 1,
+            productUnitId: 1,
             quantity: 1m,
             amount: negativeAmount
         );
@@ -295,7 +304,8 @@ public class PurchaseReturnLineTests
     public void Create_GivenZeroAmount_ShouldSucceed()
     {
         var line = PurchaseReturnLine.Create(
-            purchaseInvoiceLineId: 1,
+            productId: 1,
+            productUnitId: 1,
             quantity: 1m,
             amount: 0m
         );

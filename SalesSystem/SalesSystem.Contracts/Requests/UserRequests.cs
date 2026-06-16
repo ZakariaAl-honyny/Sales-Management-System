@@ -4,20 +4,14 @@ namespace SalesSystem.Contracts.Requests;
 
 public record CreateUserRequest(
     string UserName,
-    string FullName,
     byte Role,
     string? Password = null,
-    string? Phone = null,
-    string? Email = null,
     int? DefaultCashBoxId = null);
 
 public record UpdateUserRequest(
-    string FullName,
     byte Role,
-    byte Status,
-    string? Password,
-    string? Phone = null,
-    string? Email = null,
+    bool? IsLocked = null,
+    string? Password = null,
     int? DefaultCashBoxId = null);
 
 // ─── Password management ──────────────────────────────

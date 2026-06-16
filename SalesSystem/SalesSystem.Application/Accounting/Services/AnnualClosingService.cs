@@ -143,13 +143,22 @@ public class AnnualClosingService : IAnnualClosingService
             // ─── Step 9: Build closing journal entry ──────────────────────
             var entryDate = new DateTime(fiscalYear, 12, 31, 23, 59, 59, DateTimeKind.Utc);
 
+            // Look up FiscalYear entity for closing year
+            var fiscalYearEntity = await _uow.FiscalYears.FirstOrDefaultAsync(
+                fy => fy.Year == fiscalYear && fy.IsActive, ct: ct);
+            if (fiscalYearEntity == null)
+                return Result<int>.Failure($"السنة المالية {fiscalYear} غير موجودة أو غير نشطة");
+
             var closingEntry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value!.EntryNumber,
                 numberResult.Value!.EntryNo,
                 entryDate,
                 $"قفل السنة المالية {fiscalYear}",
                 JournalEntryType.Manual,
-                closedByUserId,
+                fiscalYearEntity.Id,
+                currencyId: 1, // Default base currency
+                createdBy: closedByUserId,
+                exchangeRate: 1m,
                 referenceType: "FiscalYearClosure",
                 referenceId: null,
                 referenceNumber: fiscalYear.ToString());

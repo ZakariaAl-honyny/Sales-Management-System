@@ -57,8 +57,8 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: 1, Name: "������ 1", Phone: null, Address: null, Notes: null, IsActive: true),
-            new WarehouseDto(Id: 2, Name: "������ 2", Phone: null, Address: null, Notes: null, IsActive: true)
+            new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "������ 1", Phone: null, Address: null, Notes: null, IsActive: true),
+            new WarehouseDto(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "������ 2", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         var products = new List<ProductDto>
@@ -121,7 +121,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             SupplierName: "مورد تجريبي",
             WarehouseId: 1,
             WarehouseName: "المستودع الرئيسي",
-            InvoiceDate: DateTime.Today,
+            InvoiceDate: DateOnly.FromDateTime(DateTime.Today),
             PaymentType: 1,
             SubTotal: 1000m,
             DiscountAmount: 0,
@@ -131,15 +131,17 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             PaidAmount: 1000m,
             RemainingAmount: 0,
             Notes: null,
+            SupplierInvoiceNo: null,
             Status: 1,
             TaxId: null,
             TaxName: null,
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            CashBoxId: null,
             Items: new List<PurchaseInvoiceLineDto>
         {
-            new PurchaseInvoiceLineDto(1, 1, "منتج 1", 1, null, 10, 100m, 1000m)
+            new PurchaseInvoiceLineDto(Id: 1, ProductId: 1, ProductName: "منتج 1", ProductUnitId: 1, ProductUnitName: null, Quantity: 10, UnitPrice: 100m, LineTotal: 1000m, LandedUnitCost: 0m)
         });
 
         _mockInvoiceService.Setup(s => s.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(Result<PurchaseInvoiceDto>.Success(invoice));

@@ -97,15 +97,16 @@ public class AccountService : IAccountService
             return Result<AccountDto>.Failure("رمز الحساب موجود مسبقاً", ErrorCodes.DuplicateEntry);
 
         var account = Account.Create(
-            request.AccountCode,
-            request.NameAr,
-            request.NameEn,
-            request.Nature,
-            request.IsLeaf,
-            request.ParentId,
-            request.IsSystem,
-            request.CategoryId,
-            userId);
+            accountCode: request.AccountCode,
+            nameAr: request.NameAr,
+            nameEn: request.NameEn,
+            nature: request.Nature,
+            isLeaf: request.IsLeaf,
+            parentId: request.ParentId,
+            isSystem: request.IsSystem,
+            categoryId: request.CategoryId,
+            level: request.IsLeaf ? (byte)4 : (byte)2,
+            createdByUserId: userId);
 
         await _uow.Accounts.AddAsync(account, ct);
         await _uow.SaveChangesAsync(ct);
@@ -141,13 +142,14 @@ public class AccountService : IAccountService
         }
 
         account.Update(
-            request.NameAr,
-            request.NameEn,
-            request.Nature,
-            request.IsLeaf,
-            request.ParentId,
-            request.CategoryId,
-            userId);
+            nameAr: request.NameAr,
+            nameEn: request.NameEn,
+            nature: request.Nature,
+            isLeaf: request.IsLeaf,
+            parentId: request.ParentId,
+            categoryId: request.CategoryId,
+            level: request.IsLeaf ? (byte)4 : (byte)2,
+            updatedByUserId: userId);
 
         await _uow.SaveChangesAsync(ct);
 

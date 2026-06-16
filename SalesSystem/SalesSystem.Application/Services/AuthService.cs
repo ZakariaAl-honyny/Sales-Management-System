@@ -8,7 +8,6 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -54,7 +53,7 @@ public class AuthService : IAuthService
             }
 
             // 2. Check if account is locked
-            if (user.Status == UserStatus.Locked)
+            if (user.IsLocked)
             {
                 _logger.LogWarning("Login failed: User {UserName} account is locked", request.UserName);
                 await _auditLogService.LogAsync(user.Id, "LoginFailed_Locked", "User", user.Id,
@@ -63,8 +62,8 @@ public class AuthService : IAuthService
                 return Result<LoginResponse>.Failure("الحساب مقفول — يرجى الاتصال بالمسؤول", ErrorCodes.AccountLocked);
             }
 
-            // 3. Check if account is active (not inactive/soft-deleted)
-            if (user.Status != UserStatus.Active)
+            // 3. Check if account is active (not soft-deleted)
+            if (!user.IsActive)
             {
                 _logger.LogWarning("Login failed: User {UserName} is inactive", request.UserName);
                 return Result<LoginResponse>.Failure("الحساب معطل", ErrorCodes.Forbidden);
@@ -116,7 +115,7 @@ public class AuthService : IAuthService
                 await _uow.SaveChangesAsync(ct);
 
                 return Result<LoginResponse>.Success(new LoginResponse(
-                    user.Id, user.UserName, user.FullName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
+                    user.Id, user.UserName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
                     token, expiresAt, MustChangePassword: true));
             }
 
@@ -137,7 +136,7 @@ public class AuthService : IAuthService
 
             // 10. Return success
             return Result<LoginResponse>.Success(new LoginResponse(
-                user.Id, user.UserName, user.FullName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
+                user.Id, user.UserName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
                 jwtToken, jwtExpiresAt, MustChangePassword: false));
         }
         catch (Exception ex)

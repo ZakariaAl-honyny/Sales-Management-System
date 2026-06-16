@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -17,7 +18,11 @@ public class ReceiptVoucherConfiguration : IEntityTypeConfiguration<ReceiptVouch
         builder.Property(x => x.VoucherDate).IsRequired().HasColumnType("date");
         builder.Property(x => x.TotalAmount).HasPrecision(18, 2).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(500).IsRequired(false);
-        builder.Property(x => x.Status).IsRequired().HasDefaultValue((byte)1);
+        builder.Property(x => x.Status)
+            .HasColumnType("tinyint")
+            .HasConversion<byte>()
+            .IsRequired()
+            .HasDefaultValue(VoucherStatus.Draft);
 
         // FK to Currency
         builder.Property(x => x.CurrencyId).IsRequired();

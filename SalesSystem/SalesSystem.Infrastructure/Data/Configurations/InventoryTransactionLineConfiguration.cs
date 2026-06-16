@@ -7,6 +7,10 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 /// <summary>
 /// EF Core configuration for <see cref="InventoryTransactionLine"/>.
 /// Maps to "InventoryTransactionLines" table.
+/// Schema: int PK, int InventoryTransactionId FK, int ProductUnitId FK,
+/// decimal(18,3) Quantity, decimal(18,2) UnitCost,
+/// nvarchar(50) BatchNo (nullable), date ExpiryDate (nullable), smallint WarehouseId (nullable).
+/// Entity (no audit).
 /// </summary>
 public class InventoryTransactionLineConfiguration : IEntityTypeConfiguration<InventoryTransactionLine>
 {
@@ -26,10 +30,20 @@ public class InventoryTransactionLineConfiguration : IEntityTypeConfiguration<In
             .IsRequired()
             .HasComment("تكلفة الوحدة");
 
-        builder.Property(x => x.TotalCost)
-            .HasPrecision(18, 2)
-            .IsRequired()
-            .HasComment("التكلفة الإجمالية للسطر");
+        builder.Property(x => x.BatchNo)
+            .HasMaxLength(50)
+            .IsRequired(false)
+            .HasComment("رقم الدفعة");
+
+        builder.Property(x => x.ExpiryDate)
+            .HasColumnType("date")
+            .IsRequired(false)
+            .HasComment("تاريخ انتهاء الصلاحية");
+
+        builder.Property(x => x.WarehouseId)
+            .HasColumnType("smallint")
+            .IsRequired(false)
+            .HasComment("معرف المستودع (إذا كان مختلفاً عن المستودع الرئيسي)");
 
         // CHECK constraints
         builder.ToTable(t =>
@@ -46,27 +60,16 @@ public class InventoryTransactionLineConfiguration : IEntityTypeConfiguration<In
             .HasForeignKey(x => x.InventoryTransactionId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.Product)
-            .WithMany()
-            .HasForeignKey(x => x.ProductId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         builder.HasOne(x => x.ProductUnit)
             .WithMany()
             .HasForeignKey(x => x.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.Batch)
-            .WithMany()
-            .HasForeignKey(x => x.BatchId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
-
         // Indexes
         builder.HasIndex(x => x.InventoryTransactionId)
             .HasDatabaseName("IX_InvTxLines_TransactionId");
 
-        builder.HasIndex(x => x.ProductId)
-            .HasDatabaseName("IX_InvTxLines_ProductId");
+        builder.HasIndex(x => x.ProductUnitId)
+            .HasDatabaseName("IX_InvTxLines_ProductUnitId");
     }
 }

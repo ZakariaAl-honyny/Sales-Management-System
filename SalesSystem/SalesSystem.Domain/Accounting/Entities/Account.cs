@@ -8,6 +8,7 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// <summary>
 /// Represents a chart of accounts entry matching schema §4.2.
 /// Nature (tinyint): 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense.
+/// Level: 1-10 hierarchy depth with CHECK constraint.
 /// System accounts are protected from modification/deletion.
 /// </summary>
 public class Account : ActivatableEntity
@@ -30,8 +31,17 @@ public class Account : ActivatableEntity
     /// <summary>Account nature: 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense.</summary>
     public byte Nature { get; private set; }
 
+    /// <summary>Hierarchy level (1-10). CHECK constraint enforces range.</summary>
+    public byte Level { get; private set; }
+
     /// <summary>True if this is a leaf (detail) account that allows journal entry transactions.</summary>
     public bool IsLeaf { get; private set; } = true;
+
+    /// <summary>
+    /// Convenience property: leaf accounts allow transactions.
+    /// Maps to schema AllowTransactions column (bit).
+    /// </summary>
+    public bool AllowTransactions => IsLeaf;
 
     /// <summary>Self-referencing parent FK.</summary>
     public int? ParentId { get; private set; }
@@ -41,6 +51,18 @@ public class Account : ActivatableEntity
 
     /// <summary>Optional classification category FK to AccountCategories (smallint).</summary>
     public short? CategoryId { get; private set; }
+
+    /// <summary>Description of this account's purpose (nvarchar(500)).</summary>
+    public string? Description { get; private set; }
+
+    /// <summary>Hex color code for UI display (nvarchar(7), e.g. #2196F3).</summary>
+    public string? ColorCode { get; private set; }
+
+    /// <summary>Opening balance for this account (decimal(18,2)).</summary>
+    public decimal OpeningBalance { get; private set; }
+
+    /// <summary>Additional notes (nvarchar(300)).</summary>
+    public string? Notes { get; private set; }
 
     // ─── Navigation Properties ──────────────────────────
     public Account? ParentAccount { get; private set; }
@@ -54,6 +76,8 @@ public class Account : ActivatableEntity
 
     /// <summary>
     /// Creates a new account with the schema-matching signature.
+    /// Level is required (1-10) — added after existing params to avoid breaking callers.
+    /// Leaf accounts (level >= 4) should have AllowTransactions = true.
     /// </summary>
     public static Account Create(
         string accountCode,
@@ -64,6 +88,11 @@ public class Account : ActivatableEntity
         int? parentId = null,
         bool isSystem = false,
         short? categoryId = null,
+        byte level = 1,
+        string? description = null,
+        string? colorCode = null,
+        decimal openingBalance = 0,
+        string? notes = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(accountCode))
@@ -75,11 +104,26 @@ public class Account : ActivatableEntity
         if (nature < 1 || nature > 5)
             throw new DomainException("نوع الحساب غير صالح — القيم المسموحة: 1-5");
 
+        if (level < 1 || level > 10)
+            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
+
         if (parentId.HasValue && parentId.Value <= 0)
             throw new DomainException("رقم الحساب الأب غير صالح");
 
         if (accountCode.Trim().Length > 20)
             throw new DomainException("رمز الحساب لا يمكن أن يتجاوز 20 حرف");
+
+        if (description?.Length > 500)
+            throw new DomainException("الوصف لا يمكن أن يتجاوز 500 حرف");
+
+        if (colorCode?.Length > 7)
+            throw new DomainException("رمز اللون لا يمكن أن يتجاوز 7 أحرف");
+
+        if (notes?.Length > 300)
+            throw new DomainException("الملاحظات لا يمكن أن تتجاوز 300 حرف");
+
+        if (openingBalance < 0)
+            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
 
         var account = new Account
         {
@@ -87,10 +131,15 @@ public class Account : ActivatableEntity
             NameAr = nameAr.Trim(),
             NameEn = nameEn?.Trim() ?? string.Empty,
             Nature = nature,
+            Level = level,
             IsLeaf = isLeaf,
             ParentId = parentId,
             IsSystem = isSystem,
             CategoryId = categoryId,
+            Description = description?.Trim(),
+            ColorCode = colorCode?.Trim(),
+            OpeningBalance = openingBalance,
+            Notes = notes?.Trim(),
         };
         account.SetCreatedBy(createdByUserId);
         return account;
@@ -106,6 +155,11 @@ public class Account : ActivatableEntity
         bool isLeaf = true,
         int? parentId = null,
         short? categoryId = null,
+        byte level = 1,
+        string? description = null,
+        string? colorCode = null,
+        decimal openingBalance = 0,
+        string? notes = null,
         int? updatedByUserId = null)
     {
         if (IsSystem)
@@ -117,12 +171,32 @@ public class Account : ActivatableEntity
         if (nature < 1 || nature > 5)
             throw new DomainException("نوع الحساب غير صالح — القيم المسموحة: 1-5");
 
+        if (level < 1 || level > 10)
+            throw new DomainException("مستوى الحساب يجب أن يكون بين 1 و 10");
+
+        if (description?.Length > 500)
+            throw new DomainException("الوصف لا يمكن أن يتجاوز 500 حرف");
+
+        if (colorCode?.Length > 7)
+            throw new DomainException("رمز اللون لا يمكن أن يتجاوز 7 أحرف");
+
+        if (notes?.Length > 300)
+            throw new DomainException("الملاحظات لا يمكن أن تتجاوز 300 حرف");
+
+        if (openingBalance < 0)
+            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
+
         NameAr = nameAr.Trim();
         NameEn = nameEn?.Trim() ?? string.Empty;
         Nature = nature;
+        Level = level;
         IsLeaf = isLeaf;
         ParentId = parentId;
         CategoryId = categoryId;
+        Description = description?.Trim();
+        ColorCode = colorCode?.Trim();
+        OpeningBalance = openingBalance;
+        Notes = notes?.Trim();
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
     }

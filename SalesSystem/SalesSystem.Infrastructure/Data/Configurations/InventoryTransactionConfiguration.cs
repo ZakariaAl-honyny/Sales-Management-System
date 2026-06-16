@@ -7,6 +7,11 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 /// <summary>
 /// EF Core configuration for <see cref="InventoryTransaction"/>.
 /// Maps to "InventoryTransactions" table.
+/// Schema: nvarchar(50) TransactionNo (unique), tinyint MovementType,
+/// nvarchar(500) Notes, smallint WarehouseId FK,
+/// int? ReferenceId, nvarchar(50) ReferenceType,
+/// int CreatedByUserId, datetime2 CreatedAt.
+/// BaseEntity with CreatedAt only — no Status, no lifecycle.
 /// </summary>
 public class InventoryTransactionConfiguration : IEntityTypeConfiguration<InventoryTransaction>
 {
@@ -17,6 +22,7 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
 
         // Properties
         builder.Property(x => x.TransactionNo)
+            .HasMaxLength(50)
             .IsRequired()
             .HasComment("رقم المعاملة — فريد");
 
@@ -24,15 +30,10 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
             .IsUnique()
             .HasDatabaseName("IX_InventoryTransactions_TransactionNo");
 
-        builder.Property(x => x.TransactionDate)
-            .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()")
-            .HasComment("تاريخ المعاملة");
-
-        builder.Property(x => x.TransactionType)
+        builder.Property(x => x.MovementType)
             .HasConversion<byte>()
             .IsRequired()
-            .HasComment("نوع المعاملة (مشتريات، مبيعات، تحويل، تسوية، إلخ)");
+            .HasComment("نوع الحركة (مشتريات، مبيعات، تحويل، تسوية، إلخ)");
 
         builder.Property(x => x.ReferenceType)
             .HasConversion<byte>()
@@ -51,11 +52,15 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
             .HasMaxLength(500)
             .IsRequired(false);
 
-        // Status as byte for InvoiceStatus (Draft=1, Posted=2, Cancelled=3)
-        builder.Property(x => x.Status)
-            .HasConversion<byte>()
+        builder.Property(x => x.CreatedAt)
             .IsRequired()
-            .HasDefaultValue(Domain.Enums.InvoiceStatus.Draft);
+            .HasDefaultValueSql("GETUTCDATE()")
+            .HasComment("تاريخ الإنشاء");
+
+        builder.Property(x => x.CreatedByUserId)
+            .IsRequired()
+            .HasDefaultValue(0)
+            .HasComment("معرف المستخدم المنشئ");
 
         // Relationships
         builder.HasOne(x => x.Warehouse)
@@ -75,8 +80,5 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
 
         builder.HasIndex(x => x.WarehouseId)
             .HasDatabaseName("IX_InventoryTransactions_WarehouseId");
-
-        // Global query filter — exclude cancelled
-        builder.HasQueryFilter(x => x.Status != Domain.Enums.InvoiceStatus.Cancelled);
     }
 }

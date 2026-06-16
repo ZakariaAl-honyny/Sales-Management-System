@@ -263,7 +263,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         SupplierName: "مورد اختبار",
         PurchaseInvoiceId: 10 + id,
         LinkToInvoice: true,
-        ReturnDate: DateTime.UtcNow,
+        ReturnDate: DateOnly.FromDateTime(DateTime.UtcNow),
         SubTotal: 200.00m,
         TotalAmount: 200.00m,
         CurrencyId: null,
@@ -272,7 +272,7 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         Status: 1,
         Items: new List<PurchaseReturnItemDto>
         {
-            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m)
+            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m, null)
         });
 
     private static CreatePurchaseReturnRequest CreateValidRequest() => new(

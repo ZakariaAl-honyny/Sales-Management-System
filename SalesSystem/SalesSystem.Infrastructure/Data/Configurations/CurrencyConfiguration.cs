@@ -10,8 +10,11 @@ public class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
     {
         builder.ToTable("Currencies");
         builder.HasKey(c => c.Id);
+        builder.Property(c => c.Id)
+            .HasColumnType("smallint")
+            .ValueGeneratedOnAdd();
         builder.Property(c => c.Name).IsRequired().HasMaxLength(100);
-        builder.Property(c => c.Code).IsRequired().HasMaxLength(3);
+        builder.Property(c => c.Code).IsRequired().HasColumnType("char(3)");
         builder.Property(c => c.Symbol).IsRequired(false).HasMaxLength(20);
         builder.Property(c => c.IsBaseCurrency).HasDefaultValue(false);
         builder.Property(c => c.FractionName).HasMaxLength(50).IsRequired();

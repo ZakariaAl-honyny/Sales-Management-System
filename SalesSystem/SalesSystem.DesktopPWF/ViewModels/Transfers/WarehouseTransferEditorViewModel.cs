@@ -27,7 +27,6 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
     private bool _isReadOnly;
     private short _sourceWarehouseId;
     private short _destinationWarehouseId;
-    private DateTime _transferDate = DateTime.Today;
     private string? _notes;
     private string? _errorMessage;
     private byte _status = 1; // Draft
@@ -152,12 +151,6 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
         set => SetProperty(ref _destinationWarehouseId, value);
     }
 
-    public DateTime TransferDate
-    {
-        get => _transferDate;
-        set => SetProperty(ref _transferDate, value);
-    }
-
     public string? Notes
     {
         get => _notes;
@@ -249,9 +242,8 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
         if (result.IsSuccess && result.Value != null)
         {
             var transfer = result.Value;
-            SourceWarehouseId = transfer.FromWarehouseId;
-            DestinationWarehouseId = transfer.ToWarehouseId;
-            TransferDate = transfer.TransferDate;
+            SourceWarehouseId = transfer.SourceWarehouseId;
+            DestinationWarehouseId = transfer.DestinationWarehouseId;
             Notes = transfer.Notes;
             Status = transfer.Status;
 
@@ -260,12 +252,11 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
             {
                 Lines.Add(new WarehouseTransferLineItem
                 {
-                    ProductId = line.ProductId,
-                    ProductName = line.ProductName ?? string.Empty,
-                    BatchId = line.BatchId,
+                    ProductUnitId = line.ProductUnitId,
+                    ProductUnitName = line.ProductUnitName ?? string.Empty,
                     BatchNo = line.BatchNo,
                     Quantity = line.Quantity,
-                    UnitCost = line.UnitCost
+                    UnitCost = 0m
                 });
             }
             OnPropertyChanged(nameof(HasLines));
@@ -329,16 +320,13 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
             ErrorMessage = null;
 
             var request = new CreateWarehouseTransferRequest(
-                0,
+                null,
                 SourceWarehouseId,
                 DestinationWarehouseId,
-                TransferDate,
                 Notes,
                 Lines.Select(l => new CreateWarehouseTransferLineRequest(
-                    l.ProductId,
                     l.ProductUnitId,
                     l.Quantity,
-                    l.UnitCost,
                     null)).ToList());
 
             Result<WarehouseTransferDto> result;
@@ -383,16 +371,13 @@ public class WarehouseTransferEditorViewModel : ViewModelBase
             if (!_transferId.HasValue)
             {
                 var createRequest = new CreateWarehouseTransferRequest(
-                    0,
+                    null,
                     SourceWarehouseId,
                     DestinationWarehouseId,
-                    TransferDate,
                     Notes,
                     Lines.Select(l => new CreateWarehouseTransferLineRequest(
-                        l.ProductId,
                         l.ProductUnitId,
                         l.Quantity,
-                        l.UnitCost,
                         null)).ToList());
 
                 var createResult = await _transferService.CreateAsync(createRequest);
@@ -474,7 +459,7 @@ public class WarehouseTransferLineItem : ViewModelBase
     private int _productUnitId;
     private string? _productUnitName;
     private int _batchId;
-    private int? _batchNo;
+    private string? _batchNo;
     private decimal _quantity;
     private decimal _unitCost;
 
@@ -508,7 +493,7 @@ public class WarehouseTransferLineItem : ViewModelBase
         set => SetProperty(ref _batchId, value);
     }
 
-    public int? BatchNo
+    public string? BatchNo
     {
         get => _batchNo;
         set => SetProperty(ref _batchNo, value);

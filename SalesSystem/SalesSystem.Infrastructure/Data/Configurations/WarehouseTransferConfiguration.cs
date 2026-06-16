@@ -7,6 +7,10 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 /// <summary>
 /// EF Core configuration for <see cref="WarehouseTransfer"/>.
 /// Maps to "WarehouseTransfers" table.
+/// Schema: nvarchar(50) TransferNo (unique), smallint SourceWarehouseId FK,
+/// smallint DestinationWarehouseId FK, nvarchar(300) Notes,
+/// tinyint Status (Draft=1,Posted=2,Cancelled=3).
+/// BaseEntity with CreatedAt only.
 /// </summary>
 public class WarehouseTransferConfiguration : IEntityTypeConfiguration<WarehouseTransfer>
 {
@@ -17,6 +21,7 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
 
         // Properties
         builder.Property(x => x.TransferNo)
+            .HasMaxLength(50)
             .IsRequired()
             .HasComment("رقم التحويل — فريد");
 
@@ -24,38 +29,40 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
             .IsUnique()
             .HasDatabaseName("IX_WarehouseTransfers_TransferNo");
 
-        builder.Property(x => x.TransferDate)
-            .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()")
-            .HasComment("تاريخ التحويل");
-
-        builder.Property(x => x.FromWarehouseId)
+        builder.Property(x => x.SourceWarehouseId)
             .HasColumnType("smallint")
             .IsRequired();
 
-        builder.Property(x => x.ToWarehouseId)
+        builder.Property(x => x.DestinationWarehouseId)
             .HasColumnType("smallint")
             .IsRequired();
 
         builder.Property(x => x.Notes)
-            .HasMaxLength(500)
+            .HasMaxLength(300)
             .IsRequired(false);
 
-        // Status as byte
         builder.Property(x => x.Status)
             .HasConversion<byte>()
             .IsRequired()
             .HasDefaultValue(Domain.Enums.InvoiceStatus.Draft);
 
+        builder.Property(x => x.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("GETUTCDATE()");
+
+        builder.Property(x => x.CreatedByUserId)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         // Relationships
-        builder.HasOne(x => x.FromWarehouse)
+        builder.HasOne(x => x.SourceWarehouse)
             .WithMany()
-            .HasForeignKey(x => x.FromWarehouseId)
+            .HasForeignKey(x => x.SourceWarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.ToWarehouse)
+        builder.HasOne(x => x.DestinationWarehouse)
             .WithMany()
-            .HasForeignKey(x => x.ToWarehouseId)
+            .HasForeignKey(x => x.DestinationWarehouseId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(x => x.Lines)
@@ -64,10 +71,10 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
             .OnDelete(DeleteBehavior.Restrict);
 
         // Indexes
-        builder.HasIndex(x => x.FromWarehouseId)
+        builder.HasIndex(x => x.SourceWarehouseId)
             .HasDatabaseName("IX_WarehouseTransfers_SourceWarehouseId");
 
-        builder.HasIndex(x => x.ToWarehouseId)
+        builder.HasIndex(x => x.DestinationWarehouseId)
             .HasDatabaseName("IX_WarehouseTransfers_DestWarehouseId");
 
         // Global query filter

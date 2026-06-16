@@ -49,15 +49,18 @@ public class ReportRepository : IReportRepository
         var startDate = from.Date;
         var endDate = to.Date.AddDays(1).AddTicks(-1);
 
+        var fromDateOnly = DateOnly.FromDateTime(startDate);
+        var toDateOnly = DateOnly.FromDateTime(endDate);
+
         return await _context.PurchaseInvoices
             .Include(i => i.Supplier).ThenInclude(s => s!.Party)
             .Where(i => i.Status == InvoiceStatus.Posted &&
-                        i.InvoiceDate >= startDate &&
-                        i.InvoiceDate <= endDate &&
+                        i.InvoiceDate >= fromDateOnly &&
+                        i.InvoiceDate <= toDateOnly &&
                         (!warehouseId.HasValue || i.WarehouseId == warehouseId.Value))
             .OrderBy(i => i.InvoiceDate)
             .Select(i => new PurchaseReportDto(
-                i.InvoiceDate,
+                i.InvoiceDate.ToDateTime(TimeOnly.MinValue),
                 i.Id,
                 i.Supplier != null ? i.Supplier.Party.Name : "غير معروف",
                 i.SubTotal,
@@ -185,22 +188,23 @@ public class ReportRepository : IReportRepository
         var query = _context.InventoryTransactionLines
             .Include(tl => tl.InventoryTransaction)
                 .ThenInclude(t => t!.Warehouse)
-            .Where(tl => tl.ProductId == productId && tl.InventoryTransaction!.Status == InvoiceStatus.Posted);
+            .Include(tl => tl.ProductUnit)
+            .Where(tl => tl.ProductUnit!.ProductId == productId);
 
         if (from.HasValue)
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= from.Value.Date);
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt >= from.Value.Date);
 
         if (to.HasValue)
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= to.Value.Date.AddDays(1).AddTicks(-1));
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt <= to.Value.Date.AddDays(1).AddTicks(-1));
 
         var rawData = await query
-            .OrderBy(tl => tl.InventoryTransaction!.TransactionDate)
+            .OrderBy(tl => tl.InventoryTransaction!.CreatedAt)
             .ThenBy(tl => tl.Id)
             .Select(tl => new
             {
-                tl.InventoryTransaction!.TransactionDate,
+                tl.InventoryTransaction!.CreatedAt,
                 WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
-                TransactionType = tl.InventoryTransaction.TransactionType,
+                MovementType = tl.InventoryTransaction.MovementType,
                 ReferenceType = tl.InventoryTransaction.ReferenceType,
                 ReferenceId = tl.InventoryTransaction.ReferenceId,
                 tl.Quantity
@@ -212,19 +216,19 @@ public class ReportRepository : IReportRepository
 
         foreach (var item in rawData)
         {
-            var isOutgoing = item.TransactionType == InventoryTransactionType.Sale
-                          || item.TransactionType == InventoryTransactionType.TransferOut
-                          || item.TransactionType == InventoryTransactionType.PurchaseReturn
-                          || item.TransactionType == InventoryTransactionType.Damage
-                          || item.TransactionType == InventoryTransactionType.InternalIssue;
+            var isOutgoing = item.MovementType == InventoryTransactionType.Sale
+                          || item.MovementType == InventoryTransactionType.TransferOut
+                          || item.MovementType == InventoryTransactionType.PurchaseReturn
+                          || item.MovementType == InventoryTransactionType.Damage
+                          || item.MovementType == InventoryTransactionType.InternalIssue;
 
             var quantityChange = isOutgoing ? -item.Quantity : item.Quantity;
             runningBalance += quantityChange;
 
             result.Add(new ProductMovementReportDto(
-                item.TransactionDate,
+                item.CreatedAt,
                 item.WarehouseName,
-                item.TransactionType.ToString(),
+                item.MovementType.ToString(),
                 $"{item.ReferenceType} #{item.ReferenceId}",
                 quantityChange,
                 runningBalance
@@ -275,8 +279,8 @@ public class ReportRepository : IReportRepository
         var query = _context.InventoryTransactionLines
             .Include(tl => tl.InventoryTransaction)
                 .ThenInclude(t => t!.Warehouse)
-            .Include(tl => tl.Product)
-            .Where(tl => tl.InventoryTransaction!.Status == InvoiceStatus.Posted)
+            .Include(tl => tl.ProductUnit)
+                .ThenInclude(pu => pu.Product)
             .AsQueryable();
 
         if (warehouseId.HasValue)
@@ -285,28 +289,28 @@ public class ReportRepository : IReportRepository
         if (from.HasValue)
         {
             var fromDate = from.Value.Date;
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= fromDate);
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt >= fromDate);
         }
 
         if (to.HasValue)
         {
             var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= toDate);
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt <= toDate);
         }
 
         var items = await query
-            .OrderByDescending(tl => tl.InventoryTransaction!.TransactionDate)
+            .OrderByDescending(tl => tl.InventoryTransaction!.CreatedAt)
             .Select(tl => new
             {
-                tl.InventoryTransaction!.TransactionDate,
-                tl.ProductId,
-                ProductName = tl.Product!.Name,
+                tl.InventoryTransaction!.CreatedAt,
+                ProductId = (int)tl.ProductUnit!.ProductId,
+                ProductName = tl.ProductUnit.Product.Name,
                 WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
-                TransactionType = tl.InventoryTransaction.TransactionType,
+                MovementType = tl.InventoryTransaction.MovementType,
                 tl.Quantity,
                 ReferenceType = tl.InventoryTransaction.ReferenceType,
                 tl.InventoryTransaction.ReferenceId,
-                WarehouseId = tl.InventoryTransaction.WarehouseId
+                WarehouseId = (short)tl.InventoryTransaction.WarehouseId
             })
             .ToListAsync(ct);
 
@@ -314,24 +318,24 @@ public class ReportRepository : IReportRepository
         return items.Select(im =>
         {
             var key = (im.ProductId, im.WarehouseId);
-            var before = balances.GetValueOrDefault(key, 0);
+            var before = balances.GetValueOrDefault(key, 0m);
 
-            var isOutgoing = im.TransactionType == InventoryTransactionType.Sale
-                          || im.TransactionType == InventoryTransactionType.TransferOut
-                          || im.TransactionType == InventoryTransactionType.PurchaseReturn
-                          || im.TransactionType == InventoryTransactionType.Damage
-                          || im.TransactionType == InventoryTransactionType.InternalIssue;
+            var isOutgoing = im.MovementType == InventoryTransactionType.Sale
+                          || im.MovementType == InventoryTransactionType.TransferOut
+                          || im.MovementType == InventoryTransactionType.PurchaseReturn
+                          || im.MovementType == InventoryTransactionType.Damage
+                          || im.MovementType == InventoryTransactionType.InternalIssue;
 
             var change = isOutgoing ? -im.Quantity : im.Quantity;
             var after = before + change;
             balances[key] = after;
 
             return new WarehouseMovementReportDto(
-                im.TransactionDate,
+                im.CreatedAt,
                 im.ProductId,
                 im.ProductName,
                 im.WarehouseName,
-                GetInventoryTransactionTypeArabic(im.TransactionType),
+                GetInventoryTransactionTypeArabic(im.MovementType),
                 change,
                 before,
                 after,
@@ -353,12 +357,12 @@ public class ReportRepository : IReportRepository
         var query = _context.InventoryTransactionLines
             .Include(tl => tl.InventoryTransaction)
                 .ThenInclude(t => t!.Warehouse)
-            .Include(tl => tl.Product)
-            .Where(tl => tl.InventoryTransaction!.Status == InvoiceStatus.Posted)
+            .Include(tl => tl.ProductUnit)
+                .ThenInclude(pu => pu.Product)
             .AsQueryable();
 
         if (productId.HasValue)
-            query = query.Where(tl => tl.ProductId == productId.Value);
+            query = query.Where(tl => tl.ProductUnit!.ProductId == productId.Value);
 
         if (warehouseId.HasValue)
             query = query.Where(tl => tl.InventoryTransaction!.WarehouseId == warehouseId.Value);
@@ -366,32 +370,32 @@ public class ReportRepository : IReportRepository
         if (from.HasValue)
         {
             var fromDate = from.Value.Date;
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate >= fromDate);
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt >= fromDate);
         }
 
         if (to.HasValue)
         {
             var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
-            query = query.Where(tl => tl.InventoryTransaction!.TransactionDate <= toDate);
+            query = query.Where(tl => tl.InventoryTransaction!.CreatedAt <= toDate);
         }
 
         var rawData = await query
-            .OrderBy(tl => tl.InventoryTransaction!.TransactionDate)
+            .OrderBy(tl => tl.InventoryTransaction!.CreatedAt)
             .ThenBy(tl => tl.Id)
             .Select(tl => new
             {
-                tl.InventoryTransaction!.TransactionDate,
+                tl.InventoryTransaction!.CreatedAt,
                 tl.InventoryTransaction.TransactionNo,
-                tl.InventoryTransaction.TransactionType,
+                MovementType = tl.InventoryTransaction.MovementType,
                 tl.InventoryTransaction.ReferenceType,
                 tl.InventoryTransaction.ReferenceId,
-                tl.ProductId,
-                ProductName = tl.Product!.Name,
+                ProductId = (int)tl.ProductUnit!.ProductId,
+                ProductName = tl.ProductUnit.Product.Name,
                 WarehouseName = tl.InventoryTransaction.Warehouse!.Name,
                 tl.Quantity,
                 tl.UnitCost,
-                tl.TotalCost,
-                WarehouseId = tl.InventoryTransaction.WarehouseId,
+                TotalCost = tl.Quantity * tl.UnitCost,
+                WarehouseId = (short)tl.InventoryTransaction.WarehouseId,
                 tl.InventoryTransaction.CreatedByUserId
             })
             .ToListAsync(ct);
@@ -400,36 +404,36 @@ public class ReportRepository : IReportRepository
         var balances = new Dictionary<(int ProductId, short WarehouseId), decimal>();
         var now = DateTime.UtcNow;
         var users = await _context.Users
-            .Where(u => rawData.Select(r => r.CreatedByUserId).Distinct().Contains((int?)u.Id))
-            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+            .Where(u => rawData.Select(r => r.CreatedByUserId).Distinct().Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.UserName, ct);
 
         return rawData.Select(r =>
         {
-            var key = (r.ProductId, (short)r.WarehouseId);
-            var before = balances.GetValueOrDefault(key, 0);
+            var key = (r.ProductId, r.WarehouseId);
+            var before = balances.GetValueOrDefault<(int, short), decimal>(key, 0m);
 
-            var isOutgoing = r.TransactionType == InventoryTransactionType.Sale
-                          || r.TransactionType == InventoryTransactionType.TransferOut
-                          || r.TransactionType == InventoryTransactionType.PurchaseReturn
-                          || r.TransactionType == InventoryTransactionType.Damage
-                          || r.TransactionType == InventoryTransactionType.InternalIssue;
+            var isOutgoing = r.MovementType == InventoryTransactionType.Sale
+                          || r.MovementType == InventoryTransactionType.TransferOut
+                          || r.MovementType == InventoryTransactionType.PurchaseReturn
+                          || r.MovementType == InventoryTransactionType.Damage
+                          || r.MovementType == InventoryTransactionType.InternalIssue;
 
             var change = isOutgoing ? -r.Quantity : r.Quantity;
             var after = before + change;
             balances[key] = after;
 
             var refNo = r.TransactionNo.ToString();
-            var refType = r.ReferenceType?.ToString() ?? r.TransactionType.ToString();
+            var refType = r.ReferenceType?.ToString() ?? r.MovementType.ToString();
 
-            var createdByName = r.CreatedByUserId.HasValue && users.TryGetValue(r.CreatedByUserId.Value, out var name)
+            var createdByName = r.CreatedByUserId > 0 && users.TryGetValue(r.CreatedByUserId, out var name)
                 ? name
                 : null;
 
             return new DetailedStockLedgerDto(
-                r.TransactionDate,
+                r.CreatedAt,
                 refNo,
                 refType,
-                GetInventoryTransactionTypeArabic(r.TransactionType),
+                GetInventoryTransactionTypeArabic(r.MovementType),
                 before,
                 change,
                 after,
@@ -507,12 +511,12 @@ public class ReportRepository : IReportRepository
 
             if (from.HasValue)
             {
-                var fromDate = from.Value.Date;
+                var fromDate = DateOnly.FromDateTime(from.Value.Date);
                 purchaseQuery = purchaseQuery.Where(prl => prl.PurchaseReturn!.ReturnDate >= fromDate);
             }
             if (to.HasValue)
             {
-                var toDate = to.Value.Date.AddDays(1).AddTicks(-1);
+                var toDate = DateOnly.FromDateTime(to.Value.Date.AddDays(1).AddTicks(-1));
                 purchaseQuery = purchaseQuery.Where(prl => prl.PurchaseReturn!.ReturnDate <= toDate);
             }
             if (productId.HasValue)
@@ -521,7 +525,7 @@ public class ReportRepository : IReportRepository
             var purchaseData = await purchaseQuery
                 .Select(prl => new ReturnsReportDto(
                     prl.PurchaseReturn!.ReturnNo.ToString(),
-                    prl.PurchaseReturn.ReturnDate,
+                    prl.PurchaseReturn.ReturnDate.ToDateTime(TimeOnly.MinValue),
                     "مشتريات",
                     prl.PurchaseReturn.Supplier.Party.Name,
                     prl.PurchaseInvoiceLine!.Product!.Name,
@@ -610,6 +614,7 @@ public class ReportRepository : IReportRepository
 
                 var suppliers = await suppliersQuery.ToListAsync(ct);
 
+                var todayDateOnly = DateOnly.FromDateTime(today);
                 foreach (var supplier in suppliers)
                 {
                     var invoices = await _context.PurchaseInvoices
@@ -623,7 +628,7 @@ public class ReportRepository : IReportRepository
                     foreach (var inv in invoices)
                     {
                         if (inv.RemainingAmount <= 0) continue;
-                        var ageDays = (today - inv.InvoiceDate).Days;
+                        var ageDays = todayDateOnly.DayNumber - inv.InvoiceDate.DayNumber;
 
                         if (ageDays <= 0) current += inv.RemainingAmount;
                         else if (ageDays <= 30) days1To30 += inv.RemainingAmount;
@@ -671,13 +676,16 @@ public class ReportRepository : IReportRepository
         var today = DateTime.Today;
         var tomorrow = today.AddDays(1);
         var monthStart = new DateTime(today.Year, today.Month, 1);
+        var todayDateOnly = DateOnly.FromDateTime(today);
+        var tomorrowDateOnly = DateOnly.FromDateTime(tomorrow);
+        var monthStartDateOnly = DateOnly.FromDateTime(monthStart);
 
         var salesToday = await _context.SalesInvoices
             .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= today && i.InvoiceDate < tomorrow)
             .ToListAsync(ct);
 
         var purchasesToday = await _context.PurchaseInvoices
-            .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= today && i.InvoiceDate < tomorrow)
+            .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= todayDateOnly && i.InvoiceDate < tomorrowDateOnly)
             .SumAsync(i => i.NetTotal, ct);
 
         var salesMonth = await _context.SalesInvoices
@@ -685,7 +693,7 @@ public class ReportRepository : IReportRepository
             .SumAsync(i => i.NetTotal, ct);
 
         var purchasesMonth = await _context.PurchaseInvoices
-            .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStart && i.InvoiceDate < tomorrow)
+            .Where(i => i.Status == InvoiceStatus.Posted && i.InvoiceDate >= monthStartDateOnly && i.InvoiceDate < tomorrowDateOnly)
             .SumAsync(i => i.NetTotal, ct);
 
         var lowStockCount = await _context.WarehouseStocks

@@ -15,6 +15,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
     }
 
@@ -38,6 +40,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -63,6 +67,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -80,6 +86,8 @@ public class JournalEntryTests
             default,
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -97,6 +105,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             (JournalEntryType)99,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -114,6 +124,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: -1);
 
         // Assert
@@ -131,6 +143,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 0);
 
         // Assert
@@ -148,6 +162,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "قيد يومية مبيعات",
             JournalEntryType.Sales,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -164,6 +180,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Sales,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1,
             referenceType: "SalesInvoice",
             referenceId: 42,
@@ -187,7 +205,9 @@ public class JournalEntryTests
                 new DateTime(2026, 6, 1),
                 "اختبار",
                 entryType,
-                createdBy: 1);
+                fiscalYearId: (short)1,
+            currencyId: (short)1,
+            createdBy: 1);
 
             entry.EntryType.Should().Be(entryType);
         }
@@ -203,6 +223,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -219,6 +241,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "  وصف به مسافات  ",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -235,6 +259,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "اختبار",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 7);
 
         // Assert
@@ -251,6 +277,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -268,6 +296,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "   ",
             JournalEntryType.Manual,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
 
         // Assert
@@ -561,6 +591,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "قيد مبيعات",
             JournalEntryType.Sales,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
         entry.AddDebitLine(accountId: 1, amount: 1150m);
         entry.AddCreditLine(accountId: 9, amount: 1000m);
@@ -585,6 +617,8 @@ public class JournalEntryTests
             new DateTime(2026, 6, 1),
             "قيد مشتريات",
             JournalEntryType.Purchase,
+            fiscalYearId: (short)1,
+            currencyId: (short)1,
             createdBy: 1);
         entry.AddDebitLine(accountId: 3, amount: 500m);
         entry.AddDebitLine(accountId: 7, amount: 25m);

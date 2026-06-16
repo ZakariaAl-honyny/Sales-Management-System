@@ -20,6 +20,29 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.Property(x => x.Description).HasMaxLength(500);
         builder.Property(x => x.EntryType).HasColumnType("tinyint").HasConversion<byte>().IsRequired();
 
+        // ─── FK to FiscalYear (smallint) ────────────────────────────────
+        builder.Property(x => x.FiscalYearId).IsRequired().HasColumnType("smallint");
+        builder.HasOne(x => x.FiscalYear)
+            .WithMany()
+            .HasForeignKey(x => x.FiscalYearId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ─── FK to Currency (smallint) ──────────────────────────────────
+        builder.Property(x => x.CurrencyId).IsRequired().HasColumnType("smallint");
+        builder.HasOne(x => x.Currency)
+            .WithMany()
+            .HasForeignKey(x => x.CurrencyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // ─── ExchangeRate (decimal(18,6)) ───────────────────────────────
+        builder.Property(x => x.ExchangeRate)
+            .HasPrecision(18, 6)
+            .HasDefaultValue(1m);
+
+        // ─── AttachmentPath ─────────────────────────────────────────────
+        builder.Property(x => x.AttachmentPath)
+            .HasMaxLength(500);
+
         // ─── 3-State Lifecycle (replaces IsPosted/IsReversed) ───────────
         builder.Property(x => x.Status)
             .HasColumnType("tinyint")
@@ -31,6 +54,9 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
         builder.Property(x => x.ReferenceId);
         builder.HasIndex(x => new { x.ReferenceType, x.ReferenceId })
             .HasFilter("[ReferenceType] IS NOT NULL AND [ReferenceId] IS NOT NULL");
+
+        builder.Property(x => x.ReviewedByUserId).IsRequired(false);
+        builder.Property(x => x.ReviewedAt).IsRequired(false);
 
         builder.HasIndex(x => x.EntryDate);
 

@@ -4,21 +4,19 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
 
+/// <summary>
+/// Tests for DocumentSequence entity (v4 schema: DocumentType + NextNumber).
+/// No Prefix/Year — formatting is done by the caller (DocumentSequenceService).
+/// </summary>
 public class DocumentSequenceTests
 {
     [Fact]
-    public void Create_GivenValidData_ShouldCreateDocumentSequence()
+    public void Create_GivenValidDocumentType_ShouldCreateSequence()
     {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
+        var sequence = DocumentSequence.Create("SalesInvoice");
 
         sequence.DocumentType.Should().Be("SalesInvoice");
-        sequence.Prefix.Should().Be("INV");
-        sequence.Year.Should().Be(2026);
-        sequence.LastNumber.Should().Be(0);
+        sequence.NextNumber.Should().Be(1);
     }
 
     [Theory]
@@ -27,216 +25,102 @@ public class DocumentSequenceTests
     [InlineData("   ")]
     public void Create_GivenInvalidDocumentType_ShouldThrowDomainException(string? invalidType)
     {
-        var action = () => DocumentSequence.Create(
-            documentType: invalidType!,
-            prefix: "INV",
-            year: 2026
-        );
+        var action = () => DocumentSequence.Create(invalidType!);
 
         action.Should().Throw<DomainException>()
             .WithMessage("*نوع المستند مطلوب*");
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Create_GivenInvalidPrefix_ShouldThrowDomainException(string? invalidPrefix)
+    [Fact]
+    public void GetNext_InitialSequence_ShouldReturnOne()
     {
-        var action = () => DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: invalidPrefix!,
-            year: 2026
-        );
+        var sequence = DocumentSequence.Create("SalesInvoice");
 
-        action.Should().Throw<DomainException>()
-            .WithMessage("*البادئة مطلوبة*");
+        var number = sequence.GetNext();
+
+        number.Should().Be(1);
+        sequence.NextNumber.Should().Be(2);
+    }
+
+    [Fact]
+    public void GetNext_CalledMultipleTimes_ShouldIncrementCorrectly()
+    {
+        var sequence = DocumentSequence.Create("SalesInvoice");
+
+        sequence.GetNext().Should().Be(1);
+        sequence.GetNext().Should().Be(2);
+        sequence.GetNext().Should().Be(3);
+
+        sequence.NextNumber.Should().Be(4);
+    }
+
+    [Fact]
+    public void GetNext_AfterSetNextNumber_ShouldUseNewValue()
+    {
+        var sequence = DocumentSequence.Create("SalesInvoice");
+
+        sequence.SetNextNumber(100);
+
+        sequence.GetNext().Should().Be(100);
+        sequence.NextNumber.Should().Be(101);
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    [InlineData(-2026)]
-    public void Create_GivenInvalidYear_ShouldThrowDomainException(int invalidYear)
+    [InlineData(-100)]
+    public void SetNextNumber_GivenInvalidValue_ShouldThrowDomainException(int invalidNext)
     {
-        var action = () => DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: "INV",
-            year: invalidYear
-        );
+        var sequence = DocumentSequence.Create("SalesInvoice");
+
+        var action = () => sequence.SetNextNumber(invalidNext);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*السنة مطلوبة*");
+            .WithMessage("*الرقم التسلسلي يجب أن يكون 1 أو أكثر*");
     }
 
     [Fact]
-    public void GetNextNumber_GivenInitialSequence_ShouldReturnFirstNumber()
+    public void GetNext_DifferentSequences_ShouldBeIndependent()
     {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
+        var salesSeq = DocumentSequence.Create("SalesInvoice");
+        var purchaseSeq = DocumentSequence.Create("PurchaseInvoice");
 
-        var number = sequence.GetNextNumber();
+        salesSeq.GetNext().Should().Be(1);
+        purchaseSeq.GetNext().Should().Be(1);
+        salesSeq.GetNext().Should().Be(2);
 
-        number.Should().Be("INV-2026-000001");
-        sequence.LastNumber.Should().Be(1);
+        salesSeq.NextNumber.Should().Be(3);
+        purchaseSeq.NextNumber.Should().Be(2);
     }
 
     [Fact]
-    public void GetNextNumber_CalledMultipleTimes_ShouldIncrementCorrectly()
+    public void SetNextNumber_ShouldUpdateTimestamp()
     {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
+        var sequence = DocumentSequence.Create("SalesInvoice");
+        var beforeUpdate = sequence.UpdatedAt;
 
-        sequence.GetNextNumber().Should().Be("INV-2026-000001");
-        sequence.GetNextNumber().Should().Be("INV-2026-000002");
-        sequence.GetNextNumber().Should().Be("INV-2026-000003");
-        sequence.LastNumber.Should().Be(3);
+        System.Threading.Thread.Sleep(10); // Ensure time difference
+        sequence.SetNextNumber(50);
+
+        sequence.NextNumber.Should().Be(50);
+        sequence.UpdatedAt.Should().NotBeNull();
+        sequence.UpdatedAt.Should().BeAfter(beforeUpdate ?? DateTime.MinValue);
     }
 
     [Fact]
-    public void GetNextNumber_ShouldFormatWithSixDigits()
+    public void GetNext_MultipleCalls_ShouldBeSequential()
     {
-        var sequence = DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: "INV",
-            year: 2026
-        );
+        var sequence = DocumentSequence.Create("PaymentVoucher");
 
-        // Add items to increment number
-        for (int i = 0; i < 99; i++)
+        var results = new int[10];
+        for (int i = 0; i < 10; i++)
         {
-            sequence.Increment();
+            results[i] = sequence.GetNext();
         }
 
-        var number = sequence.GetNextNumber();
-
-        number.Should().Be("INV-2026-000100");
-    }
-
-    [Fact]
-    public void Increment_ShouldIncreaseLastNumber()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        sequence.Increment();
-
-        sequence.LastNumber.Should().Be(1);
-    }
-
-    [Fact]
-    public void Increment_MultipleTimes_ShouldIncrementCorrectly()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        sequence.Increment();
-        sequence.Increment();
-        sequence.Increment();
-
-        sequence.LastNumber.Should().Be(3);
-    }
-
-    [Fact]
-    public void GetNextNumber_AfterManyIncrements_ShouldFormatCorrectly()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "Invoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        // Simulate many increments
-        for (int i = 0; i < 999; i++)
-        {
-            sequence.Increment();
-        }
-
-        var number = sequence.GetNextNumber();
-
-        number.Should().Be("INV-2026-001000");
-        sequence.LastNumber.Should().Be(1000);
-    }
-
-    [Fact]
-    public void GetNextInt_InitialSequence_ShouldReturnFirstNumber()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        var number = sequence.GetNextInt();
-
-        number.Should().Be(1);
-        sequence.LastNumber.Should().Be(1);
-    }
-
-    [Fact]
-    public void GetNextInt_CalledMultipleTimes_ShouldIncrementCorrectly()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        sequence.GetNextInt().Should().Be(1);
-        sequence.GetNextInt().Should().Be(2);
-        sequence.GetNextInt().Should().Be(3);
-        sequence.LastNumber.Should().Be(3);
-    }
-
-    [Fact]
-    public void GetNextInt_AfterIncrement_ShouldReturnCorrectValue()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        sequence.Increment();
-        sequence.Increment();
-
-        var number = sequence.GetNextInt();
-
-        number.Should().Be(3);
-        sequence.LastNumber.Should().Be(3);
-    }
-
-    [Fact]
-    public void GetNextInt_InterleavedWithGetNextNumber_ShouldIncrementSequentially()
-    {
-        var sequence = DocumentSequence.Create(
-            documentType: "SalesInvoice",
-            prefix: "INV",
-            year: 2026
-        );
-
-        var strNum = sequence.GetNextNumber();
-        strNum.Should().Be("INV-2026-000001");
-        sequence.LastNumber.Should().Be(1);
-
-        var intNum = sequence.GetNextInt();
-        intNum.Should().Be(2);
-        sequence.LastNumber.Should().Be(2);
-
-        strNum = sequence.GetNextNumber();
-        strNum.Should().Be("INV-2026-000003");
-        sequence.LastNumber.Should().Be(3);
+        results.Should().BeInAscendingOrder();
+        results[0].Should().Be(1);
+        results[9].Should().Be(10);
+        sequence.NextNumber.Should().Be(11);
     }
 }

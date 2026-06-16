@@ -10,6 +10,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
     {
         builder.ToTable("Roles");
         builder.HasKey(r => r.Id);
+        builder.Property(r => r.Id).HasColumnType("smallint");
 
         // Name — required, unique, max 100
         builder.Property(r => r.Name).IsRequired().HasMaxLength(100);

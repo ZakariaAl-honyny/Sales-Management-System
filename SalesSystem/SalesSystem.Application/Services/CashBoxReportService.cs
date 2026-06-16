@@ -4,6 +4,7 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Accounting.Entities;
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 
@@ -51,14 +52,14 @@ public class CashBoxReportService : ICashBoxReportService
 
             // Get posted receipt vouchers (income) up to the effective date
             var receiptVouchers = await _uow.ReceiptVouchers.ToListAsync(
-                rv => rv.Status == (byte)InvoiceStatus.Posted
+                rv => rv.Status == VoucherStatus.Posted
                    && rv.VoucherDate <= effectiveDate
                    && cashBoxIds.Contains(rv.CashBoxId),
                 ct: ct);
 
             // Get posted payment vouchers (expenses) up to the effective date
             var paymentVouchers = await _uow.PaymentVouchers.ToListAsync(
-                pv => pv.Status == (byte)InvoiceStatus.Posted
+                pv => pv.Status == VoucherStatus.Posted
                    && pv.VoucherDate <= effectiveDate
                    && cashBoxIds.Contains(pv.CashBoxId),
                 ct: ct);
@@ -210,14 +211,13 @@ public class CashBoxReportService : ICashBoxReportService
     }
 
     /// <summary>
-    /// Converts the byte Status to an Arabic display name.
-    /// Status values: 1=Draft, 2=Posted, 3=Cancelled.
+    /// Converts the VoucherStatus to an Arabic display name.
     /// </summary>
-    private static string GetStatusDisplay(byte status) => status switch
+    private static string GetStatusDisplay(VoucherStatus status) => status switch
     {
-        1 => "مسودة",
-        2 => "مرحّل",
-        3 => "ملغي",
+        VoucherStatus.Draft => "مسودة",
+        VoucherStatus.Posted => "مرحّل",
+        VoucherStatus.Cancelled => "ملغي",
         _ => "غير معروف"
     };
 }

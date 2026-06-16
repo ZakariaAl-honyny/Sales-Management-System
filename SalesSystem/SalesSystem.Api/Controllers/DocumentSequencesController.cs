@@ -33,7 +33,7 @@ public class DocumentSequencesController : ControllerBase
         {
             var sequences = await _uow.DocumentSequences.ToListAsync(ct);
             var dtos = sequences.Select(s => new DocumentSequenceDto(
-                s.Id, s.DocumentType, s.Prefix, s.Year, s.LastNumber)).ToList();
+                s.Id, s.DocumentType, s.NextNumber)).ToList();
             return Ok(dtos);
         }
         catch (Exception ex)
@@ -55,15 +55,15 @@ public class DocumentSequencesController : ControllerBase
             if (sequence == null)
                 return NotFound(new { error = "تسلسل المستند غير موجود" });
 
-            sequence.SetLastNumber(request.NextNumber);
+            sequence.SetNextNumber(request.NextNumber);
 
             await _uow.SaveChangesAsync(ct);
 
-            Serilog.Log.Information("Document sequence {Id} ({Type}) updated. New LastNumber: {Number}",
+            Serilog.Log.Information("Document sequence {Id} ({Type}) updated. New NextNumber: {Number}",
                 id, sequence.DocumentType, request.NextNumber);
 
             return Ok(new DocumentSequenceDto(
-                sequence.Id, sequence.DocumentType, sequence.Prefix, sequence.Year, sequence.LastNumber));
+                sequence.Id, sequence.DocumentType, sequence.NextNumber));
         }
         catch (Exception ex)
         {

@@ -1,10 +1,12 @@
 namespace SalesSystem.Contracts.Responses;
 
 /// <summary>
-/// Response for Warehouse entity — no AccountId, IsDefault, Code, Type, Location, or ManagerName per schema.
+/// Response for Warehouse entity — smallint PK, BranchId FK, no AccountId/Type/ManagerName per schema.
 /// </summary>
 public record WarehouseResponse(
-    int Id,
+    short Id,
+    short BranchId,
+    string? BranchName,
     string Name,
     string? Phone,
     string? Address,

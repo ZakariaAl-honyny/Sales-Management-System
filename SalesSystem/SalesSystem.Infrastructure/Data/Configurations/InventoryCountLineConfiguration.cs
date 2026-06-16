@@ -10,20 +10,27 @@ public class InventoryCountLineConfiguration : IEntityTypeConfiguration<Inventor
     {
         builder.ToTable("InventoryCountLines");
         builder.HasKey(l => l.Id);
-        builder.Property(l => l.SystemQuantity)
-            .HasPrecision(18, 3)
-            .IsRequired();
-        builder.Property(l => l.ActualQuantity)
-            .HasPrecision(18, 3)
-            .IsRequired();
-        builder.Property(l => l.DifferenceQuantity)
+
+        builder.Property(l => l.ExpectedQuantity)
             .HasPrecision(18, 3)
             .IsRequired();
 
+        builder.Property(l => l.ActualQuantity)
+            .HasPrecision(18, 3)
+            .IsRequired();
+
+        builder.Property(l => l.Difference)
+            .HasPrecision(18, 3)
+            .IsRequired();
+
+        builder.Property(l => l.Notes)
+            .HasMaxLength(300)
+            .IsRequired(false);
+
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("CHK_InvCountLines_SystemQuantity_NonNegative",
-                "[SystemQuantity] >= 0");
+            t.HasCheckConstraint("CHK_InvCountLines_ExpectedQuantity_NonNegative",
+                "[ExpectedQuantity] >= 0");
             t.HasCheckConstraint("CHK_InvCountLines_ActualQuantity_NonNegative",
                 "[ActualQuantity] >= 0");
         });
@@ -33,14 +40,15 @@ public class InventoryCountLineConfiguration : IEntityTypeConfiguration<Inventor
             .HasForeignKey(l => l.InventoryCountId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(l => l.Product)
+        builder.HasOne(l => l.ProductUnit)
             .WithMany()
-            .HasForeignKey(l => l.ProductId)
+            .HasForeignKey(l => l.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(l => l.Batch)
-            .WithMany()
-            .HasForeignKey(l => l.BatchId)
-            .OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(l => l.InventoryCountId)
+            .HasDatabaseName("IX_InvCountLines_CountId");
+
+        builder.HasIndex(l => l.ProductUnitId)
+            .HasDatabaseName("IX_InvCountLines_ProductUnitId");
     }
 }

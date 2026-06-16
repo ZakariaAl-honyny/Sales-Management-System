@@ -30,8 +30,10 @@ public class AuditLogService : IAuditLogService
             _logger.LogInformation("Audit log: User {UserId} performed {Action} on {EntityType}#{EntityId}",
                 userId, action, entityType, entityId);
 
+            // Store provided details in NewValues (preserving backward compatibility
+            // for callers that pass simple description text via the 'details' parameter)
             var auditLog = AuditLog.Create(userId, action, entityType,
-                entityId?.ToString(), details, ipAddress);
+                entityId, oldValues: null, newValues: details, changedColumns: null, ipAddress);
 
             await _uow.AuditLogs.AddAsync(auditLog, ct);
 
@@ -153,8 +155,8 @@ public class AuditLogService : IAuditLogService
         {
             var entityType = query.EntityType;
             predicate = predicate != null
-                ? Combine(predicate, l => (l.EntityName ?? "").Contains(entityType))
-                : l => (l.EntityName ?? "").Contains(entityType);
+                ? Combine(predicate, l => (l.EntityType ?? "").Contains(entityType))
+                : l => (l.EntityType ?? "").Contains(entityType);
         }
 
         if (query.From.HasValue)
@@ -194,9 +196,11 @@ public class AuditLogService : IAuditLogService
             UserId: log.UserId,
             UserName: log.User?.UserName,
             Action: log.Action,
-            EntityType: log.EntityName,
+            EntityType: log.EntityType,
             EntityId: log.EntityId,
-            Details: log.Details,
+            OldValues: log.OldValues,
+            NewValues: log.NewValues,
+            ChangedColumns: log.ChangedColumns,
             IpAddress: log.IpAddress,
             Timestamp: log.CreatedAt
         );

@@ -14,7 +14,7 @@ public class PurchaseInvoiceTests
             supplierId: 1,
             warehouseId: 1,
             invoiceNo: 1,
-            invoiceDate: new DateTime(2027, 1, 1),
+            invoiceDate: new DateOnly(2027, 1, 1),
             paymentType: PaymentType.Cash,
             discountAmount: 0,
             notes: "Test invoice",

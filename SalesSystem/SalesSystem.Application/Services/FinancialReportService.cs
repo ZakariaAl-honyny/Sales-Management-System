@@ -40,7 +40,7 @@ public class FinancialReportService : IFinancialReportService
             var totalSales = salesInvoices.Sum(si => si.NetTotal);
 
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
-                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
+                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= DateOnly.FromDateTime(from) && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 ct: ct);
 
             var totalPurchases = purchaseInvoices.Sum(pi => pi.NetTotal);
@@ -110,7 +110,7 @@ public class FinancialReportService : IFinancialReportService
             var accountIds = accountBalances.Keys.ToList();
             // Lookup COGS account from key-value system mappings
             var cogsMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                m => m.MappingKey == SystemAccountKey.CostOfGoodsSold, ct);
+                m => m.MappingKey == nameof(SystemAccountKey.CostOfGoodsSold), ct);
             int? cogsAccountId = cogsMapping?.AccountId;
 
             var accounts = await _uow.Accounts.ToListAsync(a => accountIds.Contains(a.Id), ct: ct);
@@ -471,20 +471,20 @@ public class FinancialReportService : IFinancialReportService
             if (!cashBoxId.HasValue)
             {
                 var allReceiptsBefore = await _uow.ReceiptVouchers.ToListAsync(
-                    rv => rv.Status == (byte)InvoiceStatus.Posted && rv.VoucherDate < from, ct: ct);
+                    rv => rv.Status == VoucherStatus.Posted && rv.VoucherDate < from, ct: ct);
                 var allPaymentsBefore = await _uow.PaymentVouchers.ToListAsync(
-                    pv => pv.Status == (byte)InvoiceStatus.Posted && pv.VoucherDate < from, ct: ct);
+                    pv => pv.Status == VoucherStatus.Posted && pv.VoucherDate < from, ct: ct);
                 openingBalance = allReceiptsBefore.Sum(r => r.TotalAmount)
                                - allPaymentsBefore.Sum(p => p.TotalAmount);
             }
             else
             {
                 var receiptsBefore = await _uow.ReceiptVouchers.ToListAsync(
-                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                    rv => rv.Status == VoucherStatus.Posted
                        && rv.CashBoxId == cashBoxId.Value
                        && rv.VoucherDate < from, ct: ct);
                 var paymentsBefore = await _uow.PaymentVouchers.ToListAsync(
-                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                    pv => pv.Status == VoucherStatus.Posted
                        && pv.CashBoxId == cashBoxId.Value
                        && pv.VoucherDate < from, ct: ct);
                 openingBalance = receiptsBefore.Sum(r => r.TotalAmount)
@@ -496,7 +496,7 @@ public class FinancialReportService : IFinancialReportService
             if (cashBoxId.HasValue)
             {
                 periodReceipts = await _uow.ReceiptVouchers.ToListAsync(
-                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                    rv => rv.Status == VoucherStatus.Posted
                        && rv.CashBoxId == cashBoxId.Value
                        && rv.VoucherDate >= from
                        && rv.VoucherDate <= to,
@@ -505,7 +505,7 @@ public class FinancialReportService : IFinancialReportService
             else
             {
                 periodReceipts = await _uow.ReceiptVouchers.ToListAsync(
-                    rv => rv.Status == (byte)InvoiceStatus.Posted
+                    rv => rv.Status == VoucherStatus.Posted
                        && rv.VoucherDate >= from
                        && rv.VoucherDate <= to,
                     ct: ct);
@@ -516,7 +516,7 @@ public class FinancialReportService : IFinancialReportService
             if (cashBoxId.HasValue)
             {
                 periodPayments = await _uow.PaymentVouchers.ToListAsync(
-                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                    pv => pv.Status == VoucherStatus.Posted
                        && pv.CashBoxId == cashBoxId.Value
                        && pv.VoucherDate >= from
                        && pv.VoucherDate <= to,
@@ -525,7 +525,7 @@ public class FinancialReportService : IFinancialReportService
             else
             {
                 periodPayments = await _uow.PaymentVouchers.ToListAsync(
-                    pv => pv.Status == (byte)InvoiceStatus.Posted
+                    pv => pv.Status == VoucherStatus.Posted
                        && pv.VoucherDate >= from
                        && pv.VoucherDate <= to,
                     ct: ct);
@@ -608,8 +608,8 @@ public class FinancialReportService : IFinancialReportService
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.Status == InvoiceStatus.Posted
                    && pi.TaxAmount > 0
-                   && pi.InvoiceDate >= from
-                   && pi.InvoiceDate <= to,
+                   && pi.InvoiceDate >= DateOnly.FromDateTime(from)
+                   && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 q => q.OrderBy(pi => pi.InvoiceDate),
                 ct: ct,
                 includePaths: "Supplier.Party");
@@ -622,7 +622,7 @@ public class FinancialReportService : IFinancialReportService
                     : 0;
 
                 vatItems.Add(new VatReportDto(
-                    invoice.Id.ToString(), invoice.InvoiceDate,
+                    invoice.Id.ToString(), invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue),
                     invoice.Supplier?.Party?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
@@ -701,22 +701,22 @@ public class FinancialReportService : IFinancialReportService
 
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.SupplierId == supplierId && pi.Status == InvoiceStatus.Posted
-                   && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
+                   && pi.InvoiceDate >= DateOnly.FromDateTime(from) && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 q => q.OrderBy(pi => pi.InvoiceDate), ct: ct);
 
             foreach (var invoice in invoices)
             {
-                entries.Add(new AccountStatementDto(invoice.InvoiceDate, "فاتورة شراء",
+                entries.Add(new AccountStatementDto(invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue), "فاتورة شراء",
                     invoice.Id.ToString(), 0, invoice.NetTotal, 0));
             }
 
             var payments = await _uow.SupplierPayments.ToListAsync(
-                sp => sp.SupplierId == supplierId && sp.PaymentDate >= from && sp.PaymentDate <= to,
+                sp => sp.SupplierId == supplierId && sp.PaymentDate >= DateOnly.FromDateTime(from) && sp.PaymentDate <= DateOnly.FromDateTime(to),
                 q => q.OrderBy(sp => sp.PaymentDate), ct: ct);
 
             foreach (var payment in payments)
             {
-                entries.Add(new AccountStatementDto(payment.PaymentDate, "دفعة مورد",
+                entries.Add(new AccountStatementDto(payment.PaymentDate.ToDateTime(TimeOnly.MinValue), "دفعة مورد",
                     payment.PaymentNo.ToString(), payment.Amount, 0, 0));
             }
 

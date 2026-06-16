@@ -10,6 +10,7 @@ public class UnitConfiguration : IEntityTypeConfiguration<Unit>
     {
         builder.ToTable("Units");
         builder.HasKey(u => u.Id);
+        builder.Property(u => u.Id).HasColumnType("smallint");
 
         builder.Property(u => u.Name).IsRequired().HasMaxLength(50);
         builder.Property(u => u.Symbol).HasMaxLength(20);

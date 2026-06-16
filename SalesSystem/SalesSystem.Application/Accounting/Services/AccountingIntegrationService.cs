@@ -666,7 +666,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             }
 
             var request = new CreateJournalEntryRequest(
-                EntryDate: invoice.InvoiceDate,
+                EntryDate: invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue),
                 Description: $"قيد ترحيل فاتورة شراء رقم {invoice.InvoiceNo}" +
                     (invoice.OtherCharges > 0 ? $" (تكلفة شاملة: {invoice.OtherCharges:N2} مصاريف إضافية)" : ""),
                 EntryType: JournalEntryType.Purchase,
@@ -1028,7 +1028,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
                 "مردود مشتريات"));
 
             var request = new CreateJournalEntryRequest(
-                EntryDate: purchaseReturn.ReturnDate,
+                EntryDate: purchaseReturn.ReturnDate.ToDateTime(TimeOnly.MinValue),
                 Description: $"قيد ترحيل مردود مشتريات رقم {purchaseReturn.ReturnNo}" +
                     (purchaseReturn.PurchaseInvoiceId > 0
                         ? $" (مرتبط بفاتورة شراء {purchaseReturn.PurchaseInvoiceId})"
@@ -1249,7 +1249,7 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             var m = dictResult.Value!;
 
             var request = new CreateJournalEntryRequest(
-                EntryDate: payment.PaymentDate,
+                EntryDate: payment.PaymentDate.ToDateTime(TimeOnly.MinValue),
                 Description: $"قيد سند دفع للمورد: {supplierName}",
                 EntryType: JournalEntryType.SupplierPayment,
                 ReferenceType: "SupplierPayment",

@@ -5,11 +5,17 @@ namespace SalesSystem.Domain.Accounting.Entities;
 
 /// <summary>
 /// Represents a fiscal year with open/close lifecycle.
-/// Only one fiscal year per calendar year (enforced by unique filtered index).
-/// Inherits <see cref="BaseEntity"/> for audit and soft-delete support.
+/// Inherits <see cref="ActivatableEntity"/> for audit, soft-delete, and activation support.
+/// PK is smallint (short) — a small lookup table.
+/// Schema: §2.9 FiscalYears.
 /// </summary>
-public class FiscalYear : AuditableEntity
+public class FiscalYear : ActivatableEntity
 {
+    /// <summary>
+    /// smallint PK — overrides base int Id for small lookup tables.
+    /// </summary>
+    public new short Id { get; private set; }
+
     /// <summary>
     /// The calendar year number (e.g. 2025).
     /// </summary>
@@ -80,7 +86,7 @@ public class FiscalYear : AuditableEntity
             throw new DomainException(
                 $"السنة المالية غير صالحة — يجب أن تكون بين 2000 و{DateTime.UtcNow.Year + 10}");
 
-        return new FiscalYear
+        var fiscalYear = new FiscalYear
         {
             Year = year,
             YearName = (yearName ?? year.ToString()).Trim(),
@@ -88,8 +94,12 @@ public class FiscalYear : AuditableEntity
             EndDate = new DateTime(year, 12, 31, 23, 59, 59, DateTimeKind.Utc),
             IsOpen = true,
             OpenedAt = DateTime.UtcNow,
-            OpenedByUserId = openedByUserId > 0 ? openedByUserId : null
+            OpenedByUserId = openedByUserId > 0 ? openedByUserId : null,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
         };
+        fiscalYear.SetCreatedBy(openedByUserId > 0 ? openedByUserId : null);
+        return fiscalYear;
     }
 
     /// <summary>

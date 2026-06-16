@@ -196,7 +196,7 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         SupplierName: "مورد اختبار",
         WarehouseId: 1,
         WarehouseName: "المستودع الرئيسي",
-        InvoiceDate: DateTime.UtcNow,
+        InvoiceDate: DateOnly.FromDateTime(DateTime.UtcNow),
         PaymentType: 1,
         SubTotal: 200.00m,
         DiscountAmount: 10.00m,
@@ -206,15 +206,17 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         PaidAmount: 100.00m,
         RemainingAmount: 118.50m,
         Notes: null,
+        SupplierInvoiceNo: null,
         Status: status,
         TaxId: null,
         TaxName: null,
         TaxRate: null,
         CurrencyId: null,
         ExchangeRate: null,
+        CashBoxId: null,
         Items: new List<PurchaseInvoiceLineDto>
         {
-            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m)
+            new(id * 10, 1, "منتج اختبار", 1, null, 5.000m, 40.00m, 200.00m, 0m)
         });
 
     private static CreatePurchaseInvoiceRequest CreateValidRequest() => new(

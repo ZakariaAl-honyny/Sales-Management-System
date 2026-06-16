@@ -25,8 +25,8 @@ public class WarehousesControllerTests
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "المستودع الرئيسي", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "المستودع الفرعي", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: 1, BranchId: (short)1, BranchName: null, Name: "المستودع الرئيسي", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: 2, BranchId: (short)1, BranchName: null, Name: "المستودع الفرعي", Phone: null, Address: null, Notes: null, IsActive: true)
         };
         var pagedResult = PagedResult<WarehouseDto>.Create(warehouses, 2, 1, 10);
 
@@ -55,7 +55,7 @@ public class WarehousesControllerTests
     [Fact]
     public async Task GetById_WhenWarehouseExists_ReturnsOkWithWarehouse()
     {
-        var warehouse = new WarehouseDto(1, "المستودع الرئيسي", null, "الرياض", null, true);
+        var warehouse = new WarehouseDto(Id: 1, BranchId: (short)1, BranchName: null, Name: "المستودع الرئيسي", Phone: null, Address: "الرياض", Notes: null, IsActive: true);
 
         _warehouseServiceMock
             .Setup(x => x.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -83,7 +83,7 @@ public class WarehousesControllerTests
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
         var request = new CreateWarehouseRequest(BranchId: 1, Name: "المستودع الرئيسي");
-        var warehouse = new WarehouseDto(1, request.Name, null, null, null, true);
+        var warehouse = new WarehouseDto(Id: 1, BranchId: (short)1, BranchName: null, Name: request.Name, Phone: null, Address: null, Notes: null, IsActive: true);
 
         _warehouseServiceMock
             .Setup(x => x.CreateAsync(It.IsAny<CreateWarehouseRequest>(), It.IsAny<CancellationToken>()))
@@ -113,7 +113,7 @@ public class WarehousesControllerTests
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedWarehouse()
     {
         var request = new UpdateWarehouseRequest(BranchId: 1, Name: "المستودع المحدث", IsActive: true);
-        var warehouse = new WarehouseDto(1, request.Name, null, null, null, true);
+        var warehouse = new WarehouseDto(Id: 1, BranchId: (short)1, BranchName: null, Name: request.Name, Phone: null, Address: null, Notes: null, IsActive: true);
 
         _warehouseServiceMock
             .Setup(x => x.UpdateAsync(It.IsAny<int>(), It.IsAny<UpdateWarehouseRequest>(), It.IsAny<CancellationToken>()))

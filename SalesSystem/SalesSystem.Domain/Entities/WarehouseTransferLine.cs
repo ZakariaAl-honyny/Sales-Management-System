@@ -5,56 +5,51 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// A single line item in a warehouse transfer.
-/// Schema: WarehouseTransferId FK, ProductId FK, BatchId FK (NOT nullable),
-/// Quantity, UnitCost, TotalCost.
+/// Schema: int WarehouseTransferId FK, int ProductUnitId FK,
+/// decimal(18,3) Quantity, nvarchar(50) BatchNo.
+/// Entity (no audit).
 /// </summary>
 public class WarehouseTransferLine : Entity
 {
     public int WarehouseTransferId { get; private set; }
-    public int ProductId { get; private set; }
 
     /// <summary>
-    /// FK to InventoryBatches — the specific batch being transferred.
+    /// FK to ProductUnit — identifies the product and unit.
     /// </summary>
-    public int BatchId { get; private set; }
+    public int ProductUnitId { get; private set; }
 
     public decimal Quantity { get; private set; }
-    public decimal UnitCost { get; private set; }
-    public decimal TotalCost { get; private set; }
+
+    /// <summary>
+    /// Optional batch number for FIFO tracking during transfer.
+    /// </summary>
+    public string? BatchNo { get; private set; }
 
     // Navigation properties
     public virtual WarehouseTransfer? WarehouseTransfer { get; private set; }
-    public virtual Product? Product { get; private set; }
-    public virtual InventoryBatch? Batch { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private WarehouseTransferLine() { } // EF Core
 
     public static WarehouseTransferLine Create(
         int warehouseTransferId,
-        int productId,
-        int batchId,
+        int productUnitId,
         decimal quantity,
-        decimal unitCost)
+        string? batchNo = null)
     {
         if (warehouseTransferId <= 0)
             throw new DomainException("رقم التحويل مطلوب.");
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب.");
-        if (batchId <= 0)
-            throw new DomainException("الدفعة مطلوبة.");
+        if (productUnitId <= 0)
+            throw new DomainException("وحدة المنتج مطلوبة.");
         if (quantity <= 0)
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
-        if (unitCost < 0)
-            throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
 
         return new WarehouseTransferLine
         {
             WarehouseTransferId = warehouseTransferId,
-            ProductId = productId,
-            BatchId = batchId,
+            ProductUnitId = productUnitId,
             Quantity = quantity,
-            UnitCost = unitCost,
-            TotalCost = quantity * unitCost
+            BatchNo = batchNo?.Trim()
         };
     }
 }

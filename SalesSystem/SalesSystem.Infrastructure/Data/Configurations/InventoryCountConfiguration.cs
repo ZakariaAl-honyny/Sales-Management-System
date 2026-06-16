@@ -11,17 +11,34 @@ public class InventoryCountConfiguration : IEntityTypeConfiguration<InventoryCou
     {
         builder.ToTable("InventoryCounts");
         builder.HasKey(ic => ic.Id);
-        builder.Property(ic => ic.CountNo).IsRequired();
+
+        builder.Property(ic => ic.CountNo)
+            .HasMaxLength(50)
+            .IsRequired();
         builder.HasIndex(ic => ic.CountNo)
             .IsUnique()
             .HasDatabaseName("IX_InventoryCounts_CountNo");
-        builder.Property(ic => ic.CountDate).IsRequired().HasColumnType("date");
-        builder.Property(ic => ic.Status).HasConversion<byte>();
-        builder.Property(ic => ic.Notes).HasMaxLength(500);
+
+        builder.Property(ic => ic.Status)
+            .HasConversion<byte>()
+            .IsRequired()
+            .HasDefaultValue(InventoryCountStatus.Draft);
+
+        builder.Property(ic => ic.Notes)
+            .HasMaxLength(300)
+            .IsRequired(false);
 
         builder.Property(ic => ic.WarehouseId)
             .HasColumnType("smallint")
             .IsRequired();
+
+        builder.Property(ic => ic.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("GETUTCDATE()");
+
+        builder.Property(ic => ic.CreatedByUserId)
+            .IsRequired()
+            .HasDefaultValue(0);
 
         builder.HasOne(ic => ic.Warehouse)
             .WithMany()

@@ -27,10 +27,9 @@ public class InventoryCountEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toast;
 
     private int? _countId;
-    private int _countNo;
+    private string? _countNo;
     private short _warehouseId;
     private string? _warehouseName;
-    private DateTime _countDate = DateTime.Today;
     private string? _notes;
     private string? _errorMessage;
     private byte _status = 1; // Draft
@@ -100,7 +99,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
         _countNo = count.CountNo;
         _warehouseId = count.WarehouseId;
         _warehouseName = count.WarehouseName;
-        _countDate = count.CountDate;
         _notes = count.Notes ?? string.Empty;
         _status = count.Status;
         _isEditMode = true;
@@ -112,12 +110,11 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 var lineItem = new InventoryCountLineItem
                 {
                     Id = line.Id,
-                    ProductId = line.ProductId,
-                    ProductName = line.ProductName,
-                    SystemQuantity = line.SystemQuantity,
+                    ProductUnitId = line.ProductUnitId,
+                    ProductUnitName = line.ProductUnitName,
+                    SystemQuantity = line.ExpectedQuantity,
                     IsCounted = line.ActualQuantity > 0
                 };
-                lineItem.SetInitialActualQuantity(line.ActualQuantity);
                 lineItem.SetInitialActualQuantity(line.ActualQuantity);
                 _lines.Add(lineItem);
             }
@@ -136,7 +133,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
 
     public int? CountId => _countId;
 
-    public int CountNo
+    public string? CountNo
     {
         get => _countNo;
         set => SetProperty(ref _countNo, value);
@@ -161,12 +158,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
     {
         get => _warehouseName;
         set => SetProperty(ref _warehouseName, value);
-    }
-
-    public DateTime CountDate
-    {
-        get => _countDate;
-        set => SetProperty(ref _countDate, value);
     }
 
     public string? Notes
@@ -256,6 +247,8 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
+                    ProductUnitId = 0,
+                    ProductUnitName = "حبة",
                     SystemQuantity = 0,
                     ActualQuantity = 0,
                     IsCounted = false
@@ -314,7 +307,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
-                        line.ProductId,
+                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
  
@@ -334,7 +327,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
-                        line.ProductId,
+                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
 
@@ -356,7 +349,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 // Create the count header first
                 var createResult = await _countApiService.CreateAsync(new CreateInventoryCountRequest(
                     WarehouseId,
-                    CountDate,
                     string.IsNullOrWhiteSpace(Notes) ? null : Notes));
 
                 if (!createResult.IsSuccess || createResult.Value == null)
@@ -375,7 +367,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
-                        line.ProductId,
+                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
  
@@ -408,7 +400,6 @@ public class InventoryCountEditorViewModel : ViewModelBase
             {
                 var createResult = await _countApiService.CreateAsync(new CreateInventoryCountRequest(
                     WarehouseId,
-                    CountDate,
                     string.IsNullOrWhiteSpace(Notes) ? null : Notes));
 
                 if (!createResult.IsSuccess || createResult.Value == null)
@@ -427,7 +418,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
-                        line.ProductId,
+                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
  
@@ -448,7 +439,7 @@ public class InventoryCountEditorViewModel : ViewModelBase
                 {
                     var lineRequest = new AddInventoryCountLineRequest(
                         _countId.Value,
-                        line.ProductId,
+                        line.ProductUnitId,
                         line.SystemQuantity,
                         line.ActualQuantity);
 
@@ -495,6 +486,8 @@ public class InventoryCountLineItem : ViewModelBase
     private int _id;
     private int _productId;
     private string? _productName;
+    private int _productUnitId;
+    private string? _productUnitName;
     private decimal _systemQuantity;
     private decimal _actualQuantity;
     private bool _isCounted;
@@ -517,6 +510,18 @@ public class InventoryCountLineItem : ViewModelBase
     {
         get => _productName;
         set => SetProperty(ref _productName, value);
+    }
+
+    public int ProductUnitId
+    {
+        get => _productUnitId;
+        set => SetProperty(ref _productUnitId, value);
+    }
+
+    public string? ProductUnitName
+    {
+        get => _productUnitName;
+        set => SetProperty(ref _productUnitName, value);
     }
 
     /// <summary>

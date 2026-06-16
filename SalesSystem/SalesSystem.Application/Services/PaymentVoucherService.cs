@@ -170,7 +170,7 @@ public class PaymentVoucherService : IPaymentVoucherService
             if (voucher == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            if (voucher.Status == (byte)InvoiceStatus.Posted)
+            if (voucher.Status == VoucherStatus.Posted)
                 return Result.Failure("لا يمكن حذف سند صرف مرحّل. قم بإلغائه أولاً.");
 
             voucher.Cancel();
@@ -255,7 +255,7 @@ public class PaymentVoucherService : IPaymentVoucherService
             if (voucher == null)
                 return Result<PaymentVoucherDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            var wasPosted = voucher.Status == VoucherStatus.Posted;
 
             voucher.Cancel(userId);
 
@@ -334,7 +334,7 @@ public class PaymentVoucherService : IPaymentVoucherService
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
-            voucher.Status,
+            (byte)voucher.Status,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt

@@ -1,6 +1,5 @@
 using FluentAssertions;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Tests.Entities;
@@ -12,14 +11,13 @@ public class UserTests
     {
         var user = User.Create(
             userName: "john.doe",
-            fullName: "John Doe",
             createdByUserId: 1
         );
 
         user.UserName.Should().Be("john.doe");
         user.PasswordHash.Should().Be(string.Empty); // Schema: nvarchar(256) NOT NULL
-        user.FullName.Should().Be("John Doe");
-        user.Status.Should().Be(UserStatus.Active);
+        user.IsActive.Should().BeTrue();
+        user.IsLocked.Should().BeFalse();
         user.MustChangePassword.Should().BeTrue();
     }
 
@@ -30,27 +28,11 @@ public class UserTests
     public void Create_GivenInvalidUserName_ShouldThrowDomainException(string? invalidUserName)
     {
         var action = () => User.Create(
-            userName: invalidUserName!,
-            fullName: "Test"
+            userName: invalidUserName!
         );
 
         action.Should().Throw<DomainException>()
             .WithMessage("*اسم المستخدم مطلوب*");
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Create_GivenInvalidFullName_ShouldThrowDomainException(string? invalidFullName)
-    {
-        var action = () => User.Create(
-            userName: "testuser",
-            fullName: invalidFullName!
-        );
-
-        action.Should().Throw<DomainException>()
-            .WithMessage("*الاسم الكامل مطلوب*");
     }
 
     [Fact]
@@ -59,13 +41,11 @@ public class UserTests
         var user = User.CreateWithPassword(
             userName: "john.doe",
             passwordHash: "hashedpassword123",
-            fullName: "John Doe",
             createdByUserId: 1
         );
 
         user.UserName.Should().Be("john.doe");
         user.PasswordHash.Should().Be("hashedpassword123");
-        user.FullName.Should().Be("John Doe");
         user.IsActive.Should().BeTrue();
         user.MustChangePassword.Should().BeFalse();
     }
@@ -78,8 +58,7 @@ public class UserTests
     {
         var action = () => User.CreateWithPassword(
             userName: "testuser",
-            passwordHash: invalidPassword!,
-            fullName: "Test"
+            passwordHash: invalidPassword!
         );
 
         action.Should().Throw<DomainException>()
@@ -91,16 +70,15 @@ public class UserTests
     {
         var user = User.Create(
             userName: "john.doe",
-            fullName: "Original Name",
             createdByUserId: 1
         );
 
         user.Update(
-            fullName: "Updated Name",
             updatedByUserId: 1
         );
 
-        user.FullName.Should().Be("Updated Name");
+        // Update only changes EmployeeId now; previously also changed FullName
+        user.UserName.Should().Be("john.doe");
     }
 
     [Fact]
@@ -108,7 +86,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 1
         );
 
@@ -116,7 +93,6 @@ public class UserTests
 
         user.PasswordHash.Should().Be("new_hashed_password");
         user.MustChangePassword.Should().BeFalse();
-        user.PasswordChangedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -124,7 +100,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 1
         );
 
@@ -140,7 +115,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 1
         );
         user.SetInitialPassword("old_hash");
@@ -155,7 +129,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 1
         );
         user.SetInitialPassword("original_hash");
@@ -170,7 +143,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 1
         );
         user.SetInitialPassword("old_hash");
@@ -179,25 +151,24 @@ public class UserTests
 
         user.PasswordHash.Should().Be("new_default_hash");
         user.MustChangePassword.Should().BeTrue();
-        user.PasswordChangedAt.Should().BeNull();
     }
 
     [Fact]
     public void RecordLoginAttempt_Success_ShouldResetCounterAndUpdateLastLogin()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
 
         user.RecordLoginAttempt(success: true);
 
         user.LoginAttempts.Should().Be(0);
-        user.Status.Should().Be(UserStatus.Active);
+        user.IsLocked.Should().BeFalse();
         user.LastLoginAt.Should().NotBeNull();
     }
 
     [Fact]
     public void RecordLoginAttempt_Failure_ShouldIncrementCounter()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
 
         user.RecordLoginAttempt(success: false);
         user.RecordLoginAttempt(success: false);
@@ -205,58 +176,56 @@ public class UserTests
         user.RecordLoginAttempt(success: false);
 
         user.LoginAttempts.Should().Be(4);
-        user.Status.Should().Be(UserStatus.Active);
+        user.IsLocked.Should().BeFalse();
 
         // 5th failure locks the account
         user.RecordLoginAttempt(success: false);
         user.LoginAttempts.Should().Be(5);
-        user.Status.Should().Be(UserStatus.Locked);
+        user.IsLocked.Should().BeTrue();
     }
 
     [Fact]
     public void LockAndUnlock_ShouldChangeStatus()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
 
         user.Lock();
-        user.Status.Should().Be(UserStatus.Locked);
+        user.IsLocked.Should().BeTrue();
 
         user.Unlock();
-        user.Status.Should().Be(UserStatus.Active);
+        user.IsLocked.Should().BeFalse();
     }
 
     [Fact]
     public void DeactivateAndActivate_ShouldChangeStatus()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
 
         user.Deactivate();
-        user.Status.Should().Be(UserStatus.Inactive);
+        user.IsActive.Should().BeFalse();
 
         user.Activate();
-        user.Status.Should().Be(UserStatus.Active);
+        user.IsActive.Should().BeTrue();
     }
 
     [Fact]
     public void MarkAsDeleted_ShouldSetStatusInactive()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
 
         user.MarkAsDeleted();
 
-        user.Status.Should().Be(UserStatus.Inactive);
         user.IsActive.Should().BeFalse();
     }
 
     [Fact]
     public void Restore_ShouldSetStatusActive()
     {
-        var user = User.Create(userName: "test", fullName: "Test");
+        var user = User.Create(userName: "test");
         user.MarkAsDeleted();
 
         user.Restore();
 
-        user.Status.Should().Be(UserStatus.Active);
         user.IsActive.Should().BeTrue();
     }
 
@@ -265,7 +234,6 @@ public class UserTests
     {
         var user = User.Create(
             userName: "test",
-            fullName: "Test",
             createdByUserId: 99
         );
 

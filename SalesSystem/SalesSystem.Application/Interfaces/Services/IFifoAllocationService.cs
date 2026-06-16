@@ -20,7 +20,7 @@ public interface IFifoAllocationService
         decimal quantity,
         decimal unitCost,
         string? batchNo,
-        DateTime? expiryDate,
+        DateOnly? expiryDate,
         int? purchaseInvoiceId,
         bool isOpeningBatch,
         CancellationToken ct);

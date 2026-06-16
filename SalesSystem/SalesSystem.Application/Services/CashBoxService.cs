@@ -296,7 +296,7 @@ public class CashBoxService : ICashBoxService
                 return Result<ReceiptVoucherDto>.Failure(
                     "سند القبض غير موجود", ErrorCodes.NotFound);
 
-            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            var wasPosted = voucher.Status == VoucherStatus.Posted;
             voucher.Cancel(userId);
 
             // Reverse journal entry if the voucher was previously posted
@@ -489,7 +489,7 @@ public class CashBoxService : ICashBoxService
                 return Result<PaymentVoucherDto>.Failure(
                     "سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            var wasPosted = voucher.Status == VoucherStatus.Posted;
             voucher.Cancel(userId);
 
             // Reverse journal entry if the voucher was previously posted
@@ -909,7 +909,7 @@ public class CashBoxService : ICashBoxService
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
-            voucher.Status,
+            (byte)voucher.Status,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt
@@ -931,7 +931,7 @@ public class CashBoxService : ICashBoxService
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
-            voucher.Status,
+            (byte)voucher.Status,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt

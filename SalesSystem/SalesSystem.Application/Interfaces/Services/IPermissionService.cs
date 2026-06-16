@@ -1,6 +1,5 @@
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Interfaces.Services;
 
@@ -17,13 +16,13 @@ public interface IPermissionService
     /// <summary>
     /// Returns a dictionary mapping each Role to the list of assigned permission IDs.
     /// </summary>
-    Task<Result<Dictionary<UserRole, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default);
+    Task<Result<Dictionary<byte, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Updates the permission set for a given role.
     /// Replaces all existing role permissions with the new set.
     /// </summary>
-    Task<Result> UpdateRolePermissionsAsync(UserRole role, List<int> permissionIds, CancellationToken ct = default);
+    Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds, CancellationToken ct = default);
 
     /// <summary>
     /// Gets the list of permission names for a user based on their role.

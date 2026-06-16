@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -12,25 +11,22 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.ToTable("Users");
         builder.HasKey(u => u.Id);
 
-        // Core fields
+        // Core fields — matches schema §1.9
         builder.Property(u => u.UserName).IsRequired().HasMaxLength(50);
         builder.HasIndex(u => u.UserName).IsUnique();
-        builder.Property(u => u.PasswordHash).IsRequired(false).HasMaxLength(256);
+        builder.Property(u => u.PasswordHash).IsRequired().HasMaxLength(256);
         builder.Property(u => u.EmployeeId).IsRequired(false);
 
-        // Status — replaces IsActive-based query filter
-        builder.Property(u => u.Status)
-            .IsRequired()
-            .HasConversion<byte>()
-            .HasDefaultValue(UserStatus.Active)
-            .HasSentinel((UserStatus)0);
-        builder.HasQueryFilter(u => u.Status == UserStatus.Active);
+        // Lock state — bit flag, default unlocked
+        builder.Property(u => u.IsLocked).IsRequired().HasDefaultValue(false);
 
         // Password policy
         builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);
-        builder.Property(u => u.PasswordChangedAt).IsRequired(false);
         builder.Property(u => u.LoginAttempts).IsRequired().HasDefaultValue(0);
         builder.Property(u => u.LastLoginAt).IsRequired(false);
+
+        // Query filter — soft delete via IsActive (from ActivatableEntity)
+        builder.HasQueryFilter(u => u.IsActive);
 
         // FK to Employee (optional)
         builder.HasOne<Employee>()

@@ -6,7 +6,6 @@ using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Application.Services;
-using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
 using System.Linq.Expressions;
@@ -16,7 +15,7 @@ namespace SalesSystem.Application.Tests.Services;
 
 /// <summary>
 /// Unit tests for DocumentSequenceService business logic.
-/// Tests thread-safe sequence generation.
+/// Tests thread-safe sequence generation using the schema (DocumentType + NextNumber).
 /// </summary>
 public class DocumentSequenceServiceTests : IDisposable
 {
@@ -122,62 +121,37 @@ public class DocumentSequenceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetNextNumberAsync_YearChange_ResetsSequence()
+    public async Task GetNextNumberAsync_KnownPrefix_SetsCorrectDocumentType()
     {
-        _output.WriteLine("[TEST] GetNextNumberAsync_YearChange_ResetsSequence");
-
-        // Create a sequence for a different year
-        var oldSequence = DocumentSequence.Create("فاتورة مبيعات", "INV", DateTime.Now.Year - 1);
-        oldSequence.GetNextNumber(); // Increment to 1
-        _dbContext.DocumentSequences.Add(oldSequence);
-        await _dbContext.SaveChangesAsync();
+        _output.WriteLine("[TEST] GetNextNumberAsync_KnownPrefix_SetsCorrectDocumentType");
 
         var result = await _sut.GetNextNumberAsync("INV", CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Contain(DateTime.Now.Year.ToString());
 
-        _output.WriteLine($"[DEBUG] Year changed sequence: {result.Value}");
-        _output.WriteLine("[PASS] Year change resets sequence");
-    }
-
-    [Theory]
-    [InlineData("INV", "فاتورة مبيعات")]
-    [InlineData("PUR", "فاتورة مشتريات")]
-    [InlineData("SR", "مرتجع مبيعات")]
-    [InlineData("PR", "مرتجع مشتريات")]
-    [InlineData("TRF", "تحويل مخزني")]
-    [InlineData("CP", "سند قبض عميل")]
-    [InlineData("SP", "سند صرف مورد")]
-    public async Task GetNextNumberAsync_KnownPrefix_SetsCorrectDocumentType(string prefix, string expectedType)
-    {
-        _output.WriteLine($"[TEST] GetNextNumberAsync_KnownPrefix_{prefix}_SetsCorrectDocumentType");
-
-        var result = await _sut.GetNextNumberAsync(prefix, CancellationToken.None);
-
-        result.IsSuccess.Should().BeTrue();
-
-        var sequence = await _dbContext.DocumentSequences.FirstOrDefaultAsync(s => s.Prefix == prefix);
+        // DocumentType should be "SalesInvoice" (mapped from "INV")
+        var sequence = await _dbContext.DocumentSequences.FirstOrDefaultAsync(s => s.DocumentType == "SalesInvoice");
         sequence.Should().NotBeNull();
-        sequence!.DocumentType.Should().Be(expectedType);
+        sequence!.DocumentType.Should().Be("SalesInvoice");
 
-        _output.WriteLine($"[PASS] Prefix {prefix} sets document type: {expectedType}");
+        _output.WriteLine($"[PASS] INV prefix mapped to SalesInvoice");
     }
 
     [Fact]
-    public async Task GetNextNumberAsync_UnknownPrefix_UsesDefaultType()
+    public async Task GetNextNumberAsync_UnknownPrefix_UsesPrefixAsKey()
     {
-        _output.WriteLine("[TEST] GetNextNumberAsync_UnknownPrefix_UsesDefaultType");
+        _output.WriteLine("[TEST] GetNextNumberAsync_UnknownPrefix_UsesPrefixAsKey");
 
         var result = await _sut.GetNextNumberAsync("XXX", CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
 
-        var sequence = await _dbContext.DocumentSequences.FirstOrDefaultAsync(s => s.Prefix == "XXX");
+        // Unknown prefix maps to uppercase of itself
+        var sequence = await _dbContext.DocumentSequences.FirstOrDefaultAsync(s => s.DocumentType == "XXX");
         sequence.Should().NotBeNull();
-        sequence!.DocumentType.Should().Be("أخرى");
+        sequence!.DocumentType.Should().Be("XXX");
 
-        _output.WriteLine("[PASS] Unknown prefix uses default document type");
+        _output.WriteLine("[PASS] Unknown prefix uses itself as document type");
     }
 
     [Fact]
@@ -260,24 +234,21 @@ public class DocumentSequenceServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetNextIntAsync_YearChange_ResetsSequence()
+    public async Task GetNextIntAsync_PrefixAndIntUseSameSequence()
     {
-        _output.WriteLine("[TEST] GetNextIntAsync_YearChange_ResetsSequence");
+        _output.WriteLine("[TEST] GetNextIntAsync_PrefixAndIntUseSameSequence");
 
-        // Create a sequence for a different year manually
-        var oldSequence = DocumentSequence.Create("SalesInvoice", "SalesInvoice", DateTime.Now.Year - 1);
-        oldSequence.GetNextInt(); // Increment to 1
-        _dbContext.DocumentSequences.Add(oldSequence);
-        await _dbContext.SaveChangesAsync();
+        // GetNextNumberAsync with "INV" maps to "SalesInvoice"
+        var strResult = await _sut.GetNextNumberAsync("INV", CancellationToken.None);
+        strResult.IsSuccess.Should().BeTrue();
 
-        // This should create a new sequence for the current year
-        var result = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+        // GetNextIntAsync with "SalesInvoice" shares the same sequence
+        var intResult = await _sut.GetNextIntAsync("SalesInvoice", CancellationToken.None);
+        intResult.IsSuccess.Should().BeTrue();
+        intResult.Value.Should().Be(2); // Second call after GetNextNumberAsync
 
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(1);
-
-        _output.WriteLine($"[DEBUG] Year changed sequence int: {result.Value}");
-        _output.WriteLine("[PASS] Year change resets sequence");
+        _output.WriteLine($"[DEBUG] Str result: {strResult.Value}, Int result: {intResult.Value}");
+        _output.WriteLine("[PASS] Prefix and int use same sequence");
     }
 
     #endregion

@@ -12,7 +12,7 @@ public class PurchaseInvoice : DocumentEntity
     public int SupplierId { get; private set; }
     public short WarehouseId { get; private set; }
     public short? TaxId { get; private set; }
-    public DateTime InvoiceDate { get; private set; }
+    public DateOnly InvoiceDate { get; private set; }
     public PaymentType PaymentType { get; private set; }
     public decimal SubTotal { get; private set; }
     public decimal DiscountAmount { get; private set; }
@@ -26,6 +26,7 @@ public class PurchaseInvoice : DocumentEntity
     public decimal? ExchangeRate { get; private set; }
     public int? CashBoxId { get; private set; }
     public string? Notes { get; private set; }
+    public string? SupplierInvoiceNo { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
     // Navigation properties
@@ -42,11 +43,12 @@ public class PurchaseInvoice : DocumentEntity
         int supplierId,
         short warehouseId,
         int invoiceNo,
-        DateTime? invoiceDate = null,
+        DateOnly? invoiceDate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
         decimal otherCharges = 0,
         string? notes = null,
+        string? supplierInvoiceNo = null,
         short? taxId = null,
         short currencyId = 1,
         decimal? exchangeRate = null,
@@ -74,10 +76,11 @@ public class PurchaseInvoice : DocumentEntity
             WarehouseId = warehouseId,
             InvoiceNo = invoiceNo,
             TaxId = taxId,
-            InvoiceDate = invoiceDate ?? DateTime.UtcNow,
+            InvoiceDate = invoiceDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
             OtherCharges = otherCharges,
+            SupplierInvoiceNo = supplierInvoiceNo?.Trim(),
             CurrencyId = currencyId,
             ExchangeRate = exchangeRate,
             CashBoxId = cashBoxId,

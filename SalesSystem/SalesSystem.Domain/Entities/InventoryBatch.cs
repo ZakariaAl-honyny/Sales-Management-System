@@ -7,15 +7,17 @@ namespace SalesSystem.Domain.Entities;
 /// Represents a batch/lot of inventory received via a single purchase.
 /// Enables FIFO/FEFO cost allocation.
 /// Maps to "InventoryBatches" table.
-/// Schema: BatchNo (int), SupplierBatchNo (varchar 100 nullable), ExpiryDate (date null),
-/// QuantityReceived (decimal 18,3), QuantityRemaining (decimal 18,3), UnitCost (decimal 18,2).
+/// Schema: nvarchar(50) BatchNo, date ExpiryDate (nullable),
+/// decimal(18,3) QuantityReceived, decimal(18,3) QuantityRemaining, decimal(18,2) UnitCost,
+/// int? PurchaseInvoiceLineId FK (nullable).
+/// AuditableEntity — hard-deleted, no IsActive.
 /// </summary>
 public class InventoryBatch : AuditableEntity
 {
     /// <summary>
-    /// Internal batch number (int).
+    /// Batch/lot number (nvarchar(50)).
     /// </summary>
-    public int BatchNo { get; private set; }
+    public string BatchNo { get; private set; } = string.Empty;
 
     /// <summary>
     /// FK to Product.
@@ -33,14 +35,19 @@ public class InventoryBatch : AuditableEntity
     public int? PurchaseInvoiceId { get; private set; }
 
     /// <summary>
-    /// Supplier's batch/lot reference number. varchar(100).
+    /// FK to the PurchaseInvoiceLine that brought in this stock.
+    /// </summary>
+    public int? PurchaseInvoiceLineId { get; private set; }
+
+    /// <summary>
+    /// Supplier's batch/lot reference number. nvarchar(100).
     /// </summary>
     public string? SupplierBatchNo { get; private set; }
 
     /// <summary>
     /// Expiry date (if applicable). Used for FEFO picking.
     /// </summary>
-    public DateTime? ExpiryDate { get; private set; }
+    public DateOnly? ExpiryDate { get; private set; }
 
     /// <summary>
     /// Quantity originally received. decimal(18,3).
@@ -67,6 +74,7 @@ public class InventoryBatch : AuditableEntity
     public virtual Product? Product { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
+    public virtual PurchaseInvoiceLine? PurchaseInvoiceLine { get; private set; }
 
     private InventoryBatch() { } // EF Core
 
@@ -74,17 +82,18 @@ public class InventoryBatch : AuditableEntity
     /// Creates a new inventory batch record.
     /// </summary>
     public static InventoryBatch Create(
-        int batchNo,
+        string batchNo,
         int productId,
         short warehouseId,
         decimal quantityReceived,
         decimal unitCost,
         int? purchaseInvoiceId = null,
+        int? purchaseInvoiceLineId = null,
         string? supplierBatchNo = null,
-        DateTime? expiryDate = null,
+        DateOnly? expiryDate = null,
         int? createdByUserId = null)
     {
-        if (batchNo <= 0)
+        if (string.IsNullOrWhiteSpace(batchNo))
             throw new DomainException("رقم الدفعة مطلوب.");
         if (productId <= 0)
             throw new DomainException("معرف المنتج مطلوب.");
@@ -97,10 +106,11 @@ public class InventoryBatch : AuditableEntity
 
         var batch = new InventoryBatch
         {
-            BatchNo = batchNo,
+            BatchNo = batchNo.Trim(),
             ProductId = productId,
             WarehouseId = warehouseId,
             PurchaseInvoiceId = purchaseInvoiceId,
+            PurchaseInvoiceLineId = purchaseInvoiceLineId,
             SupplierBatchNo = supplierBatchNo?.Trim(),
             ExpiryDate = expiryDate,
             QuantityReceived = quantityReceived,
@@ -140,7 +150,7 @@ public class InventoryBatch : AuditableEntity
     /// <summary>
     /// Updates the expiry date (for corrections).
     /// </summary>
-    public void UpdateExpiry(DateTime? newExpiryDate)
+    public void UpdateExpiry(DateOnly? newExpiryDate)
     {
         ExpiryDate = newExpiryDate;
         UpdateTimestamp();
@@ -149,9 +159,11 @@ public class InventoryBatch : AuditableEntity
     /// <summary>
     /// Updates the batch number.
     /// </summary>
-    public void UpdateBatchNo(string? newBatchNo)
+    public void UpdateBatchNo(string newBatchNo)
     {
-        BatchNo = int.TryParse(newBatchNo, out var parsed) ? parsed : 0;
+        if (string.IsNullOrWhiteSpace(newBatchNo))
+            throw new DomainException("رقم الدفعة مطلوب.");
+        BatchNo = newBatchNo.Trim();
         UpdateTimestamp();
     }
 }

@@ -433,7 +433,7 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var dto = result.Value;
-                ReturnDate = dto.ReturnDate;
+                ReturnDate = dto.ReturnDate.ToDateTime(TimeOnly.MinValue);
                 Notes = dto.Notes ?? string.Empty;
                 SelectedWarehouseId = dto.WarehouseId;
                 Status = (InvoiceStatus)dto.Status;

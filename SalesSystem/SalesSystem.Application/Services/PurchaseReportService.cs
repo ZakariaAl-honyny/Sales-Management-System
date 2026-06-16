@@ -29,7 +29,7 @@ public class PurchaseReportService : IPurchaseReportService
             _logger.LogInformation("Getting purchases by supplier from {From} to {To}", from, to);
 
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
-                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
+                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= DateOnly.FromDateTime(from) && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 q => q.Include(pi => pi.Supplier).ThenInclude(s => s!.Party),
                 ct);
 
@@ -66,8 +66,8 @@ public class PurchaseReportService : IPurchaseReportService
 
             var invoiceItems = await _uow.PurchaseInvoiceLines.ToListAsync(
                 item => item.PurchaseInvoice!.Status == InvoiceStatus.Posted
-                     && item.PurchaseInvoice!.InvoiceDate >= from
-                     && item.PurchaseInvoice!.InvoiceDate <= to,
+                     && item.PurchaseInvoice!.InvoiceDate >= DateOnly.FromDateTime(from)
+                     && item.PurchaseInvoice!.InvoiceDate <= DateOnly.FromDateTime(to),
                 q => q.Include(item => item.PurchaseInvoice).Include(item => item.Product),
                 ct);
 
@@ -101,10 +101,10 @@ public class PurchaseReportService : IPurchaseReportService
             _logger.LogInformation("Getting purchase trends from {From} to {To} grouped by {GroupBy}", from, to, groupBy);
 
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
-                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= from && pi.InvoiceDate <= to,
+                pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= DateOnly.FromDateTime(from) && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 ct: ct);
 
-            Func<DateTime, string> keySelector = groupBy?.ToLower() switch
+            Func<DateOnly, string> keySelector = groupBy?.ToLower() switch
             {
                 "monthly" or "month" => dt => dt.ToString("yyyy-MM"),
                 "quarterly" or "quarter" => dt => $"{dt.Year}-Q{(dt.Month - 1) / 3 + 1}",

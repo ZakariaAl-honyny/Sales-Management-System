@@ -6,8 +6,9 @@ namespace SalesSystem.Domain.Entities;
 /// <summary>
 /// Single-row table storing company-wide settings (name, contact, logo, default currency).
 /// Id is always 1 — enforced at the database level.
+/// Schema: No CreatedByUserId/UpdatedByUserId/IsActive — only CreatedAt/UpdatedAt for audit.
 /// </summary>
-public class CompanySettings : AuditableEntity
+public class CompanySettings : Entity
 {
     /// <summary>
     /// Schema: tinyint PK (byte).
@@ -48,6 +49,12 @@ public class CompanySettings : AuditableEntity
     /// FK to the Currencies table — the default currency for all financial transactions.
     /// </summary>
     public short DefaultCurrencyId { get; private set; }
+
+    /// <summary>
+    /// Audit timestamps — schema has only CreatedAt/UpdatedAt, no CreatedByUserId/UpdatedByUserId.
+    /// </summary>
+    public DateTime CreatedAt { get; protected set; }
+    public DateTime? UpdatedAt { get; protected set; }
 
     private CompanySettings() { } // EF Core
 
@@ -100,8 +107,8 @@ public class CompanySettings : AuditableEntity
             Address = address?.Trim(),
             TaxNumber = taxNumber?.Trim(),
             LogoPath = logoPath?.Trim(),
+            CreatedAt = DateTime.UtcNow
         };
-        settings.SetCreatedBy(createdByUserId);
         return settings;
     }
 
@@ -151,7 +158,6 @@ public class CompanySettings : AuditableEntity
         Address = address?.Trim();
         TaxNumber = taxNumber?.Trim();
         LogoPath = logoPath?.Trim();
-        SetUpdatedBy(updatedByUserId);
-        UpdateTimestamp();
+        UpdatedAt = DateTime.UtcNow;
     }
 }

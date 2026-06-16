@@ -7,18 +7,23 @@ namespace SalesSystem.Domain.Entities;
 /// <summary>
 /// Represents an inventory adjustment operation that corrects stock levels.
 /// Maps to "InventoryAdjustments" table.
-/// Schema: AdjustmentNo (int unique), WarehouseId (smallint FK),
-/// AdjustmentType (tinyint: 1=Opening,2=Increase,3=Shortage,4=Damage),
-/// AdjustmentDate (date), Notes, Status (tinyint), audit.
+/// Schema: nvarchar(50) AdjustmentNo (unique), tinyint AdjustmentType (Addition=1,Deduction=2,Correction=3),
+/// nvarchar(500) Reason, tinyint Status (Draft=1,Posted=2,Cancelled=3),
+/// int CreatedByUserId, datetime2 CreatedAt, datetime2? PostedAt, datetime2? CancelledAt.
+/// BaseEntity with CreatedAt (like DocumentEntity without UpdatedAt/UpdatedByUserId).
 /// </summary>
-public class InventoryAdjustment : DocumentEntity
+public class InventoryAdjustment : Entity
 {
-    public int AdjustmentNo { get; private set; }
-    public DateTime AdjustmentDate { get; private set; }
+    public string AdjustmentNo { get; private set; } = string.Empty;
     public short WarehouseId { get; private set; }
     public InventoryAdjustmentType AdjustmentType { get; private set; }
-    public InvoiceStatus Status { get; private set; }
-    public string? Notes { get; private set; }
+    public string? Reason { get; private set; }
+    public InventoryCountStatus Status { get; private set; }
+
+    public DateTime CreatedAt { get; private set; }
+    public int CreatedByUserId { get; private set; }
+    public DateTime? PostedAt { get; private set; }
+    public DateTime? CancelledAt { get; private set; }
 
     // Navigation properties
     public virtual Warehouse? Warehouse { get; private set; }
@@ -29,28 +34,27 @@ public class InventoryAdjustment : DocumentEntity
     private InventoryAdjustment() { }
 
     public static InventoryAdjustment Create(
-        int adjustmentNo,
+        string adjustmentNo,
         short warehouseId,
         InventoryAdjustmentType adjustmentType,
-        DateTime? adjustmentDate = null,
-        string? notes = null,
+        string? reason = null,
         int? createdByUserId = null)
     {
-        if (adjustmentNo <= 0)
+        if (string.IsNullOrWhiteSpace(adjustmentNo))
             throw new DomainException("رقم التسوية مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
 
         var adjustment = new InventoryAdjustment
         {
-            AdjustmentNo = adjustmentNo,
+            AdjustmentNo = adjustmentNo.Trim(),
             WarehouseId = warehouseId,
-            AdjustmentDate = adjustmentDate ?? DateTime.UtcNow,
             AdjustmentType = adjustmentType,
-            Notes = notes,
-            Status = InvoiceStatus.Draft
+            Reason = reason,
+            Status = InventoryCountStatus.Draft,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = createdByUserId ?? 0
         };
-        adjustment.SetCreatedBy(createdByUserId);
         return adjustment;
     }
 
@@ -58,29 +62,26 @@ public class InventoryAdjustment : DocumentEntity
     {
         if (line == null)
             throw new DomainException("صنف التسوية مطلوب.");
-        if (Status != InvoiceStatus.Draft)
+        if (Status != InventoryCountStatus.Draft)
             throw new DomainException("لا يمكن إضافة أصناف لتسوية غير مسودة.");
         _lines.Add(line);
-        UpdateTimestamp();
     }
 
     public void Post()
     {
-        if (Status != InvoiceStatus.Draft)
+        if (Status != InventoryCountStatus.Draft)
             throw new DomainException("فقط التسويات المسودة يمكن ترحيلها.");
         if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل تسوية بدون أصناف.");
-        Status = InvoiceStatus.Posted;
+        Status = InventoryCountStatus.Posted;
         PostedAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 
     public void Cancel()
     {
-        if (Status == InvoiceStatus.Cancelled)
+        if (Status == InventoryCountStatus.Cancelled)
             throw new DomainException("التسوية ملغاة بالفعل.");
-        Status = InvoiceStatus.Cancelled;
+        Status = InventoryCountStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 }

@@ -34,32 +34,30 @@ public class WarehouseTransferService : IWarehouseTransferService
             if (transferNo <= 0)
                 return Result<WarehouseTransferDto>.Failure("فشل في توليد رقم التحويل");
 
+            // Validate lines before saving
+            if (request.Lines == null || !request.Lines.Any())
+                return Result<WarehouseTransferDto>.Failure("يجب إضافة صنف واحد على الأقل للتحويل");
+
             var transfer = WarehouseTransfer.Create(
-                transferNo,
-                request.FromWarehouseId,
-                request.ToWarehouseId,
-                request.TransferDate,
+                transferNo.ToString(),
+                request.SourceWarehouseId,
+                request.DestinationWarehouseId,
                 request.Notes,
                 userId);
 
-            if (request.Lines != null)
-            {
-                foreach (var lineReq in request.Lines)
-                {
-                    var line = WarehouseTransferLine.Create(
-                        transfer.Id,
-                        lineReq.ProductId,
-                        lineReq.BatchId ?? 0,
-                        lineReq.Quantity,
-                        lineReq.UnitCost);
-                    transfer.AddLine(line);
-                }
-            }
-
-            if (!transfer.Lines.Any())
-                return Result<WarehouseTransferDto>.Failure("يجب إضافة صنف واحد على الأقل للتحويل");
-
             await _uow.WarehouseTransfers.AddAsync(transfer, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            // Now transfer has an ID — add lines
+            foreach (var lineReq in request.Lines)
+            {
+                var line = WarehouseTransferLine.Create(
+                    transfer.Id,
+                    lineReq.ProductUnitId,
+                    lineReq.Quantity,
+                    lineReq.BatchNo);
+                transfer.AddLine(line);
+            }
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("WarehouseTransfer created (No: {TransferNo}, ID: {Id}) by User {UserId}",
@@ -107,17 +105,17 @@ public class WarehouseTransferService : IWarehouseTransferService
             if (fromWarehouseId.HasValue || toWarehouseId.HasValue)
             {
                 predicate = t =>
-                    (!fromWarehouseId.HasValue || t.FromWarehouseId == fromWarehouseId.Value) &&
-                    (!toWarehouseId.HasValue || t.ToWarehouseId == toWarehouseId.Value);
+                    (!fromWarehouseId.HasValue || t.SourceWarehouseId == fromWarehouseId.Value) &&
+                    (!toWarehouseId.HasValue || t.DestinationWarehouseId == toWarehouseId.Value);
             }
 
             var (items, totalCount) = await _uow.WarehouseTransfers.GetPagedAsync(
                 predicate,
-                orderConfig: q => q.OrderByDescending(t => t.TransferDate).ThenByDescending(t => t.Id),
+                orderConfig: q => q.OrderByDescending(t => t.CreatedAt).ThenByDescending(t => t.Id),
                 page,
                 pageSize,
                 ct,
-                includePaths: new[] { "FromWarehouse", "ToWarehouse", "Lines", "Lines.Product", "Lines.Batch" });
+                includePaths: new[] { "SourceWarehouse", "DestinationWarehouse", "Lines", "Lines.ProductUnit", "Lines.ProductUnit.Product" });
 
             var dtos = items.Select(MapToDto).ToList();
             var result = PagedResult<WarehouseTransferDto>.Create(dtos, totalCount, page, pageSize);
@@ -145,13 +143,14 @@ public class WarehouseTransferService : IWarehouseTransferService
             // Validate stock availability before posting
             foreach (var line in transfer.Lines)
             {
+                var productId = line.ProductUnit?.ProductId ?? 0;
                 var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                    ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
+                    ws => ws.ProductId == productId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
 
                 var availableQty = sourceStock?.Quantity ?? 0;
                 if (availableQty < line.Quantity)
                 {
-                    var productName = line.Product?.Name ?? $"منتج {line.ProductId}";
+                    var productName = line.ProductUnit?.Product?.Name ?? $"منتج {productId}";
                     return Result<WarehouseTransferDto>.Failure(
                         $"الكمية غير كافية للمنتج '{productName}' في المستودع المصدر. " +
                         $"المتاح: {availableQty}, المطلوب: {line.Quantity}");
@@ -166,9 +165,11 @@ public class WarehouseTransferService : IWarehouseTransferService
                 // Execute stock movements
                 foreach (var line in transfer.Lines)
                 {
+                    var productId = line.ProductUnit?.ProductId ?? 0;
+
                     // 1. Deduct from source warehouse
                     var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
+                        ws => ws.ProductId == productId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
 
                     if (sourceStock != null)
                     {
@@ -177,13 +178,13 @@ public class WarehouseTransferService : IWarehouseTransferService
 
                     // 2. Add to destination warehouse
                     var destStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.ToWarehouseId, ct);
+                        ws => ws.ProductId == productId && ws.WarehouseId == transfer.DestinationWarehouseId, ct);
 
                     if (destStock == null)
                     {
                         destStock = WarehouseStock.Create(
-                            transfer.ToWarehouseId,
-                            line.ProductId,
+                            transfer.DestinationWarehouseId,
+                            productId,
                             line.Quantity,
                             userId);
                         await _uow.WarehouseStocks.AddAsync(destStock, ct);
@@ -237,9 +238,11 @@ public class WarehouseTransferService : IWarehouseTransferService
                 {
                     foreach (var line in transfer.Lines)
                     {
+                        var productId = line.ProductUnit?.ProductId ?? 0;
+
                         // 1. Add back to source warehouse
                         var sourceStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.FromWarehouseId, ct);
+                            ws => ws.ProductId == productId && ws.WarehouseId == transfer.SourceWarehouseId, ct);
 
                         if (sourceStock != null)
                         {
@@ -248,7 +251,7 @@ public class WarehouseTransferService : IWarehouseTransferService
 
                         // 2. Deduct from destination warehouse
                         var destStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                            ws => ws.ProductId == line.ProductId && ws.WarehouseId == transfer.ToWarehouseId, ct);
+                            ws => ws.ProductId == productId && ws.WarehouseId == transfer.DestinationWarehouseId, ct);
 
                         if (destStock != null)
                         {
@@ -289,8 +292,8 @@ public class WarehouseTransferService : IWarehouseTransferService
     {
         return await _uow.WarehouseTransfers.FirstOrDefaultAsync(
             t => t.Id == id, ct,
-            "FromWarehouse", "ToWarehouse",
-            "Lines", "Lines.Product", "Lines.Batch");
+            "SourceWarehouse", "DestinationWarehouse",
+            "Lines", "Lines.ProductUnit", "Lines.ProductUnit.Product");
     }
 
     private static WarehouseTransferDto MapToDto(WarehouseTransfer transfer)
@@ -298,22 +301,21 @@ public class WarehouseTransferService : IWarehouseTransferService
         return new WarehouseTransferDto(
             transfer.Id,
             transfer.TransferNo,
-            transfer.FromWarehouseId,
-            transfer.FromWarehouse?.Name,
-            transfer.ToWarehouseId,
-            transfer.ToWarehouse?.Name,
-            transfer.TransferDate,
+            transfer.SourceWarehouseId,
+            transfer.SourceWarehouse?.Name,
+            transfer.DestinationWarehouseId,
+            transfer.DestinationWarehouse?.Name,
             transfer.Notes,
             (byte)transfer.Status,
+            transfer.CreatedAt,
+            transfer.CreatedByUserId,
             transfer.Lines.Select(l => new WarehouseTransferLineDto(
                 l.Id,
-                l.ProductId,
-                l.Product?.Name,
-                l.BatchId,
-                l.Batch?.BatchNo,
+                l.WarehouseTransferId,
+                l.ProductUnitId,
+                l.ProductUnit?.Unit?.Name,
                 l.Quantity,
-                l.UnitCost,
-                l.TotalCost
+                l.BatchNo
             )).ToList()
         );
     }

@@ -401,8 +401,7 @@ public class ProductPriceService : IProductPriceService
         price.Currency?.Name,
         price.Price,
         price.EffectiveFrom,
-        price.EffectiveTo,
-        false);
+        price.EffectiveTo);
 
     private static EffectivePriceDto MapToEffectiveDto(ProductPrice price, string? fallbackDescription = null) => new(
         price.ProductUnitId,

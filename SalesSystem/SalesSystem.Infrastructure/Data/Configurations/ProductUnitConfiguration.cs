@@ -35,5 +35,10 @@ public class ProductUnitConfiguration : IEntityTypeConfiguration<ProductUnit>
             .WithMany()
             .HasForeignKey(x => x.UnitId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // ─── Unique index: one unit per product ──────────────
+        builder.HasIndex(x => new { x.ProductId, x.UnitId })
+            .IsUnique()
+            .HasDatabaseName("IX_ProductUnits_ProductId_UnitId");
     }
 }

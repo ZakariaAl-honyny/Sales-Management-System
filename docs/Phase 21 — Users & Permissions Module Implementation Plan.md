@@ -112,33 +112,39 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 
 | Field | Type | Status | Notes |
 |-------|------|--------|-------|
-| `Id` | `int PK` | ✅ | Inherited from `BaseEntity` |
+| `Id` | `int PK` | ✅ | Inherited from `ActivatableEntity` |
 | `UserName` | `string(50)` | ✅ | Unique index |
 | `PasswordHash` | `string(256)` | ✅ | BCrypt hash of default password "12345678" on create |
-| `FullName` | `string(150)` | ✅ | Display name |
-| `Role` | `UserRole (byte)` | ✅ | 1=Admin, 2=Manager, 3=Cashier |
-| `IsActive` | `bool` | ✅ | Global query filter |
-| `CreatedAt` | `DateTime` | ✅ | Inherited from BaseEntity |
+| `EmployeeId` | `int?` | ✅ | Optional link to employee record (new) |
+| `IsLocked` | `bool` | ✅ | True = account locked after 5 failed attempts |
+| `MustChangePassword` | `bool` | ✅ | Default true — forces password change on first login |
+| `LastLoginAt` | `DateTime?` | ✅ | Updated on each successful login |
+| `LoginAttempts` | `smallint` | ✅ | Schema: smallint — C#: short, default 0 |
+| `IsActive` | `bool` | ✅ | Inherited from `ActivatableEntity` — soft delete support |
 | `CreatedByUserId` | `int?` | ✅ | FK to Users table |
-| `Phone` | `string(20)?` | ❌ Missing | **NEW** |
-| `Email` | `string(100)?` | ❌ Missing | **NEW** |
-| `AvatarPath` | `string(255)?` | ❌ Missing | **NEW** |
-| `LastLoginAt` | `DateTime?` | ❌ Missing | **NEW** |
-| `LoginAttempts` | `int` | ❌ Missing | **NEW** — default 0 |
-| `IsLocked` | `bool` | ❌ Missing | **NEW** — default false |
+| `CreatedAt` | `DateTime` | ✅ | Inherited from ActivatableEntity |
+
+**IMPORTANT**: The User entity does NOT have Phone, Email, AvatarPath, FullName, Role (enum), or UserStatus enum. Profile fields are on the linked Parties/Employees table. Roles are assigned via the many-to-many `UserRole` join entity (not an enum on User).
 
 **Factory methods**:
-- `User.Create(userName, passwordHash, fullName, role, createdByUserId?)` — ✅ Exists
-- `User.Update(fullName, role, updatedByUserId?)` — ✅ Exists
-- `User.ChangePassword(newPasswordHash, updatedByUserId?)` — ✅ Exists
+- `User.Create(userName, employeeId?, createdByUserId?)` — ✅ Passwordless creation, `MustChangePassword = true`
+- `User.CreateWithPassword(userName, passwordHash, employeeId?, createdByUserId?, mustChangePassword?)` — ✅ For seeds/admin
+- `User.Update(employeeId?, updatedByUserId?)` — ✅ Updates profile, NOT role/password
+- `User.ChangePassword(newPasswordHash, updatedByUserId?)` — ✅ Sets hash + resets login attempts
+- `User.ResetPassword(newPasswordHash)` — ✅ Admin reset, sets `MustChangePassword = true`
+- `User.RecordLoginAttempt(bool success)` — ✅ Lockout at 5 failures via `IsLocked`
+- `User.SetInitialPassword(passwordHash)` — ✅ For passwordless flow, guard: `MustChangePassword == true`
 
-**Configuration**: `Infrastructure/Data/Configurations/UserConfiguration.cs` (21 lines) — ✅ Exists with:
+**Configuration**: `Infrastructure/Data/Configurations/UserConfiguration.cs` — ✅ Exists with:
 - `.ToTable("Users")`, `.HasKey(u => u.Id)`
 - `.Property(u => u.UserName).HasMaxLength(50).IsRequired()` + Unique Index
 - `.Property(u => u.PasswordHash).HasMaxLength(256).IsRequired()`
-- `.Property(u => u.FullName).HasMaxLength(150).IsRequired()`
-- `.Property(u => u.Role).HasConversion<byte>()`
+- `.Property(u => u.EmployeeId).IsRequired(false)`
+- `.Property(u => u.LoginAttempts).HasColumnType("smallint")` — matches schema
+- `.Property(u => u.IsLocked).HasDefaultValue(false)`
+- `.Property(u => u.MustChangePassword).HasDefaultValue(true)`
 - `.HasQueryFilter(u => u.IsActive)`
+- `.Ignore(u => u.UserRoles)` — mapped via separate configuration
 
 ### 2.2 Application Layer
 
@@ -157,13 +163,15 @@ The Users & Permissions module is divided into **3 sub-modules** based on the an
 - Serilog: `Log.Information` on login, `Log.Warning` on failed attempt
 
 **UserService features**:
-- `CreateAsync`: checks duplicate username, hashes password (default "12345678" if none provided), saves. If `CreateUserRequest.Password` is null or empty, hashes "12345678" as default. Sets `MustChangePassword = true`.
-- `UpdateAsync`: updates fullName + role + optional password + IsActive
-- `DeleteAsync`: soft delete with guard against deactivating last admin
+- `CreateAsync`: checks duplicate username, hashes "12345678" as default password (BCrypt, work factor 12), creates user via `User.CreateWithPassword(mustChangePassword: true)`, assigns role via `UserRole` join entity. `CreateUserRequest.Password` field is IGNORED — password is always default "12345678" (user must change on first login).
+- `UpdateAsync`: updates employee link, lock state, optional password, role assignment (via UserRole join — full replace). No FullName/IsActive update.
+- `DeleteAsync`: soft delete via `Users.SoftDeleteAsync()` with guard against deactivating last Admin role user.
 - `PermanentDeleteAsync`: **GUARDED** — returns `Result.Failure("لا يمكن حذف المستخدمين بشكل نهائي")` per RULE-244
-- `ResetPasswordAsync`: resets user's password to default "12345678" hash, sets `MustChangePassword = true`. Logs audit event.
+- `ResetPasswordAsync`: hashes "12345678" as new password, calls `user.ResetPassword()` sets `MustChangePassword = true`, logs audit event via `IAuditLogService`.
+- `GetCurrentUserAsync`: loads user + permissions via `IPermissionService.GetUserPermissionsAsync()`, returns `CurrentUserDto` with permission list.
 - All methods return `Result<T>` per RULE-006
 - Uses `IUnitOfWork` per RULE-024
+- Injects `IPermissionService` for permission queries and `IAuditLogService` for audit logging
 
 ### 2.3 API Layer
 
@@ -362,9 +370,36 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 
 > See `docs/database-schema.md` Module 8.1 (AuditLogs table) for the canonical AuditLog entity definition with bigint PK, indexes, and FK to Users.
 
+**Actual implementation** (extends `LongEntity` — bigint PK):
+- `Id` — `long` PK (bigint)
+- `UserId` — `int?` FK to Users (nullable for system actions)
+- `Action` — `string(100)` e.g., "LoginSuccess", "CancelInvoice"
+- `EntityType` — `string(100)?` e.g., "SalesInvoice", "Product"
+- `EntityId` — `int?` (int FK — deviates from schema's `nvarchar(50)` by design; all entity PKs are int)
+- `OldValues` — `string?` JSON of values before change (deviates from schema's single `Details` field)
+- `NewValues` — `string?` JSON of values after change
+- `ChangedColumns` — `string?` comma-separated column names
+- `IpAddress` — `string(50)?`
+- `CreatedAt` — `datetime2` (from LongEntity)
+- **Indexes**: `(UserId, CreatedAt DESC)`, `(EntityType, EntityId)`, `(CreatedAt DESC)`
+
 ### 4.7 UserSession Entity (NEW)
 
-> See `docs/database-schema.md` Module 8.1 (UserSessions table) for the canonical UserSession entity definition with SessionToken, LoginAt, LastActivityAt, ExpiresAt, and IsActive.
+> See `docs/database-schema.md` Module 1.14 (UserSessions table) for the canonical UserSession entity definition.
+
+**Actual implementation** (extends `AuditableEntity` — NOT ActivatableEntity):
+- `Id` — `int PK`
+- `UserId` — `int` FK to Users
+- `SessionToken` — `string(200)` (NOT `TokenHash` — stores the actual token)
+- `DeviceName` — `string(200)?`
+- `IpAddress` — `string(50)?`
+- `UserAgent` — `string(500)?`
+- `LastActivityAt` — `datetime2` (updated via `Touch()`)
+- `ExpiresAt` — `datetime2` (default 8 hours from creation)
+- `IsRevoked` — `bool` (NOT `IsActive` — schema uses `IsRevoked` for explicit revocation)
+- `HasExpired()` — returns `DateTime.UtcNow > ExpiresAt`
+- `IsValid()` — returns `!IsRevoked && !HasExpired()`
+- **Index**: `(UserId, IsRevoked)` — for active session lookup
 
 ### 4.8 DTO Changes (Default Password Flow)
 
@@ -436,33 +471,34 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 |-------|---------|----------|--------|
 | `UserName` | ✅ | ✅ | No change |
 | `PasswordHash` | ✅ (NOT NULL) | ✅ (NOT NULL) | **KEEP** — required, default "12345678" hash on create |
-| `FullName` | ✅ | ✅ | No change |
-| `Role` | ✅ (3 roles) | ✅ (4 roles) | **EXTEND** — add Accountant=2, Observer=4 |
-| `IsActive (bool)` | ✅ | ❌ | **REPLACE** with `Status` enum (Active/Inactive/Locked) |
-| `Status` (UserStatus) | ❌ | ✅ | **ADD** — enum: Active=1, Inactive=2, Locked=3 |
-| `MustChangePassword` | ❌ | ✅ | **ADD** — bool default true (forces password creation on first login) |
-| `PasswordChangedAt` | ❌ | ✅ | **ADD** — nullable datetime2 |
-| `DefaultCashBoxId` | ❌ | ✅ | **ADD** — nullable int FK → CashBox.Id (assigns default cashbox per user) |
-| `Phone` | ❌ | ✅ | ADD — nullable string(20) |
-| `Email` | ❌ | ✅ | ADD — nullable string(100) |
-| `AvatarPath` | ❌ | ✅ | ADD — nullable string(255) |
-| `LastLoginAt` | ❌ | ✅ | ADD — nullable datetime2 |
-| `LoginAttempts` | ❌ | ✅ | ADD — int default 0 |
+| `EmployeeId` | ❌ | ✅ | **ADD** — int null FK → Employees(Id) (link user to employee record) |
+| `IsLocked` | ✅ | ✅ | No change — bool, true after 5 failed login attempts |
+| `MustChangePassword` | ✅ | ✅ | No change — bool default true, forces change on first login |
+| `IsActive (bool)` | ✅ | ✅ | **KEEP** — ActivatableEntity uses IsActive for soft delete, NOT Status enum |
+| `LastLoginAt` | ✅ | ✅ | No change — datetime2 null, updated on successful login |
+| `LoginAttempts` | ✅ (smallint) | ✅ (smallint) | No change — short in C#, smallint in schema |
+| `PasswordChangedAt` | ❌ | ❌ | **NOT NEEDED** — UserSession.LastActivityAt tracks this |
+| `DefaultCashBoxId` | ❌ | ❌ (V2) | **DEFERRED** to V2 — CashBox integration not yet implemented |
+| `Phone` | ❌ | ❌ | **NOT NEEDED** — profile fields are on linked Employee/Party entity |
+| `Email` | ❌ | ❌ | **NOT NEEDED** — profile fields are on linked Employee/Party entity |
+| `AvatarPath` | ❌ | ❌ | **NOT NEEDED** — avatar handling deferred to V2 |
+| `FullName` | ❌ | ❌ | **NOT NEEDED** — name is on linked Employee/Party entity |
+| `Role (UserRole enum)` | ❌ | ❌ | **REPLACED** — roles use DB-driven `Role` entity + `UserRole` join table |
 
 ### 5.2 Auth (Default Password Flow)
 
 | Feature | Current | Required | Action |
 |---------|---------|----------|--------|
-| User creation flow | Requires password | **Default password** | **CHANGE** — `CreateUserRequest.Password` is optional (defaults to "12345678" if null/empty). Admin can set custom password. `MustChangePassword` = true always on create. |
-| First login flow | Normal password check | **Must change password** | **CHANGE** — login with default password succeeds but `LoginResponse.RequiresPasswordChange = true`. Desktop shows mandatory password change screen (cannot close). User calls `ChangePasswordAsync` to set new password → `MustChangePassword = false`. |
-| Password reset (admin) | Admin can set password | **Admin resets to default** | **CHANGE** — admin chooses "إعادة تعيين كلمة المرور" → `PasswordHash` set to hash of "12345678", `MustChangePassword` = true. User must change on next login. No token needed. |
+| User creation flow | Default password | **Default password** | **KEEP** — `UserService.CreateAsync()` always hashes "12345678" (BCrypt, work factor 12). `CreateUserRequest.Password` field exists but is IGNORED by the service — password is always default. `MustChangePassword = true`. |
+| First login flow | Must change password | **Must change password** | **KEEP** — login with default password succeeds but `LoginResponse.RequiresPasswordChange = true`. Desktop shows mandatory password change screen (cannot close). User calls `ChangePasswordAsync` to set new password → `MustChangePassword = false`. |
+| Password reset (admin) | Admin resets to default | **Admin resets to default** | **KEEP** — admin calls `ResetPasswordAsync()` → `PasswordHash` = hash of "12345678", `MustChangePassword = true`. Audit log entry written. |
 | BCrypt work factor 12 | ✅ | ✅ | No change |
 | JWT token generation | ✅ | ✅ | No change |
-| Track login attempts | ❌ | ✅ | ADD — `RecordLoginAttempt()` + lock after 5 fails |
-| Account lockout | ❌ | ✅ | ADD — `Status = UserStatus.Locked`, login returns "الحساب مغلق مؤقتاً" |
-| Auto-unlock | ❌ | ✅ | ADD — deferred to V2 (manual unlock via Admin for now) |
-| Last login display | ❌ | ✅ | ADD — `User.LastLoginAt` on success |
-| Password change endpoint | ❌ | ✅ | ADD — `POST /api/v1/auth/change-password` |
+| Track login attempts | ✅ | ✅ | Already implemented — `User.RecordLoginAttempt()` increments and locks at 5 failures |
+| Account lockout | ✅ | ✅ | Already implemented — `IsLocked = true` after 5 failures, login returns "الحساب مغلق مؤقتاً" |
+| Auto-unlock | ❌ | ❌ | **DEFERRED** to V2 — manual unlock via Admin only for now |
+| Last login display | ✅ | ✅ | Already implemented — `User.LastLoginAt` updated on successful login |
+| Password change endpoint | ✅ | ✅ | Already exists — `POST /api/v1/auth/change-password` |
 | Set password endpoint | ❌ | ❌ | **NOT NEEDED** — default password flow replaces token-based SetPassword |
 | Rate limiting | ✅ | ✅ | Already on login endpoint |
 
@@ -470,50 +506,51 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 
 | Feature | Current | Required | Action |
 |---------|---------|----------|--------|
-| Roles | 3 (Admin/Manager/Cashier) | **4** (Admin/Accountant/Cashier/Observer) | **CHANGE** — add Accountant=2 and Observer=4; Manager=2 renumbered to Accountant=2 |
-| Permission model | 14 flat flags + policies | **30 dot-notation codes** per analysis (lines 3981-4022) | **CHANGE** — use `Domain.Action` codes (e.g. `Sales.View`, `Sales.Create`, `Sales.Post`, `Sales.Cancel`) |
-| CRUD + Post + Cancel | Not separated | **Separate** per operation (analysis lines 4200-4243) | **ADD** — View, Create, EditDraft, Post, Cancel as separate permissions per domain |
-| Permission codes | Simple names | **Dot-notation** (analysis lines 3981-4022) | **CHANGE** — 30 permission codes in Domain.Action format |
-| DB model | Flat flags enum | **DB-backed** (Permission + RolePermission tables) | **CHANGE** — create NEW entities |
-| SQL Server table | ❌ | ✅ | CREATE `Permissions` + `RolePermissions` |
-| Seed data | ❌ | ✅ | ADD 30 permissions + 4-role mappings |
+| Roles | 3 (Admin/Manager/Cashier) + DB Role entity | **4+** (Admin/Manager/Cashier/Observer) | **ADD** Observer role (4). Roles are DB-driven via `Role` entity + `UserRole` join table — NOT a UserRole enum on User. |
+| Permission model | 22 DB-backed permissions with dot-notation codes | **33** per analysis | **EXTEND** — add missing permissions (Sales.ViewProfit, Inventory.Adjust, Backup.Manage, etc.) |
+| CRUD + Post + Cancel | Not fully separated | **Separate** per operation | **EXTEND** — Sales and Purchase domains need separate Create/EditDraft/Post/Cancel permissions |
+| Permission codes | Dot-notation codes | **Dot-notation** | **KEEP** — `Sales.View`, `Purchase.Create`, etc. are correct. Add missing codes. |
+| DB model | Permission + RolePermission entities | **Same** | **KEEP** — already implemented |
+| SQL Server table | Permissions + RolePermissions | ✅ | Already created |
+| Seed data | 22 permissions + 4-role mappings | **33** | **EXTEND** — add 11 more permissions |
 | Admin configuration UI | ❌ | ✅ | CREATE Permission Management screen |
-| API permission check | ✅ (policies) | ✅ | Same + `UserHasPermissionAsync()` |
-| Observer role (reports only) | ❌ | ✅ | ADD — Reports.View only |
+| API permission check | ✅ (policies) | ✅ | Same + `UserHasPermissionAsync()` via `IPermissionService` |
+| Observer role (reports only) | ❌ | ✅ | **ADD** — Reports.View + AuditLog.View + View-only permissions |
 
 ### 5.4 Audit & Logging
 
 | Feature | Current | Required | Action |
 |---------|---------|----------|--------|
 | Serilog file logging | ✅ | ✅ | No change |
-| AuditLog DB table | ❌ | ✅ | CREATE table + service + endpoints |
-| Audit log browser UI | ❌ | ✅ | CREATE ViewModel + View |
-| Login history tracking | ❌ | ✅ | ADD via AuditLog + User.LastLoginAt |
-| User activity per-user | ❌ | ✅ | ADD query endpoint + UI |
+| AuditLog DB table | ✅ (exists) | ✅ | **KEEP** — already implemented with `AuditLog` entity (LongEntity, bigint PK) + `IAuditLogService` |
+| Audit log browser UI | ❌ | ✅ | **CREATE** ViewModel + View in Desktop |
+| Login history tracking | ✅ | ✅ | Already implemented — `AuditLog` entries for login success/failure + `User.LastLoginAt` |
+| User activity per-user | ✅ | ✅ | Already implemented — `IAuditLogService.GetUserHistoryAsync()` |
 
 ### 5.5 Desktop — Missing Screens
 
 | Screen | Current | Required | Action |
 |--------|---------|----------|--------|
-| Enhanced UserEditor (Phone, Email, Avatar) | ❌ | ✅ | UPDATE existing ViewModel + View |
-| Password Change screen | ❌ | ✅ | CREATE new ViewModel + View |
-| Audit Log Browser | ❌ | ✅ | CREATE new ViewModel + View |
-| Permission Management (Admin) | ❌ | ✅ | CREATE new ViewModel + View |
-| Current User indicator with avatar | ❌ | ✅ | UPDATE MainWindow StatusBar |
+| User Editor (current form) | ✅ (exists) | ✅ | **KEEP** — no Phone/Email/Avatar fields needed |
+| Password Change screen | ❌ | ✅ | **CREATE** — new ViewModel + View for first-login forced change |
+| Audit Log Browser | ❌ | ✅ | **CREATE** — new ViewModel + View |
+| Permission Management (Admin) | ❌ | ✅ | **CREATE** — new ViewModel + View |
+| Current User indicator | ✅ (basic text) | ✅ | **KEEP** — StatusBar shows user name + role. Avatar deferred to V2. |
 
 ### 5.6 API — Missing Endpoints
 
 | Endpoint | Current | Required | Action |
 |----------|---------|----------|--------|
-| `POST /api/v1/auth/change-password` | ❌ | ✅ | ADD |
-| `POST /api/v1/users/avatar` | ❌ | ✅ | ADD — avatar upload |
-| `GET /api/v1/users/current` | ❌ | ✅ | ADD — current user profile |
-| `GET /api/v1/audit-logs` | ❌ | ✅ | ADD — paginated, filterable |
-| `GET /api/v1/audit-logs/user/{id}` | ❌ | ✅ | ADD — per-user history |
-| `GET /api/v1/audit-logs/login-history` | ❌ | ✅ | ADD — login history |
-| `GET /api/v1/permissions` | ❌ | ✅ | ADD — list all permissions |
-| `GET /api/v1/permissions/roles` | ❌ | ✅ | ADD — role-permission mappings |
-| `PUT /api/v1/permissions/roles/{role}` | ❌ | ✅ | ADD — update role permissions |
+| `POST /api/v1/auth/change-password` | ✅ (exists) | ✅ | **KEEP** — already implemented |
+| `GET /api/v1/users/current` | ✅ (exists) | ✅ | **KEEP** — already returns `CurrentUserDto` with permissions |
+| `GET /api/v1/audit-logs` | ❌ | ✅ | **CREATE** — paginated, filterable |
+| `GET /api/v1/audit-logs/user/{id}` | ✅ (exists via `IAuditLogService`) | ✅ | **CREATE** API endpoint |
+| `GET /api/v1/audit-logs/login-history` | ❌ | ✅ | **CREATE** — login history |
+| `GET /api/v1/permissions` | ❌ | ✅ | **CREATE** — list all permissions |
+| `GET /api/v1/permissions/roles` | ❌ | ✅ | **CREATE** — role-permission mappings |
+| `PUT /api/v1/permissions/roles/{role}` | ❌ | ✅ | **CREATE** — update role permissions |
+| `POST /api/v1/users/avatar` | ❌ | ❌ | **DEFERRED** to V2 — avatar upload not in schema |
+| `POST /api/v1/users/{id}/reset-password` | ✅ (exists) | ✅ | **KEEP** — already implemented |
 
 ---
 
@@ -521,18 +558,21 @@ Updated query filter: `HasQueryFilter(u => u.IsActive && (byte)u.Status == (byte
 
 ### 6.1 Permission Model: DB-Backed with Dot-Notation Codes
 
-The current `[Flags] Permission` enum in DesktopPWF will be migrated to **DB-backed permissions** with 30 exact dot-notation codes from Analysis Part 5 lines 3981-4022.
+The old `[Flags] Permission` enum in DesktopPWF has been **replaced** by **DB-backed permissions** via the `Permission` entity + `RolePermission` join table.
 
-**Decision**: 
-- **Permission codes** use `Domain.Action` format: `Sales.View`, `Sales.Create`, `Sales.EditDraft`, `Sales.Post`, `Sales.Cancel`, etc.
-- **CRUD + Post + Cancel** model per analysis (lines 4200-4243): View, Create, EditDraft, Post, Cancel as separate permissions for Sales and Purchase domains
-- **4 roles** per analysis (lines 3721-3737): Admin (1), Accountant (2), Cashier (3), Observer (4)
-- `SessionService` will:
-  1. On login, load `List<string> UserPermissions` from API via `GetUserPermissionsAsync(role)`
-  2. Cache in-memory as `HashSet<string>`
-  3. `HasPermission("Sales.View")` = `_permissionNames.Contains("Sales.View")`
-  4. The old flat `Permission` enum is **replaced** by DB-backed permission names
-- **Observer role** gets only `View` + `Reports.View` + `AuditLog.View` permissions (reports-only access)
+**Current state**:
+- **Permission codes** use `Domain.Action` format: `Sales.View`, `Purchase.Create`, etc.
+- **22 permissions currently seeded** across Sales, Purchases, Inventory, Customers, Suppliers, Products, Reports, Accounting, System, Operations, and Audit categories
+- **4-role model** — Admin (1), Manager (2), Cashier (3), Observer (4) via `Role` entity with `Id = 1..4`
+- `SessionService` loads `List<string> UserPermissions` from API on login via `IPermissionService.GetUserPermissionsAsync(userId)`, cached as `HashSet<string>`
+- `HasPermission("Sales.View")` = `_permissionNames.Contains("Sales.View")`
+- **Observer role** gets only View permissions + `Reports.View` + `AuditLog.View`
+
+**Future work**:
+- **EXTEND** from 22 to 33 permissions covering all operations from the analysis matrix
+- **ADD** CRUD + Post + Cancel separation for Sales and Purchase domains
+- **CREATE** Permission Management screen (Admin grid with Roles × Permissions checkboxes)
+- **API endpoints**: `GET /api/v1/permissions`, `GET /api/v1/permissions/roles`, `PUT /api/v1/permissions/roles/{role}`
 
 ### 6.2 Audit Log Storage: Database (V1)
 
@@ -545,24 +585,18 @@ The current `[Flags] Permission` enum in DesktopPWF will be migrated to **DB-bac
 
 ### 6.3 Avatar Storage: File System + API
 
-**Decision**:
-- Avatar images stored in `wwwroot/uploads/avatars/` directory
-- Filename: `avatar_{userId}_{timestamp}.{ext}`
-- Size limit: 2 MB, allowed formats: JPG, PNG, GIF
-- API serves via `GET /api/v1/users/{id}/avatar`
-- Server resizes to 128×128 max on upload
-- Desktop shows avatar in StatusBar (small 32×32) and UserEditor (128×128)
+**Decision**: **DEFERRED to V2**. The Users table has no `AvatarPath` column in the schema. Profile fields (name, phone, email) live on the linked `Employees`/`Parties` entity, not on `User`. Avatar upload and display will be implemented when the Employee module is fully integrated with User.
 
 ### 6.4 Password Policy (Default Password Flow)
 
-- **Default password**: Admin creates user with password "12345678" (BCrypt hashed immediately). Admin can set a custom password during creation if desired. `MustChangePassword` = true always.
+- **Default password**: UserService hashes "12345678" (BCrypt, work factor 12) for every new user. `MustChangePassword = true`.
 - **First login**: User logs in with "12345678" → password verified via BCrypt → login succeeds but `LoginResponse.RequiresPasswordChange = true`. Desktop displays **mandatory** password change screen (cannot be dismissed/escaped). User enters CurrentPassword + NewPassword (min 8 chars) + ConfirmPassword → calls `POST /api/v1/auth/change-password` → `MustChangePassword = false`, user proceeds to main screen.
 - **Minimum length**: 8 characters (validated by FluentValidation)
 - **BCrypt work factor**: 12 (RULE-039 — already implemented)
 - **No password expiry** in V1 (deferred to future phase)
-- **Account lockout**: 5 failed attempts → `Status = UserStatus.Locked`, login returns "الحساب مغلق مؤقتاً"
-- **Admin unlock**: Admin sets `Status = UserStatus.Active`, `LoginAttempts = 0` via UserEditor
-- **Password reset (Admin)**: Admin clicks "إعادة تعيين كلمة المرور" → `PasswordHash` = hash of "12345678", `MustChangePassword` = true, `Status` unchanged. User must change password on next login. No token needed.
+- **Account lockout**: 5 failed attempts → `IsLocked = true`, login returns "الحساب مغلق مؤقتاً"
+- **Admin unlock**: Admin sets `IsLocked = false`, `LoginAttempts = 0` via UserEditor
+- **Password reset (Admin)**: Admin clicks "إعادة تعيين كلمة المرور" → `UserService.ResetPasswordAsync()` hashes "12345678", sets `MustChangePassword = true`, `IsLocked` unchanged, `LoginAttempts = 0`. Audit log entry. User must change on next login.
 
 ### 6.5 Session Timeout
 

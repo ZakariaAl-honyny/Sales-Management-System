@@ -166,14 +166,13 @@ public class LoginWindowViewModelTests
         tcs.SetResult(new LoginResult
         {
             IsSuccess = true,
-            Response = new LoginResponse(
-                UserId: 1,
-                UserName: "admin",
-                FullName: "Admin",
-                Role: (byte)1,
-                Token: "token",
-                ExpiresAt: DateTime.UtcNow.AddHours(8))
-        });
+                Response = new LoginResponse(
+                    UserId: 1,
+                    UserName: "admin",
+                    Role: (byte)1,
+                    Token: "token",
+                    ExpiresAt: DateTime.UtcNow.AddHours(8))
+            });
 
         await tcs.Task;
     }
@@ -217,7 +216,6 @@ public class LoginWindowViewModelTests
         var loginResponse = new LoginResponse(
             UserId: 1,
             UserName: "admin",
-            FullName: "Admin User",
             Role: (byte)1,
             Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));
@@ -287,7 +285,6 @@ public class LoginWindowViewModelTests
             Response = new LoginResponse(
                 UserId: 1,
                 UserName: "admin",
-                FullName: "Admin",
                 Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
@@ -329,7 +326,6 @@ public class LoginWindowViewModelTests
             Response = new LoginResponse(
                 UserId: 1,
                 UserName: "admin",
-                FullName: "Admin",
                 Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))
@@ -379,7 +375,6 @@ public class LoginWindowViewModelTests
         var loginResponse = new LoginResponse(
             UserId: 1,
             UserName: "user1",
-            FullName: "User One",
             Role: (byte)3,
             Token: "change-password-token",
             ExpiresAt: DateTime.UtcNow.AddHours(8),
@@ -496,7 +491,6 @@ public class LoginWindowViewModelTests
             Response = new LoginResponse(
                 UserId: 1,
                 UserName: "admin",
-                FullName: "Admin",
                 Role: (byte)1,
                 Token: "token",
                 ExpiresAt: DateTime.UtcNow.AddHours(8))

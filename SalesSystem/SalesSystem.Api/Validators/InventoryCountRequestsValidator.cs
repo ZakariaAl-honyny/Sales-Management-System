@@ -10,12 +10,9 @@ public class CreateInventoryCountRequestValidator : AbstractValidator<CreateInve
         RuleFor(x => x.WarehouseId)
             .GreaterThan((short)0).WithMessage("معرف المستودع مطلوب");
 
-        RuleFor(x => x.CountDate)
-            .NotEmpty().WithMessage("تاريخ الجرد مطلوب");
-
         RuleFor(x => x.Notes)
-            .MaximumLength(500).When(x => x.Notes != null)
-            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
+            .MaximumLength(300).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 300 حرف");
     }
 }
 
@@ -24,8 +21,8 @@ public class UpdateInventoryCountRequestValidator : AbstractValidator<UpdateInve
     public UpdateInventoryCountRequestValidator()
     {
         RuleFor(x => x.Notes)
-            .MaximumLength(500).When(x => x.Notes != null)
-            .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
+            .MaximumLength(300).When(x => x.Notes != null)
+            .WithMessage("الملاحظات لا يمكن أن تتجاوز 300 حرف");
     }
 }
 
@@ -36,11 +33,11 @@ public class AddInventoryCountLineRequestValidator : AbstractValidator<AddInvent
         RuleFor(x => x.InventoryCountId)
             .GreaterThan(0).WithMessage("معرف جرد المخزون مطلوب");
 
-        RuleFor(x => x.ProductId)
-            .GreaterThan(0).WithMessage("معرف المنتج مطلوب");
+        RuleFor(x => x.ProductUnitId)
+            .GreaterThan(0).WithMessage("معرف وحدة المنتج مطلوب");
 
-        RuleFor(x => x.SystemQuantity)
-            .GreaterThanOrEqualTo(0).WithMessage("الكمية النظامية لا يمكن أن تكون سالبة");
+        RuleFor(x => x.ExpectedQuantity)
+            .GreaterThanOrEqualTo(0).WithMessage("الكمية المتوقعة لا يمكن أن تكون سالبة");
 
         RuleFor(x => x.ActualQuantity)
             .GreaterThanOrEqualTo(0).WithMessage("الكمية الفعلية لا يمكن أن تكون سالبة");

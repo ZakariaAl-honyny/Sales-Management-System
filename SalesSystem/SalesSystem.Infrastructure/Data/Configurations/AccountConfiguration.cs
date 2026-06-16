@@ -8,7 +8,10 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
 {
     public void Configure(EntityTypeBuilder<Account> builder)
     {
-        builder.ToTable("Accounts");
+        builder.ToTable("Accounts", t =>
+        {
+            t.HasCheckConstraint("CHK_Account_Level_Range", "[Level] >= 1 AND [Level] <= 10");
+        });
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.AccountCode)
@@ -29,6 +32,12 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasColumnType("tinyint")
             .IsRequired();
 
+        // Level: tinyint with CHECK constraint (1-10)
+        builder.Property(x => x.Level)
+            .HasColumnType("tinyint")
+            .IsRequired()
+            .HasDefaultValue((byte)1);
+
         builder.Property(x => x.IsLeaf)
             .HasDefaultValue(true);
 
@@ -37,6 +46,19 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
 
         builder.Property(x => x.CategoryId)
             .HasColumnType("smallint");
+
+        builder.Property(x => x.Description)
+            .HasMaxLength(500);
+
+        builder.Property(x => x.ColorCode)
+            .HasMaxLength(7);
+
+        builder.Property(x => x.OpeningBalance)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0m);
+
+        builder.Property(x => x.Notes)
+            .HasMaxLength(300);
 
         builder.Property(x => x.IsActive)
             .HasDefaultValue(true);

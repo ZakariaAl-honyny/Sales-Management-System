@@ -70,11 +70,9 @@ public class InventoryCountService : IInventoryCountService
             var countNoResult = await _sequenceService.GetNextIntAsync("InventoryCount", ct);
             if (!countNoResult.IsSuccess)
                 return Result<InventoryCountDto>.Failure("فشل في توليد رقم الجرد");
-            var countNo = countNoResult.Value;
+            var countNo = countNoResult.Value.ToString("D6");
 
-            var count = InventoryCount.Create(countNo, request.WarehouseId, request.CountDate, userId);
-            if (!string.IsNullOrWhiteSpace(request.Notes))
-                count.SetNotes(request.Notes);
+            var count = InventoryCount.Create(countNo, request.WarehouseId, request.Notes, userId);
 
             await _uow.InventoryCounts.AddAsync(count, ct);
             await _uow.SaveChangesAsync(ct);
@@ -102,23 +100,18 @@ public class InventoryCountService : IInventoryCountService
             if (count == null)
                 return Result<InventoryCountDto>.Failure("الجرد غير موجود", ErrorCodes.NotFound);
 
-            // Find a batch for this product to link the count line
-            var batch = await _uow.InventoryBatches.FirstOrDefaultAsync(
-                b => b.ProductId == request.ProductId, ct);
-            if (batch == null)
-                return Result<InventoryCountDto>.Failure("لا توجد دفعة للمنتج المحدد.");
-
             var line = InventoryCountLine.Create(
                 countId,
-                request.ProductId,
-                batch.Id,
-                request.SystemQuantity,
-                request.ActualQuantity);
+                request.ProductUnitId,
+                request.ExpectedQuantity,
+                request.ActualQuantity,
+                request.Notes);
 
             count.AddLine(line);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Line added to inventory count {CountId}: Product {ProductId}, Diff {Difference}", countId, request.ProductId, line.DifferenceQuantity);
+            _logger.LogInformation("Line added to inventory count {CountId}: ProductUnit {ProductUnitId}, Diff {Difference}",
+                countId, request.ProductUnitId, line.Difference);
             return Result<InventoryCountDto>.Success(MapToDto(count));
         }
         catch (DomainException ex)
@@ -137,55 +130,60 @@ public class InventoryCountService : IInventoryCountService
     {
         try
         {
-            // Load with Lines included for domain validation (Post checks _lines.Any())
+            // Load with Lines included for domain validation
             var count = await _uow.InventoryCounts.FirstOrDefaultAsync(
                 c => c.Id == id, ct, "Lines");
             if (count == null)
                 return Result.Failure("الجرد غير موجود", ErrorCodes.NotFound);
 
-            // Domain validation + status transition
             count.Post();
 
             // Identify lines with non-zero differences (surplus or shortage)
-            var linesNeedingAdjustment = count.Lines.Where(l => l.DifferenceQuantity != 0).ToList();
+            var linesNeedingAdjustment = count.Lines.Where(l => l.Difference != 0).ToList();
             if (linesNeedingAdjustment.Any())
             {
                 // Generate an adjustment document number
                 var adjustmentNoResult = await _sequenceService.GetNextIntAsync("InventoryCountAdjustment", ct);
                 if (!adjustmentNoResult.IsSuccess)
                     return Result.Failure("فشل في توليد رقم تسوية الجرد");
-                var adjustmentNo = adjustmentNoResult.Value;
+                var adjustmentNo = adjustmentNoResult.Value.ToString("D6");
 
                 // Create the InventoryAdjustment document to record the count results
                 var adjustment = InventoryAdjustment.Create(
                     adjustmentNo: adjustmentNo,
-                    warehouseId: (short)count.WarehouseId,
-                    adjustmentType: InventoryAdjustmentType.Increase,
-                    adjustmentDate: count.CountDate,
-                    notes: $"تسوية جرد رقم {count.CountNo}",
+                    warehouseId: count.WarehouseId,
+                    adjustmentType: InventoryAdjustmentType.Correction,
+                    reason: $"تسوية جرد رقم {count.CountNo}",
                     createdByUserId: userId);
 
                 foreach (var line in linesNeedingAdjustment)
                 {
-                    // Create adjustment line (quantity must be positive — direction is handled by the stock service)
+                    var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                    if (productUnit == null)
+                    {
+                        _logger.LogWarning("ProductUnit {ProductUnitId} not found for count line", line.ProductUnitId);
+                        continue;
+                    }
+
+                    // Create adjustment line with expected/actual quantities
                     var adjLine = InventoryAdjustmentLine.Create(
                         inventoryAdjustmentId: adjustment.Id,
-                        productId: line.ProductId,
-                        quantity: Math.Abs(line.DifferenceQuantity),
-                        unitCost: 0m,
-                        batchId: line.BatchId);
+                        productUnitId: line.ProductUnitId,
+                        expectedQuantity: line.ExpectedQuantity,
+                        actualQuantity: line.ActualQuantity,
+                        unitCost: 0m);
                     adjustment.AddLine(adjLine);
 
                     // Update stock: positive difference = surplus (increase), negative = shortage (decrease)
-                    if (line.DifferenceQuantity > 0)
+                    if (line.Difference > 0)
                     {
                         await _inventoryService.IncreaseStockAsync(
-                            line.ProductId, (int)count.WarehouseId, line.DifferenceQuantity, null, userId, ct);
+                            productUnit.ProductId, count.WarehouseId, line.Difference, null, userId, ct);
                     }
                     else
                     {
                         await _inventoryService.DecreaseStockAsync(
-                            line.ProductId, (int)count.WarehouseId, Math.Abs(line.DifferenceQuantity), null, userId, ct);
+                            productUnit.ProductId, count.WarehouseId, Math.Abs(line.Difference), null, userId, ct);
                     }
                 }
 
@@ -252,21 +250,22 @@ public class InventoryCountService : IInventoryCountService
         return new InventoryCountDto(
             count.Id,
             count.CountNo,
-            count.CountDate,
             count.WarehouseId,
             null, // WarehouseName — not loaded
             (byte)count.Status,
             GetStatusName(count.Status),
             count.Notes,
-            count.PostedAt,
+            count.CreatedAt,
+            count.CreatedByUserId,
             lines?.Select(l => new InventoryCountLineDto(
                 l.Id,
                 l.InventoryCountId,
-                l.ProductId,
-                null, // ProductName — not loaded
-                l.SystemQuantity,
+                l.ProductUnitId,
+                null, // ProductUnitName — not loaded
+                l.ExpectedQuantity,
                 l.ActualQuantity,
-                l.DifferenceQuantity
+                l.Difference,
+                l.Notes
             )).ToList()
         );
     }

@@ -5,25 +5,43 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// A single line within an inventory transaction.
-/// Stores product, unit, quantity, unit cost, and total cost.
-/// Optionally links to a specific batch for FIFO/FEFO tracking.
+/// Stores ProductUnitId, Quantity, UnitCost, and optional batch info.
 /// Maps to "InventoryTransactionLines" table.
+/// Schema: int PK, int InventoryTransactionId FK, int ProductUnitId FK,
+/// decimal(18,3) Quantity, decimal(18,2) UnitCost,
+/// nvarchar(50) BatchNo (nullable), date ExpiryDate (nullable), smallint WarehouseId (nullable).
+/// Entity (no audit).
 /// </summary>
 public class InventoryTransactionLine : Entity
 {
     public int InventoryTransactionId { get; private set; }
-    public int ProductId { get; private set; }
+
+    /// <summary>
+    /// FK to ProductUnit — identifies the product and unit.
+    /// </summary>
     public int ProductUnitId { get; private set; }
-    public int? BatchId { get; private set; }
+
     public decimal Quantity { get; private set; }
     public decimal UnitCost { get; private set; }
-    public decimal TotalCost { get; private set; }
+
+    /// <summary>
+    /// Optional batch number for FIFO/FEFO tracking.
+    /// </summary>
+    public string? BatchNo { get; private set; }
+
+    /// <summary>
+    /// Optional expiry date for batch tracking.
+    /// </summary>
+    public DateOnly? ExpiryDate { get; private set; }
+
+    /// <summary>
+    /// Optional warehouse override (if different from parent transaction).
+    /// </summary>
+    public short? WarehouseId { get; private set; }
 
     // Navigation properties
     public virtual InventoryTransaction? InventoryTransaction { get; private set; }
-    public virtual Product? Product { get; private set; }
     public virtual ProductUnit? ProductUnit { get; private set; }
-    public virtual InventoryBatch? Batch { get; private set; }
 
     private InventoryTransactionLine() { } // EF Core
 
@@ -32,16 +50,15 @@ public class InventoryTransactionLine : Entity
     /// </summary>
     public static InventoryTransactionLine Create(
         int inventoryTransactionId,
-        int productId,
         int productUnitId,
         decimal quantity,
         decimal unitCost,
-        int? batchId = null)
+        string? batchNo = null,
+        DateOnly? expiryDate = null,
+        short? warehouseId = null)
     {
         if (inventoryTransactionId <= 0)
             throw new DomainException("رقم المعاملة مطلوب.");
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب.");
         if (productUnitId <= 0)
             throw new DomainException("الوحدة مطلوبة.");
         if (quantity <= 0)
@@ -52,12 +69,12 @@ public class InventoryTransactionLine : Entity
         return new InventoryTransactionLine
         {
             InventoryTransactionId = inventoryTransactionId,
-            ProductId = productId,
             ProductUnitId = productUnitId,
             Quantity = quantity,
             UnitCost = unitCost,
-            TotalCost = quantity * unitCost,
-            BatchId = batchId
+            BatchNo = batchNo?.Trim(),
+            ExpiryDate = expiryDate,
+            WarehouseId = warehouseId
         };
     }
 }

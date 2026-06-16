@@ -148,8 +148,8 @@ public class UserSessionListViewModel : AdminOnlyViewModel
             await InvokeOnUIThreadAsync(() =>
             {
                 Users.Clear();
-                Users.Add(new UserDto(0, "", "الكل", 0, 1, false, null, null, null, null, null, 0, null));
-                foreach (var user in result.Value.OrderBy(u => u.FullName))
+                Users.Add(new UserDto(0, "الكل", 0, false, false, null, null, 0, null));
+                foreach (var user in result.Value.OrderBy(u => u.UserName))
                 {
                     Users.Add(user);
                 }

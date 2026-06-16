@@ -57,7 +57,7 @@ public class CurrencyEditorViewModel : ViewModelBase
         _currencyDto = currency;
         Name = currency.Name;
         Code = currency.Code;
-        Symbol = currency.Symbol;
+        Symbol = currency.Symbol ?? string.Empty;
         FractionName = currency.FractionName;
         DecimalPlaces = currency.DecimalPlaces;
         WindowTitle = $"تعديل العملة: {currency.Name} ({currency.Code})";
@@ -181,12 +181,12 @@ public class CurrencyEditorViewModel : ViewModelBase
         Result<CurrencyDto> result;
         if (_currencyDto == null)
         {
-            var request = new CreateCurrencyRequest(Name, Code, Symbol, IsBaseCurrency: false, FractionName, DecimalPlaces);
+            var request = new CreateCurrencyRequest(Name, Code, Symbol, IsBaseCurrency: false, FractionName ?? string.Empty, (byte)DecimalPlaces);
             result = await _currencyService.CreateAsync(request);
         }
         else
         {
-            var request = new UpdateCurrencyRequest(Name, Symbol, FractionName, DecimalPlaces);
+            var request = new UpdateCurrencyRequest(Name, Symbol, FractionName ?? string.Empty, (byte)DecimalPlaces);
             result = await _currencyService.UpdateAsync(_currencyDto.Id, request);
         }
 

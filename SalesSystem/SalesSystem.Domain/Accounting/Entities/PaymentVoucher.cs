@@ -1,6 +1,6 @@
+using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Accounting.Entities;
@@ -9,6 +9,9 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// Represents a payment voucher (سند صرف) — a record of cash disbursement from a cash box.
 /// Payments can go to suppliers, expenses, or other cash outflows.
 /// Inherits from <see cref="DocumentEntity"/> with Draft→Posted→Cancelled lifecycle.
+/// Schema: §4.8 PaymentVouchers — VoucherNo (int, unique), VoucherDate (date),
+/// CurrencyId (smallint, FK), CashBoxId (int, FK), AccountId (int, FK),
+/// TotalAmount (decimal(18,2)), Status (tinyint, VoucherStatus).
 /// </summary>
 public class PaymentVoucher : DocumentEntity
 {
@@ -51,9 +54,9 @@ public class PaymentVoucher : DocumentEntity
     public string? Notes { get; private set; }
 
     /// <summary>
-    /// Document status: 1=Draft, 2=Posted, 3=Cancelled.
+    /// Document status: Draft=1, Posted=2, Cancelled=3.
     /// </summary>
-    public byte Status { get; private set; }
+    public VoucherStatus Status { get; private set; }
 
     private readonly List<JournalEntry> _journalEntries = new();
     public IReadOnlyList<JournalEntry> JournalEntries => _journalEntries.AsReadOnly();
@@ -94,7 +97,7 @@ public class PaymentVoucher : DocumentEntity
             AccountId = accountId,
             TotalAmount = totalAmount,
             Notes = notes?.Trim(),
-            Status = (byte)InvoiceStatus.Draft,
+            Status = VoucherStatus.Draft,
             CreatedAt = DateTime.UtcNow,
         };
         voucher.SetCreatedBy(createdByUserId);
@@ -106,10 +109,10 @@ public class PaymentVoucher : DocumentEntity
     /// </summary>
     public void Post(int? postedByUserId = null)
     {
-        if (Status != (byte)InvoiceStatus.Draft)
+        if (Status != VoucherStatus.Draft)
             throw new DomainException("لا يمكن ترحيل سند الصرف إلا في حالة المسودة");
 
-        Status = (byte)InvoiceStatus.Posted;
+        Status = VoucherStatus.Posted;
         PostedAt = DateTime.UtcNow;
         SetUpdatedBy(postedByUserId);
         UpdateTimestamp();
@@ -121,10 +124,10 @@ public class PaymentVoucher : DocumentEntity
     /// </summary>
     public void Cancel(int? cancelledByUserId = null)
     {
-        if (Status == (byte)InvoiceStatus.Cancelled)
+        if (Status == VoucherStatus.Cancelled)
             throw new DomainException("سند الصرف ملغي بالفعل");
 
-        Status = (byte)InvoiceStatus.Cancelled;
+        Status = VoucherStatus.Cancelled;
         CancelledAt = DateTime.UtcNow;
         SetUpdatedBy(cancelledByUserId);
         UpdateTimestamp();
@@ -139,7 +142,7 @@ public class PaymentVoucher : DocumentEntity
         string? notes = null,
         int? updatedByUserId = null)
     {
-        if (Status != (byte)InvoiceStatus.Draft)
+        if (Status != VoucherStatus.Draft)
             throw new DomainException("لا يمكن تعديل سند الصرف إلا في حالة المسودة");
 
         if (voucherDate.HasValue)
@@ -157,7 +160,7 @@ public class PaymentVoucher : DocumentEntity
     /// </summary>
     public void UpdateTotalAmount(decimal totalAmount)
     {
-        if (Status != (byte)InvoiceStatus.Draft)
+        if (Status != VoucherStatus.Draft)
             throw new DomainException("لا يمكن تعديل مبلغ سند الصرف إلا في حالة المسودة");
 
         if (totalAmount <= 0)

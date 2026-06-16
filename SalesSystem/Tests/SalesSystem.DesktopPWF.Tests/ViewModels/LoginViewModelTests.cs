@@ -370,7 +370,6 @@ public class LoginViewModelTests
         return new LoginResponse(
             UserId: 1,
             UserName: "admin",
-            FullName: "المدير العام",
             Role: (byte)1,
             Token: "test-token-123",
             ExpiresAt: DateTime.UtcNow.AddHours(8));

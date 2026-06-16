@@ -11,6 +11,14 @@ public class SystemAccountMappingConfiguration : IEntityTypeConfiguration<System
         builder.ToTable("SystemAccountMappings");
         builder.HasKey(x => x.Id);
 
+        // Mapping key stored as nvarchar(100) — unique across all branches
+        builder.Property(x => x.MappingKey)
+            .IsRequired()
+            .HasMaxLength(100);
+        builder.HasIndex(x => x.MappingKey)
+            .IsUnique()
+            .HasFilter("[MappingKey] IS NOT NULL");
+
         // FK to Account (required)
         builder.Property(x => x.AccountId).IsRequired();
         builder.HasOne(x => x.Account)
@@ -18,15 +26,9 @@ public class SystemAccountMappingConfiguration : IEntityTypeConfiguration<System
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Mapping key stored as tinyint
-        builder.Property(x => x.MappingKey)
-            .HasConversion<byte>()
-            .IsRequired();
-
-        // Composite unique index: one mapping per (Key, BranchId)
-        builder.HasIndex(x => new { x.MappingKey, x.BranchId })
-            .IsUnique();
-
-        builder.Property(x => x.BranchId).IsRequired(false);
+        // BranchId (smallint, nullable) — branch-specific override
+        builder.Property(x => x.BranchId)
+            .IsRequired(false)
+            .HasColumnType("smallint");
     }
 }

@@ -193,8 +193,8 @@ public class WarehouseTransfersListViewModel : ViewModelBase
         if (obj is not WarehouseTransferDto transfer) return false;
 
         // Date filter
-        if (DateFrom.HasValue && transfer.TransferDate < DateFrom.Value) return false;
-        if (DateTo.HasValue && transfer.TransferDate > DateTo.Value.AddDays(1)) return false;
+        if (DateFrom.HasValue && transfer.CreatedAt < DateFrom.Value) return false;
+        if (DateTo.HasValue && transfer.CreatedAt > DateTo.Value.AddDays(1)) return false;
 
         // Status filter
         if (StatusFilter.HasValue && transfer.Status != StatusFilter.Value) return false;
@@ -204,8 +204,8 @@ public class WarehouseTransfersListViewModel : ViewModelBase
         {
             var searchLower = SearchText.Trim().ToLower();
             return transfer.TransferNo.ToString().Contains(searchLower) ||
-                   (transfer.FromWarehouseName?.ToLower().Contains(searchLower) ?? false) ||
-                   (transfer.ToWarehouseName?.ToLower().Contains(searchLower) ?? false);
+                   (transfer.SourceWarehouseName?.ToLower().Contains(searchLower) ?? false) ||
+                   (transfer.DestinationWarehouseName?.ToLower().Contains(searchLower) ?? false);
         }
 
         return true;

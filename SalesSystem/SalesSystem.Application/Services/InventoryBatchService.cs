@@ -84,13 +84,14 @@ public class InventoryBatchService : IInventoryBatchService
                 return Result<InventoryBatchDto>.Failure(seqResult.Error ?? "فشل في توليد رقم الدفعة.");
 
             var batch = InventoryBatch.Create(
-                batchNo: seqResult.Value,
+                batchNo: seqResult.Value.ToString("D6"),
                 productId: request.ProductId,
                 warehouseId: request.WarehouseId,
-                quantityReceived: request.Quantity,
+                quantityReceived: request.QuantityReceived,
                 unitCost: request.UnitCost,
                 purchaseInvoiceId: request.PurchaseInvoiceId,
-                supplierBatchNo: request.BatchNo,
+                purchaseInvoiceLineId: request.PurchaseInvoiceLineId,
+                supplierBatchNo: request.SupplierBatchNo,
                 expiryDate: request.ExpiryDate,
                 createdByUserId: userId);
 
@@ -99,7 +100,7 @@ public class InventoryBatchService : IInventoryBatchService
 
             _logger.LogInformation(
                 "Inventory batch created: Product={ProductId}, Warehouse={WarehouseId}, Qty={Quantity}, BatchNo={BatchNo} by User {UserId}",
-                request.ProductId, request.WarehouseId, request.Quantity, request.BatchNo, userId);
+                request.ProductId, request.WarehouseId, request.QuantityReceived, request.BatchNo, userId);
 
             return await GetByIdAsync(batch.Id, ct);
         }
@@ -143,11 +144,13 @@ public class InventoryBatchService : IInventoryBatchService
         batch.ProductId,
         batch.Product?.Name,
         batch.PurchaseInvoiceId,
+        batch.PurchaseInvoiceLineId,
         batch.WarehouseId,
         batch.Warehouse?.Name,
+        batch.BatchNo,
+        batch.QuantityReceived,
         batch.QuantityRemaining,
         batch.UnitCost,
-        batch.BatchNo.ToString(),
         batch.ExpiryDate,
-        batch.QuantityRemaining > 0);
+        batch.SupplierBatchNo);
 }

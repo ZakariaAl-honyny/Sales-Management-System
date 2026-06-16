@@ -35,7 +35,7 @@ public class FifoAllocationService : IFifoAllocationService
         decimal quantity,
         decimal unitCost,
         string? batchNo,
-        DateTime? expiryDate,
+        DateOnly? expiryDate,
         int? purchaseInvoiceId,
         bool isOpeningBatch,
         CancellationToken ct)
@@ -48,23 +48,21 @@ public class FifoAllocationService : IFifoAllocationService
 
         try
         {
-            var lotNumber = int.TryParse(batchNo, out var parsedLot) ? parsedLot : GenerateLotNumber(isOpeningBatch);
+            var lotNumberStr = batchNo ?? GenerateLotNumber(isOpeningBatch).ToString();
 
             var batch = InventoryBatch.Create(
-                lotNumber,
+                lotNumberStr,
                 productId,
                 warehouseId,
                 quantity,
                 unitCost,
-                purchaseInvoiceId,
-                null, // supplierBatchNo
-                expiryDate);
+                purchaseInvoiceId);
 
             await _uow.InventoryBatches.AddAsync(batch, ct);
 
             _logger.LogInformation(
                 "InventoryBatch {LotNumber} created: Product {ProductId}, Qty {Quantity}, Cost {UnitCost}, Warehouse {WarehouseId}",
-                lotNumber, productId, quantity, unitCost, warehouseId);
+                lotNumberStr, productId, quantity, unitCost, warehouseId);
 
             return Result<List<InventoryBatch>>.Success(new List<InventoryBatch> { batch });
         }
@@ -126,7 +124,7 @@ public class FifoAllocationService : IFifoAllocationService
             {
                 // FEFO: sort by ExpiryDate ascending
                 sortedBatches = batches
-                    .OrderBy(b => b.ExpiryDate ?? DateTime.MaxValue)
+                    .OrderBy(b => b.ExpiryDate.HasValue ? b.ExpiryDate.Value.ToDateTime(TimeOnly.MinValue) : DateTime.MaxValue)
                     .ThenBy(b => b.Id)
                     .ToList();
 
@@ -227,15 +225,16 @@ public class FifoAllocationService : IFifoAllocationService
             var returnBatchNo = GenerateReturnBatchNo();
 
             var newBatch = InventoryBatch.Create(
-                returnBatchNo,
-                batch.ProductId,
-                batch.WarehouseId,
-                quantityReturned,
-                batch.UnitCost,
-                null, // purchaseInvoiceId
-                null, // supplierBatchNo
-                batch.ExpiryDate,
-                createdByUserId);
+                batchNo: returnBatchNo.ToString(),
+                productId: batch.ProductId,
+                warehouseId: batch.WarehouseId,
+                quantityReceived: quantityReturned,
+                unitCost: batch.UnitCost,
+                purchaseInvoiceId: null,
+                purchaseInvoiceLineId: null,
+                supplierBatchNo: null,
+                expiryDate: batch.ExpiryDate,
+                createdByUserId: createdByUserId);
 
             await _uow.InventoryBatches.AddAsync(newBatch, ct);
 
@@ -270,17 +269,17 @@ public class FifoAllocationService : IFifoAllocationService
                 q => q.OrderBy(b => b.Id),
                 ct: ct);
 
-            var now = DateTime.UtcNow;
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
             var breakdown = batches.Select(b => new BatchStockInfo(
                 BatchId: b.Id,
-                BatchNo: b.BatchNo.ToString(),
+                BatchNo: b.BatchNo,
                 RemainingQuantity: b.QuantityRemaining,
                 OriginalQuantity: b.QuantityReceived,
                 UnitCost: b.UnitCost,
-                ExpiryDate: b.ExpiryDate,
+                ExpiryDate: b.ExpiryDate.HasValue ? b.ExpiryDate.Value.ToDateTime(TimeOnly.MinValue) : null,
                 ReceivedDate: b.CreatedAt,
-                IsExpired: b.ExpiryDate.HasValue && b.ExpiryDate.Value <= now
+                IsExpired: b.ExpiryDate.HasValue && b.ExpiryDate.Value <= today
             )).ToList();
 
             return Result<List<BatchStockInfo>>.Success(breakdown);

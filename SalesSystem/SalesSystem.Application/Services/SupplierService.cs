@@ -199,7 +199,7 @@ public class SupplierService : ISupplierService
             if (apParentAccount == null)
             {
                 var apMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                    m => m.MappingKey == SystemAccountKey.AccountsPayable, ct);
+                    m => m.MappingKey == nameof(SystemAccountKey.AccountsPayable), ct);
                 if (apMapping == null)
                     return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
 

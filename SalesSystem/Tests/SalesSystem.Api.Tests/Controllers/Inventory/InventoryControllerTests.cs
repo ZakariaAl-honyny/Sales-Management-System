@@ -130,18 +130,18 @@ public class InventoryControllerTests : ControllerTestBase
 
     private static InventoryTransactionDto CreateMovementDto(int id) => new(
         Id: id,
-        TransactionNo: id,
-        TransactionDate: DateTime.UtcNow,
-        TransactionType: 1,
+        TransactionNo: id.ToString(),
+        MovementType: (byte)1,
         WarehouseId: (short)1,
         WarehouseName: "المستودع الرئيسي",
         ReferenceId: id,
-        ReferenceType: 1,
+        ReferenceType: (byte?)1,
         Notes: null,
-        Status: 2,
+        CreatedAt: DateTime.UtcNow,
+        CreatedByUserId: 1,
         Lines: new List<InventoryTransactionLineDto>
         {
-            new(id, 1, $"منتج {id}", 1, "قطعة", 50.00m, 100.00m, 5000.00m, null)
+            new(Id: id, InventoryTransactionId: 1, ProductUnitId: 1, ProductUnitName: "قطعة", Quantity: 50.00m, UnitCost: 100.00m, BatchNo: null, ExpiryDate: null, WarehouseId: null)
         });
 
     private static WarehouseStockDto CreateStockDto(int id) => new(

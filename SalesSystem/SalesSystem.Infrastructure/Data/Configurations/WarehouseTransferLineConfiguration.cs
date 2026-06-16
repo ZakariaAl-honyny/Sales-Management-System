@@ -7,6 +7,9 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 /// <summary>
 /// EF Core configuration for <see cref="WarehouseTransferLine"/>.
 /// Maps to "WarehouseTransferLines" table.
+/// Schema: int WarehouseTransferId FK, int ProductUnitId FK,
+/// decimal(18,3) Quantity, nvarchar(50) BatchNo.
+/// Entity (no audit).
 /// </summary>
 public class WarehouseTransferLineConfiguration : IEntityTypeConfiguration<WarehouseTransferLine>
 {
@@ -21,23 +24,16 @@ public class WarehouseTransferLineConfiguration : IEntityTypeConfiguration<Wareh
             .IsRequired()
             .HasComment("الكمية بوحدات التخزين الأساسية");
 
-        builder.Property(x => x.UnitCost)
-            .HasPrecision(18, 2)
-            .IsRequired()
-            .HasComment("تكلفة الوحدة");
-
-        builder.Property(x => x.TotalCost)
-            .HasPrecision(18, 2)
-            .IsRequired()
-            .HasComment("التكلفة الإجمالية للسطر");
+        builder.Property(x => x.BatchNo)
+            .HasMaxLength(50)
+            .IsRequired(false)
+            .HasComment("رقم الدفعة المنقولة");
 
         // CHECK constraints
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("CHK_WHTxLines_Quantity_Positive",
                 "[Quantity] > 0");
-            t.HasCheckConstraint("CHK_WHTxLines_UnitCost_NonNegative",
-                "[UnitCost] >= 0");
         });
 
         // Relationships
@@ -46,22 +42,16 @@ public class WarehouseTransferLineConfiguration : IEntityTypeConfiguration<Wareh
             .HasForeignKey(x => x.WarehouseTransferId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.Product)
+        builder.HasOne(x => x.ProductUnit)
             .WithMany()
-            .HasForeignKey(x => x.ProductId)
+            .HasForeignKey(x => x.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(x => x.Batch)
-            .WithMany()
-            .HasForeignKey(x => x.BatchId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
 
         // Indexes
         builder.HasIndex(x => x.WarehouseTransferId)
             .HasDatabaseName("IX_WHTxLines_TransferId");
 
-        builder.HasIndex(x => x.ProductId)
-            .HasDatabaseName("IX_WHTxLines_ProductId");
+        builder.HasIndex(x => x.ProductUnitId)
+            .HasDatabaseName("IX_WHTxLines_ProductUnitId");
     }
 }

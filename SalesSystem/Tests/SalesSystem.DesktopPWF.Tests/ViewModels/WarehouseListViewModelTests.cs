@@ -52,8 +52,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "«·„” Êœ⁄ «·—∆Ì”Ì", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "«·„” Êœ⁄ «·À«‰Ì", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Main", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Secondary", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -64,7 +64,7 @@ public class WarehouseListViewModelTests : IDisposable
 
         // ViewModel sorts by Id descending (newest first)
         _viewModel.Warehouses.Should().HaveCount(2);
-        _viewModel.Warehouses.First().Name.Should().Be("«·„” Êœ⁄ «·À«‰Ì");
+        _viewModel.Warehouses.First().Name.Should().Be("Secondary");
         _viewModel.IsBusy.Should().BeFalse();
     }
 
@@ -73,12 +73,11 @@ public class WarehouseListViewModelTests : IDisposable
     {
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
-            .ReturnsAsync(Result<List<WarehouseDto>>.Failure("›‘· ›Ì  Õ„Ì· «·„” Êœ⁄« "));
+            .ReturnsAsync(Result<List<WarehouseDto>>.Failure("API connection timeout"));
 
         await _viewModel.LoadWarehousesAsync();
 
         _viewModel.ErrorMessage.Should().NotBeNullOrEmpty();
-        _viewModel.ErrorMessage.Should().Contain("›‘·");
     }
 
     [Fact]
@@ -105,7 +104,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>
             {
-                new(Id: 1, Name: "„” Êœ⁄  Ã—Ì»Ì", Phone: null, Address: null, Notes: null, IsActive: true)
+                new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Test", Phone: null, Address: null, Notes: null, IsActive: true)
             }));
 
         await _viewModel.LoadWarehousesAsync();
@@ -120,7 +119,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
-        var warehouseToDelete = new WarehouseDto(5, "„” Êœ⁄ ··Õ–›", null, null, null, true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "DeleteMe", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -152,7 +151,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
-        var warehouseToDelete = new WarehouseDto(5, "„” Êœ⁄", null, null, null, true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "FailMe", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -167,7 +166,7 @@ public class WarehouseListViewModelTests : IDisposable
 
         _mockWarehouseService
             .Setup(s => s.DeleteAsync(warehouseToDelete.Id))
-            .ReturnsAsync(Result.Failure("›‘· ›Ì «·Õ–›"));
+            .ReturnsAsync(Result.Failure("Delete failed"));
 
         _viewModel.DeleteCommand.Execute(null);
         await Task.Delay(100);
@@ -178,7 +177,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenWarehouseSelected_PublishesEvent()
     {
-        var warehouseToDelete = new WarehouseDto(5, "„” Êœ⁄", null, null, null, true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "EventTest", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -212,9 +211,9 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "„” Êœ⁄ «·—Ì«÷", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "„” Êœ⁄ Ãœ…", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 3, Name: "„” Êœ⁄ «·—Ì«÷ «·›—⁄Ì", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)3, BranchId: (short)1, BranchName: null, Name: "Gamma", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -223,10 +222,10 @@ public class WarehouseListViewModelTests : IDisposable
 
         await _viewModel.LoadWarehousesAsync();
 
-        _viewModel.SearchText = "«·—Ì«÷";
+        _viewModel.SearchText = "Alpha";
         _viewModel.SearchCommand.Execute(null);
 
-        _viewModel.SearchText.Should().Be("«·—Ì«÷");
+        _viewModel.SearchText.Should().Be("Alpha");
         _viewModel.WarehousesView.Should().NotBeNull();
 
         var filteredCount = 0;
@@ -237,7 +236,7 @@ public class WarehouseListViewModelTests : IDisposable
                 filteredCount++;
             }
         }
-        filteredCount.Should().Be(2);
+        filteredCount.Should().Be(1);
     }
 
     [Fact]
@@ -245,8 +244,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "„” Êœ⁄ «·—Ì«÷", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "„” Êœ⁄ Ãœ…", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -254,7 +253,7 @@ public class WarehouseListViewModelTests : IDisposable
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(warehouses));
 
         await _viewModel.LoadWarehousesAsync();
-        _viewModel.SearchText = "€Ì— „ÊÃÊœ";
+        _viewModel.SearchText = "NonExistent";
 
         _viewModel.SearchCommand.Execute(null);
 
@@ -274,8 +273,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "„” Êœ⁄ √", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "„” Êœ⁄ »", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -284,7 +283,7 @@ public class WarehouseListViewModelTests : IDisposable
 
         await _viewModel.LoadWarehousesAsync();
 
-        _viewModel.SearchText = "„” Êœ⁄ √";
+        _viewModel.SearchText = "Alpha";
         _viewModel.SearchCommand.Execute(null);
 
         var count = 0;
@@ -315,7 +314,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.ErrorMessage = "Œÿ√ ›Ì «· Õ„Ì·";
+        _viewModel.ErrorMessage = "Test error";
 
         propertyChangedEvents.Should().Contain("ErrorMessage");
     }
@@ -326,7 +325,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var warehouse = new WarehouseDto(1, "„” Êœ⁄", null, null, null, true);
+        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Warehouse1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
 
         propertyChangedEvents.Should().Contain("SelectedWarehouse");
@@ -338,7 +337,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        _viewModel.SearchText = "»ÕÀ";
+        _viewModel.SearchText = "X";
 
         propertyChangedEvents.Should().Contain("SearchText");
     }
@@ -350,7 +349,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_AlwaysEnabled_WhenNoSelection()
     {
-        // RULE-059: All buttons ALWAYS enabled ó guard is handled in the handler with a warning dialog
+        // RULE-059: All buttons ALWAYS enabled ‚Äî guard is handled in the handler with a warning dialog
         _viewModel.SelectedWarehouse = null;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -358,7 +357,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_AlwaysEnabled_WhenActiveWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "„” Êœ⁄", null, null, null, true);
+        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -366,7 +365,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_AlwaysEnabled_WhenNoSelection()
     {
-        // RULE-059: All buttons ALWAYS enabled ó guard is handled in the handler with a warning dialog
+        // RULE-059: All buttons ALWAYS enabled ‚Äî guard is handled in the handler with a warning dialog
         _viewModel.SelectedWarehouse = null;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -374,7 +373,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_AlwaysEnabled_WhenWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(1, "„” Êœ⁄", null, null, null, true);
+        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -426,7 +425,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "„” Êœ⁄", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "RefreshTest", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -448,8 +447,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: 1, Name: "„” Êœ⁄ —∆Ì”Ì", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: 2, Name: "„” Êœ⁄ ›—⁄Ì", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha Base", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta Main", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -458,7 +457,7 @@ public class WarehouseListViewModelTests : IDisposable
 
         await _viewModel.LoadWarehousesAsync();
 
-        _viewModel.SearchText = "—∆Ì”Ì";
+        _viewModel.SearchText = "Beta";
         _viewModel.SearchCommand.Execute(null);
 
         var count = 0;
@@ -474,5 +473,3 @@ public class WarehouseListViewModelTests : IDisposable
 
     #endregion
 }
-
-

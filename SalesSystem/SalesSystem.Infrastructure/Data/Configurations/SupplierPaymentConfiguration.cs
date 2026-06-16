@@ -18,18 +18,18 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
             .IsRequired();
 
         builder.Property(x => x.PaymentDate)
-            .IsRequired();
+            .HasColumnType("date");
 
         builder.Property(x => x.Amount)
             .HasPrecision(18, 2)
             .IsRequired();
 
         builder.Property(x => x.PaymentMethod)
-            .HasConversion<int>()
+            .HasConversion<byte>()
             .IsRequired();
 
         builder.Property(x => x.CashBoxId)
-            .IsRequired();
+            .IsRequired(false);
 
         builder.Property(x => x.CurrencyId)
             .IsRequired();

@@ -24,5 +24,13 @@ public class CompanySettingsConfiguration : IEntityTypeConfiguration<CompanySett
             .WithMany()
             .HasForeignKey(c => c.DefaultCurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Schema has only CreatedAt/UpdatedAt (no CreatedByUserId/UpdatedByUserId)
+        builder.Property(c => c.CreatedAt)
+            .IsRequired()
+            .HasDefaultValueSql("GETUTCDATE()");
+
+        builder.Property(c => c.UpdatedAt)
+            .IsRequired(false);
     }
 }

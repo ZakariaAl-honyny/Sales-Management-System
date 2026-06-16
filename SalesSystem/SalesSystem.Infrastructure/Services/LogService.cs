@@ -48,7 +48,8 @@ public class LogService : ILogService
                 _ => (byte)2
             };
 
-            var log = SystemLog.Create(level, message, source, exception);
+            var log = SystemLog.Create(level, message, source, exception,
+                actionName: context, ipAddress: null, userId: userId);
             await _uow.SystemLogs.AddAsync(log, ct);
             await _uow.SaveChangesAsync(ct);
 
@@ -83,14 +84,14 @@ public class LogService : ILogService
             var (items, totalCount) = await _uow.SystemLogs.GetAllAsync(level, source, search, from, to, page, pageSize, ct);
             var dtos = items.Select(x => new SystemLogDto(
                 x.Id,
-                null,           // LogLevel (string) — mapped from Level byte
-                x.Level,        // Level (byte?)
+                x.Level,
                 x.Message,
                 x.Exception,
-                null,           // StackTrace
                 x.Source,
-                null,           // Context
-                null,           // MachineName
+                x.ActionName,
+                x.IpAddress,
+                x.UserId,
+                x.User?.UserName,
                 x.CreatedAt)).ToList();
 
             return Result<PagedResult<SystemLogDto>>.Success(

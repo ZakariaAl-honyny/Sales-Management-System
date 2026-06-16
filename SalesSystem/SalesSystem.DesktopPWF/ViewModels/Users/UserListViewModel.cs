@@ -1,4 +1,4 @@
-﻿using SalesSystem.DesktopPWF.Messaging.Messages;
+using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.ViewModels.Base;
 using System.Collections.ObjectModel;
@@ -165,7 +165,7 @@ public class UserListViewModel : AdminOnlyViewModel
         }
         else
         {
-            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستخدمين", "UserListViewModel.LoadUsersOperationAsync", "[UserListViewModel.LoadUsersOperationAsync] Failed to load users list.");
+            ErrorMessage = HandleFailure(result.Error ?? "��� �� ����� ����������", "UserListViewModel.LoadUsersOperationAsync", "[UserListViewModel.LoadUsersOperationAsync] Failed to load users list.");
             IsEmpty = Users.Count == 0;
         }
     }
@@ -183,7 +183,6 @@ public class UserListViewModel : AdminOnlyViewModel
 
         var searchLower = SearchText.Trim().ToLower();
         return user.UserName.ToLower().Contains(searchLower) ||
-               user.FullName.ToLower().Contains(searchLower) ||
                user.Role.ToString().ToLower().Contains(searchLower);
     }
 
@@ -192,7 +191,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var editorVm = App.GetService<UserEditorViewModel>();
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "مستخدم جديد",
+            Title = "������ ����",
             Width = 900,
             Height = 650,
             OnClosed = (_) =>
@@ -209,7 +208,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var editorVm = new UserEditorViewModel(SelectedUser);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "تعديل المستخدم",
+            Title = "����� ��������",
             Width = 900,
             Height = 650,
             OnClosed = (_) =>
@@ -225,15 +224,15 @@ public class UserListViewModel : AdminOnlyViewModel
 
         if (SelectedUser.Id == CurrentUserId)
         {
-            await _dialogService.ShowErrorAsync("خطأ في تعطيل الحساب", "لا يمكنك تعطيل حسابك الخاص. يرجى طلب مسؤول آخر للقيام بذلك.");
+            await _dialogService.ShowErrorAsync("��� �� ����� ������", "�� ����� ����� ����� �����. ���� ��� ����� ��� ������ ����.");
             return;
         }
 
-        if (SelectedUser.Status == 1)
+        if (SelectedUser.IsActive)
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "تأكيد تعطيل الحساب",
-                $"هل أنت متأكد من تعطيل حساب المستخدم: {SelectedUser.FullName}؟");
+                "����� ����� ������",
+                $"�� ��� ����� �� ����� ���� ��������: {SelectedUser.UserName}�");
             if (!confirmed) return;
 
             await ExecuteAsync(DeactivateUserOperationAsync,
@@ -242,8 +241,8 @@ public class UserListViewModel : AdminOnlyViewModel
         else
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "تأكيد تفعيل الحساب",
-                $"هل أنت متأكد من تفعيل حساب المستخدم: {SelectedUser.FullName}؟");
+                "����� ����� ������",
+                $"�� ��� ����� �� ����� ���� ��������: {SelectedUser.UserName}�");
             if (!confirmed) return;
 
             await ExecuteAsync(ActivateUserOperationAsync,
@@ -259,11 +258,11 @@ public class UserListViewModel : AdminOnlyViewModel
         if (result.IsSuccess)
         {
             await LoadUsersOperationAsync();
-            _toastService.ShowSuccess("تم تعطيل الحساب بنجاح");
+            _toastService.ShowSuccess("�� ����� ������ �����");
         }
         else
         {
-            ErrorMessage = result.Error ?? "فشل في تعطيل الحساب";
+            ErrorMessage = result.Error ?? "��� �� ����� ������";
         }
     }
 
@@ -271,22 +270,24 @@ public class UserListViewModel : AdminOnlyViewModel
     {
         ErrorMessage = null;
 
+        var selectedUser = SelectedUser;
+        if (selectedUser == null) return;
+
         var request = new UpdateUserRequest(
-            FullName: SelectedUser!.FullName,
-            Role: SelectedUser.Role,
-            Status: (byte)1,
+            Role: selectedUser.Role,
+            IsLocked: false,
             Password: null
         );
 
-        var result = await _userService.UpdateAsync(SelectedUser.Id, request);
+        var result = await _userService.UpdateAsync(selectedUser.Id, request);
         if (result.IsSuccess)
         {
             await LoadUsersOperationAsync();
-            _toastService.ShowSuccess("تم تفعيل الحساب بنجاح");
+            _toastService.ShowSuccess("�� ����� ������ �����");
         }
         else
         {
-            ErrorMessage = result.Error ?? "فشل في تفعيل الحساب";
+            ErrorMessage = result.Error ?? "��� �� ����� ������";
         }
     }
 
@@ -295,10 +296,10 @@ public class UserListViewModel : AdminOnlyViewModel
         if (SelectedUser == null) return;
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
-            "تأكيد إعادة تعيين كلمة المرور",
-            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}؟\n\n" +
-            $"سيتم تعيين كلمة المرور إلى: 12345678\n" +
-            $"وسيُطلب من المستخدم تغييرها عند أول تسجيل دخول.");
+            "����� ����� ����� ���� ������",
+            $"�� ��� ����� �� ����� ����� ���� ������ ��������: {SelectedUser.UserName}�\n\n" +
+            $"���� ����� ���� ������ ���: 12345678\n" +
+            $"������� �� �������� ������� ��� ��� ����� ����.");
         if (!confirmed) return;
 
         await ExecuteAsync(ResetPasswordOperationAsync,
@@ -313,17 +314,17 @@ public class UserListViewModel : AdminOnlyViewModel
         if (result.IsSuccess)
         {
             await _dialogService.ShowInfoAsync(
-                "تم إعادة تعيين كلمة المرور",
-                $"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}\n\n" +
-                $"كلمة المرور الجديدة: 12345678\n\n" +
-                $"سيُطلب من المستخدم تغيير كلمة المرور عند أول تسجيل دخول.");
+                "�� ����� ����� ���� ������",
+                $"�� ����� ����� ���� ������ ��������: {SelectedUser.UserName}\n\n" +
+                $"���� ������ �������: 12345678\n\n" +
+                $"������ �� �������� ����� ���� ������ ��� ��� ����� ����.");
 
-            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.FullName}");
+            _toastService.ShowSuccess($"�� ����� ����� ���� ������ ��������: {SelectedUser.UserName}");
         }
         else
         {
-            ErrorMessage = result.Error ?? "فشل في إعادة تعيين كلمة المرور";
-            await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور", ErrorMessage);
+            ErrorMessage = result.Error ?? "��� �� ����� ����� ���� ������";
+            await _dialogService.ShowErrorAsync("��� �� ����� ����� ���� ������", ErrorMessage);
         }
     }
 

@@ -46,7 +46,18 @@ public class WarehouseTransfersListViewModelTests
 
     private static WarehouseTransferDto CreateTransfer(int id, byte status)
     {
-        return new WarehouseTransferDto(id, id, (short)1, "مستودع أ", (short)2, "مستودع ب", DateTime.Today, null, status, new List<WarehouseTransferLineDto>());
+        return new WarehouseTransferDto(
+            Id: id,
+            TransferNo: $"TRF-{id:D4}",
+            SourceWarehouseId: (short)1,
+            SourceWarehouseName: "مستودع أ",
+            DestinationWarehouseId: (short)2,
+            DestinationWarehouseName: "مستودع ب",
+            Notes: null,
+            Status: status,
+            CreatedAt: DateTime.Today,
+            CreatedByUserId: 1,
+            Lines: new List<WarehouseTransferLineDto>());
     }
 
     #region Property Tests

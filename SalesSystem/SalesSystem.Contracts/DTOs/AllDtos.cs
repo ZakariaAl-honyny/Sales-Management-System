@@ -2,16 +2,17 @@ using SalesSystem.Domain.Accounting.Enums;
 
 namespace SalesSystem.Contracts.DTOs;
 
-public record UserDto(int Id, string UserName, string FullName, byte Role,
-    byte Status, bool MustChangePassword, DateTime? PasswordChangedAt,
-    string? Phone, string? Email, string? AvatarPath,
+public record UserDto(int Id, string UserName, byte Role,
+    bool MustChangePassword, bool IsLocked,
+    string? AvatarPath,
     DateTime? LastLoginAt, int LoginAttempts, int? DefaultCashBoxId)
 {
-    public bool IsActive => Status == 1;
+    public bool IsActive => !IsLocked;
 }
 
 public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
-    string EntityType, string? EntityId, string? Details, string? IpAddress, DateTime Timestamp);
+    string? EntityType, int? EntityId, string? OldValues, string? NewValues,
+    string? ChangedColumns, string? IpAddress, DateTime Timestamp);
 
 public record RoleDto(int Id, string Name, string? Description, bool IsActive);
 
@@ -19,7 +20,6 @@ public record UserSessionDto(
     long Id,
     int UserId,
     string? UserName,
-    string FullName,
     string? DeviceName,
     string? IpAddress,
     DateTime CreatedAt,
@@ -38,7 +38,7 @@ public record PermissionDto(int Id, string Name, string DisplayNameAr, string? C
 
 public record RolePermissionDto(byte Role, List<int> PermissionIds);
 
-public record CurrentUserDto(int Id, string UserName, string FullName, byte Role,
+public record CurrentUserDto(int Id, string UserName, byte Role,
     string? AvatarPath, List<string> Permissions);
 
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword, string ConfirmPassword);
@@ -64,7 +64,9 @@ public record ProductDto(
 }
 
 public record WarehouseDto(
-    int Id,
+    short Id,
+    short BranchId,
+    string? BranchName,
     string Name,
     string? Phone,
     string? Address,
@@ -148,7 +150,7 @@ public record PurchaseInvoiceDto(
     string SupplierName,
     int WarehouseId,
     string WarehouseName,
-    DateTime InvoiceDate,
+    DateOnly InvoiceDate,
     byte PaymentType,
     decimal SubTotal,
     decimal DiscountAmount,
@@ -158,12 +160,14 @@ public record PurchaseInvoiceDto(
     decimal PaidAmount,
     decimal RemainingAmount,
     string? Notes,
+    string? SupplierInvoiceNo,
     byte Status,
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
     short? CurrencyId,
     decimal? ExchangeRate,
+    int? CashBoxId,
     IReadOnlyList<PurchaseInvoiceLineDto> Items)
 {
     public string PaymentTypeDisplay => PaymentType switch
@@ -188,7 +192,8 @@ public record PurchaseInvoiceLineDto(int Id, int ProductId, string ProductName,
     string? ProductUnitName,
     decimal Quantity,
     decimal UnitPrice,
-    decimal LineTotal);
+    decimal LineTotal,
+    decimal LandedUnitCost);
 
 public record SalesReturnDto(
     int Id,
@@ -236,8 +241,8 @@ public record PurchaseReturnDto(
     int SupplierId,
     string SupplierName,
     int? PurchaseInvoiceId,
-    bool LinkToInvoice,                   // NEW
-    DateTime ReturnDate,
+    bool LinkToInvoice,
+    DateOnly ReturnDate,
     decimal SubTotal,
     decimal TotalAmount,
     int? CurrencyId,
@@ -259,7 +264,8 @@ public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
     string? ProductUnitName,
     decimal Quantity,
     decimal UnitCost,
-    decimal LineTotal);
+    decimal LineTotal,
+    int? PurchaseInvoiceLineId);
 
 // ═══════════════════════════════════════════════════════════════
 // New Inventory Module DTOs (v4.10+)
@@ -267,18 +273,18 @@ public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
 
 public record InventoryTransactionDto(
     int Id,
-    int TransactionNo,
-    DateTime TransactionDate,
-    byte TransactionType,
+    string TransactionNo,
+    byte MovementType,
     short WarehouseId,
     string? WarehouseName,
     int? ReferenceId,
     byte? ReferenceType,
     string? Notes,
-    byte Status,
+    DateTime CreatedAt,
+    int CreatedByUserId,
     IReadOnlyList<InventoryTransactionLineDto> Lines)
 {
-    public string TransactionTypeDisplay => TransactionType switch
+    public string MovementTypeDisplay => MovementType switch
     {
         1 => "مشتريات",
         2 => "مرتجع مشتريات",
@@ -294,36 +300,30 @@ public record InventoryTransactionDto(
         12 => "استلام داخلي",
         _ => "غير معروف"
     };
-    public string StatusDisplay => Status switch
-    {
-        1 => "مسودة",
-        2 => "تم الترحيل",
-        3 => "ملغي",
-        _ => "غير معروف"
-    };
 }
 
 public record InventoryTransactionLineDto(
     int Id,
-    int ProductId,
-    string? ProductName,
+    int InventoryTransactionId,
     int ProductUnitId,
     string? ProductUnitName,
     decimal Quantity,
     decimal UnitCost,
-    decimal TotalCost,
-    int? BatchId);
+    string? BatchNo,
+    DateOnly? ExpiryDate,
+    short? WarehouseId);
 
 public record WarehouseTransferDto(
     int Id,
-    int TransferNo,
-    short FromWarehouseId,
-    string? FromWarehouseName,
-    short ToWarehouseId,
-    string? ToWarehouseName,
-    DateTime TransferDate,
+    string TransferNo,
+    short SourceWarehouseId,
+    string? SourceWarehouseName,
+    short DestinationWarehouseId,
+    string? DestinationWarehouseName,
     string? Notes,
     byte Status,
+    DateTime CreatedAt,
+    int CreatedByUserId,
     IReadOnlyList<WarehouseTransferLineDto> Lines)
 {
     public string StatusDisplay => Status switch
@@ -337,13 +337,11 @@ public record WarehouseTransferDto(
 
 public record WarehouseTransferLineDto(
     int Id,
-    int ProductId,
-    string? ProductName,
-    int BatchId,
-    int? BatchNo,
+    int WarehouseTransferId,
+    int ProductUnitId,
+    string? ProductUnitName,
     decimal Quantity,
-    decimal UnitCost,
-    decimal TotalCost);
+    string? BatchNo);
 
 // ═══════════════════════════════════════════════════════════════
 
@@ -356,7 +354,7 @@ public record SupplierPaymentDto(
     byte PaymentMethod,
     int? CurrencyId,
     decimal? ExchangeRate,
-    DateTime PaymentDate,
+    DateOnly PaymentDate,
     int? PurchaseInvoiceId,
     string? Notes)
 {
@@ -408,7 +406,7 @@ public record StoreSettingsDto(
     string? UpdateServerUrl = null,
     string? SignaturePath = null);
 
-public record DocumentSequenceDto(int Id, string DocumentType, string Prefix, int Year, int LastNumber);
+public record DocumentSequenceDto(int Id, string DocumentType, int NextNumber);
 
 public record DashboardSummaryDto(
     decimal TotalSalesToday,
@@ -573,28 +571,38 @@ public record VatReportDto(
 public record TaxDto(int Id, string Name, string Code, decimal Rate, byte TaxType, bool IsDefault, bool IsActive);
 
 public record CurrencyDto(
-    int Id,
+    short Id,
     string Name,
     string Code,
-    string Symbol,
+    string? Symbol,
     bool IsBaseCurrency,
-    string? FractionName,
-    int DecimalPlaces,
+    string FractionName,
+    byte DecimalPlaces,
     bool IsSystem,
     bool IsActive);
 
 // ─── System Log DTO ────────────────────────────────
 public record SystemLogDto(
     long Id,
-    string LogLevel,
-    byte? Level,
+    byte Level,
     string Message,
     string? Exception,
-    string? StackTrace,
     string? Source,
-    string? Context,
-    string? MachineName,
-    DateTime CreatedAt);
+    string? ActionName,
+    string? IpAddress,
+    int? UserId,
+    string? UserName,
+    DateTime CreatedAt)
+{
+    public string LogLevel => Level switch
+    {
+        1 => "معلومات",
+        2 => "تحذير",
+        3 => "خطأ",
+        4 => "حرج",
+        _ => "غير معروف"
+    };
+}
 
 // ═══════════════════════════════════════════════════════
 // Phase 22 — Chart of Accounts DTOs

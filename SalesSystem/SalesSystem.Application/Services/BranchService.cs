@@ -56,7 +56,12 @@ public class BranchService : IBranchService
     {
         try
         {
-            var branch = Branch.Create(request.Name);
+            var branch = Branch.Create(
+                request.Name,
+                request.Phone,
+                request.Address,
+                request.ManagerName,
+                request.Notes);
 
             await _uow.Branches.AddAsync(branch, ct);
             await _uow.SaveChangesAsync(ct);
@@ -85,7 +90,12 @@ public class BranchService : IBranchService
             if (branch == null)
                 return Result<BranchDto>.Failure("الفرع غير موجود", ErrorCodes.NotFound);
 
-            branch.Update(request.Name);
+            branch.Update(
+                request.Name,
+                request.Phone,
+                request.Address,
+                request.ManagerName,
+                request.Notes);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Branch updated: {Name} (ID: {Id})", branch.Name, id);
@@ -130,6 +140,10 @@ public class BranchService : IBranchService
         return new BranchDto(
             branch.Id,
             branch.Name,
+            branch.Phone,
+            branch.Address,
+            branch.ManagerName,
+            branch.Notes,
             branch.IsActive
         );
     }

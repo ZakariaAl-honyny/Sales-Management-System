@@ -261,6 +261,132 @@ public static class DbSeeder
                 allPermissionIds.Count, managerPermIds.Count, cashierPermIds.Count, observerPermIds.Count, branchManagerPermIds.Count);
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // ─── Missing Permissions (idempotent) ─────────────────────
+        // ═══════════════════════════════════════════════════════════
+        var existingCodes = await db.Set<Permission>().Select(p => p.Code).ToListAsync();
+        var existingCodeSet = new HashSet<string>(existingCodes);
+
+        var newPermissions = new List<Permission>();
+        var permissionDefs = new (string code, string displayName, string category)[]
+        {
+            ("Purchases.Return",     "مرتجع مشتريات",       "Purchases"),
+            ("Customers.Delete",     "حذف عميل",            "Customers"),
+            ("Suppliers.Delete",     "حذف مورد",            "Suppliers"),
+            ("Products.Delete",      "حذف منتج",            "Products"),
+            ("Backup.Manage",        "إدارة النسخ الاحتياطي","System"),
+            ("FiscalYear.Manage",    "إدارة السنة المالية",  "Accounting"),
+            ("Employees.View",       "عرض الموظفين",        "Employees"),
+            ("Employees.Manage",     "إدارة الموظفين",      "Employees"),
+            ("Currencies.View",      "عرض العملات",         "Accounting"),
+            ("Currencies.Manage",    "إدارة العملات",       "Accounting"),
+            ("Warehouse.Manage",     "إدارة المخازن",       "Inventory"),
+            ("Inventory.Count",      "جرد المخزون",         "Inventory"),
+        };
+
+        foreach (var (code, displayName, category) in permissionDefs)
+        {
+            if (!existingCodeSet.Contains(code))
+                newPermissions.Add(Permission.Create(code, displayName, category, isSystem: true));
+        }
+
+        if (newPermissions.Any())
+        {
+            db.Set<Permission>().AddRange(newPermissions);
+            await db.SaveChangesAsync();
+            logger?.LogInformation("Added {Count} missing permissions.", newPermissions.Count);
+        }
+
+        // ─── New Roles (idempotent) ──────────────────────────────────
+        var newRoles = new List<Role>();
+        if (!await db.Set<Role>().AnyAsync(r => r.Name == "محاسب"))
+            newRoles.Add(Role.Create("محاسب", "Accountant - صلاحيات محاسبية"));
+        if (!await db.Set<Role>().AnyAsync(r => r.Name == "أمين صندوق"))
+            newRoles.Add(Role.Create("أمين صندوق", "Treasurer - صلاحيات الصندوق"));
+        if (!await db.Set<Role>().AnyAsync(r => r.Name == "مشرف مخزن"))
+            newRoles.Add(Role.Create("مشرف مخزن", "Warehouse Supervisor - صلاحيات المخازن"));
+        if (!await db.Set<Role>().AnyAsync(r => r.Name == "موظف مبيعات"))
+            newRoles.Add(Role.Create("موظف مبيعات", "Sales Employee - صلاحيات بيع محدودة"));
+
+        if (newRoles.Any())
+        {
+            db.Set<Role>().AddRange(newRoles);
+            await db.SaveChangesAsync();
+            logger?.LogInformation("Added {Count} new roles: {Names}.", newRoles.Count,
+                string.Join(", ", newRoles.Select(r => r.Name)));
+        }
+
+        // Reload all permissions now (includes newly added ones)
+        var allPerms = await db.Set<Permission>().ToListAsync();
+
+        // ─── New RolePermissions (idempotent) ────────────────────────
+        // محاسب (Accountant): accounting, reports, view-only sales/purchases/customers/suppliers, audit
+        await AssignRolePermissionsAsync(db, "محاسب", allPerms,
+            p => p.Category is "Accounting" or "Reports" or "Audit"
+                || p.Code is "Sales.View" or "Purchases.View" or "Inventory.View"
+                || p.Code is "Customers.View" or "Suppliers.View" or "Products.View",
+            logger);
+
+        // أمين صندوق (Treasurer): cashbox operations, banking, sales view, customer view
+        await AssignRolePermissionsAsync(db, "أمين صندوق", allPerms,
+            p => p.Code is "Operations.Cashbox" or "Operations.Banking"
+                || p.Code is "Sales.View" or "Customers.View",
+            logger);
+
+        // مشرف مخزن (Warehouse Supervisor): inventory full + products view + reports view
+        await AssignRolePermissionsAsync(db, "مشرف مخزن", allPerms,
+            p => p.Category == "Inventory"
+                || p.Code is "Products.View" or "Reports.View" or "Sales.View",
+            logger);
+
+        // موظف مبيعات (Sales Employee): sales create/view/print/return + customer view + inventory view
+        await AssignRolePermissionsAsync(db, "موظف مبيعات", allPerms,
+            p => p.Category == "Sales"
+                || p.Code is "Customers.View" or "Inventory.View" or "Operations.Cashbox",
+            logger);
+
+        // ─── Assign new permissions to Admin (idempotent) ──────────────
+        var admin = await db.Set<Role>().FirstOrDefaultAsync(r => r.Name == "مدير النظام");
+        if (admin != null)
+        {
+            var adminExistingPerms = await db.Set<RolePermission>()
+                .Where(rp => rp.RoleId == admin.Id)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+            var adminExistingSet = new HashSet<int>(adminExistingPerms);
+            var adminMissingPerms = allPerms.Where(p => !adminExistingSet.Contains(p.Id)).ToList();
+            if (adminMissingPerms.Any())
+            {
+                foreach (var perm in adminMissingPerms)
+                    db.Set<RolePermission>().Add(RolePermission.Create(admin.Id, perm.Id));
+                await db.SaveChangesAsync();
+                logger?.LogInformation("Added {Count} new permissions to Admin role.", adminMissingPerms.Count);
+            }
+        }
+
+        // ─── Assign new permissions to Manager (idempotent) ───────────
+        var manager = await db.Set<Role>().FirstOrDefaultAsync(r => r.Name == "مدير");
+        if (manager != null)
+        {
+            var managerExistingPerms = await db.Set<RolePermission>()
+                .Where(rp => rp.RoleId == manager.Id)
+                .Select(rp => rp.PermissionId)
+                .ToListAsync();
+            var managerExistingSet = new HashSet<int>(managerExistingPerms);
+            // Manager gets all permissions except system-level settings and user management
+            var managerMissingPerms = allPerms
+                .Where(p => !managerExistingSet.Contains(p.Id)
+                    && p.Code is not "System.Settings" and not "System.Users")
+                .ToList();
+            if (managerMissingPerms.Any())
+            {
+                foreach (var perm in managerMissingPerms)
+                    db.Set<RolePermission>().Add(RolePermission.Create(manager.Id, perm.Id));
+                await db.SaveChangesAsync();
+                logger?.LogInformation("Added {Count} new permissions to Manager role.", managerMissingPerms.Count);
+            }
+        }
+
         // ─── Branches ──────────────────────────────────────────────
         if (!await db.Branches.AnyAsync())
         {
@@ -301,9 +427,6 @@ public static class DbSeeder
         var adminUser = User.CreateWithPassword(
             userName: "admin",
             passwordHash: adminPasswordHash,
-            fullName: "Administrator",
-            phone: null,
-            email: null,
             employeeId: null,
             createdByUserId: null,
             mustChangePassword: true
@@ -328,13 +451,13 @@ public static class DbSeeder
         await db.SaveChangesAsync();
         logger?.LogInformation("Seeded {Count} base units of measure.", 7);
 
-        db.DocumentSequences.Add(DocumentSequence.Create("INV", "INV", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PUR", "PUR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SR", "SR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("PR", "PR", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("TRF", "TRF", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("CP", "CP", 2026));
-        db.DocumentSequences.Add(DocumentSequence.Create("SP", "SP", 2026));
+        db.DocumentSequences.Add(DocumentSequence.Create("SalesInvoice"));
+        db.DocumentSequences.Add(DocumentSequence.Create("PurchaseInvoice"));
+        db.DocumentSequences.Add(DocumentSequence.Create("SalesReturn"));
+        db.DocumentSequences.Add(DocumentSequence.Create("PurchaseReturn"));
+        db.DocumentSequences.Add(DocumentSequence.Create("Transfer"));
+        db.DocumentSequences.Add(DocumentSequence.Create("CustomerPayment"));
+        db.DocumentSequences.Add(DocumentSequence.Create("SupplierPayment"));
 
         var productsWithoutUnits = await db.Products
             .Where(p => !db.ProductUnits.Any(pu => pu.ProductId == p.Id))
@@ -381,5 +504,35 @@ public static class DbSeeder
         }
 
         logger?.LogInformation("Seed data completed successfully.");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Helper: Assign permissions to a role (idempotent)
+    // ═══════════════════════════════════════════════════════════════
+    private static async Task AssignRolePermissionsAsync(
+        SalesDbContext db,
+        string roleName,
+        List<Permission> allPermissions,
+        Func<Permission, bool> predicate,
+        ILogger? logger)
+    {
+        var role = await db.Set<Role>().FirstOrDefaultAsync(r => r.Name == roleName);
+        if (role == null) return;
+
+        // Skip if already assigned — role already has any RolePermission record
+        if (await db.Set<RolePermission>().AnyAsync(rp => rp.RoleId == role.Id))
+        {
+            logger?.LogInformation("Role '{RoleName}' already has permissions assigned — skipping.", roleName);
+            return;
+        }
+
+        var selected = allPermissions.Where(predicate).ToList();
+        foreach (var perm in selected)
+        {
+            db.Set<RolePermission>().Add(RolePermission.Create(role.Id, perm.Id));
+        }
+
+        await db.SaveChangesAsync();
+        logger?.LogInformation("Assigned {Count} permissions to role '{RoleName}'.", selected.Count, roleName);
     }
 }

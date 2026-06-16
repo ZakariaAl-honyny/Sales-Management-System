@@ -277,7 +277,7 @@ public class CurrenciesListViewModel : ViewModelBase, IDisposable
 
         var request = new SalesSystem.Contracts.Requests.UpdateCurrencyRequest(
             currency.Name,
-            currency.Symbol,
+            currency.Symbol ?? string.Empty,
             currency.FractionName,
             currency.DecimalPlaces);
 

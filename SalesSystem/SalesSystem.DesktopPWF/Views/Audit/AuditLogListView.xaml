@@ -150,8 +150,8 @@
                                             Binding="{Binding EntityId}"
                                             Width="80"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        <DataGridTextColumn Header="التفاصيل"
-                                            Binding="{Binding Details}"
+                        <DataGridTextColumn Header="البيانات الجديدة"
+                                            Binding="{Binding NewValues}"
                                             Width="*"
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         <DataGridTextColumn Header="عنوان IP"

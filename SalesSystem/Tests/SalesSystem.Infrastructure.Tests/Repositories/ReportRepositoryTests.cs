@@ -429,10 +429,9 @@ public class ReportRepositoryTests
         await context.SaveChangesAsync();
 
         var transaction = InventoryTransaction.Create(
-            transactionNo: 1,
-            transactionType: InventoryTransactionType.Purchase,
+            transactionNo: "1",
+            movementType: InventoryTransactionType.Purchase,
             warehouseId: (short)warehouse.Id,
-            transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
         context.InventoryTransactions.Add(transaction);
@@ -440,13 +439,11 @@ public class ReportRepositoryTests
 
         var line = InventoryTransactionLine.Create(
             inventoryTransactionId: transaction.Id,
-            productId: product.Id,
             productUnitId: productUnit.Id,
             quantity: 100m,
             unitCost: 10m
         );
         transaction.AddLine(line);
-        transaction.Post();
         await context.SaveChangesAsync();
 
         // Act
@@ -485,10 +482,9 @@ public class ReportRepositoryTests
 
         // Movement within range
         var transactionInRange = InventoryTransaction.Create(
-            transactionNo: 1,
-            transactionType: InventoryTransactionType.Purchase,
+            transactionNo: "1",
+            movementType: InventoryTransactionType.Purchase,
             warehouseId: (short)warehouse.Id,
-            transactionDate: DateTime.UtcNow,
             createdByUserId: 1
         );
         context.InventoryTransactions.Add(transactionInRange);
@@ -496,21 +492,18 @@ public class ReportRepositoryTests
 
         var lineInRange = InventoryTransactionLine.Create(
             inventoryTransactionId: transactionInRange.Id,
-            productId: product.Id,
             productUnitId: productUnit.Id,
             quantity: 100m,
             unitCost: 10m
         );
         transactionInRange.AddLine(lineInRange);
-        transactionInRange.Post();
         await context.SaveChangesAsync();
 
         // Movement outside range - different type (SaleOut)
         var transactionOutOfRange = InventoryTransaction.Create(
-            transactionNo: 2,
-            transactionType: InventoryTransactionType.Sale,
+            transactionNo: "2",
+            movementType: InventoryTransactionType.Sale,
             warehouseId: (short)warehouse.Id,
-            transactionDate: DateTime.UtcNow.AddDays(-10),
             createdByUserId: 1
         );
         context.InventoryTransactions.Add(transactionOutOfRange);
@@ -518,13 +511,11 @@ public class ReportRepositoryTests
 
         var lineOutOfRange = InventoryTransactionLine.Create(
             inventoryTransactionId: transactionOutOfRange.Id,
-            productId: product.Id,
             productUnitId: productUnit.Id,
             quantity: 10m,
             unitCost: 10m
         );
         transactionOutOfRange.AddLine(lineOutOfRange);
-        transactionOutOfRange.Post();
         await context.SaveChangesAsync();
 
         // Act

@@ -16,7 +16,11 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
         builder.HasKey(x => x.Id);
 
         // Properties
-        builder.Property(x => x.BatchNo).IsRequired();
+        builder.Property(x => x.BatchNo)
+            .HasMaxLength(50)
+            .IsRequired()
+            .HasComment("رقم الدفعة (nvarchar 50)");
+
         builder.Property(x => x.WarehouseId)
             .HasColumnType("smallint")
             .IsRequired()
@@ -43,6 +47,7 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .HasComment("رقم الدفعة من المورد");
 
         builder.Property(x => x.ExpiryDate)
+            .HasColumnType("date")
             .IsRequired(false)
             .HasComment("تاريخ انتهاء الصلاحية");
 
@@ -66,6 +71,12 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
         builder.HasOne(x => x.PurchaseInvoice)
             .WithMany()
             .HasForeignKey(x => x.PurchaseInvoiceId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne(x => x.PurchaseInvoiceLine)
+            .WithMany()
+            .HasForeignKey(x => x.PurchaseInvoiceLineId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired(false);
 

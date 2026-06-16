@@ -11,6 +11,7 @@ public class PurchaseInvoiceLine : Entity
     public decimal Quantity { get; private set; }
     public decimal UnitPrice { get; private set; }
     public decimal LineTotal { get; private set; }
+    public decimal LandedUnitCost { get; private set; }
 
     // Navigation properties
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
@@ -40,6 +41,7 @@ public class PurchaseInvoiceLine : Entity
             ProductUnitId = productUnitId,
             Quantity = quantity,
             UnitPrice = unitPrice,
+            LandedUnitCost = unitPrice,
         };
 
         item.RecalculateLineTotal();
@@ -49,5 +51,15 @@ public class PurchaseInvoiceLine : Entity
     public void RecalculateLineTotal()
     {
         LineTotal = Quantity * UnitPrice;
+    }
+
+    /// <summary>
+    /// Sets the landed unit cost after distributing additional charges proportionally.
+    /// </summary>
+    public void SetLandedUnitCost(decimal landedUnitCost)
+    {
+        if (landedUnitCost < 0)
+            throw new DomainException("تكلفة الوحدة بعد التوزيع لا يمكن أن تكون سالبة.");
+        LandedUnitCost = landedUnitCost;
     }
 }

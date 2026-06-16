@@ -623,7 +623,7 @@ public class SalesService : ISalesService
     private async Task<int> GetCashAccountIdAsync(CancellationToken ct)
     {
         var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-            m => m.MappingKey == SystemAccountKey.DefaultCash, ct);
+            m => m.MappingKey == nameof(SystemAccountKey.DefaultCash), ct);
         return mapping?.AccountId ?? 1;
     }
 

@@ -12,20 +12,31 @@ namespace SalesSystem.Domain.Entities;
 public class PurchaseReturnLine : Entity
 {
     public int PurchaseReturnId { get; private set; }
-    public int PurchaseInvoiceLineId { get; private set; }
+    public int? PurchaseInvoiceLineId { get; private set; }
+    public int ProductId { get; private set; }
+    public int ProductUnitId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal Amount { get; private set; }
 
     // Navigation properties
     public virtual PurchaseReturn? PurchaseReturn { get; private set; }
     public virtual PurchaseInvoiceLine? PurchaseInvoiceLine { get; private set; }
+    public virtual Product? Product { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private PurchaseReturnLine() { } // EF Core
 
-    public static PurchaseReturnLine Create(int purchaseInvoiceLineId, decimal quantity, decimal amount)
+    public static PurchaseReturnLine Create(
+        int productId,
+        int productUnitId,
+        decimal quantity,
+        decimal amount,
+        int? purchaseInvoiceLineId = null)
     {
-        if (purchaseInvoiceLineId <= 0)
-            throw new DomainException("رقم بند فاتورة الشراء الأصلي مطلوب.");
+        if (productId <= 0)
+            throw new DomainException("المنتج مطلوب.");
+        if (productUnitId <= 0)
+            throw new DomainException("الوحدة مطلوبة.");
         if (quantity <= 0)
             throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
         if (amount < 0)
@@ -33,6 +44,8 @@ public class PurchaseReturnLine : Entity
 
         return new PurchaseReturnLine
         {
+            ProductId = productId,
+            ProductUnitId = productUnitId,
             PurchaseInvoiceLineId = purchaseInvoiceLineId,
             Quantity = quantity,
             Amount = amount
@@ -49,8 +62,8 @@ public class PurchaseReturnLine : Entity
 public class PurchaseReturn : DocumentEntity
 {
     public int ReturnNo { get; private set; }
-    public DateTime ReturnDate { get; private set; }
-    public int PurchaseInvoiceId { get; private set; }
+    public DateOnly ReturnDate { get; private set; }
+    public int? PurchaseInvoiceId { get; private set; }
     public int SupplierId { get; private set; }
     public short WarehouseId { get; private set; }
     public short CurrencyId { get; private set; }
@@ -71,18 +84,16 @@ public class PurchaseReturn : DocumentEntity
 
     public static PurchaseReturn Create(
         int returnNo,
-        int purchaseInvoiceId,
         int supplierId,
         short warehouseId,
         short currencyId,
-        DateTime? returnDate = null,
+        DateOnly? returnDate = null,
+        int? purchaseInvoiceId = null,
         string? notes = null,
         int? createdByUserId = null)
     {
         if (returnNo <= 0)
             throw new DomainException("رقم الإرجاع مطلوب.");
-        if (purchaseInvoiceId <= 0)
-            throw new DomainException("فاتورة الشراء الأصلية مطلوبة.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
         if (warehouseId <= 0)
@@ -97,7 +108,7 @@ public class PurchaseReturn : DocumentEntity
             SupplierId = supplierId,
             WarehouseId = warehouseId,
             CurrencyId = currencyId,
-            ReturnDate = returnDate ?? DateTime.UtcNow,
+            ReturnDate = returnDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
             Notes = notes,
             Status = InvoiceStatus.Draft
         };

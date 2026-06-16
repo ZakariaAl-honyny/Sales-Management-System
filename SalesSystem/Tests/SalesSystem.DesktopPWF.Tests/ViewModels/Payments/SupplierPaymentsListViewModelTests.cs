@@ -48,7 +48,7 @@ public class SupplierPaymentsListViewModelTests
 
     private static SupplierPaymentDto CreatePayment(int id, string supplierName, decimal amount)
     {
-        return new SupplierPaymentDto(id, $"SP-{id:000}", 1, supplierName, amount, 1, null, null, DateTime.Today, null, null);
+        return new SupplierPaymentDto(id, $"SP-{id:000}", 1, supplierName, amount, 1, null, null, DateOnly.FromDateTime(DateTime.Today), null, null);
     }
 
     #region Property Tests

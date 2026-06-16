@@ -34,7 +34,7 @@ public class WarehouseTransfersControllerTests
     {
         var transfers = new List<WarehouseTransferDto>
         {
-            new(1, 1, (short)1, "من المستودع الرئيسي", (short)2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<WarehouseTransferLineDto>())
+            new(Id: 1, TransferNo: "1", SourceWarehouseId: (short)1, SourceWarehouseName: "من المستودع الرئيسي", DestinationWarehouseId: (short)2, DestinationWarehouseName: "إلى المستودع الفرعي", Notes: null, Status: (byte)1, CreatedAt: DateTime.Now, CreatedByUserId: 1, Lines: Array.Empty<WarehouseTransferLineDto>())
         };
         var pagedResult = PagedResult<WarehouseTransferDto>.Create(transfers, 1, 1, 10);
 
@@ -63,7 +63,7 @@ public class WarehouseTransfersControllerTests
     [Fact]
     public async Task GetById_WhenTransferExists_ReturnsOkWithTransfer()
     {
-        var transfer = new WarehouseTransferDto(1, 1, (short)1, "من المستودع الرئيسي", (short)2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<WarehouseTransferLineDto>());
+        var transfer = new WarehouseTransferDto(Id: 1, TransferNo: "1", SourceWarehouseId: (short)1, SourceWarehouseName: "من المستودع الرئيسي", DestinationWarehouseId: (short)2, DestinationWarehouseName: "إلى المستودع الفرعي", Notes: null, Status: (byte)1, CreatedAt: DateTime.Now, CreatedByUserId: 1, Lines: Array.Empty<WarehouseTransferLineDto>());
 
         _warehouseTransferServiceMock
             .Setup(x => x.GetByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -90,8 +90,8 @@ public class WarehouseTransfersControllerTests
     [Fact]
     public async Task Create_WhenValidRequest_ReturnsCreatedAtAction()
     {
-        var request = new CreateWarehouseTransferRequest(1, (short)1, (short)2, DateTime.Now, null, new List<CreateWarehouseTransferLineRequest> { new(1, 1, 10m, 0m) });
-        var transfer = new WarehouseTransferDto(1, 1, (short)1, "من المستودع الرئيسي", (short)2, "إلى المستودع الفرعي", DateTime.Now, null, 1, Array.Empty<WarehouseTransferLineDto>());
+        var request = new CreateWarehouseTransferRequest("1", (short)1, (short)2, null, new List<CreateWarehouseTransferLineRequest> { new(ProductUnitId: 1, Quantity: 10m) });
+        var transfer = new WarehouseTransferDto(Id: 1, TransferNo: "1", SourceWarehouseId: (short)1, SourceWarehouseName: "من المستودع الرئيسي", DestinationWarehouseId: (short)2, DestinationWarehouseName: "إلى المستودع الفرعي", Notes: null, Status: (byte)1, CreatedAt: DateTime.Now, CreatedByUserId: 1, Lines: Array.Empty<WarehouseTransferLineDto>());
 
         _warehouseTransferServiceMock
             .Setup(x => x.CreateAsync(It.IsAny<CreateWarehouseTransferRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -106,7 +106,7 @@ public class WarehouseTransfersControllerTests
     [Fact]
     public async Task Create_WhenServiceFails_ReturnsBadRequest()
     {
-        var request = new CreateWarehouseTransferRequest(1, (short)1, (short)2, DateTime.Now, null, new List<CreateWarehouseTransferLineRequest> { new(1, 1, 10m, 0m) });
+        var request = new CreateWarehouseTransferRequest("1", (short)1, (short)2, null, new List<CreateWarehouseTransferLineRequest> { new(ProductUnitId: 1, Quantity: 10m) });
 
         _warehouseTransferServiceMock
             .Setup(x => x.CreateAsync(It.IsAny<CreateWarehouseTransferRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
@@ -125,7 +125,7 @@ public class WarehouseTransfersControllerTests
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = new ClaimsPrincipal() }
         };
 
-        var request = new CreateWarehouseTransferRequest(1, (short)1, (short)2, DateTime.Now, null, new List<CreateWarehouseTransferLineRequest> { new(1, 1, 10m, 0m) });
+        var request = new CreateWarehouseTransferRequest("1", (short)1, (short)2, null, new List<CreateWarehouseTransferLineRequest> { new(ProductUnitId: 1, Quantity: 10m) });
 
         var result = await _controller.Create(request, CancellationToken.None);
 

@@ -56,7 +56,7 @@ public static class PrintDtoExtensions
         return new InvoicePrintDto(
             invoice.Id,
             "فاتورة مشتريات",
-            invoice.InvoiceDate,
+            invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue),
             invoice.SupplierName,
             null,
             invoice.WarehouseName,

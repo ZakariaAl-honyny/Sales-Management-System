@@ -109,17 +109,6 @@
                                  ToolTip="اسم المستخدم للدخول — يجب أن يكون فريداً ولا يمكن تكراره. يُستخدم مع كلمة المرور لتسجيل الدخول"/>
                         <TextBlock Text="اسم فريد يُستخدم للدخول إلى النظام" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
 
-                        <!-- Full Name -->
-                        <TextBlock Text="الاسم بالكامل *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Tag="الاسم الثلاثي للموظف"
-                                 TabIndex="2"
-                                 helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserFullName"
-                                 ToolTip="الاسم الكامل للمستخدم — يظهر في الفواتير والتقارير"/>
-                        <TextBlock Text="يظهر هذا الاسم في الفواتير والتقارير" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
-
                         <!-- Default Password Notice -->
                         <Border Background="#FFF8E1" Padding="10" CornerRadius="6" Margin="0,0,0,6"
                                 BorderBrush="#FFE082" BorderThickness="1">
@@ -153,7 +142,7 @@
                                   SelectedValuePath="Id"
                                   DisplayMemberPath="Display"
                                   Style="{StaticResource ModernComboBox}"
-                                  TabIndex="4"
+                                  TabIndex="2"
                                   helpers:FocusHelper.AdvanceOnEnter="True"
                                   AutomationProperties.AutomationId="CbUserRole"
                                   ToolTip="تحدد صلاحيات المستخدم — مدير نظام (كل الصلاحيات)، مدير (مشرف)، كاشير (مبيعات فقط)"/>
@@ -162,7 +151,7 @@
                         <!-- Is Active -->
                         <CheckBox Content="الحساب نشط"
                                   IsChecked="{Binding IsActive}"
-                                  TabIndex="5"
+                                  TabIndex="3"
                                   Margin="0,0,0,6"
                                   AutomationProperties.AutomationId="ChkUserIsActive"
                                   ToolTip="إلغاء التحديد لتعطيل الحساب — لن يتمكن المستخدم من تسجيل الدخول"/>
@@ -196,39 +185,9 @@
                                   SelectedValuePath="Id"
                                   DisplayMemberPath="Name"
                                   Style="{StaticResource ModernComboBox}"
-                                  TabIndex="6"
+                                  TabIndex="4"
                                   ToolTip="اختيار الصندوق النقدي الافتراضي للمستخدم — يظهر تلقائياً عند فتح شاشة الدفع"/>
                         <TextBlock Text="اختياري — سيتم تعيين هذا الصندوق كافتراضي عند تسجيل المدفوعات" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Contact Info Section -->
-                <Border Style="{StaticResource CardStyle}" Padding="12">
-                    <StackPanel>
-                        <TextBlock Text="معلومات الاتصال" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
-
-                        <!-- Phone -->
-                        <TextBlock Text="رقم الهاتف" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Tag="05XXXXXXXX"
-                                 TabIndex="7"
-                                 MaxLength="20"
-                                 helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserPhone"
-                                 ToolTip="رقم الهاتف المحمول أو الثابت — حد أقصى 20 رقم"/>
-                        <TextBlock Text="حد أقصى 20 رقم — مثال: 0512345678" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
-
-                        <!-- Email -->
-                        <TextBlock Text="البريد الإلكتروني" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                                 Style="{StaticResource ModernTextBox}"
-                                 Tag="user@example.com"
-                                 TabIndex="8"
-                                 helpers:FocusHelper.AdvanceOnEnter="True"
-                                 AutomationProperties.AutomationId="TxtUserEmail"
-                                 ToolTip="البريد الإلكتروني — يجب أن يكون بصيغة صحيحة مثل user@example.com"/>
-                        <TextBlock Text="البريد الإلكتروني — صيغة صحيحة مطلوبة" Style="{StaticResource HelperTextStyle}" Margin="0,0,0,6"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

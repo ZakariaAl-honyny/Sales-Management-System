@@ -6,6 +6,7 @@ namespace SalesSystem.Infrastructure.Data.Configurations;
 
 /// <summary>
 /// EF Core configuration for the <see cref="FiscalYear"/> entity.
+/// PK is smallint (short). Date columns use date type. Extends ActivatableEntity.
 /// </summary>
 public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
 {
@@ -13,6 +14,11 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
     {
         builder.ToTable("FiscalYears");
         builder.HasKey(x => x.Id);
+
+        // PK is smallint — use short type
+        builder.Property(x => x.Id)
+            .HasColumnType("smallint")
+            .ValueGeneratedOnAdd();
 
         // === Properties ===
 
@@ -24,10 +30,12 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
             .HasMaxLength(20);
 
         builder.Property(x => x.StartDate)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("date");
 
         builder.Property(x => x.EndDate)
-            .IsRequired();
+            .IsRequired()
+            .HasColumnType("date");
 
         builder.Property(x => x.IsOpen)
             .HasDefaultValue(true);
@@ -53,8 +61,8 @@ public class FiscalYearConfiguration : IEntityTypeConfiguration<FiscalYear>
             .IsUnique()
             .HasDatabaseName("IX_FiscalYears_YearName");
 
-        // === Global query filter — only open years ===
+        // === Global query filter — ActivatableEntity: IsActive soft delete ===
 
-        builder.HasQueryFilter(x => x.IsOpen);
+        builder.HasQueryFilter(x => x.IsActive);
     }
 }

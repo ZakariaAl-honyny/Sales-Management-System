@@ -1,4 +1,3 @@
-using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
 using SalesSystem.Domain.Exceptions;
 
@@ -6,11 +5,18 @@ namespace SalesSystem.Domain.Accounting.Entities;
 
 /// <summary>
 /// Key-Value mapping between a business function and a Chart of Accounts AccountId.
-/// Each <see cref="SystemAccountKey"/> maps to exactly one Account per Branch.
-/// Inherits AuditableEntity for CreatedBy/UpdatedBy tracking without soft delete.
+/// MappingKey is stored as nvarchar(100) — e.g. "SalesRevenue", "COGS".
+/// Inherits Entity (no audit fields) — this is a pure junction/configuration table.
+/// Schema: §4.10 SystemAccountMappings.
 /// </summary>
-public class SystemAccountMapping : AuditableEntity
+public class SystemAccountMapping : Entity
 {
+    /// <summary>
+    /// Business function key as string (nvarchar(100), unique).
+    /// Values match SystemAccountKey enum names for reference.
+    /// </summary>
+    public string MappingKey { get; private set; } = string.Empty;
+
     /// <summary>
     /// Mapped AccountId from the Accounts table.
     /// </summary>
@@ -18,12 +24,7 @@ public class SystemAccountMapping : AuditableEntity
     public Account? Account { get; private set; }
 
     /// <summary>
-    /// The business function this mapping represents.
-    /// </summary>
-    public SystemAccountKey MappingKey { get; private set; }
-
-    /// <summary>
-    /// Branch identifier for multi-branch support (nullable, schema smallint).
+    /// Branch identifier for multi-branch override (nullable, schema smallint).
     /// </summary>
     public short? BranchId { get; private set; }
 
@@ -33,19 +34,22 @@ public class SystemAccountMapping : AuditableEntity
     /// Creates a new system account mapping with validation.
     /// </summary>
     public static SystemAccountMapping Create(
-        SystemAccountKey mappingKey,
+        string mappingKey,
         int accountId,
         short? branchId = null)
     {
+        if (string.IsNullOrWhiteSpace(mappingKey))
+            throw new DomainException("مفتاح الربط مطلوب");
+
+        if (mappingKey.Trim().Length > 100)
+            throw new DomainException("مفتاح الربط لا يمكن أن يتجاوز 100 حرف");
+
         if (accountId <= 0)
             throw new DomainException("رقم الحساب المحاسبي غير صالح");
 
-        if (!Enum.IsDefined(typeof(SystemAccountKey), mappingKey))
-            throw new DomainException("مفتاح الربط غير صالح");
-
         return new SystemAccountMapping
         {
-            MappingKey = mappingKey,
+            MappingKey = mappingKey.Trim(),
             AccountId = accountId,
             BranchId = branchId
         };
@@ -60,6 +64,5 @@ public class SystemAccountMapping : AuditableEntity
             throw new DomainException("رقم الحساب المحاسبي غير صالح");
 
         AccountId = accountId;
-        UpdateTimestamp();
     }
 }

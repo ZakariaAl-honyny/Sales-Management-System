@@ -251,7 +251,7 @@ public class ReportService : IReportService
                 return Result<IEnumerable<ExpiredProductDto>>.Failure("عدد الأيام يجب أن يكون صفراً أو أكثر");
             }
 
-            var cutoffDate = DateTime.Today.AddDays(thresholdDays);
+            var cutoffDate = DateOnly.FromDateTime(DateTime.Today.AddDays(thresholdDays));
 
             _logger.LogInformation("Generating expired products report with threshold {ThresholdDays} days (cutoff: {CutoffDate})",
                 thresholdDays, cutoffDate);
@@ -284,15 +284,16 @@ public class ReportService : IReportService
             var dtos = products.Select(p =>
             {
                 stockByProduct.TryGetValue(p.Id, out var totalStock);
-                var expiryDate = productEarliestExpiry.GetValueOrDefault(p.Id, DateTime.Today);
+                var expiryDate = productEarliestExpiry.GetValueOrDefault(p.Id, DateOnly.FromDateTime(DateTime.Today));
+                var expiryDateTime = expiryDate.ToDateTime(TimeOnly.MinValue);
                 return new ExpiredProductDto(
                     p.Id,
                     p.Name,
                     p.ProductCategory?.Name,
                     null,
                     totalStock,
-                    expiryDate,
-                    (DateTime.Today - expiryDate).Days
+                    expiryDateTime,
+                    (DateTime.Today - expiryDateTime).Days
                 );
             }).ToList();
 

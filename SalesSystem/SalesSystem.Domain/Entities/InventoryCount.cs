@@ -7,16 +7,19 @@ namespace SalesSystem.Domain.Entities;
 /// <summary>
 /// Represents a physical inventory count session for a specific warehouse.
 /// Maps to "InventoryCounts" table.
-/// Schema: CountNo (int unique), WarehouseId (smallint FK), CountDate (date),
-/// Notes, Status (tinyint), audit.
+/// Schema: nvarchar(50) CountNo (unique), smallint WarehouseId FK,
+/// nvarchar(300) Notes, tinyint Status (Draft=1,Posted=2,Cancelled=3).
+/// BaseEntity with CreatedAt only.
 /// </summary>
-public class InventoryCount : DocumentEntity
+public class InventoryCount : Entity
 {
-    public int CountNo { get; private set; }
-    public DateTime CountDate { get; private set; }
+    public string CountNo { get; private set; } = string.Empty;
     public short WarehouseId { get; private set; }
     public InventoryCountStatus Status { get; private set; }
     public string? Notes { get; private set; }
+
+    public DateTime CreatedAt { get; private set; }
+    public int CreatedByUserId { get; private set; }
 
     // Navigation properties
     public virtual Warehouse? Warehouse { get; private set; }
@@ -30,24 +33,25 @@ public class InventoryCount : DocumentEntity
     /// Creates a new inventory count session.
     /// </summary>
     public static InventoryCount Create(
-        int countNo,
+        string countNo,
         short warehouseId,
-        DateTime? countDate = null,
+        string? notes = null,
         int? createdByUserId = null)
     {
-        if (countNo <= 0)
+        if (string.IsNullOrWhiteSpace(countNo))
             throw new DomainException("رقم الجرد مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
 
         var inventoryCount = new InventoryCount
         {
-            CountNo = countNo,
+            CountNo = countNo.Trim(),
             WarehouseId = warehouseId,
-            CountDate = countDate ?? DateTime.UtcNow,
-            Status = InventoryCountStatus.Draft
+            Notes = notes,
+            Status = InventoryCountStatus.Draft,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = createdByUserId ?? 0
         };
-        inventoryCount.SetCreatedBy(createdByUserId);
         return inventoryCount;
     }
 
@@ -62,7 +66,6 @@ public class InventoryCount : DocumentEntity
         if (Status != InventoryCountStatus.Draft)
             throw new DomainException("لا يمكن إضافة أصناف لجرد غير مسودة.");
         _lines.Add(line);
-        UpdateTimestamp();
     }
 
     public void Post()
@@ -72,8 +75,6 @@ public class InventoryCount : DocumentEntity
         if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل جرد بدون أصناف.");
         Status = InventoryCountStatus.Posted;
-        PostedAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 
     public void Cancel()
@@ -81,8 +82,6 @@ public class InventoryCount : DocumentEntity
         if (Status == InventoryCountStatus.Cancelled)
             throw new DomainException("الجرد ملغى بالفعل.");
         Status = InventoryCountStatus.Cancelled;
-        CancelledAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 
     public void SetNotes(string? notes)
@@ -90,6 +89,5 @@ public class InventoryCount : DocumentEntity
         if (Status != InventoryCountStatus.Draft)
             throw new DomainException("لا يمكن تحديث ملاحظات جرد غير مسودة.");
         Notes = notes;
-        UpdateTimestamp();
     }
 }

@@ -170,7 +170,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             if (voucher == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
-            if (voucher.Status == (byte)InvoiceStatus.Posted)
+            if (voucher.Status == VoucherStatus.Posted)
                 return Result.Failure("لا يمكن حذف سند قبض مرحّل. قم بإلغائه أولاً.");
 
             voucher.Cancel();
@@ -255,7 +255,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
-            var wasPosted = voucher.Status == (byte)InvoiceStatus.Posted;
+            var wasPosted = voucher.Status == VoucherStatus.Posted;
 
             voucher.Cancel(userId);
 
@@ -334,7 +334,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             voucher.Account?.NameAr,
             voucher.TotalAmount,
             voucher.Notes,
-            voucher.Status,
+            (byte)voucher.Status,
             voucher.CreatedAt,
             voucher.PostedAt,
             voucher.CancelledAt

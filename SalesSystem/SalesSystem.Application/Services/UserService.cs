@@ -6,7 +6,6 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.Domain.Entities;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -84,14 +83,13 @@ public class UserService : IUserService
                 return Result<UserDto>.Failure("اسم المستخدم موجود بالفعل", ErrorCodes.DuplicateEntry);
             }
 
-            // 2. Create entity with default password — user must change on first login.
-            string defaultPasswordHash = BCrypt.Net.BCrypt.HashPassword(DefaultPassword, workFactor: 12);
+            // 2. Hash the provided password or fall back to the default password.
+            //    User must change password on first login when using the default.
+            string passwordToHash = string.IsNullOrWhiteSpace(request.Password) ? DefaultPassword : request.Password;
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(passwordToHash, workFactor: 12);
             var user = User.CreateWithPassword(
                 request.UserName,
-                defaultPasswordHash,
-                request.FullName,
-                phone: request.Phone,
-                email: request.Email,
+                passwordHash,
                 employeeId: null,
                 createdByUserId: null,
                 mustChangePassword: true
@@ -134,18 +132,16 @@ public class UserService : IUserService
 
             // Update basic info — role is assigned separately via UserRole join entity
             user.Update(
-                request.FullName,
-                phone: request.Phone,
-                email: request.Email,
                 employeeId: null,
                 updatedByUserId: null
             );
 
-            // Update status
-            var status = (UserStatus)request.Status;
-            if (status == UserStatus.Active) user.Restore();
-            else if (status == UserStatus.Inactive) user.MarkAsDeleted();
-            else if (status == UserStatus.Locked) user.Lock();
+            // Update lock/active state
+            if (request.IsLocked.HasValue)
+            {
+                if (request.IsLocked.Value) user.Lock();
+                else user.Unlock();
+            }
 
             // Update password if provided
             if (!string.IsNullOrWhiteSpace(request.Password))
@@ -193,14 +189,14 @@ public class UserService : IUserService
             var isAdmin = await _uow.UserRoles.AnyAsync(
                 ur => ur.UserId == user.Id && ur.RoleId == adminRoleId, ct);
 
-            if (isAdmin && user.Status == UserStatus.Active)
+            if (isAdmin && user.IsActive)
             {
                 var adminUserRoles = await _uow.UserRoles.ToListAsync(
                     ur => ur.RoleId == adminRoleId,
                     ct: ct,
                     includePaths: "User");
                 var activeAdminCount = adminUserRoles
-                    .Where(ur => ur.User?.Status == UserStatus.Active)
+                    .Where(ur => ur.User != null && ur.User.IsActive)
                     .Select(ur => ur.UserId)
                     .Distinct()
                     .Count();
@@ -272,9 +268,8 @@ public class UserService : IUserService
             return Result<CurrentUserDto>.Success(new CurrentUserDto(
                 Id: user.Id,
                 UserName: user.UserName,
-                FullName: user.FullName,
                 Role: (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
-                AvatarPath: null,  // Removed from User entity in v4.7+
+                AvatarPath: null,
                 Permissions: permissions
             ));
         }
@@ -290,17 +285,13 @@ public class UserService : IUserService
         return new UserDto(
             Id: user.Id,
             UserName: user.UserName,
-            FullName: user.FullName,
             Role: (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
-            Status: (byte)user.Status,
             MustChangePassword: user.MustChangePassword,
-            PasswordChangedAt: user.PasswordChangedAt,
-            Phone: user.Phone,
-            Email: user.Email,
-            AvatarPath: null,        // Removed from User entity in v4.7+
+            IsLocked: user.IsLocked,
+            AvatarPath: null,
             LastLoginAt: user.LastLoginAt,
             LoginAttempts: user.LoginAttempts,
-            DefaultCashBoxId: null   // Removed from User entity in v4.7+
+            DefaultCashBoxId: null
         );
     }
 }

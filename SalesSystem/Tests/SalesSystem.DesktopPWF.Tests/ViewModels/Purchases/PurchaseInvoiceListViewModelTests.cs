@@ -458,7 +458,7 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             SupplierName: supplierName,
             WarehouseId: 1,
             WarehouseName: "ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½ï؟½",
-            InvoiceDate: DateTime.Today,
+            InvoiceDate: DateOnly.FromDateTime(DateTime.Today),
             PaymentType: 1,
             SubTotal: totalAmount,
             DiscountAmount: 0,
@@ -468,12 +468,14 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             PaidAmount: totalAmount,
             RemainingAmount: 0,
             Notes: null,
+            SupplierInvoiceNo: null,
             Status: status,
             TaxId: null,
             TaxName: null,
             TaxRate: null,
             CurrencyId: null,
             ExchangeRate: null,
+            CashBoxId: null,
             Items: new List<PurchaseInvoiceLineDto>());
     }
 

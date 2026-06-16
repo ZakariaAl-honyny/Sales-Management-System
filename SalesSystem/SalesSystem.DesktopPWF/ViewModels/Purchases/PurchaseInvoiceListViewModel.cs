@@ -243,8 +243,8 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
         if (obj is not PurchaseInvoiceDto invoice) return false;
 
         // Date filter
-        if (DateFrom.HasValue && invoice.InvoiceDate < DateFrom.Value) return false;
-        if (DateTo.HasValue && invoice.InvoiceDate > DateTo.Value.AddDays(1)) return false;
+        if (DateFrom.HasValue && invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue) < DateFrom.Value) return false;
+        if (DateTo.HasValue && invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue) > DateTo.Value.AddDays(1)) return false;
 
         // Status filter
         if (StatusFilter.HasValue && invoice.Status != StatusFilter.Value) return false;

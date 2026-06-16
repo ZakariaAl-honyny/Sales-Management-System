@@ -5,24 +5,24 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// A single product count record within an inventory count session.
-/// Links to a specific batch (BatchId is NOT nullable).
-/// Schema: InventoryCountId FK, ProductId FK, BatchId FK (NOT null),
-/// SystemQuantity, ActualQuantity, DifferenceQuantity.
+/// Schema: int InventoryCountId FK, int ProductUnitId FK,
+/// decimal(18,3) ExpectedQuantity, decimal(18,3) ActualQuantity,
+/// decimal(18,3) Difference, nvarchar(300) Notes.
+/// Entity (no audit).
 /// </summary>
 public class InventoryCountLine : Entity
 {
     public int InventoryCountId { get; private set; }
-    public int ProductId { get; private set; }
 
     /// <summary>
-    /// FK to InventoryBatches — this line is linked to a specific batch.
+    /// FK to ProductUnit — identifies the product and unit.
     /// </summary>
-    public int BatchId { get; private set; }
+    public int ProductUnitId { get; private set; }
 
     /// <summary>
-    /// Expected quantity from system.
+    /// Expected quantity from system records.
     /// </summary>
-    public decimal SystemQuantity { get; private set; }
+    public decimal ExpectedQuantity { get; private set; }
 
     /// <summary>
     /// Actual counted quantity.
@@ -30,43 +30,45 @@ public class InventoryCountLine : Entity
     public decimal ActualQuantity { get; private set; }
 
     /// <summary>
-    /// Difference = ActualQuantity - SystemQuantity.
+    /// Difference = ActualQuantity - ExpectedQuantity.
     /// </summary>
-    public decimal DifferenceQuantity { get; private set; }
+    public decimal Difference { get; private set; }
+
+    /// <summary>
+    /// Optional notes for this count line.
+    /// </summary>
+    public string? Notes { get; private set; }
 
     // Navigation properties
     public virtual InventoryCount? InventoryCount { get; private set; }
-    public virtual Product? Product { get; private set; }
-    public virtual InventoryBatch? Batch { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private InventoryCountLine() { }
 
     public static InventoryCountLine Create(
         int inventoryCountId,
-        int productId,
-        int batchId,
-        decimal systemQuantity,
-        decimal actualQuantity)
+        int productUnitId,
+        decimal expectedQuantity,
+        decimal actualQuantity,
+        string? notes = null)
     {
         if (inventoryCountId <= 0)
             throw new DomainException("رقم الجرد مطلوب.");
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب.");
-        if (batchId <= 0)
-            throw new DomainException("الدفعة مطلوبة.");
-        if (systemQuantity < 0)
-            throw new DomainException("الكمية النظامية لا يمكن أن تكون سالبة.");
+        if (productUnitId <= 0)
+            throw new DomainException("وحدة المنتج مطلوبة.");
+        if (expectedQuantity < 0)
+            throw new DomainException("الكمية المتوقعة لا يمكن أن تكون سالبة.");
         if (actualQuantity < 0)
             throw new DomainException("الكمية الفعلية لا يمكن أن تكون سالبة.");
 
         return new InventoryCountLine
         {
             InventoryCountId = inventoryCountId,
-            ProductId = productId,
-            BatchId = batchId,
-            SystemQuantity = systemQuantity,
+            ProductUnitId = productUnitId,
+            ExpectedQuantity = expectedQuantity,
             ActualQuantity = actualQuantity,
-            DifferenceQuantity = actualQuantity - systemQuantity
+            Difference = actualQuantity - expectedQuantity,
+            Notes = notes?.Trim()
         };
     }
 }

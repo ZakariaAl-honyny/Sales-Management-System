@@ -1,25 +1,23 @@
 using SalesSystem.Domain.Common;
-using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Represents a system user for authentication and authorization.
+/// Schema §1.9 — Users table. Uses two bit flags for state:
+///   IsActive (from ActivatableEntity): active=1, soft-deleted=0
+///   IsLocked: unlocked=0, locked=1 (after 5 failed login attempts)
+/// Roles are assigned via many-to-many UserRole join table.
 /// Uses passwordless creation by default (MustChangePassword = true).
-/// Roles are assigned via many-to-many UserRole join table (not a direct enum).
 /// </summary>
 public class User : ActivatableEntity
 {
     public string UserName { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
     public int? EmployeeId { get; private set; }               // Optional link to employee record
-    public string FullName { get; private set; } = string.Empty; // Display name for UI
-    public string? Phone { get; private set; }
-    public string? Email { get; private set; }
-    public UserStatus Status { get; private set; } = UserStatus.Active;
+    public bool IsLocked { get; private set; }                  // true = account locked (max failed attempts)
     public bool MustChangePassword { get; private set; } = true;
-    public DateTime? PasswordChangedAt { get; private set; }
     public DateTime? LastLoginAt { get; private set; }
     public short LoginAttempts { get; private set; }
 
@@ -38,22 +36,15 @@ public class User : ActivatableEntity
     /// <see cref="ChangePassword"/> to set the password later.
     /// Roles/branches are assigned separately via UserRole/UserBranch join entities.
     /// </summary>
-    public static User Create(string userName, string fullName, string? phone = null,
-        string? email = null, int? employeeId = null, int? createdByUserId = null)
+    public static User Create(string userName, int? employeeId = null, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new DomainException("اسم المستخدم مطلوب.");
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new DomainException("الاسم الكامل مطلوب.");
 
         var user = new User
         {
             UserName = userName.Trim(),
-            FullName = fullName.Trim(),
-            Phone = phone?.Trim(),
-            Email = email?.Trim(),
             EmployeeId = employeeId,
-            Status = UserStatus.Active,
             MustChangePassword = true,
             LoginAttempts = 0
         };
@@ -66,7 +57,6 @@ public class User : ActivatableEntity
     /// MustChangePassword is false by default for seeds.
     /// </summary>
     public static User CreateWithPassword(string userName, string passwordHash,
-        string fullName, string? phone = null, string? email = null,
         int? employeeId = null, int? createdByUserId = null,
         bool mustChangePassword = false)
     {
@@ -74,20 +64,13 @@ public class User : ActivatableEntity
             throw new DomainException("اسم المستخدم مطلوب.");
         if (string.IsNullOrWhiteSpace(passwordHash))
             throw new DomainException("كلمة المرور مطلوبة.");
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new DomainException("الاسم الكامل مطلوب.");
 
         var user = new User
         {
             UserName = userName.Trim(),
             PasswordHash = passwordHash,
-            FullName = fullName.Trim(),
-            Phone = phone?.Trim(),
-            Email = email?.Trim(),
             EmployeeId = employeeId,
-            Status = UserStatus.Active,
             MustChangePassword = mustChangePassword,
-            PasswordChangedAt = mustChangePassword ? null : DateTime.UtcNow,
             LoginAttempts = 0
         };
         user.SetCreatedBy(createdByUserId);
@@ -98,17 +81,10 @@ public class User : ActivatableEntity
 
     /// <summary>
     /// Updates the user's profile information.
-    /// Validates fullName is not empty.
     /// Does NOT change UserName or password — those have dedicated methods.
     /// </summary>
-    public void Update(string fullName, string? phone = null, string? email = null,
-        int? employeeId = null, int? updatedByUserId = null)
+    public void Update(int? employeeId = null, int? updatedByUserId = null)
     {
-        if (string.IsNullOrWhiteSpace(fullName))
-            throw new DomainException("الاسم الكامل مطلوب.");
-        FullName = fullName.Trim();
-        Phone = phone?.Trim();
-        Email = email?.Trim();
         EmployeeId = employeeId;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
@@ -128,7 +104,6 @@ public class User : ActivatableEntity
             throw new DomainException("كلمة المرور مطلوبة.");
         PasswordHash = passwordHash;
         MustChangePassword = false;
-        PasswordChangedAt = DateTime.UtcNow;
         UpdateTimestamp();
     }
 
@@ -140,7 +115,6 @@ public class User : ActivatableEntity
         if (string.IsNullOrWhiteSpace(newPasswordHash))
             throw new DomainException("كلمة المرور الجديدة مطلوبة.");
         PasswordHash = newPasswordHash;
-        PasswordChangedAt = DateTime.UtcNow;
         MustChangePassword = false;
         LoginAttempts = 0;
         SetUpdatedBy(updatedByUserId);
@@ -157,7 +131,6 @@ public class User : ActivatableEntity
             throw new DomainException("كلمة المرور مطلوبة.");
         PasswordHash = newPasswordHash;
         MustChangePassword = true;
-        PasswordChangedAt = null;
         LoginAttempts = 0;
         UpdateTimestamp();
     }
@@ -173,14 +146,14 @@ public class User : ActivatableEntity
         if (success)
         {
             LoginAttempts = 0;
-            Status = UserStatus.Active;
+            IsLocked = false;
             LastLoginAt = DateTime.UtcNow;
         }
         else
         {
             LoginAttempts++;
             if (LoginAttempts >= 5)
-                Status = UserStatus.Locked;
+                IsLocked = true;
         }
         UpdateTimestamp();
     }
@@ -189,26 +162,26 @@ public class User : ActivatableEntity
 
     public void Lock()
     {
-        Status = UserStatus.Locked;
+        IsLocked = true;
         UpdateTimestamp();
     }
 
     public void Unlock()
     {
-        Status = UserStatus.Active;
+        IsLocked = false;
         LoginAttempts = 0;
         UpdateTimestamp();
     }
 
     public void Deactivate()
     {
-        Status = UserStatus.Inactive;
+        IsActive = false;
         UpdateTimestamp();
     }
 
     public void Activate()
     {
-        Status = UserStatus.Active;
+        IsActive = true;
         UpdateTimestamp();
     }
 
@@ -224,13 +197,15 @@ public class User : ActivatableEntity
 
     public override void MarkAsDeleted()
     {
-        Status = UserStatus.Inactive;
+        IsActive = false;
+        IsLocked = false;
         base.MarkAsDeleted();
     }
 
     public override void Restore()
     {
-        Status = UserStatus.Active;
+        IsActive = true;
+        IsLocked = false;
         base.Restore();
     }
 

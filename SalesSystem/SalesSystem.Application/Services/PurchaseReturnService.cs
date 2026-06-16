@@ -108,20 +108,24 @@ public class PurchaseReturnService : IPurchaseReturnService
 
                 var purchaseReturn = PurchaseReturn.Create(
                     returnNoResult.Value,
-                    request.PurchaseInvoiceId ?? 0,
                     request.SupplierId,
                     (short)request.WarehouseId,
                     (short)(request.CurrencyId ?? 1),
-                    request.ReturnDate,
+                    request.ReturnDate.HasValue
+                        ? DateOnly.FromDateTime(request.ReturnDate.Value)
+                        : DateOnly.FromDateTime(DateTime.UtcNow),
+                    request.PurchaseInvoiceId,
                     request.Notes,
                     userId);
 
                 foreach (var item in request.Items)
                 {
                     var line = PurchaseReturnLine.Create(
-                        item.PurchaseInvoiceLineId,
+                        item.ProductId,
+                        item.ProductUnitId,
                         item.Quantity,
-                        item.Amount);
+                        item.Amount,
+                        item.PurchaseInvoiceLineId);
                     purchaseReturn.AddLine(line);
                 }
 
@@ -305,7 +309,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.SupplierId,
             r.Supplier?.Party?.Name ?? "غير معروف",
             r.PurchaseInvoiceId,
-            true, // LinkToInvoice always true for current design
+            r.PurchaseInvoiceId.HasValue, // LinkToInvoice = true when linked to an invoice
             r.ReturnDate,
             0, // SubTotal removed
             r.TotalAmount,
@@ -315,13 +319,14 @@ public class PurchaseReturnService : IPurchaseReturnService
             (byte)r.Status,
             r.Lines.Select(it => new PurchaseReturnItemDto(
                 it.Id,
-                it.PurchaseInvoiceLine?.ProductId ?? 0,
-                it.PurchaseInvoiceLine?.Product?.Name ?? "غير معروف",
-                0, // ProductUnitId removed
-                null, // ProductUnitName removed
+                it.ProductId,
+                it.Product?.Name ?? "غير معروف",
+                it.ProductUnitId,
+                it.ProductUnit?.Unit?.Name ?? null,
                 it.Quantity,
                 it.Amount,
-                it.Amount
+                it.Amount,
+                it.PurchaseInvoiceLineId
             )).ToList()
         );
     }

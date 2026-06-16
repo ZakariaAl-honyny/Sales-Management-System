@@ -67,7 +67,7 @@ public class DocumentSequenceListViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _selectedSequence, value))
             {
                 if (value != null)
-                    ResetValue = value.LastNumber;
+                    ResetValue = value.NextNumber;
                 OnPropertyChanged(nameof(HasSelection));
             }
         }
@@ -147,7 +147,7 @@ public class DocumentSequenceListViewModel : ViewModelBase, IDisposable
         }
 
         var confirmed = await _dialogService.ShowConfirmationAsync("تأكيد إعادة تعيين التسلسل",
-            $"سيتم إعادة تعيين الرقم التالي لتسلسل '{SelectedSequence.DocumentType}' من {SelectedSequence.LastNumber} إلى {ResetValue}.\n\n" +
+            $"سيتم إعادة تعيين الرقم التالي لتسلسل '{SelectedSequence.DocumentType}' من {SelectedSequence.NextNumber} إلى {ResetValue}.\n\n" +
             $"هل تريد المتابعة؟");
 
         if (!confirmed) return;

@@ -5,65 +5,65 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// A single product adjustment line within an inventory adjustment.
-/// Schema: InventoryAdjustmentId FK, ProductId FK, BatchId FK (nullable),
-/// Quantity, UnitCost, TotalCost.
+/// Schema: int InventoryAdjustmentId FK, int ProductUnitId FK,
+/// decimal(18,3) ExpectedQuantity, decimal(18,3) ActualQuantity, decimal(18,2) UnitCost.
+/// Entity (no audit).
 /// </summary>
 public class InventoryAdjustmentLine : Entity
 {
     public int InventoryAdjustmentId { get; private set; }
-    public int ProductId { get; private set; }
 
     /// <summary>
-    /// FK to InventoryBatches — nullable for opening adjustments.
+    /// FK to ProductUnit — identifies the product and unit.
     /// </summary>
-    public int? BatchId { get; private set; }
+    public int ProductUnitId { get; private set; }
 
     /// <summary>
-    /// The adjustment quantity.
+    /// Expected quantity per system records.
     /// </summary>
-    public decimal Quantity { get; private set; }
+    public decimal ExpectedQuantity { get; private set; }
 
     /// <summary>
-    /// The unit cost at the time of adjustment.
+    /// Actual quantity counted/adjusted.
+    /// </summary>
+    public decimal ActualQuantity { get; private set; }
+
+    /// <summary>
+    /// Unit cost at the time of adjustment. decimal(18,2).
     /// </summary>
     public decimal UnitCost { get; private set; }
 
-    /// <summary>
-    /// Total cost = Quantity x UnitCost.
-    /// </summary>
-    public decimal TotalCost { get; private set; }
-
     // Navigation properties
     public virtual InventoryAdjustment? InventoryAdjustment { get; private set; }
-    public virtual Product? Product { get; private set; }
-    public virtual InventoryBatch? Batch { get; private set; }
+    public virtual ProductUnit? ProductUnit { get; private set; }
 
     private InventoryAdjustmentLine() { }
 
     public static InventoryAdjustmentLine Create(
         int inventoryAdjustmentId,
-        int productId,
-        decimal quantity,
-        decimal unitCost,
-        int? batchId = null)
+        int productUnitId,
+        decimal expectedQuantity,
+        decimal actualQuantity,
+        decimal unitCost)
     {
         if (inventoryAdjustmentId <= 0)
             throw new DomainException("رقم التسوية مطلوب.");
-        if (productId <= 0)
-            throw new DomainException("المنتج مطلوب.");
-        if (quantity <= 0)
-            throw new DomainException("الكمية يجب أن تكون أكبر من الصفر.");
+        if (productUnitId <= 0)
+            throw new DomainException("وحدة المنتج مطلوبة.");
+        if (expectedQuantity < 0)
+            throw new DomainException("الكمية المتوقعة لا يمكن أن تكون سالبة.");
+        if (actualQuantity < 0)
+            throw new DomainException("الكمية الفعلية لا يمكن أن تكون سالبة.");
         if (unitCost < 0)
             throw new DomainException("تكلفة الوحدة لا يمكن أن تكون سالبة.");
 
         return new InventoryAdjustmentLine
         {
             InventoryAdjustmentId = inventoryAdjustmentId,
-            ProductId = productId,
-            BatchId = batchId,
-            Quantity = quantity,
-            UnitCost = unitCost,
-            TotalCost = quantity * unitCost
+            ProductUnitId = productUnitId,
+            ExpectedQuantity = expectedQuantity,
+            ActualQuantity = actualQuantity,
+            UnitCost = unitCost
         };
     }
 }

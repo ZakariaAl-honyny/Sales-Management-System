@@ -19,7 +19,7 @@ public record SettingsResponse(
 );
 
 public record UserResponse(
-    int Id, string Username, string FullName, string Role, bool IsActive
+    int Id, string Username, string Role, bool IsActive, bool IsLocked
 );
 
 /// <summary>

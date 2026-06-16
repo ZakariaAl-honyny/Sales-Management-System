@@ -259,7 +259,7 @@ public class SalesReportService : ISalesReportService
             var users = userIds.Count > 0
                 ? await _uow.Users.ToListAsync(u => userIds.Contains(u.Id), ct: ct)
                 : new List<Domain.Entities.User>();
-            var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
+            var userDict = users.ToDictionary(u => u.Id, u => u.UserName);
 
             var grouped = invoices
                 .GroupBy(si => si.CreatedByUserId)

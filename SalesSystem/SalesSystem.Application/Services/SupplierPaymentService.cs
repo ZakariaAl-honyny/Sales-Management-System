@@ -48,13 +48,16 @@ public class SupplierPaymentService : ISupplierPaymentService
             var payment = SupplierPayment.Create(
                 paymentNo: paymentNo,
                 supplierId: request.SupplierId,
-                cashBoxId: request.CashBoxId ?? 0,
                 currencyId: request.CurrencyId,
                 amount: request.Amount,
                 paymentMethod: (PaymentMethod)request.PaymentMethod,
+                referenceNo: null,
                 notes: request.Notes,
+                cashBoxId: request.CashBoxId,
                 createdByUserId: userId,
-                paymentDate: request.PaymentDate);
+                paymentDate: request.PaymentDate.HasValue
+                    ? DateOnly.FromDateTime(request.PaymentDate.Value)
+                    : DateOnly.FromDateTime(DateTime.UtcNow));
 
             await _uow.SupplierPayments.AddAsync(payment, ct);
             await _uow.SaveChangesAsync(ct);
@@ -87,13 +90,15 @@ public class SupplierPaymentService : ISupplierPaymentService
             if (!string.IsNullOrEmpty(search) && int.TryParse(search, out var parsedNo))
                 searchPaymentNo = parsedNo;
 
+            var fromDate = from.HasValue ? DateOnly.FromDateTime(from.Value) : (DateOnly?)null;
+            var toDate = to.HasValue ? DateOnly.FromDateTime(to.Value) : (DateOnly?)null;
             var (items, totalCount) = await _uow.SupplierPayments.GetPagedAsync(
                 predicate: p =>
                     (string.IsNullOrEmpty(search) ||
                      (searchPaymentNo.HasValue && p.PaymentNo == searchPaymentNo.Value) ||
                      (p.Supplier != null && p.Supplier.Party != null && p.Supplier.Party.Name.Contains(search))) &&
-                    (!from.HasValue || p.PaymentDate >= from.Value) &&
-                    (!to.HasValue || p.PaymentDate <= to.Value),
+                    (!fromDate.HasValue || p.PaymentDate >= fromDate.Value) &&
+                    (!toDate.HasValue || p.PaymentDate <= toDate.Value),
                 orderConfig: q => q.OrderByDescending(p => p.PaymentDate),
                 page,
                 pageSize,
@@ -161,14 +166,16 @@ public class SupplierPaymentService : ISupplierPaymentService
                             return Result<SupplierPaymentDto>.Failure(reverseResult.Error!);
 
                         // 2. Update payment with new amount
-                        payment.Update(
-                            amount: request.Amount,
-                            paymentMethod: (PaymentMethod)request.PaymentMethod,
-                            paymentDate: request.PaymentDate,
-                            notes: request.Notes,
-                            updatedByUserId: userId);
+                    payment.Update(
+                        amount: request.Amount,
+                        paymentMethod: (PaymentMethod)request.PaymentMethod,
+                        paymentDate: request.PaymentDate.HasValue
+                            ? DateOnly.FromDateTime(request.PaymentDate.Value)
+                            : null,
+                        notes: request.Notes,
+                        updatedByUserId: userId);
 
-                        // 3. Create new journal entry for updated amount
+                    // 3. Create new journal entry for updated amount
                         var entryResult = await _accountingService.CreateSupplierPaymentEntryAsync(
                             payment, supplierName, userId, ct);
                         if (!entryResult.IsSuccess)
@@ -188,7 +195,9 @@ public class SupplierPaymentService : ISupplierPaymentService
                     payment.Update(
                         amount: request.Amount,
                         paymentMethod: (PaymentMethod)request.PaymentMethod,
-                        paymentDate: request.PaymentDate,
+                        paymentDate: request.PaymentDate.HasValue
+                            ? DateOnly.FromDateTime(request.PaymentDate.Value)
+                            : null,
                         notes: request.Notes,
                         updatedByUserId: userId);
                     await _uow.SaveChangesAsync(ct);
@@ -205,7 +214,9 @@ public class SupplierPaymentService : ISupplierPaymentService
                 payment.Update(
                     amount: request.Amount,
                     paymentMethod: (PaymentMethod)request.PaymentMethod,
-                    paymentDate: request.PaymentDate,
+                    paymentDate: request.PaymentDate.HasValue
+                        ? DateOnly.FromDateTime(request.PaymentDate.Value)
+                        : null,
                     notes: request.Notes,
                     updatedByUserId: userId);
                 await _uow.SaveChangesAsync(ct);

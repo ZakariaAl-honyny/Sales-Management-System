@@ -37,21 +37,17 @@ public class UserReportService : IUserReportService
             var users = distinctUserIds.Count > 0
                 ? await _uow.Users.ToListAsync(u => distinctUserIds.Contains(u.Id), ct: ct)
                 : new List<Domain.Entities.User>();
-            var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
+            var userDict = users.ToDictionary(u => u.Id, u => u.UserName);
 
-            var result = auditLogs.Select(al =>
-            {
-                int? parsedEntityId = al.EntityId != null && int.TryParse(al.EntityId, out var eid) ? eid : null;
-                return new UserActivityReportDto(
-                    al.UserId ?? 0,
-                    userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
-                    al.CreatedAt,
-                    al.Action,
-                    al.EntityName ?? string.Empty,
-                    parsedEntityId,
-                    al.Details
-                );
-            }).ToList();
+            var result = auditLogs.Select(al => new UserActivityReportDto(
+                al.UserId ?? 0,
+                userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
+                al.CreatedAt,
+                al.Action,
+                al.EntityType ?? string.Empty,
+                al.EntityId,
+                al.NewValues ?? al.OldValues
+            )).ToList();
 
             return Result<List<UserActivityReportDto>>.Success(result);
         }
@@ -83,14 +79,14 @@ public class UserReportService : IUserReportService
             var users = distinctUserIds.Count > 0
                 ? await _uow.Users.ToListAsync(u => distinctUserIds.Contains(u.Id), ct: ct)
                 : new List<Domain.Entities.User>();
-            var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
+            var userDict = users.ToDictionary(u => u.Id, u => u.UserName);
 
             var result = loginLogs.Select(al => new LoginHistoryDto(
                 al.UserId ?? 0,
                 userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
                 al.CreatedAt,
                 al.Action == "LoginSuccess",
-                al.Action == "LoginSuccess" ? null : (al.Details ?? al.Action)
+                al.Action == "LoginSuccess" ? null : (al.NewValues ?? al.Action)
             )).ToList();
 
             return Result<List<LoginHistoryDto>>.Success(result);
@@ -120,15 +116,15 @@ public class UserReportService : IUserReportService
             var users = distinctUserIds.Count > 0
                 ? await _uow.Users.ToListAsync(u => distinctUserIds.Contains(u.Id), ct: ct)
                 : new List<Domain.Entities.User>();
-            var userDict = users.ToDictionary(u => u.Id, u => u.FullName);
+            var userDict = users.ToDictionary(u => u.Id, u => u.UserName);
 
             var result = auditLogs.Select(al => new AuditTrailSummaryDto(
                 al.CreatedAt,
                 userDict.GetValueOrDefault(al.UserId ?? 0, "نظام"),
                 al.Action,
-                al.EntityName ?? string.Empty,
-                al.EntityId,
-                al.Details
+                al.EntityType ?? string.Empty,
+                al.EntityId?.ToString(),
+                al.NewValues ?? al.OldValues
             )).ToList();
 
             return Result<List<AuditTrailSummaryDto>>.Success(result);

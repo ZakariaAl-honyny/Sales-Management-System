@@ -76,8 +76,8 @@ public class PurchaseService : IPurchaseService
             (!supplierId.HasValue || i.SupplierId == supplierId.Value) &&
             (!status.HasValue || (int)i.Status == status.Value) &&
             (status.HasValue || includeInactive || i.Status != InvoiceStatus.Cancelled) &&
-            (!from.HasValue || i.InvoiceDate >= from.Value) &&
-            (!to.HasValue || i.InvoiceDate <= to.Value) &&
+            (!from.HasValue || i.InvoiceDate >= DateOnly.FromDateTime(from.Value)) &&
+            (!to.HasValue || i.InvoiceDate <= DateOnly.FromDateTime(to.Value)) &&
             (searchLower == null ||
              (searchId.HasValue && i.Id == searchId.Value) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
@@ -122,11 +122,12 @@ public class PurchaseService : IPurchaseService
                     invoiceNo = seqResult.Value;
                 }
 
+                var invoiceDate = request.InvoiceDate.HasValue ? DateOnly.FromDateTime(request.InvoiceDate.Value) : DateOnly.FromDateTime(DateTime.Today);
                 var invoice = PurchaseInvoice.Create(
                     request.SupplierId,
                     (short)request.WarehouseId,
                     invoiceNo,
-                    request.InvoiceDate,
+                    invoiceDate,
                     (Domain.Enums.PaymentType)request.PaymentType,
                     request.DiscountAmount,
                     request.OtherCharges,
@@ -420,12 +421,14 @@ public class PurchaseService : IPurchaseService
             i.PaidAmount,
             i.RemainingAmount,
             i.Notes,
+            i.SupplierInvoiceNo,
             (byte)i.Status,
             i.TaxId,
             i.Tax?.Name,
             (decimal?)i.Tax?.Rate,
             i.CurrencyId,
             i.ExchangeRate,
+            i.CashBoxId,
             i.Items.Select(it => new PurchaseInvoiceLineDto(
                 it.Id,
                 it.ProductId,
@@ -434,7 +437,8 @@ public class PurchaseService : IPurchaseService
                 it.ProductUnit?.Unit?.Name ?? "غير معروف",
                 it.Quantity,
                 it.UnitPrice,
-                it.LineTotal
+                it.LineTotal,
+                it.LandedUnitCost
             )).ToList()
         );
     }

@@ -76,16 +76,22 @@ public class JournalEntryService : IJournalEntryService
             }
 
             // 6. Create the journal entry via domain factory (Draft status)
+            // Resolve fiscal year from entry date year
+            short fiscalYearId = (short)request.EntryDate.Year;
+            short currencyId = 1; // Default to base currency (resolved at service level)
             var entry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value.EntryNumber,
                 entryNo,
                 request.EntryDate,
                 request.Description ?? string.Empty,
                 request.EntryType,
+                fiscalYearId,
+                currencyId,
                 userId,
-                request.ReferenceType,
-                request.ReferenceId,
-                request.ReferenceNumber);
+                exchangeRate: 1m,
+                referenceType: request.ReferenceType,
+                referenceId: request.ReferenceId,
+                referenceNumber: request.ReferenceNumber);
 
             // 7. Add debit/credit lines via domain methods
             foreach (var line in request.Lines)

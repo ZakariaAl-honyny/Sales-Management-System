@@ -206,8 +206,8 @@ public class PurchaseReturnListViewModel : ViewModelBase
         if (obj is not PurchaseReturnDto returnItem) return false;
 
         // Date filter
-        if (DateFrom.HasValue && returnItem.ReturnDate < DateFrom.Value) return false;
-        if (DateTo.HasValue && returnItem.ReturnDate > DateTo.Value.AddDays(1)) return false;
+        if (DateFrom.HasValue && returnItem.ReturnDate.ToDateTime(TimeOnly.MinValue) < DateFrom.Value) return false;
+        if (DateTo.HasValue && returnItem.ReturnDate.ToDateTime(TimeOnly.MinValue) > DateTo.Value.AddDays(1)) return false;
 
         // Search text filter
         if (!string.IsNullOrWhiteSpace(SearchText))

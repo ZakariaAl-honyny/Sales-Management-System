@@ -16,9 +16,9 @@ public class SupplierPayment : DocumentEntity
     /// </summary>
     public int PaymentNo { get; private set; }
 
-    public DateTime PaymentDate { get; private set; }
+    public DateOnly PaymentDate { get; private set; }
     public int SupplierId { get; private set; }
-    public int CashBoxId { get; private set; }
+    public int? CashBoxId { get; private set; }
     public short CurrencyId { get; private set; }
     public decimal Amount { get; private set; }
 
@@ -48,21 +48,19 @@ public class SupplierPayment : DocumentEntity
     public static SupplierPayment Create(
         int paymentNo,
         int supplierId,
-        int cashBoxId,
         short currencyId,
         decimal amount,
         PaymentMethod paymentMethod,
         string? referenceNo = null,
         string? notes = null,
+        int? cashBoxId = null,
         int? createdByUserId = null,
-        DateTime? paymentDate = null)
+        DateOnly? paymentDate = null)
     {
         if (paymentNo <= 0)
             throw new DomainException("رقم السداد مطلوب.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
-        if (cashBoxId <= 0)
-            throw new DomainException("الصندوق مطلوب.");
         if (currencyId <= 0)
             throw new DomainException("العملة مطلوبة.");
         if (amount <= 0)
@@ -78,7 +76,7 @@ public class SupplierPayment : DocumentEntity
             PaymentMethod = paymentMethod,
             ReferenceNo = referenceNo,
             Notes = notes,
-            PaymentDate = paymentDate ?? DateTime.UtcNow,
+            PaymentDate = paymentDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
             Status = InvoiceStatus.Draft
         };
         payment.SetCreatedBy(createdByUserId);
@@ -106,7 +104,7 @@ public class SupplierPayment : DocumentEntity
     public void Update(
         decimal amount,
         PaymentMethod paymentMethod,
-        DateTime? paymentDate,
+        DateOnly? paymentDate,
         string? notes,
         int? updatedByUserId = null)
     {
@@ -115,9 +113,7 @@ public class SupplierPayment : DocumentEntity
         Amount = amount;
         PaymentMethod = paymentMethod;
         if (paymentDate.HasValue)
-            PaymentDate = paymentDate.Value.Kind == DateTimeKind.Utc
-                ? paymentDate.Value
-                : paymentDate.Value.ToUniversalTime();
+            PaymentDate = paymentDate.Value;
         if (notes != null) Notes = notes;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

@@ -33,7 +33,7 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
     {
         try
         {
-            var adjustments = await _uow.InventoryAdjustments.ToListAsync(ct, "Warehouse", "Account", "Lines");
+            var adjustments = await _uow.InventoryAdjustments.ToListAsync(ct, "Warehouse", "Lines");
             var dtos = adjustments.Select(MapToDto).ToList();
             return Result<List<InventoryAdjustmentDto>>.Success(dtos);
         }
@@ -49,7 +49,7 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
         try
         {
             var adjustment = await _uow.InventoryAdjustments.FirstOrDefaultAsync(
-                a => a.Id == id, ct, "Warehouse", "Account", "Lines");
+                a => a.Id == id, ct, "Warehouse", "Lines");
             if (adjustment == null)
                 return Result<InventoryAdjustmentDto>.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
 
@@ -70,14 +70,13 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
             var seqResult = await _sequenceService.GetNextIntAsync("InventoryAdjustment", ct);
             if (!seqResult.IsSuccess)
                 return Result<InventoryAdjustmentDto>.Failure(seqResult.Error!);
-            var adjustmentNo = seqResult.Value;
+            var adjustmentNo = seqResult.Value.ToString("D6");
 
             var adjustment = InventoryAdjustment.Create(
                 adjustmentNo,
-                (short)request.WarehouseId,
+                request.WarehouseId,
                 (InventoryAdjustmentType)request.AdjustmentType,
-                request.AdjustmentDate,
-                notes: null,
+                reason: request.Reason,
                 createdByUserId: userId);
 
             await _uow.InventoryAdjustments.AddAsync(adjustment, ct);
@@ -110,16 +109,16 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
 
             var line = InventoryAdjustmentLine.Create(
                 adjustmentId,
-                request.ProductId,
-                request.Quantity,
-                request.UnitCost,
-                batchId: null);
+                request.ProductUnitId,
+                request.ExpectedQuantity,
+                request.ActualQuantity,
+                request.UnitCost);
 
             adjustment.AddLine(line);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Line added to inventory adjustment {AdjustmentId}: Product {ProductId}, Qty {Quantity}, Cost {UnitCost}",
-                adjustmentId, request.ProductId, request.Quantity, request.UnitCost);
+            _logger.LogInformation("Line added to inventory adjustment {AdjustmentId}: ProductUnit {ProductUnitId}, Expected {Expected}, Actual {Actual}",
+                adjustmentId, request.ProductUnitId, request.ExpectedQuantity, request.ActualQuantity);
             return Result<InventoryAdjustmentDto>.Success(MapToDto(adjustment));
         }
         catch (DomainException ex)
@@ -145,34 +144,43 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
 
             adjustment.Post();
 
-            // Update stock levels based on adjustment type
+            // Update stock levels based on adjustment type and line differences
             foreach (var line in adjustment.Lines)
             {
+                var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                if (productUnit == null)
+                {
+                    _logger.LogWarning("ProductUnit {ProductUnitId} not found for adjustment line", line.ProductUnitId);
+                    continue;
+                }
+
+                var productId = productUnit.ProductId;
+                var diff = line.ActualQuantity - line.ExpectedQuantity;
+
                 switch (adjustment.AdjustmentType)
                 {
-                    case InventoryAdjustmentType.Opening:
-                    case InventoryAdjustmentType.Increase:
-                        await _inventoryService.IncreaseStockAsync(
-                            line.ProductId, adjustment.WarehouseId, line.Quantity, line.UnitCost, userId, ct);
+                    case InventoryAdjustmentType.Addition:
+                        // Increase stock by ActualQuantity (treated as addition from zero)
+                        if (line.ActualQuantity > 0)
+                            await _inventoryService.IncreaseStockAsync(
+                                productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
                         break;
 
-                    case InventoryAdjustmentType.Shortage:
-                    case InventoryAdjustmentType.Damage: // Damage also decreases stock
-                        // Correction = set quantity to target level: compute delta, then adjust
-                        var stockResult = await _inventoryService.GetStockAsync(
-                            line.ProductId, adjustment.WarehouseId, ct);
-                        if (stockResult.IsSuccess)
-                        {
-                            var currentQty = stockResult.Value;
-                            if (line.Quantity > currentQty)
-                                await _inventoryService.IncreaseStockAsync(
-                                    line.ProductId, adjustment.WarehouseId,
-                                    line.Quantity - currentQty, line.UnitCost, userId, ct);
-                            else if (line.Quantity < currentQty)
-                                await _inventoryService.DecreaseStockAsync(
-                                    line.ProductId, adjustment.WarehouseId,
-                                    currentQty - line.Quantity, line.UnitCost, userId, ct);
-                        }
+                    case InventoryAdjustmentType.Deduction:
+                        // Decrease stock by ActualQuantity (treated as removal)
+                        if (line.ActualQuantity > 0)
+                            await _inventoryService.DecreaseStockAsync(
+                                productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
+                        break;
+
+                    case InventoryAdjustmentType.Correction:
+                        // Adjust stock to match ActualQuantity
+                        if (diff > 0)
+                            await _inventoryService.IncreaseStockAsync(
+                                productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
+                        else if (diff < 0)
+                            await _inventoryService.DecreaseStockAsync(
+                                productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
                         break;
                 }
             }
@@ -227,40 +235,42 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
         return new InventoryAdjustmentDto(
             adjustment.Id,
             adjustment.AdjustmentNo,
-            adjustment.AdjustmentDate,
             adjustment.WarehouseId,
             adjustment.Warehouse?.Name,
             (byte)adjustment.AdjustmentType,
             GetAdjustmentTypeName(adjustment.AdjustmentType),
+            adjustment.Reason,
             (byte)adjustment.Status,
             GetStatusName(adjustment.Status),
+            adjustment.CreatedAt,
+            adjustment.CreatedByUserId,
             adjustment.PostedAt,
+            adjustment.CancelledAt,
             adjustment.Lines?.Select(l => new InventoryAdjustmentLineDto(
                 l.Id,
                 l.InventoryAdjustmentId,
-                l.ProductId,
-                null, // ProductName — not loaded
-                l.Quantity,
-                l.UnitCost,
-                l.TotalCost
+                l.ProductUnitId,
+                null,
+                l.ExpectedQuantity,
+                l.ActualQuantity,
+                l.UnitCost
             )).ToList()
         );
     }
 
     private static string? GetAdjustmentTypeName(InventoryAdjustmentType type) => type switch
     {
-        InventoryAdjustmentType.Opening => "افتتاحي",
-        InventoryAdjustmentType.Increase => "إضافة",
-        InventoryAdjustmentType.Shortage => "عجز",
-        InventoryAdjustmentType.Damage => "تلف",
+        InventoryAdjustmentType.Addition => "إضافة",
+        InventoryAdjustmentType.Deduction => "خصم",
+        InventoryAdjustmentType.Correction => "تصحيح",
         _ => null
     };
 
-    private static string? GetStatusName(InvoiceStatus status) => status switch
+    private static string? GetStatusName(InventoryCountStatus status) => status switch
     {
-        InvoiceStatus.Draft => "مسودة",
-        InvoiceStatus.Posted => "مرحّل",
-        InvoiceStatus.Cancelled => "ملغي",
+        InventoryCountStatus.Draft => "مسودة",
+        InventoryCountStatus.Posted => "مرحّل",
+        InventoryCountStatus.Cancelled => "ملغي",
         _ => null
     };
 }

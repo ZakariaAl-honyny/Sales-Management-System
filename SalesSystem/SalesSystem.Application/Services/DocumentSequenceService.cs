@@ -6,6 +6,11 @@ using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;
 
+/// <summary>
+/// Thread-safe document sequence generator.
+/// Schema: DocumentType (unique key) + NextNumber (int).
+/// All formatting (e.g., "INV-2026-000001") is done by the caller, not stored in the entity.
+/// </summary>
 public class DocumentSequenceService : IDocumentSequenceService
 {
     private readonly IUnitOfWork _uow;
@@ -18,42 +23,35 @@ public class DocumentSequenceService : IDocumentSequenceService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Generates the next formatted sequential number for a given prefix + year.
+    /// Uses the schema's DocumentType key (derived from prefix) for storage.
+    /// Format: {prefix}-{year}-{number:D6} (e.g., INV-2026-000001).
+    /// </summary>
     public async Task<Result<string>> GetNextNumberAsync(string prefix, CancellationToken ct)
     {
-        try
-        {
-            await _lock.WaitAsync(ct);
-        }
-        catch (OperationCanceledException)
-        {
-            return Result<string>.Failure("تم إلغاء العملية");
-        }
-
+        await _lock.WaitAsync(ct);
         try
         {
             var year = DateTime.Now.Year;
+            var documentType = GetDocumentTypeKey(prefix);
 
-            // Try to find an existing sequence for this prefix and year
-            var sequence = await _uow.DocumentSequences.FirstOrDefaultAsync(
-                s => s.Prefix == prefix && s.Year == year, ct);
+            var sequence = await _uow.DocumentSequences
+                .FirstOrDefaultAsync(s => s.DocumentType == documentType, ct);
 
             if (sequence == null)
             {
-                // Create new sequence for the year
-                // We assume documentType is derived from prefix or generic for now
-                // In a more complex system, documentType would be passed as a param
-                string documentType = DetermineDocumentType(prefix);
-
-                sequence = DocumentSequence.Create(documentType, prefix, year);
+                sequence = DocumentSequence.Create(documentType);
                 await _uow.DocumentSequences.AddAsync(sequence, ct);
             }
 
-            var nextNumber = sequence.GetNextNumber();
+            var nextNumber = sequence.GetNext();
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Generated sequence number: {Number}", nextNumber);
+            var formatted = $"{prefix}-{year:D4}-{nextNumber:D6}";
+            _logger.LogInformation("Generated sequence number: {Number}", formatted);
 
-            return Result<string>.Success(nextNumber);
+            return Result<string>.Success(formatted);
         }
         catch (DomainException ex)
         {
@@ -70,31 +68,25 @@ public class DocumentSequenceService : IDocumentSequenceService
         }
     }
 
+    /// <summary>
+    /// Generates the next integer sequence number for a given document type key.
+    /// Thread-safe via SemaphoreSlim. Used for InvoiceNo and other int-only sequences.
+    /// </summary>
     public async Task<Result<int>> GetNextIntAsync(string sequenceKey, CancellationToken ct)
     {
+        await _lock.WaitAsync(ct);
         try
         {
-            await _lock.WaitAsync(ct);
-        }
-        catch (OperationCanceledException)
-        {
-            return Result<int>.Failure("تم إلغاء العملية");
-        }
-
-        try
-        {
-            var year = DateTime.Now.Year;
-
-            var sequence = await _uow.DocumentSequences.FirstOrDefaultAsync(
-                s => s.DocumentType == sequenceKey && s.Year == year, ct);
+            var sequence = await _uow.DocumentSequences
+                .FirstOrDefaultAsync(s => s.DocumentType == sequenceKey, ct);
 
             if (sequence == null)
             {
-                sequence = DocumentSequence.Create(sequenceKey, sequenceKey, year);
+                sequence = DocumentSequence.Create(sequenceKey);
                 await _uow.DocumentSequences.AddAsync(sequence, ct);
             }
 
-            var nextNumber = sequence.GetNextInt();
+            var nextNumber = sequence.GetNext();
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Generated sequence int {Number} for {Key}", nextNumber, sequenceKey);
@@ -116,18 +108,18 @@ public class DocumentSequenceService : IDocumentSequenceService
         }
     }
 
-    private static string DetermineDocumentType(string prefix)
+    /// <summary>
+    /// Maps a prefix (e.g., "INV") to a canonical DocumentType key for storage.
+    /// </summary>
+    private static string GetDocumentTypeKey(string prefix) => prefix.ToUpper() switch
     {
-        return prefix.ToUpper() switch
-        {
-            "INV" => "فاتورة مبيعات",
-            "PUR" => "فاتورة مشتريات",
-            "SR" => "مرتجع مبيعات",
-            "PR" => "مرتجع مشتريات",
-            "TRF" => "تحويل مخزني",
-            "CP" => "سند قبض عميل",
-            "SP" => "سند صرف مورد",
-            _ => "أخرى"
-        };
-    }
+        "INV" => "SalesInvoice",
+        "PUR" => "PurchaseInvoice",
+        "SR" => "SalesReturn",
+        "PR" => "PurchaseReturn",
+        "TRF" => "WarehouseTransfer",
+        "CP" => "CustomerPayment",
+        "SP" => "SupplierPayment",
+        _ => prefix.ToUpper()
+    };
 }

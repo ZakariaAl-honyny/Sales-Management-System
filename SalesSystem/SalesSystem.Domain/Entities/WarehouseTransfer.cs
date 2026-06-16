@@ -7,53 +7,56 @@ namespace SalesSystem.Domain.Entities;
 /// <summary>
 /// Represents a stock transfer between two warehouses.
 /// Maps to "WarehouseTransfers" table.
-/// Schema: TransferNo (int unique), FromWarehouseId (smallint FK),
-/// ToWarehouseId (smallint FK), TransferDate (date), Notes, Status (tinyint), audit.
+/// Schema: nvarchar(50) TransferNo (unique), smallint SourceWarehouseId FK,
+/// smallint DestinationWarehouseId FK, nvarchar(300) Notes,
+/// tinyint Status (Draft=1,Posted=2,Cancelled=3).
+/// BaseEntity with CreatedAt only.
 /// </summary>
-public class WarehouseTransfer : DocumentEntity
+public class WarehouseTransfer : Entity
 {
-    public int TransferNo { get; private set; }
-    public DateTime TransferDate { get; private set; }
-    public short FromWarehouseId { get; private set; }
-    public short ToWarehouseId { get; private set; }
+    public string TransferNo { get; private set; } = string.Empty;
+    public short SourceWarehouseId { get; private set; }
+    public short DestinationWarehouseId { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
+    public DateTime CreatedAt { get; private set; }
+    public int CreatedByUserId { get; private set; }
+
     // Navigation properties
-    public virtual Warehouse? FromWarehouse { get; private set; }
-    public virtual Warehouse? ToWarehouse { get; private set; }
+    public virtual Warehouse? SourceWarehouse { get; private set; }
+    public virtual Warehouse? DestinationWarehouse { get; private set; }
     private readonly List<WarehouseTransferLine> _lines = new();
     public IReadOnlyCollection<WarehouseTransferLine> Lines => _lines.AsReadOnly();
 
     private WarehouseTransfer() { } // EF Core
 
     public static WarehouseTransfer Create(
-        int transferNo,
-        short fromWarehouseId,
-        short toWarehouseId,
-        DateTime? transferDate = null,
+        string transferNo,
+        short sourceWarehouseId,
+        short destinationWarehouseId,
         string? notes = null,
         int? createdByUserId = null)
     {
-        if (transferNo <= 0)
+        if (string.IsNullOrWhiteSpace(transferNo))
             throw new DomainException("رقم التحويل مطلوب.");
-        if (fromWarehouseId <= 0)
+        if (sourceWarehouseId <= 0)
             throw new DomainException("المستودع المصدر مطلوب.");
-        if (toWarehouseId <= 0)
+        if (destinationWarehouseId <= 0)
             throw new DomainException("المستودع الوجهة مطلوب.");
-        if (fromWarehouseId == toWarehouseId)
+        if (sourceWarehouseId == destinationWarehouseId)
             throw new DomainException("المستودع المصدر والوجهة يجب أن يكونا مختلفين.");
 
         var t = new WarehouseTransfer
         {
             Status = InvoiceStatus.Draft,
-            TransferNo = transferNo,
-            FromWarehouseId = fromWarehouseId,
-            ToWarehouseId = toWarehouseId,
-            TransferDate = transferDate ?? DateTime.UtcNow,
-            Notes = notes
+            TransferNo = transferNo.Trim(),
+            SourceWarehouseId = sourceWarehouseId,
+            DestinationWarehouseId = destinationWarehouseId,
+            Notes = notes,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByUserId = createdByUserId ?? 0
         };
-        t.SetCreatedBy(createdByUserId);
         return t;
     }
 
@@ -64,7 +67,6 @@ public class WarehouseTransfer : DocumentEntity
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("لا يمكن إضافة أصناف لتحويل غير مسودة.");
         _lines.Add(line);
-        UpdateTimestamp();
     }
 
     public void Post()
@@ -74,8 +76,6 @@ public class WarehouseTransfer : DocumentEntity
         if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل تحويل بدون أصناف.");
         Status = InvoiceStatus.Posted;
-        PostedAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 
     public void Cancel()
@@ -83,7 +83,5 @@ public class WarehouseTransfer : DocumentEntity
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("التحويل ملغي بالفعل.");
         Status = InvoiceStatus.Cancelled;
-        CancelledAt = DateTime.UtcNow;
-        UpdateTimestamp();
     }
 }

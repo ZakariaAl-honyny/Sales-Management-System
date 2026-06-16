@@ -25,12 +25,11 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toast;
 
     private int? _adjustmentId;
-    private int _adjustmentNo;
+    private string? _adjustmentNo;
     private short _warehouseId;
     private string? _warehouseName;
     private byte _adjustmentType = 1; // Addition
-    private DateTime _adjustmentDate = DateTime.Today;
-    private string? _notes;
+    private string? _reason;
     private string? _errorMessage;
     private byte _status = 1; // Draft
 
@@ -93,8 +92,7 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
         _warehouseId = (short)adjustment.WarehouseId;
         _warehouseName = adjustment.WarehouseName;
         _adjustmentType = adjustment.AdjustmentType;
-        _adjustmentDate = adjustment.AdjustmentDate;
-        _notes = null; // Notes not in DTO yet; kept for future
+        _reason = adjustment.Reason;
         _status = adjustment.Status;
 
         if (adjustment.Lines != null)
@@ -103,9 +101,9 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
             {
                 _lines.Add(new InventoryAdjustmentLineItem
                 {
-                    ProductId = line.ProductId,
-                    ProductName = line.ProductName,
-                    Quantity = line.Quantity,
+                    ProductUnitId = line.ProductUnitId,
+                    ProductUnitName = line.ProductUnitName,
+                    Quantity = line.ActualQuantity,
                     UnitCost = line.UnitCost
                 });
             }
@@ -118,7 +116,7 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
 
     public string Title => _adjustmentId.HasValue ? "تعديل تسوية مخزون" : "تسوية مخزون جديدة";
 
-    public int AdjustmentNo
+    public string? AdjustmentNo
     {
         get => _adjustmentNo;
         set => SetProperty(ref _adjustmentNo, value);
@@ -192,16 +190,10 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
         set { if (value) AdjustmentType = 3; }
     }
 
-    public DateTime AdjustmentDate
+    public string? Reason
     {
-        get => _adjustmentDate;
-        set => SetProperty(ref _adjustmentDate, value);
-    }
-
-    public string? Notes
-    {
-        get => _notes;
-        set => SetProperty(ref _notes, value);
+        get => _reason;
+        set => SetProperty(ref _reason, value);
     }
 
     public string? ErrorMessage
@@ -280,6 +272,8 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
                 {
                     ProductId = product.Id,
                     ProductName = product.Name,
+                    ProductUnitId = 0,
+                    ProductUnitName = "حبة",
                     Quantity = 1,
                     UnitCost = 0m
                 });
@@ -337,8 +331,8 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
 
             var request = new CreateInventoryAdjustmentRequest(
                 WarehouseId,
-                AdjustmentDate,
-                AdjustmentType);
+                AdjustmentType,
+                Reason);
 
             var result = await _adjustmentService.CreateAsync(request);
             if (result.IsSuccess && result.Value != null)
@@ -374,8 +368,8 @@ public class InventoryAdjustmentEditorViewModel : ViewModelBase
             {
                 var createRequest = new CreateInventoryAdjustmentRequest(
                     WarehouseId,
-                    AdjustmentDate,
-                    AdjustmentType);
+                    AdjustmentType,
+                    Reason);
 
                 var createResult = await _adjustmentService.CreateAsync(createRequest);
                 if (!createResult.IsSuccess || createResult.Value == null)
@@ -421,6 +415,8 @@ public class InventoryAdjustmentLineItem : ViewModelBase
 {
     private int _productId;
     private string? _productName;
+    private int _productUnitId;
+    private string? _productUnitName;
     private decimal _quantity;
     private decimal _unitCost;
 
@@ -434,6 +430,18 @@ public class InventoryAdjustmentLineItem : ViewModelBase
     {
         get => _productName;
         set => SetProperty(ref _productName, value);
+    }
+
+    public int ProductUnitId
+    {
+        get => _productUnitId;
+        set => SetProperty(ref _productUnitId, value);
+    }
+
+    public string? ProductUnitName
+    {
+        get => _productUnitName;
+        set => SetProperty(ref _productUnitName, value);
     }
 
     public decimal Quantity

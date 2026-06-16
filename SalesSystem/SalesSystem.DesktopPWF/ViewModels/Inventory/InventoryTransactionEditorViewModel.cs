@@ -21,7 +21,7 @@ public class InventoryTransactionEditorViewModel : ViewModelBase
     private byte _transactionType;
 
     private int? _transactionId;
-    private int _currentTransactionNo;
+    private string? _currentTransactionNo;
     private short _warehouseId;
     private DateTime _transactionDate = DateTime.Today;
     private string? _notes;
@@ -90,7 +90,7 @@ public class InventoryTransactionEditorViewModel : ViewModelBase
 
     public void SetTransactionType(byte type) => _transactionType = type;
 
-    public int CurrentTransactionNo
+    public string? CurrentTransactionNo
     {
         get => _currentTransactionNo;
         set => SetProperty(ref _currentTransactionNo, value);
@@ -206,18 +206,18 @@ public class InventoryTransactionEditorViewModel : ViewModelBase
             ErrorMessage = null;
 
             var request = new CreateInventoryTransactionRequest(
-                0,
+                null,
                 _transactionType,
                 WarehouseId,
-                TransactionDate,
-                ReferenceType: null,
-                ReferenceId: null,
+                null,
+                null,
                 Notes,
                 Lines.Select(l => new CreateInventoryTransactionLineRequest(
-                    l.ProductId,
                     l.ProductUnitId,
                     l.Quantity,
                     l.UnitCost,
+                    null,
+                    null,
                     null)).ToList());
 
             var result = await _inventoryApiService.CreateInventoryTransactionAsync(request);
@@ -248,18 +248,18 @@ public class InventoryTransactionEditorViewModel : ViewModelBase
             if (!_transactionId.HasValue)
             {
                 var createRequest = new CreateInventoryTransactionRequest(
-                    0,
+                    null,
                     _transactionType,
                     WarehouseId,
-                    TransactionDate,
-                    ReferenceType: null,
-                    ReferenceId: null,
+                    null,
+                    null,
                     Notes,
                     Lines.Select(l => new CreateInventoryTransactionLineRequest(
-                        l.ProductId,
                         l.ProductUnitId,
                         l.Quantity,
                         l.UnitCost,
+                        null,
+                        null,
                         null)).ToList());
 
                 var createResult = await _inventoryApiService.CreateInventoryTransactionAsync(createRequest);

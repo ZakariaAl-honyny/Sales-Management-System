@@ -10,8 +10,10 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
     {
         builder.ToTable("Branches");
         builder.HasKey(b => b.Id);
+        builder.Property(b => b.Id)
+            .HasColumnType("smallint")
+            .ValueGeneratedOnAdd();
         builder.Property(b => b.Name).IsRequired().HasMaxLength(150);
-        builder.Property(b => b.Id).ValueGeneratedOnAdd();
         builder.Property(b => b.Phone).HasMaxLength(30);
         builder.Property(b => b.Address).HasMaxLength(300);
         builder.Property(b => b.ManagerName).HasMaxLength(150);

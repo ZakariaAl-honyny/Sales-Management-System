@@ -86,7 +86,7 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Creates a new user (passwordless — user must set password on first login).
     /// </summary>
-    /// <param name="request">Create user request with UserName, FullName, and Role.</param>
+    /// <param name="request">Create user request with UserName and Role.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the created user with ID.</returns>
     [HttpPost]
@@ -102,7 +102,7 @@ public class UsersController : ControllerBase
     /// Updates an existing user.
     /// </summary>
     /// <param name="id">User ID to update.</param>
-    /// <param name="request">Update user request with FullName, Role, and optional fields.</param>
+    /// <param name="request">Update user request with Role and optional fields.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Returns the updated user.</returns>
     [HttpPut("{id:int}")]

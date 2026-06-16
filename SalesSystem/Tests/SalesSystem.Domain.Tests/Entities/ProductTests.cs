@@ -77,7 +77,7 @@ public class ProductTests
     public void AddInventoryBatch_ShouldCreateBatch()
     {
         var batch = InventoryBatch.Create(
-            batchNo: 1001,
+            batchNo: "BATCH-001",
             productId: 1,
             warehouseId: (short)1,
             quantityReceived: 100m,
@@ -86,7 +86,7 @@ public class ProductTests
         );
 
         batch.Should().NotBeNull();
-        batch.BatchNo.Should().Be(1001);
+        batch.BatchNo.Should().Be("BATCH-001");
         batch.QuantityReceived.Should().Be(100m);
         batch.UnitCost.Should().Be(50m);
         batch.IsFullyConsumed.Should().BeFalse();

@@ -261,7 +261,7 @@ public class CustomerService : ICustomerService
             if (arParentAccount == null)
             {
                 var arMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                    m => m.MappingKey == SystemAccountKey.AccountsReceivable, ct);
+                    m => m.MappingKey == nameof(SystemAccountKey.AccountsReceivable), ct);
                 if (arMapping == null)
                     return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
 

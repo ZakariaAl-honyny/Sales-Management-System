@@ -49,44 +49,42 @@ public class PermissionService : IPermissionService
     }
 
     /// <inheritdoc />
-    public async Task<Result<Dictionary<Domain.Enums.UserRole, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default)
+    public async Task<Result<Dictionary<byte, List<int>>>> GetRolePermissionsAsync(CancellationToken ct = default)
     {
         try
         {
             var rolePermissions = await _uow.RolePermissions.ToListAsync(
                 includePaths: new[] { "Permission" });
 
-            var result = new Dictionary<Domain.Enums.UserRole, List<int>>();
+            var allRoles = await _uow.Roles.ToListAsync(ct: ct);
+            var result = new Dictionary<byte, List<int>>();
 
-            foreach (Domain.Enums.UserRole role in Enum.GetValues<Domain.Enums.UserRole>())
+            foreach (var role in allRoles)
             {
-                if (role == 0) continue; // Skip undefined
-                var roleId = (short)role;
-                result[role] = rolePermissions
-                    .Where(rp => rp.RoleId == roleId && rp.Permission.IsActive)
+                result[(byte)role.Id] = rolePermissions
+                    .Where(rp => rp.RoleId == role.Id && rp.Permission.IsActive)
                     .Select(rp => rp.PermissionId)
                     .Distinct()
                     .ToList();
             }
 
-            return Result<Dictionary<Domain.Enums.UserRole, List<int>>>.Success(result);
+            return Result<Dictionary<byte, List<int>>>.Success(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get role permissions");
-            return Result<Dictionary<Domain.Enums.UserRole, List<int>>>.Failure("حدث خطأ أثناء جلب صلاحيات الأدوار.");
+            return Result<Dictionary<byte, List<int>>>.Failure("حدث خطأ أثناء جلب صلاحيات الأدوار.");
         }
     }
 
     /// <inheritdoc />
-    public async Task<Result> UpdateRolePermissionsAsync(Domain.Enums.UserRole role, List<int> permissionIds, CancellationToken ct = default)
+    public async Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds, CancellationToken ct = default)
     {
         try
         {
             // 1. Get existing role permissions (read — outside transaction)
-            var roleId = (short)role;
             var existing = await _uow.RolePermissions.ToListAsync(
-                rp => rp.RoleId == roleId,
+                rp => rp.RoleId == role,
                 ct: ct);
 
             // 2. Execute atomic write operations inside a transaction (RULE-317)
@@ -110,7 +108,7 @@ public class PermissionService : IPermissionService
                 await _uow.SaveChangesAsync(ct);
             }, ct);
 
-            _logger.LogInformation("Updated permissions for role {Role}: {Count} permissions assigned",
+            _logger.LogInformation("Updated permissions for role ID {RoleId}: {Count} permissions assigned",
                 role, permissionIds.Count);
 
             return Result.Success();
@@ -135,7 +133,6 @@ public class PermissionService : IPermissionService
             var roleIds = userRoles.Select(ur => ur.RoleId).ToHashSet();
 
             // Get all permission names for the user's roles
-            // RolePermission.Role is the UserRole enum but matches Role.Id values (Admin=1, Manager=2, etc.)
             var allRolePermissions = await _uow.RolePermissions.ToListAsync(
                 ct: ct,
                 includePaths: "Permission");

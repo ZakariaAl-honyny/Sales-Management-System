@@ -73,15 +73,15 @@ public class UserEditorViewModel : ViewModelBase
     {
         _id = user.Id;
         Username = user.UserName;
-        FullName = user.FullName;
+        // FullName removed per schema v4.10
         SelectedRoleId = user.Role;
-        IsActive = user.Status == 1;
-        Phone = user.Phone ?? string.Empty;
-        Email = user.Email ?? string.Empty;
+        IsActive = !user.IsLocked;
+        // Phone removed per schema v4.10
+        // Email removed per schema v4.10
         AvatarUrl = user.AvatarPath ?? string.Empty;
         DefaultCashBoxId = user.DefaultCashBoxId;
         _isEditMode = true;
-        _isLocked = user.Status == 2; // Locked status
+        _isLocked = user.IsLocked;
         WindowTitle = $"تعديل مستخدم: {user.UserName}";
         _ = LoadUserRolesAndBranchesAsync(user.Id);
     }
@@ -121,21 +121,6 @@ public class UserEditorViewModel : ViewModelBase
         }
     }
 
-    public string FullName
-    {
-        get => _fullName;
-        set
-        {
-            if (SetProperty(ref _fullName, value))
-            {
-                if (string.IsNullOrWhiteSpace(value))
-                    AddError(nameof(FullName), "الاسم بالكامل مطلوب");
-                else
-                    ClearErrors(nameof(FullName));
-            }
-        }
-    }
-
     public int SelectedRoleId
     {
         get => _selectedRoleId;
@@ -146,36 +131,6 @@ public class UserEditorViewModel : ViewModelBase
     {
         get => _isActive;
         set => SetProperty(ref _isActive, value);
-    }
-
-    public string Phone
-    {
-        get => _phone;
-        set
-        {
-            if (SetProperty(ref _phone, value))
-            {
-                if (!string.IsNullOrWhiteSpace(value) && value.Length > 20)
-                    AddError(nameof(Phone), "رقم الهاتف لا يتجاوز 20 رقم");
-                else
-                    ClearErrors(nameof(Phone));
-            }
-        }
-    }
-
-    public string Email
-    {
-        get => _email;
-        set
-        {
-            if (SetProperty(ref _email, value))
-            {
-                if (!string.IsNullOrWhiteSpace(value) && !IsValidEmail(value))
-                    AddError(nameof(Email), "البريد الإلكتروني غير صالح — مثال: user@example.com");
-                else
-                    ClearErrors(nameof(Email));
-            }
-        }
     }
 
     public string AvatarUrl
@@ -327,19 +282,6 @@ public class UserEditorViewModel : ViewModelBase
         CashBoxOptions = new ObservableCollection<CashBoxOptionItem>(options ?? new List<CashBoxOptionItem>());
     }
 
-    private static bool IsValidEmail(string email)
-    {
-        try
-        {
-            var addr = new System.Net.Mail.MailAddress(email);
-            return addr.Address == email;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private async Task LoadAuxiliaryDataAsync()
     {
         // Load available roles
@@ -461,7 +403,7 @@ public class UserEditorViewModel : ViewModelBase
 
         var confirm = await _dialogService.ShowConfirmationAsync(
             "إعادة تعيين كلمة المرور",
-            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {FullName}؟\n\n" +
+            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {Username}؟\n\n" +
             $"سيتم تعيين كلمة المرور إلى: 12345678\n" +
             $"وسيُطلب من المستخدم تغييرها عند أول تسجيل دخول.");
 
@@ -470,7 +412,7 @@ public class UserEditorViewModel : ViewModelBase
         var result = await _userService.ResetPasswordAsync(_id);
         if (result.IsSuccess)
         {
-            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم {FullName} إلى 12345678");
+            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم {Username} إلى 12345678");
         }
         else
         {
@@ -534,14 +476,11 @@ public class UserEditorViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(Username))
             AddError(nameof(Username), "اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
 
-        if (string.IsNullOrWhiteSpace(FullName))
-            AddError(nameof(FullName), "الاسم بالكامل مطلوب — سيظهر هذا الاسم في الفواتير والتقارير");
+        
 
-        if (!string.IsNullOrWhiteSpace(Phone) && Phone.Length > 20)
-            AddError(nameof(Phone), "رقم الهاتف لا يتجاوز 20 رقم");
+        
 
-        if (!string.IsNullOrWhiteSpace(Email) && !IsValidEmail(Email))
-            AddError(nameof(Email), "البريد الإلكتروني غير صالح — مثال: user@example.com");
+        
 
         return await ValidateAllAsync();
     }
@@ -558,12 +497,9 @@ public class UserEditorViewModel : ViewModelBase
         if (IsEditMode)
         {
             var request = new UpdateUserRequest(
-                FullName: FullName,
                 Role: (byte)SelectedRoleId,
-                Status: (byte)(IsActive ? SalesSystem.Domain.Enums.UserStatus.Active : SalesSystem.Domain.Enums.UserStatus.Inactive),
+                IsLocked: IsLocked,
                 Password: null,
-                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
                 DefaultCashBoxId: DefaultCashBoxId);
             result = await _userService.UpdateAsync(_id, request);
         }
@@ -571,10 +507,8 @@ public class UserEditorViewModel : ViewModelBase
         {
             var request = new CreateUserRequest(
                 UserName: Username,
-                FullName: FullName,
                 Role: (byte)SelectedRoleId,
-                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
+                Password: null,
                 DefaultCashBoxId: DefaultCashBoxId);
             result = await _userService.CreateAsync(request);
         }

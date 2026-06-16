@@ -6,9 +6,9 @@ namespace SalesSystem.Domain.Entities;
 /// Tracks user login sessions for token management and activity monitoring.
 /// When a user logs in, a new session is created. Sessions can be terminated
 /// on logout or admin revocation.
-/// Schema §1.14 — UserSessions table. Uses ActivatableEntity (has IsActive).
+/// Schema §1.14 — UserSessions table. Uses AuditableEntity (audit fields, no IsActive).
 /// </summary>
-public class UserSession : ActivatableEntity
+public class UserSession : AuditableEntity
 {
     public int UserId { get; private set; }
     public User? User { get; private set; }

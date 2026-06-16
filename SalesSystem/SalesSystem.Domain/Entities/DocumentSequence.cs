@@ -3,60 +3,62 @@ using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Entities;
 
+/// <summary>
+/// Per-document-type auto-increment sequence tracker.
+/// Schema: DocumentType (unique), NextNumber (int). No Prefix/Year.
+/// Thread-safe service layer (SemaphoreSlim) handles concurrency.
+/// </summary>
 public class DocumentSequence : AuditableEntity
 {
+    /// <summary>
+    /// Unique document type key (e.g., "SalesInvoice", "PurchaseInvoice", "PaymentVoucher").
+    /// </summary>
     public string DocumentType { get; private set; } = string.Empty;
-    public string Prefix { get; private set; } = string.Empty;
-    public int Year { get; private set; }
-    public int LastNumber { get; private set; }
+
+    /// <summary>
+    /// The next available sequence number.
+    /// </summary>
+    public int NextNumber { get; private set; }
 
     private DocumentSequence() { }
 
-    public static DocumentSequence Create(string documentType, string prefix, int year)
+    /// <summary>
+    /// Creates a new sequence starting at 1.
+    /// </summary>
+    /// <param name="documentType">Unique document type key.</param>
+    /// <returns>A new DocumentSequence instance.</returns>
+    public static DocumentSequence Create(string documentType)
     {
         if (string.IsNullOrWhiteSpace(documentType))
             throw new DomainException("نوع المستند مطلوب.");
-        if (string.IsNullOrWhiteSpace(prefix))
-            throw new DomainException("البادئة مطلوبة.");
-        if (year <= 0)
-            throw new DomainException("السنة مطلوبة.");
 
         return new DocumentSequence
         {
-            DocumentType = documentType,
-            Prefix = prefix,
-            Year = year,
-            LastNumber = 0
+            DocumentType = documentType.Trim(),
+            NextNumber = 1
         };
     }
 
-    public string GetNextNumber()
+    /// <summary>
+    /// Returns the current NextNumber and advances it by 1.
+    /// Thread-safe operations are handled by the service-layer SemaphoreSlim.
+    /// </summary>
+    public int GetNext()
     {
-        LastNumber++;
-        return $"{Prefix}-{Year:D4}-{LastNumber:D6}";
-    }
-
-    public int GetNextInt()
-    {
-        LastNumber++;
-        return LastNumber;
-    }
-
-    public void Increment()
-    {
-        LastNumber++;
+        var current = NextNumber;
+        NextNumber++;
+        return current;
     }
 
     /// <summary>
-    /// Resets the last number to a new value (e.g., during year rollover or manual correction).
+    /// Sets the next number (e.g., during manual correction or year reset).
     /// </summary>
-    /// <param name="newNumber">The new last number (must be >= 0).</param>
-    /// <exception cref="DomainException">If newNumber is negative.</exception>
-    public void SetLastNumber(int newNumber)
+    /// <param name="newNext">The next number to use (must be >= 1).</param>
+    public void SetNextNumber(int newNext)
     {
-        if (newNumber < 0)
-            throw new DomainException("الرقم التسلسلي لا يمكن أن يكون سالباً.");
-        LastNumber = newNumber;
+        if (newNext < 1)
+            throw new DomainException("الرقم التسلسلي يجب أن يكون 1 أو أكثر.");
+        NextNumber = newNext;
         UpdateTimestamp();
     }
 }

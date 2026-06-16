@@ -12,8 +12,7 @@ public record ProductPriceDto(
     string? CurrencyName,
     decimal Price,
     DateTime EffectiveFrom,
-    DateTime? EffectiveTo,
-    bool IsActive)
+    DateTime? EffectiveTo)
 {
     public bool IsCurrentlyEffective => EffectiveFrom <= DateTime.UtcNow
         && (!EffectiveTo.HasValue || EffectiveTo.Value >= DateTime.UtcNow);

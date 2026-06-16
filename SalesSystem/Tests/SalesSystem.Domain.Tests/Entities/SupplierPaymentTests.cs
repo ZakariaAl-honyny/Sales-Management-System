@@ -66,19 +66,19 @@ public class SupplierPaymentTests
     }
 
     [Fact]
-    public void Create_GivenCashBoxIdIsZero_ShouldThrowDomainException()
+    public void Create_GivenNullCashBoxId_ShouldNotThrow()
     {
-        var action = () => SupplierPayment.Create(
+        var payment = SupplierPayment.Create(
             paymentNo: 1,
             supplierId: 1,
-            cashBoxId: 0,
             currencyId: (short)1,
             amount: 100m,
-            paymentMethod: PaymentMethod.Cash
+            paymentMethod: PaymentMethod.Cash,
+            cashBoxId: null
         );
 
-        action.Should().Throw<DomainException>()
-            .WithMessage("الصندوق مطلوب.");
+        payment.Should().NotBeNull();
+        payment.CashBoxId.Should().BeNull();
     }
 
     [Fact]

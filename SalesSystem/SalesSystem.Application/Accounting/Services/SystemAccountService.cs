@@ -28,9 +28,9 @@ public class SystemAccountService : ISystemAccountService
             Expression<Func<SystemAccountMapping, bool>> predicate;
 
             if (branchId.HasValue)
-                predicate = m => m.MappingKey == key && m.BranchId == branchId.Value;
+                predicate = m => m.MappingKey == key.ToString() && m.BranchId == branchId.Value;
             else
-                predicate = m => m.MappingKey == key && m.BranchId == null;
+                predicate = m => m.MappingKey == key.ToString() && m.BranchId == null;
 
             var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(predicate, ct, "Account");
 
@@ -74,13 +74,13 @@ public class SystemAccountService : ISystemAccountService
         {
             // Check for duplicate key + branch combination
             var existing = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                m => m.MappingKey == request.MappingKey && m.BranchId == request.BranchId, ct: ct);
+                m => m.MappingKey == request.MappingKey.ToString() && m.BranchId == request.BranchId, ct: ct);
 
             if (existing != null)
                 return Result<SystemAccountMappingDto>.Failure("يوجد تعيين نشط لنفس المفتاح والفرع");
 
             var mapping = SystemAccountMapping.Create(
-                request.MappingKey,
+                request.MappingKey.ToString(),
                 request.AccountId,
                 request.BranchId);
 
@@ -146,8 +146,10 @@ public class SystemAccountService : ISystemAccountService
     {
         return new SystemAccountMappingDto(
             Id: mapping.Id,
-            MappingKey: mapping.MappingKey,
-            MappingKeyName: mapping.MappingKey.ToString(),
+            MappingKey: Enum.TryParse<SystemAccountKey>(mapping.MappingKey, out var key)
+                ? key
+                : SystemAccountKey.DefaultCash,
+            MappingKeyName: mapping.MappingKey,
             AccountId: mapping.AccountId,
             AccountName: mapping.Account?.NameAr,
             AccountCode: mapping.Account?.AccountCode,

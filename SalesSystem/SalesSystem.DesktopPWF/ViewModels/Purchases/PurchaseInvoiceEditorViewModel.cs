@@ -578,7 +578,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 InvoiceNo = invoice.InvoiceNo;
                 SelectedWarehouseId = invoice.WarehouseId;
                 SelectedSupplierId = invoice.SupplierId;
-                InvoiceDate = invoice.InvoiceDate;
+                InvoiceDate = invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue);
                 SelectedPaymentType = (byte)invoice.PaymentType;
                 InvoiceDiscount = invoice.DiscountAmount;
                 OtherCharges = invoice.OtherCharges;

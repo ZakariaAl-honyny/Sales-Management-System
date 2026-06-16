@@ -179,10 +179,6 @@
                                             Width="150" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
-                        <DataGridTextColumn Header="الاسم بالكامل" 
-                                            Binding="{Binding FullName}" 
-                                            Width="*" 
-                                            CellStyle="{StaticResource DataGridCellStyle}"/>
                         
                         <DataGridTemplateColumn Header="الصلاحية" Width="120" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>

@@ -13,8 +13,8 @@ public class CreateInventoryBatchRequestValidator : AbstractValidator<CreateInve
         RuleFor(x => x.WarehouseId)
             .Must(id => id > 0).WithMessage("معرف المستودع مطلوب");
 
-        RuleFor(x => x.Quantity)
-            .GreaterThan(0).WithMessage("الكمية يجب أن تكون أكبر من الصفر");
+        RuleFor(x => x.QuantityReceived)
+            .GreaterThan(0).WithMessage("الكمية المستلمة يجب أن تكون أكبر من الصفر");
 
         RuleFor(x => x.UnitCost)
             .GreaterThanOrEqualTo(0).WithMessage("تكلفة الوحدة لا يمكن أن تكون سالبة");
@@ -27,8 +27,12 @@ public class CreateInventoryBatchRequestValidator : AbstractValidator<CreateInve
             .GreaterThan(0).WithMessage("معرف فاتورة المشتريات يجب أن يكون أكبر من صفر")
             .When(x => x.PurchaseInvoiceId.HasValue);
 
+        RuleFor(x => x.PurchaseInvoiceLineId)
+            .GreaterThan(0).WithMessage("معرف بند فاتورة المشتريات يجب أن يكون أكبر من صفر")
+            .When(x => x.PurchaseInvoiceLineId.HasValue);
+
         RuleFor(x => x.ExpiryDate)
-            .Must(d => d!.Value > DateTime.UtcNow)
+            .Must(d => d!.Value > DateOnly.FromDateTime(DateTime.UtcNow))
             .When(x => x.ExpiryDate.HasValue)
             .WithMessage("تاريخ انتهاء الصلاحية يجب أن يكون في المستقبل");
     }

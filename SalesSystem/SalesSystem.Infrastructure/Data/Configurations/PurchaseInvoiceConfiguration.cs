@@ -19,6 +19,8 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.PaidAmount).HasPrecision(18, 2);
         builder.Property(pi => pi.RemainingAmount).HasPrecision(18, 2);
         builder.Property(pi => pi.Notes).HasMaxLength(500);
+        builder.Property(pi => pi.SupplierInvoiceNo).HasMaxLength(200).IsRequired(false);
+        builder.Property(pi => pi.InvoiceDate).HasColumnType("date");
         builder.Property(pi => pi.PaymentType).HasConversion<byte>();
         builder.Property(pi => pi.Status).HasConversion<byte>();
 
@@ -70,6 +72,7 @@ public class PurchaseInvoiceLineConfiguration : IEntityTypeConfiguration<Purchas
         builder.HasKey(pii => pii.Id);
         builder.Property(pii => pii.Quantity).HasPrecision(18, 3);
         builder.Property(pii => pii.UnitPrice).HasPrecision(18, 2);
+        builder.Property(pii => pii.LandedUnitCost).HasPrecision(18, 2);
         builder.Property(pii => pii.LineTotal).HasPrecision(18, 2);
         builder.Property(pii => pii.ProductUnitId).IsRequired();
 

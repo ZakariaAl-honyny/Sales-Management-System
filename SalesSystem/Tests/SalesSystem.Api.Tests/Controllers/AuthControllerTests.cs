@@ -36,8 +36,7 @@ public class AuthControllerTests
         var expectedResponse = new LoginResponse(
             1,
             "admin",
-            "المسؤول",
-            1,
+            (byte)1,
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
             DateTime.UtcNow.AddHours(8)
         );

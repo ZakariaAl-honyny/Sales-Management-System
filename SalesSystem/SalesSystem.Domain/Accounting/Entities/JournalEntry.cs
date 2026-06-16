@@ -1,5 +1,6 @@
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Common;
+using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Domain.Accounting.Entities;
@@ -7,8 +8,9 @@ namespace SalesSystem.Domain.Accounting.Entities;
 /// <summary>
 /// Represents a journal entry (double-entry accounting record) with 3-state lifecycle:
 /// Draft (1) → Posted (2) → Cancelled (3).
-/// Lines must be added via AddDebitLine / AddCreditLine methods
-/// to ensure the entry remains internally consistent.
+/// Supports multi-currency via CurrencyId + ExchangeRate.
+/// FK to FiscalYear for period-based reporting.
+/// Lines must be added via AddDebitLine / AddCreditLine methods.
 /// </summary>
 public class JournalEntry : DocumentEntity
 {
@@ -30,12 +32,33 @@ public class JournalEntry : DocumentEntity
     public string Description { get; private set; } = string.Empty;
     public JournalEntryType EntryType { get; private set; }
     public JournalEntryStatus Status { get; private set; }
+
+    /// <summary>FK to FiscalYears table (smallint). Required for period reporting.</summary>
+    public short FiscalYearId { get; private set; }
+    public FiscalYear? FiscalYear { get; private set; }
+
+    /// <summary>FK to Currencies table (smallint). Required for multi-currency support.</summary>
+    public short CurrencyId { get; private set; }
+    public Currency? Currency { get; private set; }
+
+    /// <summary>Exchange rate to base currency. Precision (18,6).</summary>
+    public decimal ExchangeRate { get; private set; } = 1m;
+
+    /// <summary>Optional attachment file path (nvarchar(500)).</summary>
+    public string? AttachmentPath { get; private set; }
+
     public string? ReferenceType { get; private set; }
     public int? ReferenceId { get; private set; }
     public string? ReferenceNumber { get; private set; }
     public bool IsReversed { get; private set; }
     public int? ReversedByEntryId { get; private set; }
     public JournalEntry? ReversedByEntry { get; private set; }
+
+    /// <summary>User who reviewed this entry (nullable).</summary>
+    public int? ReviewedByUserId { get; private set; }
+
+    /// <summary>Timestamp when this entry was reviewed (nullable).</summary>
+    public DateTime? ReviewedAt { get; private set; }
 
     private readonly List<JournalEntryLine> _lines = new();
     public IReadOnlyList<JournalEntryLine> Lines => _lines.AsReadOnly();
@@ -53,10 +76,14 @@ public class JournalEntry : DocumentEntity
         DateTime entryDate,
         string description,
         JournalEntryType entryType,
+        short fiscalYearId,
+        short currencyId,
         int createdBy,
+        decimal exchangeRate = 1m,
         string? referenceType = null,
         int? referenceId = null,
-        string? referenceNumber = null)
+        string? referenceNumber = null,
+        string? attachmentPath = null)
     {
         if (string.IsNullOrWhiteSpace(entryNumber))
             throw new DomainException("رقم القيد المحاسبي مطلوب");
@@ -73,8 +100,20 @@ public class JournalEntry : DocumentEntity
         if (!Enum.IsDefined(typeof(JournalEntryType), entryType))
             throw new DomainException("نوع القيد المحاسبي غير صالح");
 
+        if (fiscalYearId <= 0)
+            throw new DomainException("السنة المالية مطلوبة");
+
+        if (currencyId <= 0)
+            throw new DomainException("عملة القيد المحاسبي مطلوبة");
+
+        if (exchangeRate <= 0)
+            throw new DomainException("سعر الصرف يجب أن يكون أكبر من صفر");
+
         if (createdBy <= 0)
             throw new DomainException("منشئ القيد المحاسبي مطلوب");
+
+        if (attachmentPath?.Length > 500)
+            throw new DomainException("مسار المرفق لا يمكن أن يتجاوز 500 حرف");
 
         var entry = new JournalEntry
         {
@@ -83,10 +122,14 @@ public class JournalEntry : DocumentEntity
             EntryDate = entryDate,
             Description = description.Trim(),
             EntryType = entryType,
+            FiscalYearId = fiscalYearId,
+            CurrencyId = currencyId,
+            ExchangeRate = exchangeRate,
             Status = JournalEntryStatus.Draft,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId,
-            ReferenceNumber = referenceNumber?.Trim()
+            ReferenceNumber = referenceNumber?.Trim(),
+            AttachmentPath = attachmentPath?.Trim()
         };
         entry.SetCreatedBy(createdBy);
         return entry;

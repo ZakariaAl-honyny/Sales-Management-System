@@ -10,10 +10,17 @@ public class DocumentSequenceConfiguration : IEntityTypeConfiguration<DocumentSe
     {
         builder.ToTable("DocumentSequences");
         builder.HasKey(ds => ds.Id);
-        builder.Property(ds => ds.DocumentType).IsRequired().HasMaxLength(50);
-        builder.Property(ds => ds.Prefix).IsRequired().HasMaxLength(10);
-        builder.HasIndex(ds => new { ds.Prefix, ds.Year }).IsUnique();
-        builder.Property(ds => ds.Year).IsRequired();
-        builder.Property(ds => ds.LastNumber).IsRequired();
+
+        builder.Property(ds => ds.DocumentType)
+            .IsRequired()
+            .HasMaxLength(50);
+
+        builder.Property(ds => ds.NextNumber)
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.HasIndex(ds => ds.DocumentType)
+            .IsUnique()
+            .HasDatabaseName("IX_DocumentSequences_DocumentType");
     }
 }

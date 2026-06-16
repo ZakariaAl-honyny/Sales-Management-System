@@ -13,14 +13,16 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
 
         builder.Property(pr => pr.ReturnNo).IsRequired();
         builder.HasIndex(pr => pr.ReturnNo).IsUnique();
-        builder.Property(pr => pr.ReturnDate).IsRequired();
+        builder.Property(pr => pr.ReturnDate).HasColumnType("date");
         builder.Property(pr => pr.TotalAmount).HasPrecision(18, 2);
         builder.Property(pr => pr.Notes).HasMaxLength(500);
+        builder.Property(pr => pr.CurrencyId).HasColumnType("smallint");
         builder.Property(pr => pr.Status).HasConversion<byte>();
 
         builder.HasOne(pr => pr.PurchaseInvoice)
             .WithMany()
             .HasForeignKey(pr => pr.PurchaseInvoiceId)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(pr => pr.Supplier)
@@ -65,6 +67,17 @@ public class PurchaseReturnLineConfiguration : IEntityTypeConfiguration<Purchase
         builder.HasOne(l => l.PurchaseInvoiceLine)
             .WithMany()
             .HasForeignKey(l => l.PurchaseInvoiceLineId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(l => l.Product)
+            .WithMany()
+            .HasForeignKey(l => l.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(l => l.ProductUnit)
+            .WithMany()
+            .HasForeignKey(l => l.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
