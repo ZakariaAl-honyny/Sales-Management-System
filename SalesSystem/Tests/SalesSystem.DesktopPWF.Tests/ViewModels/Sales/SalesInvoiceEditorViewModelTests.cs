@@ -34,6 +34,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly Mock<ICurrencyApiService> _mockCurrencyService;
     private readonly Mock<IProductCategoryApiService> _mockProductCategoryService;
+    private readonly Mock<IProductUnitApiService> _mockUnitService;
+    private readonly Mock<IProductPriceApiService> _mockPriceService;
     public SalesInvoiceEditorViewModelTests()
     {
         _mockInvoiceService = new Mock<ISalesInvoiceApiService>();
@@ -51,6 +53,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _mockToastService = new Mock<IToastNotificationService>();
         _mockCurrencyService = new Mock<ICurrencyApiService>();
         _mockProductCategoryService = new Mock<IProductCategoryApiService>();
+        _mockUnitService = new Mock<IProductUnitApiService>();
+        _mockPriceService = new Mock<IProductPriceApiService>();
     }
 
     public void Dispose()
@@ -598,6 +602,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _mockToastService.Object,
             _mockCurrencyService.Object,
             _mockProductCategoryService.Object,
+            _mockUnitService.Object,
+            _mockPriceService.Object,
             invoiceId);
     }
 

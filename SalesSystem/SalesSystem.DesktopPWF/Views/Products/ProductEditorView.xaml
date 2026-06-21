@@ -70,7 +70,7 @@
                                          VerticalContentAlignment="Top" 
                                          TabIndex="4"
                                          ToolTip="وصف إضافي للمنتج (اختياري) — يظهر في الفواتير والتقارير"/>
-                                <Border Height="12"/>
+                                <Border Height="8"/>
 
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -89,13 +89,13 @@
 
                                     <StackPanel Grid.Column="1" Margin="6,0,0,0">
                                         <TextBlock Text="تنبيه المخزون المنخفض" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding MinStock, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
+                                        <TextBox Text="{Binding ReorderLevel, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
                                                  Style="{StaticResource ModernTextBox}" 
                                                  TabIndex="6"
                                                  ToolTip="الحد الأدنى للمخزون — سيتم تنبيهك عندما يصل المخزون إلى هذا الحد"/>
                                     </StackPanel>
                                 </Grid>
-                                <Border Height="12"/>
+                                <Border Height="8"/>
 
                                 <!-- Options Section -->
                                 <StackPanel>
@@ -240,79 +240,14 @@
                 </Grid>
             </TabItem>
             
-            <!-- Tab 4: Images (inline gallery) -->
+            <!-- Tab 4: Images (placeholder — feature not yet implemented) -->
             <TabItem Header="🖼️ الصور">
                 <Grid Margin="8,6,8,8">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
-                    
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,6">
-                        <Button Command="{Binding AddImageCommand}" Style="{StaticResource PrimaryButton}" 
-                                Margin="0,0,4,0" MinWidth="100"
-                                ToolTip="إضافة صورة جديدة للمنتج — اختيار ملف صورة من الجهاز">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="➕" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="إضافة صورة" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding SetPrimaryImageCommand}" Style="{StaticResource SecondaryButton}" 
-                                Margin="4,0" MinWidth="80"
-                                ToolTip="تعيين الصورة المحددة كصورة رئيسية للمنتج">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="⭐" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="تعيين رئيسية" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding DeleteImageCommand}" Style="{StaticResource DangerButton}" 
-                                Margin="4,0" MinWidth="70"
-                                ToolTip="حذف الصورة المحددة — لا يمكن التراجع عن هذا الإجراء">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🗑️" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="حذف" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button Command="{Binding RefreshImagesCommand}" Style="{StaticResource SecondaryButton}"
-                                Margin="4,0,0,0" MinWidth="40"
-                                ToolTip="تحديث قائمة صور المنتج">
-                            <TextBlock Text="🔄" VerticalAlignment="Center"/>
-                        </Button>
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="🖼️" FontSize="48" HorizontalAlignment="Center" Margin="0,0,0,12" Opacity="0.3"/>
+                        <TextBlock Text="إدارة صور المنتج" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="هذه الميزة قيد التطوير — سيتم إتاحتها قريباً" FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"/>
                     </StackPanel>
-                    
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{Binding Images}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Margin="4" Padding="4"
-                                            BorderBrush="{StaticResource BorderBrush}" 
-                                            BorderThickness="1" CornerRadius="4"
-                                            Background="White">
-                                        <StackPanel>
-                                            <Border Width="100" Height="100" Background="#FFF5F5F5" CornerRadius="2">
-                                                <Image Source="{Binding ImagePath}" 
-                                                       Width="96" Height="96"
-                                                       Stretch="Uniform"
-                                                       VerticalAlignment="Center" 
-                                                       HorizontalAlignment="Center"/>
-                                            </Border>
-                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,4,0,0">
-                                                <TextBlock Text="⭐" FontSize="12" 
-                                                           Visibility="{Binding IsPrimary, Converter={StaticResource BoolToVisibility}}"
-                                                           Margin="0,0,4,0"/>
-                                                <TextBlock Text="{Binding Id}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
                 </Grid>
             </TabItem>
             
@@ -390,7 +325,7 @@
         </TabControl>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="White" Padding="24,16" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -400,7 +335,7 @@
                 <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Command="{Binding SaveCommand}" 
                             Style="{StaticResource PrimaryButton}"
-                            Width="140"
+                            MinWidth="100"
                             Margin="0,0,12,0"
                             IsDefault="True" 
                             TabIndex="17"
@@ -414,7 +349,7 @@
                     <Button Content="إلغاء" 
                             Command="{Binding CancelCommand}" 
                             Style="{StaticResource SecondaryButton}" 
-                            Width="100"
+                            MinWidth="80"
                             TabIndex="18"
                             ToolTip="إلغاء وإغلاق النافذة"/>
                 </StackPanel>

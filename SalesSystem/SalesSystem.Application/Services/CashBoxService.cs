@@ -744,6 +744,7 @@ public class CashBoxService : ICashBoxService
                 parentId: parent.Id,
                 isSystem: false,
                 categoryId: null,
+                level: 4,
                 createdByUserId: userId);
 
             await _uow.Accounts.AddAsync(account, ct);

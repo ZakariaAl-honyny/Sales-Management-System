@@ -239,6 +239,34 @@ public class JournalEntryService : IJournalEntryService
         }
     }
 
+    public async Task<Result> DeleteDraftAsync(int id, int userId, CancellationToken ct = default)
+    {
+        try
+        {
+            var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
+                e => e.Id == id, ct);
+
+            if (entry == null)
+                return Result.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
+
+            if (entry.Status != JournalEntryStatus.Draft)
+                return Result.Failure("لا يمكن حذف إلا القيود المحاسبية في حالة مسودة", ErrorCodes.InvalidOperation);
+
+            await _uow.JournalEntries.HardDeleteAsync(entry.Id, ct);
+
+            _logger.LogInformation(
+                "Journal entry {EntryNumber} (ID={Id}) deleted (draft) by User {UserId}",
+                entry.EntryNumber, entry.Id, userId);
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting draft journal entry {Id}", id);
+            return Result.Failure("حدث خطأ أثناء حذف القيد المحاسبي");
+        }
+    }
+
     // ─── Private Mapping Helpers ──────────────────────
 
     private static string GetEntryTypeDisplay(JournalEntryType entryType) => entryType switch

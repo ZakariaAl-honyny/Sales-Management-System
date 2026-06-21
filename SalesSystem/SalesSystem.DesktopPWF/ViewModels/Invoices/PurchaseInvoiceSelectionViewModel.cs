@@ -86,9 +86,9 @@ public class PurchaseInvoiceSelectionViewModel : ViewModelBase
                 InvoicesView = CollectionViewSource.GetDefaultView(Invoices);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Log error
+            LogSystemError("فشل في تحميل فواتير الشراء", "PurchaseInvoiceSelectionViewModel.LoadInvoicesAsync", ex);
         }
         finally
         {

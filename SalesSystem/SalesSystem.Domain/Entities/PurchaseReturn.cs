@@ -68,6 +68,10 @@ public class PurchaseReturn : DocumentEntity
     public short WarehouseId { get; private set; }
     public short CurrencyId { get; private set; }
     public decimal TotalAmount { get; private set; }
+    public decimal ReturnedDiscountAmount { get; private set; }
+    public decimal ReturnedTaxAmount { get; private set; }
+    public decimal ReturnedChargeAmount { get; private set; }
+    public short? TaxId { get; private set; }
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
@@ -130,6 +134,19 @@ public class PurchaseReturn : DocumentEntity
     public void RecalculateTotals()
     {
         TotalAmount = _lines.Sum(l => l.Amount);
+    }
+
+    /// <summary>
+    /// Sets proportional amounts for discount, tax, and charges based on the original invoice.
+    /// Called by the service layer BEFORE Post() — the service computes the ratio
+    /// from the original invoice's SubTotal, DiscountAmount, TaxAmount, OtherCharges.
+    /// </summary>
+    public void SetProportionalAmounts(decimal discountPortion, decimal taxPortion, decimal chargesPortion, short? taxId)
+    {
+        ReturnedDiscountAmount = discountPortion;
+        ReturnedTaxAmount = taxPortion;
+        ReturnedChargeAmount = chargesPortion;
+        TaxId = taxId;
     }
 
     public void Post()

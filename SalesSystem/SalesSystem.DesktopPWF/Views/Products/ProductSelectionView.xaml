@@ -17,12 +17,13 @@
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Search Bar -->
-        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,10" Padding="8">
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,6" Padding="8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -31,18 +32,56 @@
                 <TextBox x:Name="SearchBox" 
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
                          Style="{StaticResource ModernTextBox}"
-                         Tag="ابحث بالاسم، الكود، أو الباركود...">
+                         Tag="ابحث بالاسم أو الباركود...">
                     <TextBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding ScanBarcodeCommand}"/>
                     </TextBox.InputBindings>
                 </TextBox>
                 <Button Grid.Column="1" Content="🔍 بحث" Command="{Binding SearchCommand}" 
-                        Style="{StaticResource SecondaryButton}" Width="80" Margin="8,0,0,0" ToolTip="البحث في القائمة"/>
+                        Style="{StaticResource SecondaryButton}" MinWidth="80" Margin="8,0,0,0" ToolTip="البحث في القائمة"/>
+            </Grid>
+        </Border>
+
+        <!-- Unit Selection Panel (visible when a product row is selected) -->
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="0,0,0,6" Padding="8"
+                Visibility="{Binding HasUnits, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="المنتج:" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                <TextBlock Grid.Column="1" Text="{Binding SelectedProductName}" FontSize="12" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="0,0,12,0"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="{Binding SelectedProductName}"/>
+
+                <TextBlock Grid.Column="2" Text="الوحدة:" FontSize="12" VerticalAlignment="Center" Margin="0,0,4,0"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                <ComboBox Grid.Column="3" 
+                          ItemsSource="{Binding AvailableUnits}"
+                          SelectedItem="{Binding SelectedUnit}"
+                          DisplayMemberPath="UnitName"
+                          Style="{StaticResource ModernComboBox}"
+                          ToolTip="اختر الوحدة لعرض المخزون المحول"/>
+
+                <!-- Converted stock display -->
+                <TextBlock Grid.Column="3" 
+                           Text="{Binding ConvertedStockDisplay}" 
+                           FontSize="13" FontWeight="Bold"
+                           VerticalAlignment="Center" HorizontalAlignment="Right"
+                           Margin="0,0,8,0"
+                           Foreground="{StaticResource PrimaryBrush}"
+                           Visibility="Collapsed"/>
             </Grid>
         </Border>
 
         <!-- Product List -->
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
             <Grid>
                 <DataGrid x:Name="ProductsDataGrid"
                           ItemsSource="{Binding ProductsView}"
@@ -57,12 +96,11 @@
                         <KeyBinding Key="Return" Command="{Binding SelectCommand}"/>
                     </DataGrid.InputBindings>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="رقم الصنف" Binding="{Binding Id}" Width="80"/>
-                        <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="120"/>
+                        <DataGridTextColumn Header="رقم الصنف" Binding="{Binding Id}" Width="70"/>
+                        <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="110"/>
                         <DataGridTextColumn Header="اسم الصنف" Binding="{Binding Name}" Width="*"/>
-                        <DataGridTextColumn Header="سعر التجزئة" Binding="{Binding RetailPrice, StringFormat=N2}" Width="100"/>
-                        <DataGridTextColumn Header="سعر الجملة" Binding="{Binding WholesalePrice, StringFormat=N2}" Width="100"/>
-                        <DataGridTextColumn Header="المخزون" Binding="{Binding StockDisplay}" Width="90"/>
+                        <DataGridTextColumn Header="المخزون" Binding="{Binding StockDisplay}" Width="110"
+                                            ToolTipService.ToolTip="المخزون المتوفر — يتم التحويل تلقائياً حسب الوحدة المختارة"/>
                     </DataGrid.Columns>
                 </DataGrid>
 
@@ -77,20 +115,20 @@
         </Border>
 
         <!-- Footer -->
-        <Grid Grid.Row="2" Margin="0,10,0,0">
+        <Grid Grid.Row="3" Margin="0,8,0,0">
             <TextBlock Text="💡 تلميح: استخدم الأسهم (↑↓) للتنقل واضغط Enter للاختيار السريع." 
                        VerticalAlignment="Center" 
                        Foreground="{StaticResource TextSecondaryBrush}" 
                        FontSize="11"/>
             
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" Width="100" Margin="0,0,12,0" ToolTip="إلغاء وإغلاق النافذة"/>
-                <Button Content="✅ اختيار" Command="{Binding SelectCommand}" Style="{StaticResource PrimaryButton}" Width="120" IsDefault="True" ToolTip="تأكيد الاختيار"/>
+                <Button Content="إلغاء" Command="{Binding CancelCommand}" Style="{StaticResource SecondaryButton}" MinWidth="80" Margin="0,0,12,0" ToolTip="إلغاء وإغلاق النافذة"/>
+                <Button Content="✅ اختيار" Command="{Binding SelectCommand}" Style="{StaticResource PrimaryButton}" MinWidth="100" IsDefault="True" ToolTip="تأكيد تحديد المنتج وإغلاق النافذة"/>
             </StackPanel>
         </Grid>
 
         <!-- General Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="3"
+        <Border Grid.Row="0" Grid.RowSpan="4"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

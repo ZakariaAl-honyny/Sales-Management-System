@@ -44,7 +44,8 @@ public class WarehouseTransferConfiguration : IEntityTypeConfiguration<Warehouse
         builder.Property(x => x.Status)
             .HasConversion<byte>()
             .IsRequired()
-            .HasDefaultValue(Domain.Enums.InvoiceStatus.Draft);
+            .HasDefaultValue(Domain.Enums.InvoiceStatus.Draft)
+            .HasSentinel((Domain.Enums.InvoiceStatus)0);
 
         builder.Property(x => x.CreatedAt)
             .IsRequired()

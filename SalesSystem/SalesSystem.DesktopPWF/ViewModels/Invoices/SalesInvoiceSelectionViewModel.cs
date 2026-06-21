@@ -89,9 +89,9 @@ public class SalesInvoiceSelectionViewModel : ViewModelBase
                 // But usually better to let the caller handle auto-select if they want.
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Log error
+            LogSystemError("فشل في تحميل فواتير البيع", "SalesInvoiceSelectionViewModel.LoadInvoicesAsync", ex);
         }
         finally
         {

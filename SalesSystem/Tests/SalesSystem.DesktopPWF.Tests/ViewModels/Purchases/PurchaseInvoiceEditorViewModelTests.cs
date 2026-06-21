@@ -31,6 +31,8 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
     private readonly Mock<ICurrencyApiService> _mockCurrencyService;
+    private readonly Mock<IProductUnitApiService> _mockUnitService;
+    private readonly Mock<IProductPriceApiService> _mockPriceService;
     private readonly PurchaseInvoiceEditorViewModel _viewModel;
 
     public PurchaseInvoiceEditorViewModelTests()
@@ -48,6 +50,8 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
         _mockCurrencyService = new Mock<ICurrencyApiService>();
+        _mockUnitService = new Mock<IProductUnitApiService>();
+        _mockPriceService = new Mock<IProductPriceApiService>();
 
         var suppliers = new List<SupplierDto>
         {
@@ -83,7 +87,9 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
             _mockBarcodeInputService.Object,
             _printApiServiceMock.Object,
             _mockToastService.Object,
-            _mockCurrencyService.Object);
+            _mockCurrencyService.Object,
+            _mockUnitService.Object,
+            _mockPriceService.Object);
     }
 
     public void Dispose() { }
@@ -97,7 +103,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         var vmWithId = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, _mockUnitService.Object, _mockPriceService.Object, invoiceId: 1);
         vmWithId.IsEditMode.Should().BeTrue();
     }
 
@@ -149,7 +155,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
         var vm = new PurchaseInvoiceEditorViewModel(
             _mockInvoiceService.Object, _mockEventBus.Object, _mockSupplierService.Object,
             _mockWarehouseService.Object, _mockProductService.Object, _mockSettingsService.Object,
-            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, invoiceId: 1);
+            _mockDialogService.Object, _mockSoundService.Object, _mockBarcodeInputService.Object, _printApiServiceMock.Object, _mockToastService.Object, _mockCurrencyService.Object, _mockUnitService.Object, _mockPriceService.Object, invoiceId: 1);
 
         await Task.Delay(100);
         vm.SelectedWarehouseId.Should().Be(1);

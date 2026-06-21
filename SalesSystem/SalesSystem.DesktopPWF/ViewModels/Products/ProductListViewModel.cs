@@ -304,6 +304,7 @@ public async Task DeleteProductAsync()
             CategoryId: SelectedProduct.CategoryId,
             Description: SelectedProduct.Description,
             ReorderLevel: SelectedProduct.ReorderLevel,
+            TrackExpiry: SelectedProduct.TrackExpiry,
             IsActive: true
         );
 

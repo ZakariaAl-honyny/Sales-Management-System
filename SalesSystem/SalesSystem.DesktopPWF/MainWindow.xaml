@@ -167,6 +167,9 @@
             <DataTemplate DataType="{x:Type vmProducts:ProductImportViewModel}">
                 <viewsProducts:ProductImportView />
             </DataTemplate>
+            <DataTemplate DataType="{x:Type vmProducts:ProductCategoriesListViewModel}">
+                <viewsProducts:ProductCategoriesListView />
+            </DataTemplate>
             <DataTemplate DataType="{x:Type vmWarehouses:InventoryBatchesViewModel}">
                 <viewsWarehouses:InventoryBatchesView />
             </DataTemplate>
@@ -529,6 +532,13 @@
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                         <StackPanel Background="#1E293B">
 
+                            <!-- Dashboard — always visible -->
+                            <Button Content="📊  الرئيسية"
+                                    Command="{Binding NavigateToDashboardCommand}"
+                                    Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                    AutomationProperties.AutomationId="NavDashboard"
+                                    ToolTip="الرجوع إلى شاشة الرئيسية — عرض ملخص المبيعات والمخزون والإحصائيات"/>
+
                             <!-- Sales Expander -->
                             <Expander Header="المبيعات" Style="{StaticResource SidebarExpanderStyle}"
                                       AutomationProperties.AutomationId="SidebarExpanderSales">
@@ -817,6 +827,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavProductImport"
                                             ToolTip="استيراد الأصناف والمنتجات من ملف Excel — إضافة أو تحديث الكميات والأسعار"/>
+                                    <Button Content="مجموعات الأصناف" 
+                                            Command="{Binding NavigateToProductCategoriesCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavProductCategories"
+                                            ToolTip="إدارة مجموعات التصنيف — إضافة وتعديل مجموعات الأصناف لتنظيم المنتجات"/>
                                 </StackPanel>
                             </Expander>
 

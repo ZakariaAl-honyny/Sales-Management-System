@@ -521,9 +521,10 @@ Default schema: **`dbo`**
 | `AccountCode` | nvarchar(20) not null | unique filtered `[IsActive]=1` |
 | `Name` | nvarchar(200) not null | |
 | `Nature` | tinyint not null | 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense |
+| `Level` | tinyint not null default 1 | 1=Group, 2=Main, 3=Sub, 4=Detail — auto-created detail accounts use Level=4 |
 | `IsLeaf` | bit not null default 1 | leaf accounts allow transactions |
 | `IsSystem` | bit not null default 0 | system accounts protected from modification |
-| `CategoryId` | smallint null FK → AccountCategories(Id) | |
+| `CategoryId` | smallint null FK → AccountCategories(Id) |
 | `IsActive` | bit not null default 1 | |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
@@ -576,6 +577,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 | **Indexes** | `EntryNo`, `(ReferenceType, ReferenceId)` | |
 
 ### 4.6 JournalEntryLines
@@ -607,6 +610,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 4.8 PaymentVouchers (سندات صرف)
 | Column | Type | Notes |
@@ -624,6 +629,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 4.9 Expenses
 | Column | Type | Notes |
@@ -641,6 +648,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 4.10 SystemAccountMappings
 | Column | Type | Notes |
@@ -683,15 +692,17 @@ Default schema: **`dbo`**
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `BatchNo` | int not null | internal batch number |
+| `BatchNo` | nvarchar(50) not null | internal batch number |
 | `ProductId` | int not null FK → Products(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
 | `PurchaseInvoiceId` | int null FK → PurchaseInvoices(Id) | source purchase invoice |
-| `SupplierBatchNo` | varchar(100) null | supplier's batch reference |
+| `PurchaseInvoiceLineId` | int null FK → PurchaseInvoiceLines(Id) | source purchase invoice line |
+| `SupplierBatchNo` | nvarchar(100) null | supplier's batch reference |
 | `ExpiryDate` | date null | for FEFO tracking |
 | `QuantityReceived` | decimal(18,3) not null | CHK `>= 0` |
 | `QuantityRemaining` | decimal(18,3) not null | CHK `>= 0` |
 | `UnitCost` | decimal(18,2) not null | CHK `>= 0` |
+| `IsClosed` | bit not null default 0 | CHK: 0 when QtyRemaining > 0, 1 when fully consumed |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
@@ -741,6 +752,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 5.6 InventoryCountLines
 | Column | Type | Notes |
@@ -767,6 +780,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 5.8 InventoryAdjustmentLines
 | Column | Type | Notes |
@@ -793,6 +808,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 5.10 WarehouseTransferLines
 | Column | Type | Notes |
@@ -842,6 +859,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 | **UK** | `UNIQUE(InvoiceNo)` | |
 
 ### 6.2 SalesInvoiceLines
@@ -867,12 +886,18 @@ Default schema: **`dbo`**
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
 | `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
+| `ReturnedDiscountAmount` | decimal(18,2) not null default 0 | proportional discount from original invoice |
+| `ReturnedTaxAmount` | decimal(18,2) not null default 0 | proportional tax from original invoice |
+| `ReturnedChargeAmount` | decimal(18,2) not null default 0 | proportional other charges from original invoice |
+| `TaxId` | smallint null FK → Taxes(Id) | tax rate used from original invoice |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 6.4 SalesReturnLines
 | Column | Type | Notes |
@@ -899,6 +924,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 6.6 CustomerReceiptApplications
 | Column | Type | Notes |
@@ -944,6 +971,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 | **UK** | `UNIQUE(InvoiceNo)` | |
 
 ### 7.2 PurchaseInvoiceLines
@@ -968,12 +997,18 @@ Default schema: **`dbo`**
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
 | `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
+| `ReturnedDiscountAmount` | decimal(18,2) not null default 0 | proportional discount from original invoice |
+| `ReturnedTaxAmount` | decimal(18,2) not null default 0 | proportional tax from original invoice |
+| `ReturnedChargeAmount` | decimal(18,2) not null default 0 | proportional other charges from original invoice |
+| `TaxId` | smallint null FK → Taxes(Id) | tax rate used from original invoice |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 7.4 PurchaseReturnLines
 | Column | Type | Notes |
@@ -1000,6 +1035,8 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+| `PostedAt` | datetime2 null | set when Status=2 |
+| `CancelledAt` | datetime2 null | set when Status=3 |
 
 ### 7.6 SupplierPaymentApplications
 | Column | Type | Notes |

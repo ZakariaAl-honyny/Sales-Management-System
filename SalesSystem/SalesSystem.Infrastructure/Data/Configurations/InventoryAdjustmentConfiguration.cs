@@ -30,7 +30,8 @@ public class InventoryAdjustmentConfiguration : IEntityTypeConfiguration<Invento
         builder.Property(ia => ia.Status)
             .HasConversion<byte>()
             .IsRequired()
-            .HasDefaultValue(InventoryCountStatus.Draft);
+            .HasDefaultValue(InventoryCountStatus.Draft)
+            .HasSentinel((InventoryCountStatus)0);
 
         builder.Property(ia => ia.WarehouseId)
             .HasColumnType("smallint")

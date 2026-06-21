@@ -22,7 +22,8 @@ public class ReceiptVoucherConfiguration : IEntityTypeConfiguration<ReceiptVouch
             .HasColumnType("tinyint")
             .HasConversion<byte>()
             .IsRequired()
-            .HasDefaultValue(VoucherStatus.Draft);
+            .HasDefaultValue(VoucherStatus.Draft)
+            .HasSentinel((VoucherStatus)0);
 
         // FK to Currency
         builder.Property(x => x.CurrencyId).IsRequired();

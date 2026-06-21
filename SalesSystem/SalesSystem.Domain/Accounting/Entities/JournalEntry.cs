@@ -190,6 +190,7 @@ public class JournalEntry : DocumentEntity
             throw new DomainException(
                 $"القيد المحاسبي غير متوازن — مجموع المدين ({TotalDebit:N2}) لا يساوي مجموع الدائن ({TotalCredit:N2})");
 
+        PostedAt = DateTime.UtcNow;
         Status = JournalEntryStatus.Posted;
         UpdateTimestamp();
     }
@@ -205,6 +206,7 @@ public class JournalEntry : DocumentEntity
         if (Status != JournalEntryStatus.Posted)
             throw new DomainException("لا يمكن إلغاء إلا القيود المحاسبية المرحلة");
 
+        CancelledAt = DateTime.UtcNow;
         Status = JournalEntryStatus.Cancelled;
         ReversedByEntryId = reversedByEntryId;
         UpdateTimestamp();

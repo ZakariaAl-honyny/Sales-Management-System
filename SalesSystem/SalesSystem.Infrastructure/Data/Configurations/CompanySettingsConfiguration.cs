@@ -10,7 +10,7 @@ public class CompanySettingsConfiguration : IEntityTypeConfiguration<CompanySett
     {
         builder.ToTable("CompanySettings");
         builder.HasKey(c => c.Id);
-        builder.Property(c => c.Id).HasColumnType("tinyint").ValueGeneratedNever().HasDefaultValue(1);
+        builder.Property(c => c.Id).HasColumnType("tinyint").ValueGeneratedNever();
 
         builder.Property(c => c.CompanyName).IsRequired().HasMaxLength(200);
         builder.Property(c => c.Phone).HasMaxLength(30);

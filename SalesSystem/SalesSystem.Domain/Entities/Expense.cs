@@ -90,6 +90,7 @@ public class Expense : DocumentEntity
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("المصروف ملغي بالفعل.");
 
+        CancelledAt = DateTime.UtcNow;
         Status = InvoiceStatus.Cancelled;
         UpdateTimestamp();
     }

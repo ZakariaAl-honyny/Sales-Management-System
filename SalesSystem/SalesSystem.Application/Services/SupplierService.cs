@@ -223,6 +223,7 @@ public class SupplierService : ISupplierService
                 parentId: apParentAccount.Id,
                 isSystem: false,
                 categoryId: null,
+                level: 4,
                 createdByUserId: userId
             );
 

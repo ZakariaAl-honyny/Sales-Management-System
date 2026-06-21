@@ -172,6 +172,21 @@
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
 
+                        <DataGridTextColumn Header="خصم" 
+                                            Binding="{Binding ReturnedDiscountAmount, StringFormat=N2}" 
+                                            Width="100" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        
+                        <DataGridTextColumn Header="ضريبة" 
+                                            Binding="{Binding ReturnedTaxAmount, StringFormat=N2}" 
+                                            Width="100" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                        
+                        <DataGridTextColumn Header="رسوم" 
+                                            Binding="{Binding ReturnedChargeAmount, StringFormat=N2}" 
+                                            Width="100" 
+                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+
                         <DataGridTemplateColumn Header="الحالة" Width="110" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>

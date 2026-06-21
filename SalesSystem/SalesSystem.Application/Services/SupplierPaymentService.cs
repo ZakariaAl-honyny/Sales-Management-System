@@ -246,19 +246,23 @@ public class SupplierPaymentService : ISupplierPaymentService
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            payment.Post();
-            payment.SetUpdatedBy(userId);
-            await _uow.SaveChangesAsync(ct);
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
+            {
+                payment.Post();
+                payment.SetUpdatedBy(userId);
 
-            // Create journal entry: Dr AP / Cr Cash
-            var supplierName = payment.Supplier?.Party?.Name ?? "";
-            var entryResult = await _accountingService.CreateSupplierPaymentEntryAsync(
-                payment, supplierName, userId, ct);
-            if (!entryResult.IsSuccess)
-                return Result.Failure(entryResult.Error!);
+                // Create journal entry: Dr AP / Cr Cash
+                var supplierName = payment.Supplier?.Party?.Name ?? "";
+                var entryResult = await _accountingService.CreateSupplierPaymentEntryAsync(
+                    payment, supplierName, userId, ct);
+                if (!entryResult.IsSuccess)
+                    return Result.Failure(entryResult.Error!);
 
-            _logger.LogInformation("Supplier payment {Id} posted by User {UserId}", id, userId);
-            return Result.Success();
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Supplier payment {Id} posted by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (DomainException ex)
         {

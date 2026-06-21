@@ -108,6 +108,9 @@ public class SupplierPayment : DocumentEntity
         string? notes,
         int? updatedByUserId = null)
     {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن تعديل سند صرف مرحل أو ملغي");
+
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
         Amount = amount;

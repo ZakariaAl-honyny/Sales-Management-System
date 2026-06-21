@@ -44,8 +44,8 @@ public class LowStockViewModel : ViewModelBase
         _navigationService = navigationService;
 
         RefreshCommand = new AsyncRelayCommand(LoadDataAsync);
-        ExportCommand = new RelayCommand(ExportToExcel);
-        PrintCommand = new RelayCommand(Print);
+        ExportCommand = new AsyncRelayCommand(ExportToExcelAsync);
+        PrintCommand = new AsyncRelayCommand(PrintAsync);
         
         _ = LoadWarehousesAsync();
         _ = LoadDataAsync();
@@ -150,7 +150,7 @@ public class LowStockViewModel : ViewModelBase
         }
     }
 
-    private async void ExportToExcel()
+    private async Task ExportToExcelAsync()
     {
         if (Items.Count == 0)
         {
@@ -173,7 +173,7 @@ public class LowStockViewModel : ViewModelBase
                     var worksheet = workbook.Worksheets.Add("Low Stock");
                     
                     // Headers
-                    worksheet.Cell(1, 1).Value = "كود المنتج";
+                    worksheet.Cell(1, 1).Value = "رقم المنتج";
                     worksheet.Cell(1, 2).Value = "اسم المنتج";
                     worksheet.Cell(1, 3).Value = "الفئة";
                     worksheet.Cell(1, 4).Value = "المستودع";
@@ -187,7 +187,7 @@ public class LowStockViewModel : ViewModelBase
                     for (int i = 0; i < Items.Count; i++)
                     {
                         var item = Items[i];
-                        // worksheet.Cell(i + 2, 1).Value = item.ProductCode;
+                        worksheet.Cell(i + 2, 1).Value = item.ProductId;
                         worksheet.Cell(i + 2, 2).Value = item.ProductName;
                         worksheet.Cell(i + 2, 3).Value = item.CategoryName;
                         worksheet.Cell(i + 2, 4).Value = item.WarehouseName;
@@ -216,10 +216,17 @@ public class LowStockViewModel : ViewModelBase
         }
     }
 
-    private async void Print()
+    private async Task PrintAsync()
     {
-        // Printing logic using a print service or simple PDF export
-        await _dialogService.ShowInfoAsync("معلومات", "جاري تجهيز الطباعة...");
+        try
+        {
+            // Printing logic using a print service or simple PDF export
+            await _dialogService.ShowInfoAsync("معلومات", "جاري تجهيز الطباعة...");
+        }
+        catch (Exception ex)
+        {
+            LogSystemError("فشل في طباعة تقرير نواقص المخزون", "LowStockViewModel.PrintAsync", ex);
+        }
     }
 }
 

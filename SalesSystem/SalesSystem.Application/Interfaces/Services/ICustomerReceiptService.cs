@@ -12,5 +12,6 @@ public interface ICustomerReceiptService
     Task<Result<CustomerReceiptDto>> UpdateAsync(int id, UpdateCustomerReceiptRequest request, int userId, CancellationToken ct);
     Task<Result> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result> CancelAsync(int id, int userId, CancellationToken ct);
+    Task<Result> DeleteAsync(int id, int userId, CancellationToken ct);
     Task<Result<CustomerReceiptDto>> AddApplicationAsync(int receiptId, AddReceiptApplicationRequest request, CancellationToken ct);
 }

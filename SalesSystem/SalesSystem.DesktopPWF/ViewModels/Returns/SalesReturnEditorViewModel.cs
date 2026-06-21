@@ -424,20 +424,31 @@ public class SalesReturnEditorViewModel : ViewModelBase
     private void UpdateImpactAnalysis()
     {
         var warehouse = Warehouses.FirstOrDefault(w => w.Id == SelectedWarehouseId);
-        
+        var invoice = SelectedInvoice;
+
+        // Compute proportional ratios from the original invoice
+        decimal discountRatio = 0, taxRatio = 0, chargeRatio = 0;
+        if (invoice != null && invoice.SubTotal > 0)
+        {
+            discountRatio = invoice.DiscountAmount / invoice.SubTotal;
+            taxRatio = invoice.TaxAmount / invoice.SubTotal;
+            chargeRatio = invoice.OtherCharges / invoice.SubTotal;
+        }
+
+        var totalReturned = Items.Where(i => i.ReturnQuantity > 0).Sum(i => i.LineTotal);
+
         var summary = new ReturnImpactSummary
         {
             TotalReturnAmount = TotalAmount,
             StockQuantityImpact = Items.Sum(i => i.ReturnQuantity),
             WarehouseName = warehouse?.Name ?? "غير محدد",
-            CounterpartyName = SelectedInvoice?.CustomerName ?? "غير محدد",
+            CounterpartyName = invoice?.CustomerName ?? "غير محدد",
             CounterpartyType = "العميل",
-            BalanceImpact = TotalAmount, // For credit sales, it reduces balance
-            TaxImpact = Items.Sum(i => {
-                var lineTotal = i.LineTotal;
-                // Assuming 15% tax for calculation preview if not specified
-                return lineTotal * 0.15m / 1.15m; 
-            })
+            BalanceImpact = TotalAmount,
+            TaxImpact = totalReturned * taxRatio,
+            ReturnedDiscountAmount = totalReturned * discountRatio,
+            ReturnedTaxAmount = totalReturned * taxRatio,
+            ReturnedChargeAmount = totalReturned * chargeRatio
         };
 
         Impact = summary;
@@ -534,7 +545,13 @@ public class SalesReturnEditorViewModel : ViewModelBase
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
-            var result = await _returnService.PostAsync(_returnId.Value);
+            var postRequest = new PostSalesReturnRequest
+            {
+                CashBoxId = EnableRefund && SelectedCashBox != null ? SelectedCashBox.Id : null,
+                RefundAmount = EnableRefund ? RefundAmount : 0,
+                Notes = Notes
+            };
+            var result = await _returnService.PostAsync(_returnId.Value, postRequest);
             if (result.IsSuccess)
             {
                 Status = InvoiceStatus.Posted;
@@ -678,6 +695,9 @@ public class SalesReturnItemViewModel : ViewModelBase
     public byte Mode => _mode;
     public decimal LineTotal => ReturnQuantity * (UnitPrice - (OriginalQuantity > 0 ? DiscountAmount / OriginalQuantity : 0));
 
+    public decimal PreviouslyReturnedQuantity { get; } = 0;
+    public decimal RemainingQuantity => OriginalQuantity - ReturnQuantity - PreviouslyReturnedQuantity;
+
     public decimal ReturnQuantity
     {
         get => _returnQuantity;
@@ -709,7 +729,7 @@ public class SalesReturnItemViewModel : ViewModelBase
     {
         SalesInvoiceLineId = 0; // Not available from DTO, set to 0 (read-only view)
         ProductId = item.ProductId;
-        ProductUnitId = 1;
+        ProductUnitId = item.ProductUnitId;
         ProductName = item.ProductName;
         OriginalQuantity = item.Quantity;
         UnitPrice = item.UnitPrice;

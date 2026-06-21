@@ -22,7 +22,8 @@ public class InventoryCountConfiguration : IEntityTypeConfiguration<InventoryCou
         builder.Property(ic => ic.Status)
             .HasConversion<byte>()
             .IsRequired()
-            .HasDefaultValue(InventoryCountStatus.Draft);
+            .HasDefaultValue(InventoryCountStatus.Draft)
+            .HasSentinel((InventoryCountStatus)0);
 
         builder.Property(ic => ic.Notes)
             .HasMaxLength(300)

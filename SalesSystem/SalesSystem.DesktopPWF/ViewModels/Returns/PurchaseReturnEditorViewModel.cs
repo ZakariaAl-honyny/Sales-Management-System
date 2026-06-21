@@ -253,6 +253,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             {
                 IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
                 OnPropertyChanged(nameof(IsForeignCurrency));
+                OnPropertyChanged(nameof(CurrencyName));
+                OnPropertyChanged(nameof(IsBaseCurrency));
             }
         }
     }
@@ -267,6 +269,83 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     {
         get => _isForeignCurrency;
         set => SetProperty(ref _isForeignCurrency, value);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // XAML-bound properties added for view compatibility
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>توافق مع XAML — اسم IsInvoiceLinked (يعادل IsLinkedToInvoice)</summary>
+    public bool IsInvoiceLinked => IsLinkedToInvoice;
+
+    /// <summary>اسم العملة المحددة للعرض في الواجهة</summary>
+    public string CurrencyName
+    {
+        get
+        {
+            if (SelectedCurrencyId.HasValue)
+            {
+                var currency = Currencies.FirstOrDefault(c => c.Id == SelectedCurrencyId.Value);
+                if (currency != null) return currency.Name;
+            }
+            return "ريال يمني";
+        }
+    }
+
+    /// <summary>قائمة الموردين للوضع المستقل (ComboBox)</summary>
+    public ObservableCollection<SupplierDto> Suppliers { get; } = new();
+
+    /// <summary>هل العملة المحددة هي العملة الأساسية (لعكس IsForeignCurrency)</summary>
+    public bool IsBaseCurrency => !IsForeignCurrency;
+
+    // Discount properties
+    private byte _selectedDiscountType; // 0 = Amount, 1 = Percentage
+    public byte SelectedDiscountType
+    {
+        get => _selectedDiscountType;
+        set
+        {
+            if (SetProperty(ref _selectedDiscountType, value))
+            {
+                OnPropertyChanged(nameof(IsAmountDiscount));
+                OnPropertyChanged(nameof(IsPercentageDiscount));
+                OnPropertyChanged(nameof(DiscountAmount));
+            }
+        }
+    }
+
+    private decimal _discountRate;
+    public decimal DiscountRate
+    {
+        get => _discountRate;
+        set
+        {
+            if (SetProperty(ref _discountRate, value))
+            {
+                OnPropertyChanged(nameof(DiscountAmount));
+            }
+        }
+    }
+
+    /// <summary>قائمة خيارات الخصم (مبلغ/نسبة)</summary>
+    public List<DiscountOption> DiscountTypeOptions { get; } = DiscountOption.GetOptions();
+
+    /// <summary>هل الخصم بقيمة مالية ثابتة</summary>
+    public bool IsAmountDiscount => SelectedDiscountType == 0;
+
+    /// <summary>هل الخصم بنسبة مئوية</summary>
+    public bool IsPercentageDiscount => SelectedDiscountType == 1;
+
+    /// <summary>قيمة الخصم المحتسبة (مبلغ ثابت أو نسبة × الإجمالي)</summary>
+    public decimal DiscountAmount
+    {
+        get
+        {
+            if (SelectedDiscountType == 0) // Amount
+                return DiscountRate;
+            else // Percentage
+                return TotalAmount * DiscountRate / 100m;
+        }
     }
 
     #endregion
@@ -331,6 +410,16 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
 
             if (result.IsSuccess && result.Value != null)
             {
+                // Update the Suppliers collection for combo box
+                InvokeOnUIThread(() =>
+                {
+                    Suppliers.Clear();
+                    foreach (var s in result.Value.OrderBy(s => s.Name))
+                    {
+                        Suppliers.Add(s);
+                    }
+                });
+
                 var search = SearchText.Trim().ToLowerInvariant();
                 var matches = result.Value
                     .Where(s => s.Name.ToLowerInvariant().Contains(search) || s.Id.ToString() == search)
@@ -462,12 +551,14 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                         if (e.PropertyName == nameof(PurchaseReturnItemViewModel.LineTotal))
                         {
                             OnPropertyChanged(nameof(TotalAmount));
+                            OnPropertyChanged(nameof(DiscountAmount));
                             UpdateImpactAnalysis();
                         }
                     };
                     Items.Add(lineVm);
                 }
                 OnPropertyChanged(nameof(TotalAmount));
+                OnPropertyChanged(nameof(DiscountAmount));
                 UpdateImpactAnalysis();
             }
             else
@@ -496,6 +587,29 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 if (baseCurrency != null)
                     SelectedCurrencyId = baseCurrency.Id;
             }
+
+            // Load suppliers for standalone mode ComboBox
+            await LoadSuppliersAsync();
+        });
+    }
+
+    private async Task LoadSuppliersAsync()
+    {
+        await ExecuteAsync(async () =>
+        {
+            var supplierService = App.GetService<ISupplierApiService>();
+            var result = await supplierService.GetAllAsync();
+            if (result.IsSuccess && result.Value != null)
+            {
+                InvokeOnUIThread(() =>
+                {
+                    Suppliers.Clear();
+                    foreach (var s in result.Value.OrderBy(s => s.Name))
+                    {
+                        Suppliers.Add(s);
+                    }
+                });
+            }
         });
     }
 
@@ -512,31 +626,49 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 if (e.PropertyName == nameof(PurchaseReturnItemViewModel.LineTotal))
                 {
                     OnPropertyChanged(nameof(TotalAmount));
+                    OnPropertyChanged(nameof(DiscountAmount));
                     UpdateImpactAnalysis();
                 }
             };
             Items.Add(lineVm);
         }
         OnPropertyChanged(nameof(TotalAmount));
+        OnPropertyChanged(nameof(DiscountAmount));
         UpdateImpactAnalysis();
     }
 
     private void UpdateImpactAnalysis()
     {
         var warehouse = Warehouses.FirstOrDefault(w => w.Id == SelectedWarehouseId);
+        var totalReturnAmount = TotalAmount;
+
+        decimal proportionalDiscount = 0m;
+        decimal proportionalTax = 0m;
+        decimal proportionalCharges = 0m;
+
+        if (SelectedInvoice != null)
+        {
+            // Compute proportional amounts from the original invoice values
+            var invoiceTotal = SelectedInvoice.SubTotal > 0 ? SelectedInvoice.SubTotal : 1m;
+            decimal ratio = totalReturnAmount / invoiceTotal;
+
+            proportionalDiscount = SelectedInvoice.DiscountAmount * ratio;
+            proportionalTax = SelectedInvoice.TaxAmount * ratio;
+            proportionalCharges = SelectedInvoice.OtherCharges * ratio;
+        }
 
         var summary = new ReturnImpactSummary
         {
-            TotalReturnAmount = TotalAmount,
+            TotalReturnAmount = totalReturnAmount,
             StockQuantityImpact = Items.Sum(i => i.ReturnQuantity),
             WarehouseName = warehouse?.Name ?? "غير محدد",
             CounterpartyName = SelectedInvoice?.SupplierName ?? SelectedSupplierName,
             CounterpartyType = "المورد",
-            BalanceImpact = TotalAmount,
-            TaxImpact = Items.Sum(i => {
-                var lineTotal = i.LineTotal;
-                return lineTotal * 0.15m / 1.15m;
-            })
+            BalanceImpact = totalReturnAmount,
+            TaxImpact = proportionalTax,
+            ReturnedDiscountAmount = proportionalDiscount,
+            ReturnedTaxAmount = proportionalTax,
+            ReturnedChargeAmount = proportionalCharges
         };
 
         Impact = summary;
@@ -836,4 +968,13 @@ public class DiscountOption
 {
     public byte Value { get; set; }
     public string Display { get; set; } = string.Empty;
+
+    public static List<DiscountOption> GetOptions()
+    {
+        return new List<DiscountOption>
+        {
+            new() { Value = 0, Display = "مبلغ" },
+            new() { Value = 1, Display = "نسبة %" }
+        };
+    }
 }

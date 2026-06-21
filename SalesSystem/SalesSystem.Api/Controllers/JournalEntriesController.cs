@@ -200,51 +200,25 @@ public class JournalEntriesController : ControllerBase
     }
 
     /// <summary>
-    /// Posts a Draft journal entry (transitions to Posted status).
+    /// Deletes a Draft journal entry (permanently removed from DB).
     /// </summary>
     /// <param name="id">Journal entry ID.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The posted journal entry details.</returns>
-    [HttpPost("{id:int:min(1)}/post")]
+    /// <returns>Success message.</returns>
+    [HttpDelete("{id:int:min(1)}")]
     [Authorize(Policy = "ManagerAndAbove")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> PostEntry(int id, CancellationToken ct)
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
     {
         var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(userIdStr, out var userId))
             return Unauthorized(new { error = "المستخدم غير مصرح له" });
 
-        var result = await _journalEntryService.PostJournalEntryAsync(id, userId, ct);
+        var result = await _journalEntryService.DeleteDraftAsync(id, userId, ct);
         if (result.IsSuccess)
-            return Ok(result.Value);
-
-        if (result.ErrorCode == ErrorCodes.NotFound)
-            return NotFound(new { error = result.Error });
-        return BadRequest(new { error = result.Error });
-    }
-
-    /// <summary>
-    /// Cancels a Posted journal entry (transitions to Cancelled status).
-    /// </summary>
-    /// <param name="id">Journal entry ID.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>The cancelled journal entry details.</returns>
-    [HttpPost("{id:int:min(1)}/cancel")]
-    [Authorize(Policy = "ManagerAndAbove")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CancelEntry(int id, CancellationToken ct)
-    {
-        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (!int.TryParse(userIdStr, out var userId))
-            return Unauthorized(new { error = "المستخدم غير مصرح له" });
-
-        var result = await _journalEntryService.CancelJournalEntryAsync(id, userId, ct);
-        if (result.IsSuccess)
-            return Ok(result.Value);
+            return Ok(new { message = "تم حذف القيد المحاسبي بنجاح" });
 
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });

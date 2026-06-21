@@ -126,6 +126,10 @@ public class SalesReturnsControllerTests : ControllerTestBase
         TaxAmount: 0.00m,
         DiscountAmount: 0.00m,
         TotalAmount: 100.00m,
+        ReturnedDiscountAmount: 0.00m,
+        ReturnedTaxAmount: 0.00m,
+        ReturnedChargeAmount: 0.00m,
+        TaxId: null,
         CurrencyId: null,
         ExchangeRate: null,
         Notes: "ملاحظات",
@@ -135,7 +139,7 @@ public class SalesReturnsControllerTests : ControllerTestBase
         RefundAmount: 0m,
         Items: new List<SalesReturnItemDto>
         {
-            new(id * 10, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
+            new(id * 10, 1, 1, "منتج اختبار", 2.000m, 50.00m, 0.00m, 100.00m, 1)
         });
 
     private static CreateSalesReturnRequest CreateValidRequest() => new(
@@ -266,6 +270,10 @@ public class PurchaseReturnsControllerTests : ControllerTestBase
         ReturnDate: DateOnly.FromDateTime(DateTime.UtcNow),
         SubTotal: 200.00m,
         TotalAmount: 200.00m,
+        ReturnedDiscountAmount: 0.00m,
+        ReturnedTaxAmount: 0.00m,
+        ReturnedChargeAmount: 0.00m,
+        TaxId: null,
         CurrencyId: null,
         ExchangeRate: null,
         Notes: "ملاحظات",

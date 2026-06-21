@@ -20,11 +20,15 @@ public class ProductCategoryService : IProductCategoryService
         _logger = logger;
     }
 
-    public async Task<Result<List<ProductCategoryDto>>> GetAllAsync(CancellationToken ct)
+    public async Task<Result<List<ProductCategoryDto>>> GetAllAsync(bool includeInactive = false, CancellationToken ct = default)
     {
         try
         {
-            var categories = await _uow.ProductCategories.ToListAsync(ct, "Parent");
+            var categories = await _uow.ProductCategories.ToListAsync(
+                predicate: null,
+                queryConfig: null,
+                ct: ct,
+                ignoreQueryFilters: includeInactive);
             var dtos = categories.Select(MapToDto).ToList();
             return Result<List<ProductCategoryDto>>.Success(dtos);
         }
@@ -39,7 +43,7 @@ public class ProductCategoryService : IProductCategoryService
     {
         try
         {
-            var category = await _uow.ProductCategories.FirstOrDefaultAsync(c => c.Id == id, ct, "Parent");
+            var category = await _uow.ProductCategories.FirstOrDefaultAsync(c => c.Id == id, ct);
             if (category == null)
                 return Result<ProductCategoryDto>.Failure("التصنيف غير موجود", ErrorCodes.NotFound);
 
@@ -139,6 +143,32 @@ public class ProductCategoryService : IProductCategoryService
         {
             _logger.LogError(ex, "Error deactivating product category {Id}", id);
             return Result.Failure("حدث خطأ أثناء إلغاء تنشيط التصنيف");
+        }
+    }
+
+    public async Task<Result> ReactivateAsync(int id, CancellationToken ct)
+    {
+        try
+        {
+            var category = await _uow.ProductCategories.FirstOrDefaultIgnoreFiltersAsync(c => c.Id == id, ct);
+            if (category == null)
+                return Result.Failure("التصنيف غير موجود", ErrorCodes.NotFound);
+
+            category.Restore();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Product category reactivated: {Name} (ID: {Id})", category.Name, id);
+            return Result.Success();
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation reactivating product category {Id}: {Message}", id, ex.Message);
+            return Result.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reactivating product category {Id}", id);
+            return Result.Failure("حدث خطأ أثناء استعادة التصنيف");
         }
     }
 

@@ -35,7 +35,7 @@ public class UserService : IUserService
 
     public async Task<Result<UserDto>> GetByIdAsync(int id, CancellationToken ct)
     {
-        var user = await _uow.Users.GetByIdAsync(id, ct);
+        var user = await _uow.Users.FirstOrDefaultAsync(u => u.Id == id, ct, "UserRoles");
         if (user == null)
             return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
@@ -48,7 +48,7 @@ public class UserService : IUserService
             return Result<UserDto>.Failure("اسم المستخدم مطلوب", ErrorCodes.ValidationError);
 
         var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(
-            u => u.UserName == userName, ct);
+            u => u.UserName == userName, ct, "UserRoles");
         if (user == null)
             return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
@@ -60,11 +60,11 @@ public class UserService : IUserService
         List<User> users;
         if (includeInactive)
         {
-            users = await _uow.Users.ToListIgnoreFiltersAsync(ct);
+            users = await _uow.Users.ToListIgnoreFiltersAsync(ct, "UserRoles");
         }
         else
         {
-            users = await _uow.Users.ToListAsync(ct);
+            users = await _uow.Users.ToListAsync(ct, "UserRoles");
         }
 
         var dtos = users.Select(MapToDto).OrderByDescending(x => x.Id).ToList();
@@ -126,7 +126,7 @@ public class UserService : IUserService
     {
         try
         {
-            var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(u => u.Id == id, ct);
+            var user = await _uow.Users.FirstOrDefaultIgnoreFiltersAsync(u => u.Id == id, ct, "UserRoles");
             if (user == null)
                 return Result<UserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 
@@ -258,7 +258,7 @@ public class UserService : IUserService
     {
         try
         {
-            var user = await _uow.Users.GetByIdAsync(id, ct);
+            var user = await _uow.Users.FirstOrDefaultAsync(u => u.Id == id, ct, "UserRoles");
             if (user == null)
                 return Result<CurrentUserDto>.Failure("المستخدم غير موجود", ErrorCodes.NotFound);
 

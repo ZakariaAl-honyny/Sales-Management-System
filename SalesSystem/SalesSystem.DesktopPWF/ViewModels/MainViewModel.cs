@@ -228,6 +228,7 @@ public class MainViewModel : ViewModelBase
         // Products section commands
         NavigateToProductUnitsCommand = new RelayCommand(() => NavigateTo<ProductUnitsListViewModel>());
         NavigateToProductImportCommand = new RelayCommand(() => NavigateTo<ProductImportViewModel>());
+        NavigateToProductCategoriesCommand = new RelayCommand(() => NavigateTo<ProductCategoriesListViewModel>());
 
         ChangePasswordCommand = new AsyncRelayCommand((Func<Task>)(async () => await ExecuteAsync(LoadChangePasswordAsync)));
     }
@@ -656,6 +657,9 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى شاشة استيراد الأصناف من Excel</summary>
     public ICommand NavigateToProductImportCommand { get; }
 
+    /// <summary>نقل إلى إدارة مجموعات الأصناف — عرض وتعديل وإضافة مجموعات التصنيف</summary>
+    public ICommand NavigateToProductCategoriesCommand { get; }
+
     // ═══════════════════════════════════════════════════════════════
     // Helper Methods
     // ═══════════════════════════════════════════════════════════════
@@ -798,6 +802,7 @@ public class MainViewModel : ViewModelBase
             "Products"         => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductUnits"     => _sessionService.CanAccess(Permission.ProductManagement),
             "ProductImport"    => _sessionService.CanAccess(Permission.ProductManagement),
+            "ProductCategories" => _sessionService.CanAccess(Permission.ProductManagement),
             "Units"            => _sessionService.CanAccess(Permission.ProductManagement),
             "Inventory"        => _sessionService.CanAccess(Permission.ProductManagement),
             "InventoryActivity" => _sessionService.CanAccess(Permission.ProductManagement),
@@ -867,6 +872,7 @@ public class MainViewModel : ViewModelBase
     {
         return viewModelType.Name switch
         {
+            nameof(DashboardViewModel)             => "Dashboard",
             nameof(TouchPosViewModel)              => "Pos",
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
@@ -914,6 +920,7 @@ public class MainViewModel : ViewModelBase
             nameof(InventoryBatchesViewModel)       => "Products",
             nameof(ProductUnitsListViewModel)       => "ProductUnits",
             nameof(ProductImportViewModel)          => "ProductImport",
+            nameof(ProductCategoriesListViewModel)  => "ProductCategories",
             nameof(TaxesListViewModel)              => "Taxes",
             nameof(CurrenciesListViewModel)         => "Currencies",
             nameof(CurrencyRatesViewModel)          => "Currencies",

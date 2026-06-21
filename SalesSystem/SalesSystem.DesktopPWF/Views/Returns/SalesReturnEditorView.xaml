@@ -74,6 +74,8 @@
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="الكمية المشتراة" Binding="{Binding OriginalQuantity}" Width="110" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                <DataGridTextColumn Header="المرتجع سابقاً" Binding="{Binding PreviouslyReturnedQuantity}" Width="110" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                <DataGridTextColumn Header="المتبقي" Binding="{Binding RemainingQuantity}" Width="100" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                                 <DataGridTemplateColumn Header="كمية المرتجع" Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
@@ -89,6 +91,35 @@
                                 <DataGridTextColumn Header="الإجمالي" Binding="{Binding LineTotal, StringFormat=N2}" Width="110" IsReadOnly="True" CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                             </DataGrid.Columns>
                         </DataGrid>
+
+                        <!-- Proportional Totals Footer -->
+                        <Border DockPanel.Dock="Bottom" Background="#F8FAFC" Padding="12,6" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,20,0">
+                                    <TextBlock Text="خصم: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding Impact.ReturnedDiscountAmount, StringFormat=N2}" Foreground="#E65100" FontWeight="Bold" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,20,0">
+                                    <TextBlock Text="ضريبة: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding Impact.ReturnedTaxAmount, StringFormat=N2}" Foreground="#7C3AED" FontWeight="Bold" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,20,0">
+                                    <TextBlock Text="رسوم: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                    <TextBlock Text="{Binding Impact.ReturnedChargeAmount, StringFormat=N2}" Foreground="#0891B2" FontWeight="Bold" FontSize="12"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                    <TextBlock Text="الإجمالي النهائي: " FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" FontSize="13"/>
+                                    <TextBlock Text="{Binding Impact.TotalReturnAmount, StringFormat=N2}" Foreground="{StaticResource PrimaryBrush}" FontWeight="Bold" FontSize="14"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </DockPanel>
                 </Border>
             </Grid>

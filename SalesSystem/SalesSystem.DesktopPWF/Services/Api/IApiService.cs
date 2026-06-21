@@ -559,6 +559,7 @@ public interface IProductCategoryApiService
     Task<Result<ProductCategoryDto>> CreateAsync(CreateProductCategoryRequest request);
     Task<Result<ProductCategoryDto>> UpdateAsync(int id, UpdateProductCategoryRequest request);
     Task<Result> DeactivateAsync(int id);
+    Task<Result> ReactivateAsync(int id);
 }
 
 public interface INotificationApiService

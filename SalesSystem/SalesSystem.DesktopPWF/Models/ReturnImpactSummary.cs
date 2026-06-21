@@ -12,5 +12,14 @@ public class ReturnImpactSummary
     public string CounterpartyType { get; set; } = "العميل"; // "العميل" or "المورد"
     public decimal TaxImpact { get; set; }
     
+    /// <summary>إجمالي الخصم المتناسب من الفاتورة الأصلية</summary>
+    public decimal ReturnedDiscountAmount { get; set; }
+    
+    /// <summary>إجمالي الضريبة المتناسبة من الفاتورة الأصلية</summary>
+    public decimal ReturnedTaxAmount { get; set; }
+    
+    /// <summary>إجمالي الرسوم المتناسبة من الفاتورة الأصلية</summary>
+    public decimal ReturnedChargeAmount { get; set; }
+    
     public bool HasImpact => TotalReturnAmount > 0 || StockQuantityImpact > 0;
 }

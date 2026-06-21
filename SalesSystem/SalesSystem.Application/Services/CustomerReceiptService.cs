@@ -153,18 +153,22 @@ public class CustomerReceiptService : ICustomerReceiptService
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
-            receipt.Post();
-            await _uow.SaveChangesAsync(ct);
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
+            {
+                receipt.Post();
 
-            // Create journal entry: Dr Cash / Cr AR
-            var customerName = receipt.Customer?.Party?.Name ?? "";
-            var entryResult = await _accountingService.CreateCustomerPaymentEntryAsync(
-                receipt, customerName, userId, ct);
-            if (!entryResult.IsSuccess)
-                return Result.Failure(entryResult.Error!);
+                // Create journal entry: Dr Cash / Cr AR
+                var customerName = receipt.Customer?.Party?.Name ?? "";
+                var entryResult = await _accountingService.CreateCustomerPaymentEntryAsync(
+                    receipt, customerName, userId, ct);
+                if (!entryResult.IsSuccess)
+                    return Result.Failure(entryResult.Error!);
 
-            _logger.LogInformation("Customer receipt {Id} posted by User {UserId}", id, userId);
-            return Result.Success();
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Customer receipt {Id} posted by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (DomainException ex)
         {
@@ -257,6 +261,47 @@ public class CustomerReceiptService : ICustomerReceiptService
         {
             _logger.LogError(ex, "Error adding application to customer receipt {ReceiptId}", receiptId);
             return Result<CustomerReceiptDto>.Failure("حدث خطأ أثناء إضافة تخصيص السند");
+        }
+    }
+
+    public async Task<Result> DeleteAsync(int id, int userId, CancellationToken ct)
+    {
+        try
+        {
+            var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
+                r => r.Id == id, ct, "Customer", "Customer.Party");
+            if (receipt == null)
+                return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
+
+            if (receipt.Status == InvoiceStatus.Cancelled)
+                return Result.Failure("سند القبض ملغي بالفعل", ErrorCodes.InvalidOperation);
+
+            // If already posted, reverse the journal entry first
+            if (receipt.Status == InvoiceStatus.Posted)
+            {
+                var customerAccountId = receipt.Customer?.AccountId ?? 0;
+                var customerName = receipt.Customer?.Party?.Name ?? "";
+                var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
+                    receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
+                if (!reverseResult.IsSuccess)
+                    return Result.Failure(reverseResult.Error!);
+            }
+
+            receipt.UpdateTimestamp();
+            _uow.CustomerReceipts.DeleteRange(new[] { receipt });
+
+            _logger.LogInformation("Customer receipt {Id} deleted by User {UserId}", id, userId);
+            return Result.Success();
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Domain rule violation deleting customer receipt {Id}: {Message}", id, ex.Message);
+            return Result.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting customer receipt {Id}", id);
+            return Result.Failure("حدث خطأ أثناء حذف سند القبض");
         }
     }
 

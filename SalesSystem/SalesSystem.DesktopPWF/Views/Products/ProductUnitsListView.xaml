@@ -21,21 +21,149 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Header -->
         <TextBlock Grid.Row="0"
                    Text="وحدات القياس"
                    Style="{StaticResource HeaderStyle}"
                    AutomationProperties.AutomationId="ProductUnitsPageTitle"/>
 
-        <!-- Toolbar -->
-        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+        <!-- ── Product Search / Selection Panel (Row 1) ──────────────────── -->
+
+        <!-- Search Mode: shown when no product is selected -->
+        <Border Grid.Row="1"
+                Style="{StaticResource CardStyle}"
+                Margin="10,0,10,6"
+                Padding="8"
+                Visibility="{Binding HasSelectedProduct, Converter={StaticResource InverseBoolToVisibility}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Search bar -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource ModernTextBox}"
+                             Tag="ابحث باسم المنتج أو الباركود...">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding SearchCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Grid.Column="1"
+                            Content="🔍 بحث"
+                            Command="{Binding SearchCommand}"
+                            Style="{StaticResource PrimaryButton}"
+                            MinWidth="80"
+                            Margin="6,0,0,0"
+                            ToolTip="البحث عن منتج لعرض وحدات قياسه"/>
+                </Grid>
+
+                <!-- Search results list -->
+                <ListBox Grid.Row="1"
+                         ItemsSource="{Binding SearchResults}"
+                         SelectedItem="{Binding SelectedProduct}"
+                         BorderThickness="0"
+                         MaxHeight="160"
+                         Margin="0,6,0,0"
+                         Visibility="{Binding SearchResults.Count, Converter={StaticResource CountToVisibility}}"
+                         ToolTip="اختر المنتج لعرض وحدات القياس الخاصة به">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="4,2" Cursor="Hand">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               FontSize="13"/>
+                                    <TextBlock Text="{Binding Barcode, StringFormat='الباركود: {0}'}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CategoryName}"
+                                           FontSize="11"
+                                           Foreground="{StaticResource PrimaryBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="8,0,0,0"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- No results hint -->
+                <TextBlock Grid.Row="1"
+                           Text="لم يتم العثور على منتجات. حاول كتابة جزء من الاسم أو الباركود."
+                           FontSize="12"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Margin="0,8,0,0"
+                           Visibility="{Binding SearchResults.Count, Converter={StaticResource InverseBoolToVisibility}}"/>
+            </Grid>
+        </Border>
+
+        <!-- Selected Product Mode: shown when a product is selected -->
+        <Border Grid.Row="1"
+                Style="{StaticResource CardStyle}"
+                Margin="10,0,10,6"
+                Padding="10,8"
+                Visibility="{Binding HasSelectedProduct, Converter={StaticResource BoolToVisibility}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="المنتج المحدد:"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{StaticResource TextSecondaryBrush}"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding SelectedProductName}"
+                               FontSize="14"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource PrimaryBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding SelectedProduct.Barcode, StringFormat='  (الباركود: {0})'}"
+                               FontSize="12"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="8,0,0,0"
+                               Visibility="{Binding SelectedProduct.Barcode, Converter={StaticResource NullToVisibility}}"/>
+                </StackPanel>
+
+                <Button Grid.Column="2"
+                        Content="🔁 تغيير المنتج"
+                        Command="{Binding ClearProductCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        MinWidth="100"
+                        ToolTip="إلغاء تحديد المنتج الحالي واختيار منتج آخر"/>
+            </Grid>
+        </Border>
+
+        <!-- Toolbar (Row 2) -->
+        <Border Grid.Row="2" Style="{StaticResource ToolbarStyle}">
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
-                            ToolTip="إضافة وحدة قياس جديدة للمنتج">
+                            ToolTip="إضافة وحدة قياس جديدة للمنتج المحدد">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="إضافة وحدة" VerticalAlignment="Center"/>
@@ -76,8 +204,8 @@
             </WrapPanel>
         </Border>
 
-        <!-- Error Message Bar -->
-        <Border Grid.Row="2"
+        <!-- Error Message Bar (Row 3) -->
+        <Border Grid.Row="3"
                 Background="{StaticResource ErrorLightBrush}" 
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
@@ -96,8 +224,8 @@
             </StackPanel>
         </Border>
 
-        <!-- DataGrid Area -->
-        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+        <!-- DataGrid Area (Row 4) -->
+        <Border Grid.Row="4" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
             <Grid>
                 <DataGrid ItemsSource="{Binding Units}"
                           SelectedItem="{Binding SelectedUnit}"
@@ -151,12 +279,42 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <!-- Empty State -->
-                <Grid Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibility}}" Background="White">
+                <!-- Empty State: No product selected -->
+                <Grid Visibility="{Binding HasSelectedProduct, Converter={StaticResource InverseBoolToVisibility}}"
+                      Background="White">
+                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="📏" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
+                        <TextBlock Text="الرجاء اختيار منتج أولاً" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
+                        <TextBlock Text="استخدم مربع البحث أعلاه للعثور على المنتج ثم اختره لعرض وحدات قياسه"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"
+                                   TextWrapping="Wrap" MaxWidth="350" TextAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Empty State: Product selected but no units -->
+                <Grid Visibility="{Binding HasSelectedProduct, Converter={StaticResource BoolToVisibility}}"
+                      Background="White">
+                    <Grid.Style>
+                        <Style TargetType="Grid">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding HasSelectedProduct}" Value="True"/>
+                                        <Condition Binding="{Binding IsEmpty}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <MultiDataTrigger.Setters>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger.Setters>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Grid.Style>
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock Text="📏" FontSize="50" HorizontalAlignment="Center" Margin="0,0,0,16" Opacity="0.2"/>
                         <TextBlock Text="لا توجد وحدات قياس" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
-                        <TextBlock Text="أضف وحدات قياس للمنتج مثل: قطعة، علبة، كرتون" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                        <TextBlock Text="أضف وحدات قياس للمنتج مثل: قطعة، علبة، كرتون"
+                                   Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" HorizontalAlignment="Center" Margin="0,8,0,0"/>
                         <Button Content="➕ إضافة وحدة" Command="{Binding AddCommand}" Style="{StaticResource PrimaryButton}" Margin="0,12,0,0" Width="140"
                                 ToolTip="إضافة وحدة قياس جديدة للمنتج"/>
                     </StackPanel>
@@ -164,8 +322,8 @@
             </Grid>
         </Border>
 
-        <!-- Footer -->
-        <Border Grid.Row="4" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <!-- Footer (Row 5) -->
+        <Border Grid.Row="5" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <TextBlock Text="عدد الوحدات: " FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding Units.Count, FallbackValue=0}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="4,0,0,0"/>
@@ -173,7 +331,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="5"
+        <Border Grid.Row="0" Grid.RowSpan="6"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

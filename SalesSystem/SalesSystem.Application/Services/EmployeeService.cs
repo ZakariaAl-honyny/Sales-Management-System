@@ -205,6 +205,7 @@ public class EmployeeService : IEmployeeService
                 parentId: parentAccount.Id,
                 isSystem: false,
                 categoryId: null,
+                level: 4,
                 createdByUserId: createdByUserId);
 
             await _uow.Accounts.AddAsync(account, ct);

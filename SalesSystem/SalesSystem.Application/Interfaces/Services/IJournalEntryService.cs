@@ -51,4 +51,12 @@ public interface IJournalEntryService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The cancelled journal entry detail.</returns>
     Task<Result<JournalEntryDetailDto>> CancelJournalEntryAsync(int id, int userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Deletes a Draft journal entry (permanently removed from DB).
+    /// </summary>
+    /// <param name="id">Journal entry ID.</param>
+    /// <param name="userId">Authenticated user ID from JWT claims.</param>
+    /// <param name="ct">Cancellation token.</param>
+    Task<Result> DeleteDraftAsync(int id, int userId, CancellationToken ct = default);
 }

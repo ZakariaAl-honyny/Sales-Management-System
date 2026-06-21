@@ -23,6 +23,7 @@ public class PurchaseService : IPurchaseService
     private readonly ICashBoxService _cashBoxService;
     private readonly IAccountingIntegrationService _accountingService;
     private readonly IDocumentSequenceService _documentSequenceService;
+    private readonly IFifoAllocationService _fifoAllocationService;
     private readonly ILogger<PurchaseService> _logger;
 
     public PurchaseService(
@@ -33,6 +34,7 @@ public class PurchaseService : IPurchaseService
         ICashBoxService cashBoxService,
         IAccountingIntegrationService accountingService,
         IDocumentSequenceService documentSequenceService,
+        IFifoAllocationService fifoAllocationService,
         ILogger<PurchaseService> logger)
     {
         _uow = uow;
@@ -42,6 +44,7 @@ public class PurchaseService : IPurchaseService
         _cashBoxService = cashBoxService;
         _accountingService = accountingService;
         _documentSequenceService = documentSequenceService;
+        _fifoAllocationService = fifoAllocationService;
         _logger = logger;
     }
 
@@ -304,6 +307,30 @@ public class PurchaseService : IPurchaseService
                     {
                         _logger.LogWarning(ex, "فشل تحديث التكلفة للمنتج {ProductId} من الفاتورة {Id}",
                             item.ProductId, invoice.Id);
+                    }
+                }
+
+                // ─── FIFO Batch Creation ──────────────────────────────────────────
+                for (int i = 0; i < itemsList.Count; i++)
+                {
+                    var item = itemsList[i];
+                    var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitPrice);
+                    var batchResult = await _fifoAllocationService.AddPurchaseBatchesAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        landedUnitCost,
+                        batchNo: null,
+                        expiryDate: null,
+                        purchaseInvoiceId: invoice.Id,
+                        isOpeningBatch: false,
+                        ct: ct);
+
+                    if (!batchResult.IsSuccess)
+                    {
+                        _logger.LogWarning("فشل إنشاء دفعة FIFO للمنتج {ProductId} في فاتورة الشراء {Id}: {Error}",
+                            item.ProductId, invoice.Id, batchResult.Error);
+                        return Result<PurchaseInvoiceDto>.Failure(batchResult.Error!);
                     }
                 }
 

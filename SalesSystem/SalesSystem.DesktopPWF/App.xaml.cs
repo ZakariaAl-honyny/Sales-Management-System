@@ -44,6 +44,7 @@ using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Accounts;
+using SalesSystem.DesktopPWF.Views.Products;
 using SalesSystem.DesktopPWF.Views.Currencies;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
@@ -453,6 +454,12 @@ public partial class App : System.Windows.Application
         services.AddTransient<InventoryAdjustmentEditorViewModel>();
         services.AddTransient<NotificationListViewModel>();
         services.AddTransient<AttachmentListViewModel>();
+
+        // Product Category ViewModels + Views
+        services.AddTransient<ProductCategoriesListViewModel>();
+        services.AddTransient<ProductCategoryEditorViewModel>();
+        services.AddTransient<ProductCategoriesListView>();
+        services.AddTransient<ProductCategoryEditorView>();
 
         // New Module ViewModels (Branch, Department, Employee, Bank, Party, Expense)
         services.AddTransient<BranchListViewModel>();

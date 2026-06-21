@@ -11,16 +11,8 @@ public class ProductUnitRowViewModel : ViewModelBase
     private string _placeholder_UnitName = "مثال: حبة، قطعة";
     private decimal _factor = 1;
     private bool _isBaseUnit;
-    [Obsolete("Prices moved to ProductPrices table")]
-    private decimal _salesPrice;
-    [Obsolete("Cost tracked via InventoryBatches")]
-    private decimal _purchaseCost;
-    [Obsolete("SupplierPrice replaced by ProductPrices table")]
-    private decimal _supplierPrice;
     private int _sortOrder;
     private bool _isActive = true;
-    private bool _isDefaultBarcode;
-    private string _barcodeValue = string.Empty;
 
     public int Id
     {
@@ -63,27 +55,6 @@ public class ProductUnitRowViewModel : ViewModelBase
         }
     }
 
-    [Obsolete("Use ProductPrices instead — pricing moved to ProductPrices table.")]
-    public decimal SalesPrice
-    {
-        get => _salesPrice;
-        set => SetProperty(ref _salesPrice, value);
-    }
-
-#pragma warning disable CS0618 // Obsolete — kept for backward compatibility during Phase 25 transition
-    public decimal PurchaseCost
-    {
-        get => _purchaseCost;
-        set => SetProperty(ref _purchaseCost, value);
-    }
-
-    public decimal SupplierPrice
-    {
-        get => _supplierPrice;
-        set => SetProperty(ref _supplierPrice, value);
-    }
-#pragma warning restore CS0618
-
     public int SortOrder
     {
         get => _sortOrder;
@@ -94,18 +65,6 @@ public class ProductUnitRowViewModel : ViewModelBase
     {
         get => _isActive;
         set => SetProperty(ref _isActive, value);
-    }
-
-    public bool IsDefaultBarcode
-    {
-        get => _isDefaultBarcode;
-        set => SetProperty(ref _isDefaultBarcode, value);
-    }
-
-    public string BarcodeValue
-    {
-        get => _barcodeValue;
-        set => SetProperty(ref _barcodeValue, value);
     }
 
     public bool IsFactorValid => IsBaseUnit || Factor > 1;

@@ -23,9 +23,9 @@ public class ProductCategoriesController : ControllerBase
     /// </summary>
     [HttpGet]
     [Authorize(Policy = "AllStaff")]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<IActionResult> GetAll([FromQuery] bool includeInactive = false, CancellationToken ct = default)
     {
-        var result = await _service.GetAllAsync(ct);
+        var result = await _service.GetAllAsync(includeInactive, ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
@@ -75,6 +75,20 @@ public class ProductCategoriesController : ControllerBase
     public async Task<IActionResult> Deactivate(int id, CancellationToken ct)
     {
         var result = await _service.DeactivateAsync(id, ct);
+        if (result.IsSuccess) return Ok();
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Reactivates a soft-deleted product category.
+    /// </summary>
+    [HttpPost("{id:int}/reactivate")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> Reactivate(int id, CancellationToken ct)
+    {
+        var result = await _service.ReactivateAsync(id, ct);
         if (result.IsSuccess) return Ok();
         if (result.ErrorCode == ErrorCodes.NotFound)
             return NotFound(new { error = result.Error });

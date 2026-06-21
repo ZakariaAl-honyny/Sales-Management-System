@@ -44,7 +44,7 @@ public class AuthService : IAuthService
 
             // 1. Find user — query with predicate instead of loading all users into memory
             var user = await _uow.Users.FirstOrDefaultAsync(
-                u => u.UserName.ToLower() == request.UserName.ToLower().Trim(), ct);
+                u => u.UserName.ToLower() == request.UserName.ToLower().Trim(), ct, "UserRoles");
 
             if (user == null)
             {

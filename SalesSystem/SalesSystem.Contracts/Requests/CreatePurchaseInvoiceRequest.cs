@@ -18,6 +18,7 @@ public record CreatePurchaseInvoiceRequest(
     short? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
+    int? TaxId,
     List<CreatePurchaseInvoiceLineRequest> Items);
 
 /// <summary>

@@ -20,6 +20,8 @@ public class InventoryCount : Entity
 
     public DateTime CreatedAt { get; private set; }
     public int CreatedByUserId { get; private set; }
+    public DateTime? PostedAt { get; private set; }
+    public DateTime? CancelledAt { get; private set; }
 
     // Navigation properties
     public virtual Warehouse? Warehouse { get; private set; }
@@ -75,6 +77,7 @@ public class InventoryCount : Entity
         if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل جرد بدون أصناف.");
         Status = InventoryCountStatus.Posted;
+        PostedAt = DateTime.UtcNow;
     }
 
     public void Cancel()
@@ -82,6 +85,7 @@ public class InventoryCount : Entity
         if (Status == InventoryCountStatus.Cancelled)
             throw new DomainException("الجرد ملغى بالفعل.");
         Status = InventoryCountStatus.Cancelled;
+        CancelledAt = DateTime.UtcNow;
     }
 
     public void SetNotes(string? notes)

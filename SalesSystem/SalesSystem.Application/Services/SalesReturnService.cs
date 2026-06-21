@@ -16,6 +16,8 @@ public class SalesReturnService : ISalesReturnService
     private readonly IDocumentSequenceService _sequenceService;
     private readonly ICashBoxService _cashBoxService;
     private readonly IAccountingIntegrationService _accountingService;
+    private readonly IProductCostService _productCostService;
+    private readonly IFifoAllocationService _fifoAllocationService;
     private readonly ILogger<SalesReturnService> _logger;
 
     public SalesReturnService(
@@ -24,6 +26,8 @@ public class SalesReturnService : ISalesReturnService
         IDocumentSequenceService sequenceService,
         ICashBoxService cashBoxService,
         IAccountingIntegrationService accountingService,
+        IProductCostService productCostService,
+        IFifoAllocationService fifoAllocationService,
         ILogger<SalesReturnService> logger)
     {
         _uow = uow;
@@ -31,6 +35,8 @@ public class SalesReturnService : ISalesReturnService
         _sequenceService = sequenceService;
         _cashBoxService = cashBoxService;
         _accountingService = accountingService;
+        _productCostService = productCostService;
+        _fifoAllocationService = fifoAllocationService;
         _logger = logger;
     }
 
@@ -138,7 +144,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines", "Customer", "Customer.Party");
+            r => r.Id == id, ct, "Lines.SalesInvoiceLine.Product", "SalesInvoice", "Customer", "Customer.Party");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
@@ -147,6 +153,20 @@ public class SalesReturnService : ISalesReturnService
         {
             try
             {
+                // ---- Proportional calculation from original invoice ----
+                if (sr.SalesInvoice != null)
+                {
+                    var invoice = sr.SalesInvoice;
+                    var ratio = invoice.SubTotal > 0
+                        ? sr.TotalAmount / invoice.SubTotal
+                        : 0;
+                    sr.SetProportionalAmounts(
+                        invoice.DiscountAmount * ratio,
+                        invoice.TaxAmount * ratio,
+                        invoice.OtherCharges * ratio,
+                        invoice.TaxId);
+                }
+
                 sr.Post();
                 await _uow.SaveChangesAsync(ct);
 
@@ -162,9 +182,78 @@ public class SalesReturnService : ISalesReturnService
                         ct: ct);
                 }
 
-                // Create journal entry for the sales return
+                // ─── FIFO Return to Batch ────────────────────────────────────────
+                // For each returned item, find a reference batch for cost metadata,
+                // then create a new return batch via ReturnToBatchAsync.
+                foreach (var item in sr.Lines)
+                {
+                    var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                    if (productId <= 0 || item.Quantity <= 0) continue;
+
+                    var breakdownResult = await _fifoAllocationService.GetBatchBreakdownAsync(
+                        productId, sr.WarehouseId, ct);
+
+                    if (!breakdownResult.IsSuccess || breakdownResult.Value == null || breakdownResult.Value.Count == 0)
+                    {
+                        _logger.LogWarning(
+                            "No reference batch found for sales return Product {ProductId}, " +
+                            "Warehouse {WarehouseId} — creating return batch with default cost",
+                            productId, sr.WarehouseId);
+
+                        // Create a return batch via AddPurchaseBatchesAsync (no reference batch available)
+                        var unitCost = item.Quantity > 0 ? item.Amount / item.Quantity : 0;
+                        var fallbackResult = await _fifoAllocationService.AddPurchaseBatchesAsync(
+                            productId,
+                            sr.WarehouseId,
+                            item.Quantity,
+                            unitCost,
+                            batchNo: $"SR-{sr.Id}-{item.Id}",
+                            expiryDate: null,
+                            purchaseInvoiceId: null,
+                            isOpeningBatch: false,
+                            ct: ct);
+
+                        if (!fallbackResult.IsSuccess)
+                        {
+                            _logger.LogWarning("Fallback batch creation failed for sales return item {ItemId}: {Error}",
+                                item.Id, fallbackResult.Error);
+                        }
+
+                        continue;
+                    }
+
+                    // Use the most recent batch as the reference for cost/expiry metadata
+                    var referenceBatch = breakdownResult.Value.OrderByDescending(b => b.ReceivedDate).First();
+                    var returnResult = await _fifoAllocationService.ReturnToBatchAsync(
+                        referenceBatch.BatchId,
+                        item.Quantity,
+                        item.Id,
+                        userId,
+                        ct);
+
+                    if (!returnResult.IsSuccess)
+                    {
+                        _logger.LogWarning("ReturnToBatchAsync failed for sales return item {ItemId}: {Error}",
+                            item.Id, returnResult.Error);
+                    }
+                }
+
+                // Compute actual totalCost from product costs (FIX: was sr.TotalAmount)
+                decimal totalCost = 0;
+                foreach (var item in sr.Lines)
+                {
+                    var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                    if (productId > 0 && item.Quantity > 0)
+                    {
+                        var costResult = await _productCostService.GetAverageCostAsync(productId, ct);
+                        if (costResult.IsSuccess)
+                            totalCost += item.Quantity * costResult.Value;
+                    }
+                }
+
+                // Create journal entry for the sales return with actual cost
                 var entryResult = await _accountingService.CreateSalesReturnEntryAsync(
-                    sr, sr.TotalAmount, userId, ct);
+                    sr, totalCost, userId, ct);
                 if (!entryResult.IsSuccess)
                 {
                     _logger.LogWarning("Journal entry creation failed for sales return {Id}: {Error}",
@@ -217,9 +306,22 @@ public class SalesReturnService : ISalesReturnService
                             ct: ct);
                     }
 
+                    // Compute actual totalCost from product costs (same as in PostAsync)
+                    decimal totalCost = 0;
+                    foreach (var item in sr.Lines)
+                    {
+                        var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                        if (productId > 0 && item.Quantity > 0)
+                        {
+                            var costResult = await _productCostService.GetAverageCostAsync(productId, ct);
+                            if (costResult.IsSuccess)
+                                totalCost += item.Quantity * costResult.Value;
+                        }
+                    }
+
                     // Reverse the journal entry for the posted sales return
                     var reversalResult = await _accountingService.ReverseSalesReturnEntryAsync(
-                        sr, sr.TotalAmount, userId, ct);
+                        sr, totalCost, userId, ct);
                     if (!reversalResult.IsSuccess)
                     {
                         _logger.LogWarning("Journal entry reversal failed for sales return {Id}: {Error}",
@@ -251,7 +353,7 @@ public class SalesReturnService : ISalesReturnService
     {
         return new SalesReturnDto(
             r.Id,
-            r.ReturnNo.ToString(), // ReturnNo is int, DTO expects string
+            r.ReturnNo.ToString(),
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
@@ -259,9 +361,13 @@ public class SalesReturnService : ISalesReturnService
             r.SalesInvoiceId,
             r.ReturnDate,
             0, // SubTotal removed
-            0, // TaxAmount (not in entity yet)
-            0, // DiscountAmount (not in entity yet)
+            r.ReturnedTaxAmount,
+            r.ReturnedDiscountAmount,
             r.TotalAmount,
+            r.ReturnedDiscountAmount,
+            r.ReturnedTaxAmount,
+            r.ReturnedChargeAmount,
+            r.TaxId,
             r.CurrencyId,
             null, // ExchangeRate removed
             r.Notes,
@@ -272,10 +378,11 @@ public class SalesReturnService : ISalesReturnService
             r.Lines.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.SalesInvoiceLine?.ProductId ?? 0,
+                it.SalesInvoiceLine?.ProductUnitId ?? 0,
                 it.SalesInvoiceLine?.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.Amount,
-                0, // DiscountAmount removed
+                0, // DiscountAmount per line (not tracked separately)
                 it.Amount,
                 1 // Mode default (Retail)
             )).ToList()

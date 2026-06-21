@@ -51,6 +51,12 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
             .IsRequired(false)
             .HasComment("تاريخ انتهاء الصلاحية");
 
+        builder.Property(x => x.IsClosed)
+            .HasColumnType("bit")
+            .IsRequired()
+            .HasDefaultValue(false)
+            .HasComment("هل الدفعة مغلقة (تم استهلاكها بالكامل)");
+
         // CHECK constraints
         builder.ToTable(t =>
         {
@@ -60,6 +66,8 @@ public class InventoryBatchConfiguration : IEntityTypeConfiguration<InventoryBat
                 "[QuantityRemaining] >= 0");
             t.HasCheckConstraint("CHK_InventoryBatches_UnitCost_NonNegative",
                 "[UnitCost] >= 0");
+            t.HasCheckConstraint("CHK_InventoryBatches_IsClosed_Consistency",
+                "([IsClosed] = 0 AND [QuantityRemaining] > 0) OR ([IsClosed] = 1 AND [QuantityRemaining] <= 0)");
         });
 
         // Relationships

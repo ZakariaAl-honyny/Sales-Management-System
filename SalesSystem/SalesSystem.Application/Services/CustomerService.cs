@@ -285,6 +285,7 @@ public class CustomerService : ICustomerService
                 parentId: arParentAccount.Id,
                 isSystem: false,
                 categoryId: null,
+                level: 4,
                 createdByUserId: userId
             );
 

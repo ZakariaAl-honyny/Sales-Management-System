@@ -137,14 +137,37 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="الكمية" Width="90">
+                                <DataGridTemplateColumn Header="الوحدة" Width="80">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
-                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"/>
+                                            <ComboBox ItemsSource="{Binding AvailableProductUnits}"
+                                                      SelectedItem="{Binding SelectedProductUnit, UpdateSourceTrigger=PropertyChanged}"
+                                                      DisplayMemberPath="UnitName"
+                                                      Style="{StaticResource ModernComboBox}"
+                                                      BorderThickness="0" Background="Transparent"
+                                                      ToolTip="اختيار الوحدة — تتغير التكلفة تلقائياً حسب الوحدة المختارة"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="الكمية" Width="90">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                             <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
+                                                      Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
+                                                      ToolTip="الكمية — أدخل القيمة أو عدّل الإجمالي لتحسب الكمية تلقائياً"/>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                 </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="المتاح" Binding="{Binding AvailableStockText}" Width="80" IsReadOnly="True">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="FontSize" Value="11"/>
+                                            <Setter Property="Margin" Value="8,0"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <!-- Unit Cost with sync indicator -->
                                 <DataGridTemplateColumn Header="التكلفة" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -155,7 +178,8 @@
                                                     <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
                                                 <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
-                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"/>
+                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
+                                                         ToolTip="تكلفة الوحدة — أدخل القيمة أو عدّل الإجمالي لتحسب التكلفة تلقائياً"/>
                                             </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -236,18 +260,21 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox ItemsSource="{Binding Suppliers}" SelectedValue="{Binding SelectedSupplierId}" 
-                                          SelectedValuePath="Id" DisplayMemberPath="Name"/>
+                                          SelectedValuePath="Id" DisplayMemberPath="Name"
+                                          ToolTip="اختر المورد — البيع النقدي لا يتطلب اختيار مورد"/>
                                 <Button Grid.Column="1" Content="🔍" Command="{Binding SearchSupplierCommand}"
                                         Style="{StaticResource SecondaryButton}" Width="28" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
                             </Grid>
 
                             <TextBlock Text="المستودع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Warehouses}" SelectedValue="{Binding SelectedWarehouseId}" 
-                                      SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,6"/>
+                                      SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,6"
+                                      ToolTip="اختر المستودع الذي سيتم إضافة المخزون إليه"/>
 
                             <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
-                                      SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,6"/>
+                                      SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,6"
+                                      ToolTip="اختر طريقة الدفع: نقداً أو آجل (دفع لاحق)"/>
 
                             <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
                             <ComboBox ItemsSource="{Binding Currencies}"
@@ -267,10 +294,20 @@
                                 <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
                                          Style="{StaticResource ModernTextBox}"
                                          ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
-                            </Grid>
+                             </Grid>
+
+                            <TextBlock Text="الضريبة" Style="{StaticResource LabelStyle}"/>
+                            <ComboBox ItemsSource="{Binding Taxes}"
+                                      SelectedValue="{Binding TaxId}"
+                                      SelectedValuePath="Id"
+                                      DisplayMemberPath="Name"
+                                      Style="{StaticResource ModernComboBox}"
+                                      Margin="0,0,0,8"
+                                      ToolTip="اختر ضريبة القيمة المضافة المطبقة على الفاتورة"/>
 
                             <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding Notes}" Height="50" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"/>
+                            <TextBox Text="{Binding Notes}" Height="50" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"
+                                     ToolTip="أضف ملاحظات إضافية للفاتورة (اختياري)"/>
                         </StackPanel>
                     </Border>
 
@@ -279,11 +316,13 @@
                         <StackPanel>
                             <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                             
-                            <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,8"/>
+                                    <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,8"
+                                              ToolTip="تضمين قيمة الضريبة في سعر المنتج — بدلاً من إضافتها بشكل منفصل"/>
                             
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="الضريبة (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding TaxRate, UpdateSourceTrigger=PropertyChanged}" Width="60" HorizontalAlignment="Right" TextAlignment="Center"/>
+                                <TextBox Text="{Binding TaxRate, UpdateSourceTrigger=PropertyChanged}" Width="60" HorizontalAlignment="Right" TextAlignment="Center"
+                                         ToolTip="نسبة الضريبة المطبقة — تُحدد تلقائياً عند اختيار الضريبة"/>
                             </Grid>
 
                             <Grid Margin="0,0,0,4">
@@ -354,7 +393,8 @@
 
                             <Grid Margin="0,0,0,8">
                                 <TextBlock Text="المبلغ المدفوع" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" FontWeight="Bold"/>
-                                <TextBox Text="{Binding PaidAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="110" HorizontalAlignment="Right" FontWeight="Bold" Background="#F0F9FF" BorderBrush="#7DD3FC"/>
+                                <TextBox Text="{Binding PaidAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="110" HorizontalAlignment="Right" FontWeight="Bold" Background="#F0F9FF" BorderBrush="#7DD3FC"
+                                         ToolTip="المبلغ المدفوع للمورد — لا يمكن أن يتجاوز صافي الفاتورة"/>
                             </Grid>
 
                             <Border Background="#FEF2F2" Padding="8,6" CornerRadius="4">

@@ -421,6 +421,7 @@ public class ProductEditorViewModel : ViewModelBase
                 CategoryId: CategoryId ?? 0,
                 Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
                 ReorderLevel: ReorderLevel,
+                TrackExpiry: TrackExpiry,
                 IsActive: IsActive);
 
             result = await _productService.UpdateAsync(_productId, updateRequest);

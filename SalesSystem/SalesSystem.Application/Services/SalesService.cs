@@ -26,6 +26,7 @@ public class SalesService : ISalesService
     private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly IProductCostService _productCostService;
     private readonly IProductPriceService _productPriceService;
+    private readonly IFifoAllocationService _fifoAllocationService;
     private readonly ILogger<SalesService> _logger;
 
     public SalesService(
@@ -39,6 +40,7 @@ public class SalesService : ISalesService
         ISystemSettingsRepository systemSettingsRepo,
         IProductCostService productCostService,
         IProductPriceService productPriceService,
+        IFifoAllocationService fifoAllocationService,
         ILogger<SalesService> logger)
     {
         _uow = uow;
@@ -51,6 +53,7 @@ public class SalesService : ISalesService
         _systemSettingsRepo = systemSettingsRepo;
         _productCostService = productCostService;
         _productPriceService = productPriceService;
+        _fifoAllocationService = fifoAllocationService;
         _logger = logger;
     }
 
@@ -108,104 +111,95 @@ public class SalesService : ISalesService
 
     public async Task<Result<SalesInvoiceDto>> CreateAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
     {
-        await using var transaction = await _uow.BeginTransactionAsync(ct);
-        try
+        return await _uow.ExecuteTransactionAsync<Result<SalesInvoiceDto>>(async () =>
         {
-            // Resolve InvoiceNo INSIDE transaction — prevents TOCTOU race (RULE-384 fix)
-            int invoiceNo;
-            if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+            try
             {
-                var existing = await _uow.SalesInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
-                if (existing)
+                // Resolve InvoiceNo INSIDE transaction — prevents TOCTOU race (RULE-384 fix)
+                int invoiceNo;
+                if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
                 {
-                    await transaction.RollbackAsync(ct);
-                    return Result<SalesInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                    var existing = await _uow.SalesInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+                    if (existing)
+                        return Result<SalesInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                    invoiceNo = request.InvoiceNo.Value;
                 }
-                invoiceNo = request.InvoiceNo.Value;
-            }
-            else
-            {
-                var seqResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
-                if (!seqResult.IsSuccess)
+                else
                 {
-                    await transaction.RollbackAsync(ct);
-                    return Result<SalesInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                    var seqResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
+                    if (!seqResult.IsSuccess)
+                        return Result<SalesInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                    invoiceNo = seqResult.Value;
                 }
-                invoiceNo = seqResult.Value;
-            }
 
-            var invoice = SalesInvoice.Create(
-                (short)request.WarehouseId,
-                invoiceNo,
-                request.CustomerId,
-                request.InvoiceDate,
-                (PaymentType)request.PaymentType,
-                request.DiscountAmount,
-                otherCharges: request.OtherCharges,
-                notes: request.Notes,
-                cashBoxId: request.CashBoxId,
-                taxId: (short?)request.TaxId,
-                currencyId: request.CurrencyId ?? 0,
-                exchangeRate: request.ExchangeRate,
-                createdByUserId: userId
-            );
-            foreach (var item in request.Items)
-            {
-                var invoiceItem = SalesInvoiceLine.Create(
-                    item.ProductId,
-                    item.ProductUnitId,
-                    item.Quantity,
-                    item.UnitPrice
+                var invoice = SalesInvoice.Create(
+                    (short)request.WarehouseId,
+                    invoiceNo,
+                    request.CustomerId,
+                    request.InvoiceDate,
+                    (PaymentType)request.PaymentType,
+                    request.DiscountAmount,
+                    otherCharges: request.OtherCharges,
+                    notes: request.Notes,
+                    cashBoxId: request.CashBoxId,
+                    taxId: (short?)request.TaxId,
+                    currencyId: request.CurrencyId ?? 0,
+                    exchangeRate: request.ExchangeRate,
+                    createdByUserId: userId
                 );
-                invoice.AddItem(invoiceItem);
-            }
-
-            invoice.SetTaxAmount(request.TaxAmount);
-            invoice.SetPaidAmount(request.PaidAmount);
-
-            // ── Price Enforcement (server-side) ─────────────────────
-            var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
-            if (preventBelowRetailPrice)
-            {
-                var effectiveCurrencyId = request.CurrencyId ?? (await GetBaseCurrencyIdAsync(ct));
                 foreach (var item in request.Items)
                 {
-                    if (item.ProductUnitId <= 0) continue;
-                    var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
-                        item.ProductUnitId, effectiveCurrencyId, ct);
-                    if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
+                    var invoiceItem = SalesInvoiceLine.Create(
+                        item.ProductId,
+                        item.ProductUnitId,
+                        item.Quantity,
+                        item.UnitPrice
+                    );
+                    invoice.AddItem(invoiceItem);
+                }
+
+                invoice.SetTaxAmount(request.TaxAmount);
+                invoice.SetPaidAmount(request.PaidAmount);
+
+                // ── Price Enforcement (server-side) ─────────────────────
+                var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
+                if (preventBelowRetailPrice)
+                {
+                    var effectiveCurrencyId = request.CurrencyId ?? (await GetBaseCurrencyIdAsync(ct));
+                    foreach (var item in request.Items)
                     {
-                        await transaction.RollbackAsync(ct);
-                        _logger.LogWarning(
-                            "Price enforcement: Item ProductId={ProductId}, unit price {UnitPrice} < registered price {RegisteredPrice}",
-                            item.ProductId, item.UnitPrice, priceResult.Value.Price);
-                        return Result<SalesInvoiceDto>.Failure(
-                            $"سعر البيع أقل من السعر الرسمي للمنتج (معرف المنتج: {item.ProductId})");
+                        if (item.ProductUnitId <= 0) continue;
+                        var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
+                            item.ProductUnitId, effectiveCurrencyId, ct);
+                        if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
+                        {
+                            _logger.LogWarning(
+                                "Price enforcement: Item ProductId={ProductId}, unit price {UnitPrice} < registered price {RegisteredPrice}",
+                                item.ProductId, item.UnitPrice, priceResult.Value.Price);
+                            return Result<SalesInvoiceDto>.Failure(
+                                $"سعر البيع أقل من السعر الرسمي للمنتج (معرف المنتج: {item.ProductId})");
+                        }
                     }
                 }
+
+                await _uow.SalesInvoices.AddAsync(invoice, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Sales Invoice created as Draft: ID {Id} by User {UserId}", invoice.Id, userId);
+
+                return await GetByIdAsync(invoice.Id, ct);
             }
-
-            await _uow.SalesInvoices.AddAsync(invoice, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            await transaction.CommitAsync(ct);
-
-            _logger.LogInformation("Sales Invoice created as Draft: ID {Id} by User {UserId}", invoice.Id, userId);
-
-            return await GetByIdAsync(invoice.Id, ct);
-        }
-        catch (DomainException ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogWarning(ex, "Validation error creating sales invoice draft");
-            return Result<SalesInvoiceDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync(ct);
-            _logger.LogError(ex, "Error creating sales invoice draft");
-            return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
-        }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Validation error creating sales invoice draft");
+                return Result<SalesInvoiceDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating sales invoice draft");
+                return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
+            }
+        }, ct);
     }
 
     public async Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, int userId, CancellationToken ct)
@@ -350,10 +344,9 @@ public class SalesService : ISalesService
                 return Result<SalesInvoiceDto>.Failure(stockValidation.Error!);
         }
 
-        // 2. Open Transaction
-        return await _uow.ExecuteAsync(async () =>
+        // 2. Open Transaction via ExecuteTransactionAsync
+        return await _uow.ExecuteTransactionAsync<Result<SalesInvoiceDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 invoice.Post();
@@ -362,7 +355,6 @@ public class SalesService : ISalesService
                 // 3. Deduct Stock
                 foreach (var item in invoice.Items)
                 {
-                    // Phase 25: GetRetailQuantityEquivalent removed. Quantity is in base units.
                     var stockResult = await _inventoryService.DecreaseStockAsync(
                         item.ProductId,
                         invoice.WarehouseId,
@@ -373,19 +365,36 @@ public class SalesService : ISalesService
 
                     if (!stockResult.IsSuccess)
                     {
-                        await transaction.RollbackAsync(ct);
                         _logger.LogWarning("Stock decrease failed for sales invoice post: {Error}", stockResult.Error);
                         return Result<SalesInvoiceDto>.Failure(stockResult.Error!);
                     }
                 }
 
-                // 4. Update Customer Balance
+                // 4. FIFO/FEFO Batch Allocation — deduct from specific batches
+                foreach (var item in invoice.Items)
+                {
+                    var fifoResult = await _fifoAllocationService.DeductFromBatchesAsync(
+                        item.ProductId,
+                        invoice.WarehouseId,
+                        item.Quantity,
+                        item.Id,
+                        userId,
+                        ct);
+
+                    if (!fifoResult.IsSuccess)
+                    {
+                        _logger.LogWarning("FIFO allocation failed for sales invoice {Id}, Product {ProductId}: {Error}",
+                            invoice.Id, item.ProductId, fifoResult.Error);
+                        return Result<SalesInvoiceDto>.Failure(fifoResult.Error!);
+                    }
+                }
+
+                // 5. Update Customer Balance
                 if (invoice.RemainingAmount > 0)
                 {
                     var customer = await _uow.Customers.GetByIdAsync(invoice.CustomerId, ct);
                     if (customer == null)
                     {
-                        await transaction.RollbackAsync(ct);
                         _logger.LogWarning("Customer {CustomerId} not found for credit sales invoice {Id} post", invoice.CustomerId, invoice.Id);
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
@@ -395,7 +404,6 @@ public class SalesService : ISalesService
                     {
                         if (!customer.CheckCreditLimit(invoice.RemainingAmount))
                         {
-                            await transaction.RollbackAsync(ct);
                             _logger.LogWarning(
                                 "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Remaining: {Remaining}",
                                 customer.Id, customer.CreditLimit, invoice.RemainingAmount);
@@ -407,7 +415,7 @@ public class SalesService : ISalesService
                     // Direct In-memory balance tracking on Customer entity is removed — use Account balance instead.
                 }
 
-                // 5. Record payment voucher (سند صرف) if payment is linked to a cash box
+                // 6. Record payment voucher (سند صرف) if payment is linked to a cash box
                 if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                 {
                     var paymentCurrencyId = await GetCurrencyIdAsync(invoice, ct);
@@ -430,8 +438,7 @@ public class SalesService : ISalesService
 
                 await _uow.SaveChangesAsync(ct);
 
-                // 6. Create journal entry for sales posting (revenue + COGS)
-                // Phase 25: Get cost from InventoryBatches via ProductCostService.
+                // 7. Create journal entry for sales posting (revenue + COGS)
                 var totalCost = 0m;
                 var distinctProductIds = invoice.Items
                     .Select(item => item.ProductId)
@@ -449,12 +456,9 @@ public class SalesService : ISalesService
                 var entryResult = await _accountingService.CreateSalesPostEntryAsync(invoice, userId, totalCost, ct);
                 if (!entryResult.IsSuccess)
                 {
-                    await transaction.RollbackAsync(ct);
                     _logger.LogWarning("Journal entry creation failed for sales invoice post {Id}: {Error}", invoice.Id, entryResult.Error);
                     return Result<SalesInvoiceDto>.Failure(entryResult.Error!);
                 }
-
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Invoice posted: ID {Id} by User {UserId}", invoice.Id, userId);
 
@@ -493,13 +497,11 @@ public class SalesService : ISalesService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "Domain exception posting sales invoice {Id}: {Message}", id, ex.Message);
                 return Result<SalesInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogError(ex, "Error posting sales invoice {Id}", id);
                 return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء ترحيل الفاتورة");
             }

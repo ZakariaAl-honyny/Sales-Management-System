@@ -15,6 +15,10 @@ public class PurchaseReturnConfiguration : IEntityTypeConfiguration<PurchaseRetu
         builder.HasIndex(pr => pr.ReturnNo).IsUnique();
         builder.Property(pr => pr.ReturnDate).HasColumnType("date");
         builder.Property(pr => pr.TotalAmount).HasPrecision(18, 2);
+        builder.Property(pr => pr.ReturnedDiscountAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(pr => pr.ReturnedTaxAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(pr => pr.ReturnedChargeAmount).HasPrecision(18, 2).HasDefaultValue(0m);
+        builder.Property(pr => pr.TaxId).HasColumnType("smallint").IsRequired(false);
         builder.Property(pr => pr.Notes).HasMaxLength(500);
         builder.Property(pr => pr.CurrencyId).HasColumnType("smallint");
         builder.Property(pr => pr.Status).HasConversion<byte>();

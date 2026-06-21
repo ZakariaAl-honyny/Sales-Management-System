@@ -208,6 +208,10 @@ public record SalesReturnDto(
     decimal TaxAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
+    decimal ReturnedDiscountAmount,
+    decimal ReturnedTaxAmount,
+    decimal ReturnedChargeAmount,
+    short? TaxId,
     int? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,
@@ -226,7 +230,7 @@ public record SalesReturnDto(
     };
 }
 
-public record SalesReturnItemDto(int Id, int ProductId, string ProductName,
+public record SalesReturnItemDto(int Id, int ProductId, int ProductUnitId, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal DiscountAmount,
@@ -245,6 +249,10 @@ public record PurchaseReturnDto(
     DateOnly ReturnDate,
     decimal SubTotal,
     decimal TotalAmount,
+    decimal ReturnedDiscountAmount,
+    decimal ReturnedTaxAmount,
+    decimal ReturnedChargeAmount,
+    short? TaxId,
     int? CurrencyId,
     decimal? ExchangeRate,
     string? Notes,

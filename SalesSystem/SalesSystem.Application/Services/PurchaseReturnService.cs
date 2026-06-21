@@ -148,7 +148,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "Supplier.Party");
+            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "PurchaseInvoice", "Supplier.Party");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
@@ -165,6 +165,20 @@ public class PurchaseReturnService : IPurchaseReturnService
                 productId, pr.WarehouseId, item.Quantity, allowNegativeStock, ct);
             if (!stockValidation.IsSuccess)
                 return Result<PurchaseReturnDto>.Failure(stockValidation.Error!);
+        }
+
+        // ---- Proportional calculation from original invoice ----
+        if (pr.PurchaseInvoiceId.HasValue && pr.PurchaseInvoice != null)
+        {
+            var invoice = pr.PurchaseInvoice;
+            var ratio = invoice.SubTotal > 0
+                ? pr.TotalAmount / invoice.SubTotal
+                : 0;
+            pr.SetProportionalAmounts(
+                invoice.DiscountAmount * ratio,
+                invoice.TaxAmount * ratio,
+                invoice.OtherCharges * ratio,
+                invoice.TaxId);
         }
 
         return await _uow.ExecuteTransactionAsync<Result<PurchaseReturnDto>>(async () =>
@@ -313,6 +327,10 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.ReturnDate,
             0, // SubTotal removed
             r.TotalAmount,
+            r.ReturnedDiscountAmount,
+            r.ReturnedTaxAmount,
+            r.ReturnedChargeAmount,
+            r.TaxId,
             r.CurrencyId,
             null, // ExchangeRate removed
             r.Notes,

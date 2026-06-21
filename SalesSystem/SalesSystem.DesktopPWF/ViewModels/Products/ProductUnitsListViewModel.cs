@@ -1,3 +1,4 @@
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
@@ -9,8 +10,9 @@ using SalesSystem.DesktopPWF.Services.App;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Products;
 
-public class ProductUnitsListViewModel : ViewModelBase
+public class ProductUnitsListViewModel : ViewModelBase, IDisposable
 {
+    private readonly IProductApiService _productService;
     private readonly IProductUnitApiService _unitService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
@@ -23,8 +25,17 @@ public class ProductUnitsListViewModel : ViewModelBase
     private bool _isEmpty;
     private int _productId;
 
+    // Search/selection fields
+    private string _searchText = string.Empty;
+    private ObservableCollection<ProductDto> _searchResults = new();
+    private ProductDto? _selectedProduct;
+    private bool _hasSelectedProduct;
+    private string _selectedProductName = string.Empty;
+    private bool _isSearching;
+
     public ProductUnitsListViewModel()
         : this(
+            App.GetService<IProductApiService>(),
             App.GetService<IProductUnitApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
@@ -34,12 +45,14 @@ public class ProductUnitsListViewModel : ViewModelBase
     }
 
     public ProductUnitsListViewModel(
+        IProductApiService productService,
         IProductUnitApiService unitService,
         IDialogService dialogService,
         IEventBus eventBus,
         IScreenWindowService screenWindowService,
         IToastNotificationService? toastService = null)
     {
+        _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -56,12 +69,16 @@ public class ProductUnitsListViewModel : ViewModelBase
         EditCommand = new RelayCommand(EditUnit);
         DeleteCommand = new AsyncRelayCommand(DeleteUnitAsync);
         PricesCommand = new RelayCommand(ViewPrices);
+
+        SearchCommand = new AsyncRelayCommand(SearchProductsAsync);
+        SelectProductCommand = new RelayCommand<ProductDto>(SelectProduct);
+        ClearProductCommand = new RelayCommand(ClearProductSelection);
     }
 
     public void OnNavigatedTo()
     {
         _eventBus.Subscribe<ProductChangedMessage>(OnProductChanged);
-        _ = LoadUnitsAsync();
+        // Do NOT auto-load units — user must search and select a product first
     }
 
     #region Properties
@@ -98,6 +115,46 @@ public class ProductUnitsListViewModel : ViewModelBase
 
     #endregion
 
+    #region Search/Selection Properties
+
+    public string SearchText
+    {
+        get => _searchText;
+        set => SetProperty(ref _searchText, value);
+    }
+
+    public ObservableCollection<ProductDto> SearchResults
+    {
+        get => _searchResults;
+        set => SetProperty(ref _searchResults, value);
+    }
+
+    public ProductDto? SelectedProduct
+    {
+        get => _selectedProduct;
+        set => SetProperty(ref _selectedProduct, value);
+    }
+
+    public bool HasSelectedProduct
+    {
+        get => _hasSelectedProduct;
+        private set => SetProperty(ref _hasSelectedProduct, value);
+    }
+
+    public string SelectedProductName
+    {
+        get => _selectedProductName;
+        private set => SetProperty(ref _selectedProductName, value);
+    }
+
+    public bool IsSearching
+    {
+        get => _isSearching;
+        set => SetProperty(ref _isSearching, value);
+    }
+
+    #endregion
+
     #region Commands
 
     public ICommand RefreshCommand { get; private set; } = null!;
@@ -106,12 +163,17 @@ public class ProductUnitsListViewModel : ViewModelBase
     public ICommand DeleteCommand { get; private set; } = null!;
     public ICommand PricesCommand { get; private set; } = null!;
 
+    public ICommand SearchCommand { get; private set; } = null!;
+    public ICommand SelectProductCommand { get; private set; } = null!;
+    public ICommand ClearProductCommand { get; private set; } = null!;
+
     #endregion
 
     #region Methods
 
     public async Task LoadUnitsAsync()
     {
+        if (ProductId <= 0) return;
         await ExecuteAsync(LoadUnitsOperationAsync);
     }
 
@@ -125,7 +187,7 @@ public class ProductUnitsListViewModel : ViewModelBase
             InvokeOnUIThread(() =>
             {
                 Units.Clear();
-                foreach (var item in result.Value.OrderBy(x => x.ConversionFactor))
+                foreach (var item in result.Value.OrderByDescending(x => x.Id))
                 {
                     Units.Add(item);
                 }
@@ -139,8 +201,85 @@ public class ProductUnitsListViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Searches for products matching the current SearchText via the API.
+    /// </summary>
+    public async Task SearchProductsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchText))
+        {
+            InvokeOnUIThread(() => SearchResults.Clear());
+            return;
+        }
+
+        await ExecuteAsync(SearchProductsOperationAsync);
+    }
+
+    private async Task SearchProductsOperationAsync()
+    {
+        IsSearching = true;
+        ErrorMessage = null;
+        try
+        {
+            var result = await _productService.SearchAsync(SearchText.Trim());
+            if (result.IsSuccess && result.Value != null)
+            {
+                InvokeOnUIThread(() =>
+                {
+                    SearchResults.Clear();
+                    foreach (var product in result.Value.OrderBy(p => p.Name))
+                    {
+                        SearchResults.Add(product);
+                    }
+                });
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في البحث عن المنتجات", "ProductUnitsListViewModel.SearchProductsOperationAsync", "[ProductUnitsListViewModel.SearchProductsOperationAsync] Failed to search products.");
+            }
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Selects a product from the search results and loads its units.
+    /// </summary>
+    private void SelectProduct(ProductDto? product)
+    {
+        if (product == null) return;
+
+        ProductId = product.Id;
+        SelectedProduct = product;
+        SelectedProductName = product.Name;
+        HasSelectedProduct = true;
+        SearchResults.Clear();
+        SearchText = string.Empty;
+        ErrorMessage = null;
+
+        _ = LoadUnitsAsync();
+    }
+
+    /// <summary>
+    /// Clears the product selection and returns to search mode.
+    /// </summary>
+    private void ClearProductSelection()
+    {
+        ProductId = 0;
+        SelectedProduct = null;
+        SelectedProductName = string.Empty;
+        HasSelectedProduct = false;
+        Units.Clear();
+        IsEmpty = false;
+        ErrorMessage = null;
+    }
+
     private void AddUnit()
     {
+        if (ProductId <= 0) return;
+
         var editorVm = new ProductUnitEditorViewModel(ProductId);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
@@ -158,6 +297,7 @@ public class ProductUnitsListViewModel : ViewModelBase
 
     private void EditUnit()
     {
+        if (ProductId <= 0) return;
         if (SelectedUnit == null) return;
 
         var editorVm = new ProductUnitEditorViewModel(ProductId, SelectedUnit.Id);
@@ -174,6 +314,7 @@ public class ProductUnitsListViewModel : ViewModelBase
 
     public async Task DeleteUnitAsync()
     {
+        if (ProductId <= 0) return;
         if (SelectedUnit == null) return;
 
         var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الوحدة: {SelectedUnit.UnitName}");
@@ -204,6 +345,7 @@ public class ProductUnitsListViewModel : ViewModelBase
 
     private void ViewPrices()
     {
+        if (ProductId <= 0) return;
         if (SelectedUnit == null) return;
 
         var vm = new ProductPricesListViewModel(
@@ -235,7 +377,10 @@ public class ProductUnitsListViewModel : ViewModelBase
     {
         _ = InvokeOnUIThreadAsync(async () =>
         {
-            await LoadUnitsAsync();
+            if (ProductId > 0)
+            {
+                await LoadUnitsAsync();
+            }
         });
     }
 
@@ -243,6 +388,8 @@ public class ProductUnitsListViewModel : ViewModelBase
     {
         _eventBus.Unsubscribe<ProductChangedMessage>(OnProductChanged);
     }
+
+    public void Dispose() => Cleanup();
 
     #endregion
 }

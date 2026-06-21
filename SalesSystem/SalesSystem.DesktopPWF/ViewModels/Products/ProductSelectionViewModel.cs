@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Input;
 using SalesSystem.Contracts.DTOs;
+using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
 using System.Linq;
@@ -12,13 +13,37 @@ namespace SalesSystem.DesktopPWF.ViewModels.Products;
 
 /// <summary>
 /// Wrapper ViewModel for a product row in the selection dialog.
-/// Adds live stock display without touching the immutable ProductDto record.
+/// Adds live stock display (per-unit converted) without touching the immutable ProductDto record.
 /// </summary>
-public class ProductSelectionItemViewModel
+public class ProductSelectionItemViewModel : INotifyPropertyChanged
 {
     public ProductDto Product { get; }
     public decimal Stock { get; set; }
-    public string StockDisplay => Stock > 0 ? Stock.ToString("N3") : "—";
+
+    /// <summary>Stock converted to the currently selected unit (set by parent VM).</summary>
+    public decimal StockInSelectedUnit { get; set; }
+
+    /// <summary>Display name of the selected unit (e.g., "كرتون", "حبة").</summary>
+    public string? SelectedUnitName { get; set; }
+
+    /// <summary>
+    /// Fallback: shows base-unit stock (N3) when no unit selected.
+    /// When a unit is selected, shows converted stock + unit name.
+    /// </summary>
+    public string StockDisplay
+    {
+        get
+        {
+            if (StockInSelectedUnit > 0 && !string.IsNullOrWhiteSpace(SelectedUnitName))
+            {
+                var val = StockInSelectedUnit < 1
+                    ? StockInSelectedUnit.ToString("N1")
+                    : $"{StockInSelectedUnit:N0}";
+                return $"{val} {SelectedUnitName}";
+            }
+            return Stock > 0 ? Stock.ToString("N3") : (Product.CurrentStock > 0 ? Product.CurrentStock.ToString("N3") : "—");
+        }
+    }
 
     // Delegated properties for XAML column bindings
     public int Id => Product.Id;
@@ -32,6 +57,19 @@ public class ProductSelectionItemViewModel
         Product = product;
         Stock = stock;
     }
+
+    /// <summary>Recalculates StockInSelectedUnit from base stock and a product unit factor.</summary>
+    public void ApplyUnit(decimal conversionFactor, string unitName)
+    {
+        StockInSelectedUnit = conversionFactor > 0 ? Stock / conversionFactor : Stock;
+        SelectedUnitName = unitName;
+        OnPropertyChanged(nameof(StockDisplay));
+        OnPropertyChanged(nameof(StockInSelectedUnit));
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
 /// <summary>
@@ -46,6 +84,7 @@ public class ProductSelectionViewModel : ViewModelBase
 {
     private readonly IProductApiService _productService;
     private readonly IInventoryApiService _inventoryService;
+    private readonly IProductUnitApiService _productUnitService;
     private readonly int _warehouseId;
 
     private ObservableCollection<ProductSelectionItemViewModel> _products = new();
@@ -53,6 +92,13 @@ public class ProductSelectionViewModel : ViewModelBase
     private ProductSelectionItemViewModel? _selectedItem;
     private string _searchText = string.Empty;
     private bool _isStockLoading;
+
+    // ── Unit selection ──────────────────────────────────────────────────────────
+    private ObservableCollection<ProductUnitDto> _availableUnits = new();
+    private ProductUnitDto? _selectedUnit;
+    private bool _hasUnits;
+    private string _convertedStockDisplay = string.Empty;
+    private string _selectedProductName = string.Empty;
 
     /// <summary>
     /// Raised when the user confirms a product selection.
@@ -66,11 +112,15 @@ public class ProductSelectionViewModel : ViewModelBase
     /// </param>
     public ProductSelectionViewModel(int warehouseId = 0)
     {
-        _productService  = App.GetService<IProductApiService>();
-        _inventoryService = App.GetService<IInventoryApiService>();
+        _productService      = App.GetService<IProductApiService>();
+        _inventoryService    = App.GetService<IInventoryApiService>();
+        _productUnitService  = App.GetService<IProductUnitApiService>();
         _warehouseId = warehouseId;
 
-        SelectCommand = new RelayCommand(Select, () => SelectedItem != null);
+        AvailableUnits = new ObservableCollection<ProductUnitDto>();
+        SelectedUnit = null;
+
+        SelectCommand = new RelayCommand(Select);
         CancelCommand = new RelayCommand(Cancel);
         SearchCommand = new RelayCommand(Search);
         ScanBarcodeCommand = new RelayCommand(ScanBarcode);
@@ -98,7 +148,9 @@ public class ProductSelectionViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _selectedItem, value))
-                (SelectCommand as RelayCommand)?.RaiseCanExecuteChanged();
+            {
+                _ = OnSelectedItemChangedAsync();
+            }
         }
     }
 
@@ -124,6 +176,46 @@ public class ProductSelectionViewModel : ViewModelBase
 
     public bool ShowStockColumn => _warehouseId > 0;
 
+    // ── Unit Selection Properties ──────────────────────────────────────────────
+
+    public ObservableCollection<ProductUnitDto> AvailableUnits
+    {
+        get => _availableUnits;
+        set => SetProperty(ref _availableUnits, value);
+    }
+
+    public ProductUnitDto? SelectedUnit
+    {
+        get => _selectedUnit;
+        set
+        {
+            if (SetProperty(ref _selectedUnit, value))
+            {
+                OnSelectedUnitChanged();
+            }
+        }
+    }
+
+    public bool HasUnits
+    {
+        get => _hasUnits;
+        set => SetProperty(ref _hasUnits, value);
+    }
+
+    /// <summary>Converted stock display: "{N} {UnitName}" for the selected product + unit.</summary>
+    public string ConvertedStockDisplay
+    {
+        get => _convertedStockDisplay;
+        set => SetProperty(ref _convertedStockDisplay, value);
+    }
+
+    /// <summary>Name of the currently selected product (shown in details panel).</summary>
+    public string SelectedProductName
+    {
+        get => _selectedProductName;
+        set => SetProperty(ref _selectedProductName, value);
+    }
+
     // ── Commands ───────────────────────────────────────────────────────────────
 
     public ICommand SelectCommand { get; }
@@ -142,6 +234,7 @@ public class ProductSelectionViewModel : ViewModelBase
             if (result.IsSuccess && result.Value != null)
             {
                 var items = result.Value
+                    .OrderByDescending(p => p.Id)
                     .Select(p => new ProductSelectionItemViewModel(p))
                     .ToList();
 
@@ -175,6 +268,18 @@ public class ProductSelectionViewModel : ViewModelBase
 
             await Task.WhenAll(tasks);
 
+            // Re-apply unit conversion for the selected item if a unit is active
+            var selItem = SelectedItem;
+            var selUnit = SelectedUnit;
+            if (selItem != null && selUnit != null)
+            {
+                selItem.ApplyUnit(selUnit.ConversionFactor, selUnit.UnitName ?? "");
+                var val = selItem.StockInSelectedUnit < 1
+                    ? selItem.StockInSelectedUnit.ToString("N1")
+                    : $"{selItem.StockInSelectedUnit:N0}";
+                ConvertedStockDisplay = $"{val} {selUnit.UnitName}";
+            }
+
             // Refresh the view to show updated stock values
             System.Windows.Application.Current.Dispatcher.Invoke(() => ProductsView?.Refresh());
         }
@@ -186,6 +291,79 @@ public class ProductSelectionViewModel : ViewModelBase
         {
             IsStockLoading = false;
         }
+    }
+
+    /// <summary>
+    /// Called when the selected product row changes.
+    /// Loads the product's available units for the unit selector panel.
+    /// </summary>
+    private async Task OnSelectedItemChangedAsync()
+    {
+        var item = SelectedItem;
+        if (item == null)
+        {
+            HasUnits = false;
+            SelectedProductName = string.Empty;
+            ConvertedStockDisplay = string.Empty;
+            return;
+        }
+
+        SelectedProductName = item.Name;
+        HasUnits = false;
+        AvailableUnits.Clear();
+        SelectedUnit = null;
+
+        if (_productUnitService == null) return;
+
+        try
+        {
+            var result = await _productUnitService.GetByProductIdAsync(item.Id);
+            if (result.IsSuccess && result.Value != null && result.Value.Count > 0)
+            {
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    AvailableUnits = new ObservableCollection<ProductUnitDto>(result.Value);
+                    HasUnits = true;
+
+                    // Auto-select base unit (or first available)
+                    SelectedUnit = result.Value.FirstOrDefault(u => u.IsBaseUnit)
+                        ?? result.Value.First();
+                });
+            }
+        }
+        catch
+        {
+            // Unit loading is optional — swallow errors silently
+        }
+    }
+
+    /// <summary>
+    /// Called when the user picks a different unit from the dropdown.
+    /// Converts the selected product's stock from base units to the chosen unit.
+    /// </summary>
+    private void OnSelectedUnitChanged()
+    {
+        var item = SelectedItem;
+        var unit = SelectedUnit;
+
+        if (item == null || unit == null)
+        {
+            ConvertedStockDisplay = string.Empty;
+            return;
+        }
+
+        // Convert base-unit stock to selected unit
+        var baseStock = item.Stock > 0 ? item.Stock : item.Product.CurrentStock;
+        item.ApplyUnit(unit.ConversionFactor, unit.UnitName ?? "");
+
+        // Build display string
+        var val = item.StockInSelectedUnit < 1
+            ? item.StockInSelectedUnit.ToString("N1")
+            : $"{item.StockInSelectedUnit:N0}";
+        ConvertedStockDisplay = $"{val} {unit.UnitName}";
+
+        // Refresh DataGrid stock column
+        ProductsView?.Refresh();
     }
 
     private bool ApplyFilter(object obj)

@@ -50,4 +50,11 @@ public class ProductCategoryApiService : ApiServiceBase, IProductCategoryApiServ
             () => _httpClient.DeleteAsync($"api/v1/product-categories/{id}"),
             "ProductCategoryApiService.DeactivateAsync");
     }
+
+    public async Task<Result> ReactivateAsync(int id)
+    {
+        return await ExecuteCommandAsync(
+            () => _httpClient.PostAsync($"api/v1/product-categories/{id}/reactivate", null),
+            "ProductCategoryApiService.ReactivateAsync");
+    }
 }

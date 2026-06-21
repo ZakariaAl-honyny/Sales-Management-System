@@ -22,6 +22,8 @@ public class WarehouseTransfer : Entity
 
     public DateTime CreatedAt { get; private set; }
     public int CreatedByUserId { get; private set; }
+    public DateTime? PostedAt { get; private set; }
+    public DateTime? CancelledAt { get; private set; }
 
     // Navigation properties
     public virtual Warehouse? SourceWarehouse { get; private set; }
@@ -76,6 +78,7 @@ public class WarehouseTransfer : Entity
         if (!_lines.Any())
             throw new DomainException("لا يمكن ترحيل تحويل بدون أصناف.");
         Status = InvoiceStatus.Posted;
+        PostedAt = DateTime.UtcNow;
     }
 
     public void Cancel()
@@ -83,5 +86,6 @@ public class WarehouseTransfer : Entity
         if (Status == InvoiceStatus.Cancelled)
             throw new DomainException("التحويل ملغي بالفعل.");
         Status = InvoiceStatus.Cancelled;
+        CancelledAt = DateTime.UtcNow;
     }
 }

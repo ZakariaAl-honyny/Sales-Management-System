@@ -70,11 +70,29 @@ public class InventoryBatch : AuditableEntity
     /// </summary>
     public bool IsFullyConsumed => QuantityRemaining <= 0.0001m;
 
+    /// <summary>
+    /// Indicates whether this batch is closed for further mutations.
+    /// Set to true when QuantityRemaining reaches zero (fully consumed).
+    /// Once closed, no further Deduct, IncreaseRemaining, UpdateExpiry, or UpdateBatchNo
+    /// operations are allowed.
+    /// </summary>
+    public bool IsClosed { get; private set; }
+
     // Navigation properties
     public virtual Product? Product { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual PurchaseInvoiceLine? PurchaseInvoiceLine { get; private set; }
+
+    /// <summary>
+    /// Guards against mutations on a closed batch (fully consumed).
+    /// Throws <see cref="DomainException"/> if the batch is already closed.
+    /// </summary>
+    private void IsClosedGuard()
+    {
+        if (QuantityRemaining <= 0 || IsClosed)
+            throw new DomainException("لا يمكن تعديل الدفعة بعد استهلاكها بالكامل");
+    }
 
     private InventoryBatch() { } // EF Core
 
@@ -126,6 +144,7 @@ public class InventoryBatch : AuditableEntity
     /// </summary>
     public void Deduct(decimal quantity)
     {
+        IsClosedGuard();
         if (quantity <= 0)
             throw new DomainException("كمية السحب يجب أن تكون أكبر من صفر.");
         if (quantity > QuantityRemaining + 0.0001m)
@@ -133,6 +152,8 @@ public class InventoryBatch : AuditableEntity
                 $"الكمية المطلوبة ({quantity:N3}) تتجاوز المتاح في الدفعة ({QuantityRemaining:N3}).");
 
         QuantityRemaining -= quantity;
+        if (IsFullyConsumed)
+            IsClosed = true;
         UpdateTimestamp();
     }
 
@@ -141,9 +162,13 @@ public class InventoryBatch : AuditableEntity
     /// </summary>
     public void IncreaseRemaining(decimal quantity)
     {
+        IsClosedGuard();
         if (quantity <= 0)
             throw new DomainException("كمية الإضافة يجب أن تكون أكبر من صفر.");
         QuantityRemaining += quantity;
+        // Reopening the batch — clear IsClosed flag
+        if (IsClosed && QuantityRemaining > 0)
+            IsClosed = false;
         UpdateTimestamp();
     }
 
@@ -152,6 +177,7 @@ public class InventoryBatch : AuditableEntity
     /// </summary>
     public void UpdateExpiry(DateOnly? newExpiryDate)
     {
+        IsClosedGuard();
         ExpiryDate = newExpiryDate;
         UpdateTimestamp();
     }
@@ -161,6 +187,7 @@ public class InventoryBatch : AuditableEntity
     /// </summary>
     public void UpdateBatchNo(string newBatchNo)
     {
+        IsClosedGuard();
         if (string.IsNullOrWhiteSpace(newBatchNo))
             throw new DomainException("رقم الدفعة مطلوب.");
         BatchNo = newBatchNo.Trim();
