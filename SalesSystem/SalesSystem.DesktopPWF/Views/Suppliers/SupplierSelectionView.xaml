@@ -47,7 +47,7 @@
                     <DataGridTextColumn Header="رقم المورد" Binding="{Binding Id}" Width="80"/>
                     <DataGridTextColumn Header="اسم المورد" Binding="{Binding Name}" Width="*"/>
                     <DataGridTextColumn Header="الهاتف" Binding="{Binding Phone}" Width="120"/>
-                    <DataGridTextColumn Header="الرصيد" Binding="{Binding CurrentBalance, StringFormat=N2}" Width="120"/>
+                    <DataGridTextColumn Header="الحساب" Binding="{Binding AccountName}" Width="120"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

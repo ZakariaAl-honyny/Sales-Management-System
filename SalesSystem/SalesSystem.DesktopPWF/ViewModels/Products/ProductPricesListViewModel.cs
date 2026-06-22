@@ -24,6 +24,7 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     private int _productId;
     private int _productUnitId;
     private string _productUnitName = string.Empty;
+    private bool _includeInactive;
     private ObservableCollection<ProductUnitDto> _availableUnits = new();
     private ProductUnitDto? _selectedAvailableUnit;
 
@@ -132,6 +133,18 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
     {
         get => _isEmpty;
         private set => SetProperty(ref _isEmpty, value);
+    }
+
+    public bool IncludeInactive
+    {
+        get => _includeInactive;
+        set
+        {
+            if (SetProperty(ref _includeInactive, value))
+            {
+                _ = LoadPricesAsync();
+            }
+        }
     }
 
     #endregion
@@ -266,7 +279,7 @@ public class ProductPricesListViewModel : ViewModelBase, IDisposable
         {
             var error = deleteResult.Error ?? "فشل في إلغاء تنشيط السعر";
             ErrorMessage = HandleFailure(error, "ProductPricesListViewModel.DeactivatePriceOperationAsync", "[ProductPricesListViewModel.DeactivatePriceOperationAsync] Failed to deactivate product price.");
-            _toastService.ShowError(ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في حذف السعر", ErrorMessage!);
         }
     }
 

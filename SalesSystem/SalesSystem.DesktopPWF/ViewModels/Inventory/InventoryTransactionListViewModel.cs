@@ -244,6 +244,7 @@ public class InventoryTransactionListViewModel : ViewModelBase
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل حركات المخزون", "InventoryTransactionListViewModel.LoadTransactionsOperationAsync");
             IsEmpty = Transactions.Count == 0;
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
     }
 

@@ -5,6 +5,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.Generic;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Units;
@@ -14,6 +15,7 @@ public class UnitEditorViewModel : ViewModelBase
     private readonly IUnitApiService _unitService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
     private string _name = string.Empty;
     private string? _errorMessage;
     private string _windowTitle = "إضافة وحدة جديدة";
@@ -23,6 +25,7 @@ public class UnitEditorViewModel : ViewModelBase
         _unitService = App.GetService<IUnitApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
         InitializeCommands();
     }
@@ -103,6 +106,7 @@ public class UnitEditorViewModel : ViewModelBase
         if (result.IsSuccess && result.Value != null)
         {
             _eventBus.Publish(new UnitChangedMessage(result.Value.Id));
+            _toastService.ShowSuccess("تم حفظ الوحدة بنجاح");
             RequestClose();
         }
         else

@@ -58,9 +58,6 @@ public class Account : ActivatableEntity
     /// <summary>Hex color code for UI display (nvarchar(7), e.g. #2196F3).</summary>
     public string? ColorCode { get; private set; }
 
-    /// <summary>Opening balance for this account (decimal(18,2)).</summary>
-    public decimal OpeningBalance { get; private set; }
-
     /// <summary>Additional notes (nvarchar(300)).</summary>
     public string? Notes { get; private set; }
 
@@ -91,7 +88,6 @@ public class Account : ActivatableEntity
         byte level = 1,
         string? description = null,
         string? colorCode = null,
-        decimal openingBalance = 0,
         string? notes = null,
         int? createdByUserId = null)
     {
@@ -122,9 +118,6 @@ public class Account : ActivatableEntity
         if (notes?.Length > 300)
             throw new DomainException("الملاحظات لا يمكن أن تتجاوز 300 حرف");
 
-        if (openingBalance < 0)
-            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
-
         var account = new Account
         {
             AccountCode = accountCode.Trim(),
@@ -138,7 +131,6 @@ public class Account : ActivatableEntity
             CategoryId = categoryId,
             Description = description?.Trim(),
             ColorCode = colorCode?.Trim(),
-            OpeningBalance = openingBalance,
             Notes = notes?.Trim(),
         };
         account.SetCreatedBy(createdByUserId);
@@ -158,7 +150,6 @@ public class Account : ActivatableEntity
         byte level = 1,
         string? description = null,
         string? colorCode = null,
-        decimal openingBalance = 0,
         string? notes = null,
         int? updatedByUserId = null)
     {
@@ -183,9 +174,6 @@ public class Account : ActivatableEntity
         if (notes?.Length > 300)
             throw new DomainException("الملاحظات لا يمكن أن تتجاوز 300 حرف");
 
-        if (openingBalance < 0)
-            throw new DomainException("الرصيد الافتتاحي لا يمكن أن يكون سالباً");
-
         NameAr = nameAr.Trim();
         NameEn = nameEn?.Trim() ?? string.Empty;
         Nature = nature;
@@ -195,7 +183,6 @@ public class Account : ActivatableEntity
         CategoryId = categoryId;
         Description = description?.Trim();
         ColorCode = colorCode?.Trim();
-        OpeningBalance = openingBalance;
         Notes = notes?.Trim();
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

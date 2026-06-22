@@ -54,7 +54,8 @@
                                   SelectedValuePath="Id"
                                   DisplayMemberPath="Name"
                                   Style="{StaticResource ModernComboBox}"
-                                  IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"/>
+                                  IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                  ToolTip="اختر المخزن المصدر (الذي ستُنقل منه البضاعة)"/>
 
                         <TextBlock Grid.Column="3" Text="المخزن الهدف" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
                         <ComboBox Grid.Column="4" ItemsSource="{Binding Warehouses}"
@@ -62,7 +63,8 @@
                                   SelectedValuePath="Id"
                                   DisplayMemberPath="Name"
                                   Style="{StaticResource ModernComboBox}"
-                                  IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"/>
+                                  IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBoolConverter}}"
+                                  ToolTip="اختر المخزن الهدف (الذي ستُنقل إليه البضاعة)"/>
                     </Grid>
                 </Border>
 
@@ -138,7 +140,8 @@
                                                           Style="{StaticResource ModernComboBox}"
                                                           Height="28" Padding="8,0"
                                                           BorderThickness="0"
-                                                          IsEnabled="{Binding DataContext.IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolConverter}}"/>
+                                                          IsEnabled="{Binding DataContext.IsReadOnly, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource InverseBoolConverter}}"
+                                                          ToolTip="اختر صنف من القائمة أو ابحث بالاسم"/>
                                                 <Button Grid.Column="1" 
                                                         Content="🔍" 
                                                         Command="{Binding DataContext.SearchProductSingleCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
@@ -180,7 +183,8 @@
                                 <DataGridTextColumn Header="الكمية *" 
                                                     Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, StringFormat=N3}" 
                                                     Width="120"
-                                                    CellStyle="{StaticResource DataGridCellCenterStyle}"/>
+                                                    CellStyle="{StaticResource DataGridCellCenterStyle}"
+                                                    ToolTipService.ToolTip="أدخل كمية النقل"/>
 
                                 <DataGridTemplateColumn Width="60">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -209,7 +213,8 @@
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
                                  VerticalContentAlignment="Top" Padding="8,4"
-                                 IsReadOnly="{Binding IsReadOnly}"/>
+                                 IsReadOnly="{Binding IsReadOnly}"
+                                 ToolTip="ملاحظات إضافية حول عملية التحويل"/>
                     </StackPanel>
                 </Border>
             </StackPanel>

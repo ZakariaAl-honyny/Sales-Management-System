@@ -228,6 +228,7 @@ public class DepartmentListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط القسم", "DepartmentListViewModel.DeleteDepartmentAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف القسم", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)

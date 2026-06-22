@@ -148,7 +148,7 @@ public class UserSessionListViewModel : AdminOnlyViewModel
             await InvokeOnUIThreadAsync(() =>
             {
                 Users.Clear();
-                Users.Add(new UserDto(0, "الكل", 0, false, false, null, null, 0, null));
+                Users.Add(new UserDto(0, "الكل", 0, false, false, true, null, null, 0, null));
                 foreach (var user in result.Value.OrderBy(u => u.UserName))
                 {
                     Users.Add(user);
@@ -181,6 +181,7 @@ public class UserSessionListViewModel : AdminOnlyViewModel
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الجلسات", "UserSessionListViewModel.LoadSessionsOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Sessions.Count == 0;
         }
     }

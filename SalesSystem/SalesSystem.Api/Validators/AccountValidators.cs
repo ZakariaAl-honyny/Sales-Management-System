@@ -7,9 +7,7 @@ public class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequ
 {
     public CreateAccountRequestValidator()
     {
-        RuleFor(x => x.AccountCode)
-            .NotEmpty().WithMessage("رمز الحساب مطلوب")
-            .Matches(@"^\d{4,10}$").WithMessage("رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
+        // AccountCode is NOT user-supplied — auto-generated via AccountCodeGeneratorService
 
         RuleFor(x => x.NameAr)
             .NotEmpty().WithMessage("اسم الحساب بالعربية مطلوب")
@@ -21,6 +19,18 @@ public class CreateAccountRequestValidator : AbstractValidator<CreateAccountRequ
 
         RuleFor(x => x.Nature)
             .InclusiveBetween((byte)1, (byte)5).WithMessage("نوع الحساب غير صالح — القيم المسموحة: 1-5");
+
+        RuleFor(x => x.Description)
+            .MaximumLength(500).WithMessage("الوصف يجب ألا يتجاوز 500 حرف")
+            .When(x => !string.IsNullOrWhiteSpace(x.Description));
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(300).WithMessage("الملاحظات يجب ألا تتجاوز 300 حرف")
+            .When(x => !string.IsNullOrWhiteSpace(x.Notes));
+
+        RuleFor(x => x.OpeningBalance)
+            .GreaterThanOrEqualTo(0).WithMessage("الرصيد الافتتاحي لا يمكن أن يكون سالباً")
+            .When(x => x.OpeningBalance.HasValue);
     }
 }
 
@@ -38,5 +48,13 @@ public class UpdateAccountRequestValidator : AbstractValidator<UpdateAccountRequ
 
         RuleFor(x => x.Nature)
             .InclusiveBetween((byte)1, (byte)5).WithMessage("نوع الحساب غير صالح — القيم المسموحة: 1-5");
+
+        RuleFor(x => x.Description)
+            .MaximumLength(500).WithMessage("الوصف يجب ألا يتجاوز 500 حرف")
+            .When(x => !string.IsNullOrWhiteSpace(x.Description));
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(300).WithMessage("الملاحظات يجب ألا تتجاوز 300 حرف")
+            .When(x => !string.IsNullOrWhiteSpace(x.Notes));
     }
 }

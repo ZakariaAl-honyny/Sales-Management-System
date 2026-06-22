@@ -179,12 +179,14 @@ public class SalesReturnListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مرتجعات المبيعات", "SalesReturnListViewModel.LoadReturnsAsync", "[SalesReturnListViewModel.LoadReturnsAsync] Failed to load sales returns list.");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
                 IsEmpty = Returns.Count == 0;
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SalesReturnListViewModel.LoadReturnsAsync", "[SalesReturnListViewModel.LoadReturnsAsync] Failed to load sales returns list.");
+            _ = _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
         finally
         {
@@ -264,10 +266,7 @@ public class SalesReturnListViewModel : ViewModelBase
                 }
                 else
                 {
-                    InvokeOnUIThread(() =>
-                    {
-                        dialogService.ShowError(fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
-                    });
+                    await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
                 }
             }
             catch (Exception ex)

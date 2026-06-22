@@ -61,7 +61,8 @@
                     <CheckBox Content="عرض الملغاة" 
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
-                               FontSize="12"/>
+                               FontSize="12"
+                               ToolTip="عرض التحويلات الملغاة"/>
                 </StackPanel>
 
                 <!-- Actions Group -->
@@ -147,28 +148,28 @@
                     </DataGrid.InputBindings>
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="عرض التحويل" Command="{Binding ViewCommand}">
+                            <MenuItem Header="عرض التحويل" ToolTip="عرض تفاصيل التحويل" Command="{Binding ViewCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="👁️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="تعديل التحويل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل التحويل" ToolTip="تعديل التحويل المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="📝"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="ترحيل التحويل" Command="{Binding PostCommand}">
+                            <MenuItem Header="ترحيل التحويل" ToolTip="ترحيل التحويل — سيتم نقل المخزون" Command="{Binding PostCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✅"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="إلغاء التحويل" Command="{Binding CancelCommand}">
+                            <MenuItem Header="إلغاء التحويل" ToolTip="إلغاء التحويل المحدد" Command="{Binding CancelCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="❌"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="طباعة" Command="{Binding PrintCommand}">
+                            <MenuItem Header="طباعة" ToolTip="طباعة إذن التحويل" Command="{Binding PrintCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🖨️"/>
                                 </MenuItem.Icon>

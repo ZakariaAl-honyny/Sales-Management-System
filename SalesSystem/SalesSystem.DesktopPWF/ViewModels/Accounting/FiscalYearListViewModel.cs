@@ -117,6 +117,7 @@ public class FiscalYearListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل السنوات المالية", "LoadFiscalYears");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Years.Count == 0;
             OnPropertyChanged(nameof(HasNoYears));
         }
@@ -150,6 +151,7 @@ public class FiscalYearListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إنشاء السنة المالية", "CreateFiscalYear");
+            await _dialogService.ShowErrorAsync("خطأ في إنشاء السنة المالية", ErrorMessage!);
         }
     }
 
@@ -183,6 +185,7 @@ public class FiscalYearListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في فتح السنة المالية", "OpenFiscalYear");
+            await _dialogService.ShowErrorAsync("خطأ في فتح السنة المالية", ErrorMessage!);
         }
     }
 
@@ -219,6 +222,7 @@ public class FiscalYearListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إغلاق السنة المالية", "CloseFiscalYear");
+            await _dialogService.ShowErrorAsync("خطأ في إغلاق السنة المالية", ErrorMessage!);
         }
     }
 

@@ -24,6 +24,7 @@ public class ProductUnitsListViewModel : ViewModelBase, IDisposable
     private string? _errorMessage;
     private bool _isEmpty;
     private int _productId;
+    private bool _includeInactive;
 
     // Search/selection fields
     private string _searchText = string.Empty;
@@ -111,6 +112,18 @@ public class ProductUnitsListViewModel : ViewModelBase, IDisposable
     {
         get => _isEmpty;
         private set => SetProperty(ref _isEmpty, value);
+    }
+
+    public bool IncludeInactive
+    {
+        get => _includeInactive;
+        set
+        {
+            if (SetProperty(ref _includeInactive, value))
+            {
+                _ = LoadUnitsAsync();
+            }
+        }
     }
 
     #endregion
@@ -339,7 +352,7 @@ public class ProductUnitsListViewModel : ViewModelBase, IDisposable
         {
             var error = deleteResult.Error ?? "فشل في حذف الوحدة";
             ErrorMessage = error;
-            _toastService.ShowError(error);
+            await _dialogService.ShowErrorAsync("خطأ في حذف الوحدة", error);
         }
     }
 

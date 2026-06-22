@@ -171,6 +171,7 @@ public class SupplierContactEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث جهة الاتصال", "SupplierContactEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث جهة الاتصال", ErrorMessage!);
             }
         }
         else
@@ -193,6 +194,7 @@ public class SupplierContactEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة جهة الاتصال", "SupplierContactEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة جهة الاتصال", ErrorMessage!);
             }
         }
     }

@@ -519,17 +519,36 @@ Default schema: **`dbo`**
 | `Id` | int PK | |
 | `ParentId` | int null FK → Accounts(Id) | self-referencing hierarchy |
 | `AccountCode` | nvarchar(20) not null | unique filtered `[IsActive]=1` |
-| `Name` | nvarchar(200) not null | |
+| `NameAr` | nvarchar(200) not null | Arabic name |
+| `NameEn` | nvarchar(200) null | English name for bilingual support |
 | `Nature` | tinyint not null | 1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense |
-| `Level` | tinyint not null default 1 | 1=Group, 2=Main, 3=Sub, 4=Detail — auto-created detail accounts use Level=4 |
+| `Level` | tinyint not null default 1 | 1=Group(1 digit), 2=Main(2 digits), 3=Sub(4 digits), 4=Detail(8 digits) — see hierarchical numbering below |
 | `IsLeaf` | bit not null default 1 | leaf accounts allow transactions |
 | `IsSystem` | bit not null default 0 | system accounts protected from modification |
+| `Description` | nvarchar(500) null | Explanation of account purpose |
+| `ColorCode` | nvarchar(7) null | Auto-generated hex color from Nature: #2B579A (Asset), #D32F2F (Liability), #6A1B9A (Equity), #2E7D32 (Revenue), #795548 (Expense) |
+| `Notes` | nvarchar(300) null | Additional notes |
 | `CategoryId` | smallint null FK → AccountCategories(Id) |
 | `IsActive` | bit not null default 1 | |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
+
+### Hierarchical Account Numbering Scheme
+
+Account codes follow an expanding hierarchical pattern that encodes the account's level:
+
+| Level | Digits | Pattern | Example |
+|-------|--------|---------|---------|
+| 1 (Group) | 1 | Single digit | `1` (Assets) |
+| 2 (Main) | 2 | Level1 + 1-digit sequence | `11` (Current Assets) |
+| 3 (Sub) | 4 | Level2 + 2-digit sequence | `1101` (Cash & Equivalents) |
+| 4 (Detail) | 8 | Level3 + 4-digit sequence | `11010001` (Cash on Hand) |
+
+This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 customer accounts under `1103` — Accounts Receivable).
+
+**Auto-generation rule:** When creating a detail account under parent `1103`, the system queries `LIKE '1103%'` for the current max code, increments the suffix, and assigns the new code (e.g., `11030001` → `11030002`). Thread safety via `SemaphoreSlim`.
 
 ### 4.3 CashBoxes
 | Column | Type | Notes |
@@ -665,6 +684,7 @@ Default schema: **`dbo`**
 | **Notes** | Flexible key-value design | replaces fixed-column approach |
 
 **Design Notes:**
+- **OpeningBalance** is NOT stored on the Account entity. When an account is created with an opening balance, the system generates an automatic Journal Entry (Debit/Credit based on Nature) against the `OpeningBalanceEquity` (1422) account within a database transaction. This ensures double-entry integrity.
 - NO CashTransactions table (replaced by ReceiptVouchers/PaymentVouchers)
 - NO DailyClosures table (removed from V1)
 - NO Cheques table (removed from V1)

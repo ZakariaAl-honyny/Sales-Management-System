@@ -11,14 +11,15 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
         <TextBlock Grid.Row="0"
-                   Text="🎭  إدارة الأدوار"
-                   Style="{StaticResource HeaderStyle}"
-                   AutomationProperties.AutomationId="RolesPageTitle"/>
+                    Text="🎭  إدارة الأدوار"
+                    Style="{StaticResource HeaderStyle}"
+                    AutomationProperties.AutomationId="RolesPageTitle"/>
 
         <!-- Toolbar -->
         <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
@@ -89,8 +90,28 @@
             </WrapPanel>
         </Border>
 
+        <!-- Error Message Bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="12,8"
+                Margin="{StaticResource StandardSectionMargin}"
+                CornerRadius="6"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
         <!-- Grid -->
-        <Border Grid.Row="2" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
             <Grid>
                 <DataGrid ItemsSource="{Binding RolesView}"
                           SelectedItem="{Binding SelectedRole}"
@@ -99,13 +120,13 @@
                           AutomationProperties.AutomationId="DgRoles">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" ToolTip="تعديل بيانات الدور المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✏️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="حذف" Command="{Binding DeleteCommand}"
+                            <MenuItem Header="حذف" ToolTip="حذف الدور المحدد" Command="{Binding DeleteCommand}"
                                       Visibility="{Binding SelectedRole.IsActive, Converter={StaticResource BoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🗑️"/>
@@ -178,7 +199,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="3"
+        <Border Grid.Row="0" Grid.RowSpan="4"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

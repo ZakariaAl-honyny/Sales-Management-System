@@ -119,6 +119,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل القيود اليومية", "LoadJournalEntries");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Entries.Count == 0;
             OnPropertyChanged(nameof(HasNoEntries));
         }
@@ -160,6 +161,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل تفاصيل القيد", "ViewJournalEntryDetails");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
     }
 
@@ -226,6 +228,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل القيد", "PostJournalEntry");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -272,6 +275,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء القيد", "CancelJournalEntry");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 

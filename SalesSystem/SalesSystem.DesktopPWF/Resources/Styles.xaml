@@ -426,6 +426,23 @@
         <Setter Property="Margin" Value="0,0,0,12"/>
     </Style>
 
+    <!-- عنوان القسم -->
+    <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Margin" Value="0,12,0,6"/>
+    </Style>
+
+    <!-- تذييل البطاقة -->
+    <Style x:Key="FooterStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}"/>
+        <Setter Property="BorderThickness" Value="1,1,0,0"/>
+        <Setter Property="BorderBrush" Value="#E2E8F0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="12,8"/>
+    </Style>
+
     <!--CheckBox نمط -->
     <Style TargetType="CheckBox">
         <Setter Property="FontSize" Value="11"/>
@@ -725,6 +742,15 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- خلية رقم (محاذاة لليمين) -->
+    <Style x:Key="DataGridCellNumberStyle" TargetType="DataGridCell" BasedOn="{StaticResource DataGridCellStyle}">
+        <Setter Property="HorizontalContentAlignment" Value="Right"/>
+        <Setter Property="TextBlock.TextAlignment" Value="Right"/>
+        <Setter Property="TextBlock.FontFamily" Value="Segoe UI, Tahoma"/>
+        <Setter Property="TextBlock.FontSize" Value="11"/>
+        <Setter Property="Padding" Value="6,0,6,0"/>
     </Style>
 
     <!-- DataGrid عصري (Keyed) -->

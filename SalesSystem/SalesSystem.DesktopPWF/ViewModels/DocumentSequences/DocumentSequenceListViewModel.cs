@@ -163,6 +163,7 @@ public class DocumentSequenceListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إعادة تعيين التسلسل", "DocumentSequenceListViewModel.Reset");
+            await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين التسلسل", ErrorMessage!);
         }
     }
 

@@ -83,7 +83,8 @@
                                                      Style="{StaticResource ModernTextBox}" 
                                                      Padding="8,4" 
                                                      FontWeight="Bold"
-                                                     HorizontalContentAlignment="Center"/>
+                                                     HorizontalContentAlignment="Center"
+                                                     ToolTip="أدخل كمية المرتجع"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -139,7 +140,8 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                  <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                          Style="{StaticResource ModernTextBox}">
+                                          Style="{StaticResource ModernTextBox}"
+                                          ToolTip="ابحث عن صنف بالاسم أو الباركود">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
                                     </TextBox.InputBindings>
@@ -233,7 +235,8 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="80" 
                                      AcceptsReturn="True"
-                                     VerticalContentAlignment="Top" Padding="8,4"/>
+                                     VerticalContentAlignment="Top" Padding="8,4"
+                                     ToolTip="ملاحظات إضافية حول مرتجع البيع"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

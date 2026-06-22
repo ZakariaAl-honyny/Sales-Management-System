@@ -310,3 +310,234 @@ When you encounter any code related to these areas, apply fixes automatically:
 10. COGS using PurchaseCost → Change to AverageCost from ProductUnit
 11. Payment without allocation → Add PaymentAllocation tracking
 12. Missing reversal entries on payment update/delete → Add reversal journal entries
+
+## CHANGE: Add these fix patterns
+
+### XAML ToolTip Fixes (v4.10.4 — Comprehensive Audit)
+
+When fixing XAML files for missing ToolTips:
+
+#### Adding ContextMenu MenuItem ToolTips:
+For each MenuItem in a ContextMenu:
+```xml
+<!-- BEFORE: -->
+<MenuItem Header="تعديل" Command="{Binding EditCommand}"/>
+
+<!-- AFTER: -->
+<MenuItem Header="تعديل" Command="{Binding EditCommand}" ToolTip="تعديل العنصر المحدد"/>
+```
+
+Common ToolTip values:
+| Header | ToolTip |
+|--------|---------|
+| تعديل | "تعديل العنصر المحدد" |
+| حذف | "حذف العنصر المحدد" |
+| ترحيل | "ترحيل العنصر — سيتم تحديث المخزون والرصيد" |
+| إلغاء | "إلغاء العنصر المحدد" |
+| استعادة | "استعادة عنصر محذوف" |
+| عرض الفاتورة | "عرض تفاصيل الفاتورة" |
+| معاينة الطباعة | "معاينة العنصر قبل الطباعة" |
+| طباعة A4 | "طباعة العنصر بصيغة A4" |
+| طباعة حرارية | "طباعة العنصر على طابعة حرارية" |
+| تحديث | "تحديث البيانات من الخادم" |
+
+#### Adding CheckBox ToolTips:
+```xml
+<!-- BEFORE: -->
+<CheckBox Content="عرض غير النشطة" IsChecked="{Binding IncludeInactive}"/>
+
+<!-- AFTER: -->
+<CheckBox Content="عرض غير النشطة" IsChecked="{Binding IncludeInactive}"
+          ToolTip="عرض العناصر غير النشطة (المحذوفة)"/>
+```
+
+#### Adding Form Control ToolTips:
+For every form control (TextBox, ComboBox, DatePicker) that lacks a ToolTip:
+```xml
+<!-- ComboBox in editor -->
+<ComboBox ItemsSource="{Binding Options}" ToolTip="اختر من القائمة"/>
+
+<!-- TextBox in editor -->
+<TextBox Text="{Binding Name}" ToolTip="أدخل الاسم — هذا الحقل إلزامي"/>
+```
+
+### ErrorMessage Bar Addition Pattern (v4.10.4)
+
+When a list view is missing an ErrorMessage bar, add it between the header and content sections:
+
+```xml
+<!-- Add between header (Grid.Row=0) and search/content (Grid.Row=1+) -->
+<!-- Step 1: Increase Grid.RowDefinitions by 1 (insert new row at index 1-2) -->
+<RowDefinition Height="Auto"/>  <!-- New error row -->
+
+<!-- Step 2: Add the error bar -->
+<Border Grid.Row="1"
+        Background="#FEE2E2" BorderBrush="#FCA5A5" BorderThickness="0,0,0,1"
+        Padding="12,8"
+        Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyToVisibility}}">
+    <TextBlock Text="{Binding ErrorMessage}" Foreground="#DC2626" FontSize="12"/>
+</Border>
+
+<!-- Step 3: Shift all existing Grid.Row values below by +1 -->
+```
+
+### Loading Overlay Addition Pattern (v4.10.4)
+
+When an editor view is missing a loading overlay:
+
+```xml
+<!-- Add as LAST child before closing </Grid> tag -->
+<Border Grid.Row="0" Grid.RowSpan="99"
+        Background="#CCFFFFFF"
+        Panel.ZIndex="1000"
+        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+        CornerRadius="0">
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="180" Height="4"
+                     Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+        <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold"
+                   Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}"
+                   HorizontalAlignment="Center"/>
+    </StackPanel>
+</Border>
+```
+
+Grid.RowSpan should cover ALL rows in the parent Grid. If uncertain, use a number larger than the total rows.
+
+### Success/Failure Message Addition Pattern (v4.10.4)
+
+When a ViewModel is missing success/failure messages:
+
+1. For Save operations — add success dialog + failure dialog:
+```csharp
+var result = await _service.CreateAsync(request);
+if (result.IsSuccess)
+{
+    await _dialogService.ShowSuccessAsync("تم الحفظ", "تم حفظ العنصر بنجاح");
+    RequestClose();
+}
+else
+{
+    ErrorMessage = HandleFailure(result.Error, "SaveItem");
+    await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
+}
+```
+
+2. For Delete/Post/Cancel operations — add success toast + failure dialog:
+```csharp
+if (result.IsSuccess)
+{
+    _toastService.ShowSuccess("تمت العملية بنجاح");
+    await LoadDataAsync();
+}
+else
+{
+    ErrorMessage = HandleFailure(result.Error, "OperationName");
+    await _dialogService.ShowErrorAsync("خطأ في العملية", ErrorMessage!);
+}
+```
+
+3. If the ViewModel lacks `_toastService` or `_dialogService`, add the DI injections:
+```csharp
+public MyViewModel(IMyApiService service, IDialogService dialogService,
+    IToastNotificationService toastService)
+{
+    _service = service;
+    _dialogService = dialogService;
+    _toastService = toastService;
+}
+```
+
+### ComboBoxStyle to ModernComboBox Fix (v4.10.4)
+
+```xml
+<!-- BEFORE (wrong style key): -->
+<ComboBox Style="{StaticResource ComboBoxStyle}" .../>
+
+<!-- AFTER (correct style key): -->
+<ComboBox Style="{StaticResource ModernComboBox}" .../>
+```
+
+### Hardcoded Size Violation Fix (v4.10.4)
+
+Remove hardcoded Height and Padding that duplicate style defaults:
+```xml
+<!-- BEFORE: -->
+<Button Content="حفظ" Height="36" Padding="16,0" Style="{StaticResource PrimaryButton}"/>
+
+<!-- AFTER: -->
+<Button Content="حفظ" Style="{StaticResource PrimaryButton}" ToolTip="حفظ البيانات المدخلة"/>
+```
+
+### ComboBox Missing ItemsSource Fix (v4.10.4)
+
+When a ComboBox has `SelectedValue` but no `ItemsSource`, add the binding:
+```xml
+<!-- BEFORE (non-functional): -->
+<ComboBox SelectedValue="{Binding CategoryId}" SelectedValuePath="Key"/>
+
+<!-- AFTER (functional): -->
+<ComboBox ItemsSource="{Binding CategoryOptions}" SelectedValue="{Binding CategoryId}"
+          SelectedValuePath="Key" DisplayMemberPath="Value"/>
+```
+
+### Duplicate Grid.Row Fix (v4.10.4)
+
+When two elements share the same Grid.Row:
+1. Read the file layout
+2. Assign unique Grid.Row values to each
+3. Adjust other Grid.Row references and Grid.RowSpan values
+4. Increment Grid.RowDefinitions count if needed
+
+### IncludeInactive Checkbox Fix Pattern (v4.10.5)
+
+When a list ViewModel is missing the IncludeInactive checkbox and the entity supports soft-delete (has IsActive property):
+
+**Step 1: Add property to the ViewModel:**
+```csharp
+private bool _includeInactive;
+public bool IncludeInactive
+{
+    get => _includeInactive;
+    set
+    {
+        if (SetProperty(ref _includeInactive, value))
+        {
+            _ = LoadDataAsync();  // Method name varies by ViewModel
+        }
+    }
+}
+```
+
+**Step 2: Add filtering in the Load method (if API doesn't support includeInactive param):**
+```csharp
+// At the end of LoadDataAsync, after populating the ObservableCollection:
+if (!IncludeInactive)
+{
+    var inactiveItems = ItemsCollection.Where(x => !x.IsActive).ToList();
+    foreach (var item in inactiveItems)
+        ItemsCollection.Remove(item);
+}
+```
+
+Or use CollectionView filter:
+```csharp
+var view = CollectionViewSource.GetDefaultView(ItemsCollection);
+if (IncludeInactive)
+    view.Filter = null;
+else
+    view.Filter = x => x is T t && t.IsActive;
+```
+
+**Step 3: Add CheckBox to the XAML toolbar:**
+```xml
+<!-- Add near search box or filter controls -->
+<CheckBox Content="عرض غير النشطة" 
+          IsChecked="{Binding IncludeInactive}" 
+          VerticalAlignment="Center" 
+          FontSize="11"
+          ToolTip="عرض العناصر غير النشطة"/>
+```
+
+**Check if ViewModel already has the API parameter:**
+Some API service methods already accept `bool? includeInactive`. In that case, simply pass `IncludeInactive` to the API call instead of hardcoding `false`.

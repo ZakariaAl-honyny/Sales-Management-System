@@ -6,8 +6,8 @@
         xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
         Title="فاتورة شراء"
-        Height="720" Width="1100"
-        MinHeight="600" MinWidth="1000"
+        Height="720" Width="1000"
+        MinHeight="550" MinWidth="850"
         FlowDirection="RightToLeft"
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
@@ -40,6 +40,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
             <RowDefinition Height="*"/>    <!-- Scrollable Content -->
+            <RowDefinition Height="Auto"/> <!-- Horizontal Summary Bar -->
             <RowDefinition Height="Auto"/> <!-- Footer -->
         </Grid.RowDefinitions>
 
@@ -52,74 +53,157 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <Path Data="{StaticResource IconInvoice}" Fill="White" Width="20" Height="20" Margin="0,0,12,0" Stretch="Uniform"/>
-                    <TextBlock Text="📥  تحرير فاتورة شراء" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="📥  تحرير فاتورة شراء" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
-                <Border Grid.Column="1" Background="{StaticResource PrimaryLightBrush}" CornerRadius="6" Padding="12,4">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="المعرف: " Foreground="#94A3B8" FontSize="13" VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding InvoiceId, FallbackValue='جديد'}" Foreground="White" FontWeight="Bold" FontSize="14" VerticalAlignment="Center" Margin="6,0,0,0"/>
-                    </StackPanel>
+                <Border Grid.Column="1" Background="{StaticResource PrimaryLightBrush}" CornerRadius="6" Padding="16,4">
+                    <TextBlock Text="{Binding InvoiceId, FallbackValue='جديد'}" Foreground="White" FontWeight="Bold" FontSize="15" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                 </Border>
             </Grid>
         </Border>
 
         <!-- Content Area -->
-        <Grid Grid.Row="1" Margin="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>      <!-- Main: Items -->
-                <ColumnDefinition Width="320"/>    <!-- Side: Info, Totals, Notes -->
-            </Grid.ColumnDefinitions>
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Top Info Panel -->
+                <RowDefinition Height="Auto"/> <!-- Barcode Search -->
+                <RowDefinition Height="*"/>    <!-- DataGrid -->
+            </Grid.RowDefinitions>
 
-            <!-- Main Panel (Right side) -->
-            <Grid Grid.Column="0" Margin="0,0,10,0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/> <!-- Barcode Search -->
-                    <RowDefinition Height="*"/>    <!-- DataGrid -->
-                </Grid.RowDefinitions>
+            <!-- Top Info Panel (Responsive WrapPanel) -->
+            <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="12,12,12,0" Padding="12,8" Background="#F8FAFC">
+                <WrapPanel Orientation="Horizontal">
+                    
+                    <!-- Supplier -->
+                    <StackPanel Margin="4,4,16,4" Width="220">
+                        <TextBlock Text="المورد" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox ItemsSource="{Binding Suppliers}" SelectedValue="{Binding SelectedSupplierId}" 
+                                      SelectedValuePath="Id" DisplayMemberPath="Name" 
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="البيع النقدي لا يتطلب اختيار مورد"/>
+                            <Button Grid.Column="1" Content="🔍" Command="{Binding SearchSupplierCommand}"
+                                    Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
+                        </Grid>
+                    </StackPanel>
 
-                <!-- Barcode Search -->
-                <Border Grid.Row="0" Style="{StaticResource CardStyle}" Margin="0,0,0,8" Background="#F1F5F9" Padding="10">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="300"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                        <TextBox Grid.Column="1" Text="{Binding BarcodeSearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                 Style="{StaticResource ModernTextBox}">
-                            <TextBox.InputBindings>
-                                <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
-                            </TextBox.InputBindings>
-                        </TextBox>
-                        <!-- Green button: opens continuous product selection window -->
-                        <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
-                                Style="{StaticResource SuccessButton}" Margin="6,0,0,0" Width="80" ToolTip="البحث عن منتج وإضافته للقائمة"/>
-                        <!-- Separator -->
-                        <Separator Grid.Column="3" Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
-                        <TextBlock Grid.Column="4" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"/>
-                    </Grid>
-                </Border>
+                    <!-- Warehouse -->
+                    <StackPanel Margin="4,4,16,4" Width="160">
+                        <TextBlock Text="المستودع *" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding Warehouses}" SelectedValue="{Binding SelectedWarehouseId}" 
+                                  SelectedValuePath="Id" DisplayMemberPath="Name" Style="{StaticResource ModernComboBox}"
+                                  ToolTip="اختر المخزن الذي سيتم إيداع البضاعة إليه"/>
+                    </StackPanel>
 
-                <!-- Items Grid -->
-                <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0">
+                    <!-- Payment Type -->
+                    <StackPanel Margin="4,4,16,4" Width="140">
+                        <TextBlock Text="طريقة الدفع *" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
+                                  SelectedValuePath="Value" DisplayMemberPath="Display" Style="{StaticResource ModernComboBox}"
+                                  ToolTip="اختر طريقة الدفع: نقدي أو آجل"/>
+                    </StackPanel>
+
+                    <!-- Invoice No -->
+                    <StackPanel Margin="4,4,16,4" Width="120">
+                        <TextBlock Text="رقم الفاتورة *" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding InvoiceNo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource ModernTextBox}" Height="32" ToolTip="رقم الفاتورة"/>
+                    </StackPanel>
+
+                    <!-- Currency -->
+                    <StackPanel Margin="4,4,16,4" Width="120">
+                        <TextBlock Text="العملة" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <ComboBox ItemsSource="{Binding Currencies}" SelectedValue="{Binding SelectedCurrencyId}"
+                                  SelectedValuePath="Id" DisplayMemberPath="Name" Style="{StaticResource ModernComboBox}"
+                                  ToolTip="اختر عملة الفاتورة — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+                    </StackPanel>
+
+                    <!-- Exchange Rate (Visible only if IsForeignCurrency) -->
+                    <StackPanel Margin="4,4,16,4" Width="120" Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="سعر الصرف:" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding ExchangeRate, StringFormat=N2}" Style="{StaticResource ModernTextBox}" Height="32"
+                                 ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
+                    </StackPanel>
+
+                    <!-- Notes -->
+                    <StackPanel Margin="4,4,16,4" Width="200">
+                        <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <TextBox Text="{Binding Notes}" Height="32" Padding="8,4" Style="{StaticResource ModernTextBox}"
+                                 ToolTip="ملاحظات إضافية حول فاتورة الشراء"/>
+                    </StackPanel>
+                    
+                    <!-- Attachments -->
+                    <StackPanel Margin="4,4,16,4" Width="200">
+                        <TextBlock Text="المرفقات" Style="{StaticResource LabelStyle}" Margin="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <!-- TextBlock for name if exists, else "بدون مرفقات" -->
+                            <Border Grid.Column="0" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="6,4">
+                                <TextBlock Text="{Binding AttachmentFileName, TargetNullValue='لا يوجد'}" 
+                                           FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Border>
+                            <Button Grid.Column="1" Command="{Binding BrowseAttachmentCommand}" Content="📂" 
+                                    Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0" ToolTip="إرفاق ملف" />
+                            <Button Grid.Column="2" Command="{Binding RemoveAttachmentCommand}" Content="✖" 
+                                    Style="{StaticResource SecondaryButton}" Width="32" Height="32" Margin="4,0,0,0" Foreground="#DC2626"
+                                    Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVisibility}}" ToolTip="إزالة المرفق" />
+                        </Grid>
+                    </StackPanel>
+                    
+                </WrapPanel>
+            </Border>
+
+            <!-- Shared Barcode Search -->
+            <Border Grid.Row="1" Style="{StaticResource CardStyle}" Margin="12,12,12,0" Background="#F1F5F9" Padding="12">
+                <Grid HorizontalAlignment="Center" MaxWidth="850">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <TextBlock Grid.Column="0" Text="🔍 البحث بالباركود" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBox Grid.Column="1" MinWidth="150" MaxWidth="350" Text="{Binding BarcodeSearchText, UpdateSourceTrigger=PropertyChanged}" 
+                             Style="{StaticResource ModernTextBox}"
+                             ToolTip="امسح الباركود أو أدخل الرمز للبحث عن الصنف">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <!-- Green button: opens continuous product selection window -->
+                    <Button Grid.Column="2" Content="إضافة" Command="{Binding SearchProductCommand}"
+                            Style="{StaticResource SuccessButton}" Margin="8,0,0,0" Width="80" ToolTip="البحث عن منتج وإضافته للقائمة"/>
+                    
+                    <TextBlock Grid.Column="3" Text="مسح الباركود يضيف الصنف تلقائياً" VerticalAlignment="Center" Margin="16,0,0,0" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
+                </Grid>
+            </Border>
+
+            <!-- Items Grid -->
+            <Grid Grid.Row="2" Margin="12">
+                <Border Style="{StaticResource CardStyle}" Padding="0">
                     <DockPanel>
-                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="10,6" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
+                        <Border DockPanel.Dock="Top" Background="#F8FAFC" Padding="16,10" BorderThickness="0,0,0,1" BorderBrush="{StaticResource BorderBrush}">
                             <Grid>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="📋 قائمة الأصناف" FontSize="13" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                                    <TextBlock Text="📋 قائمة الأصناف" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                                     <Border Background="{StaticResource PrimaryBrush}" CornerRadius="10" Padding="8,1" Margin="10,0,0,0" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Items.Count}" Foreground="White" FontSize="11" FontWeight="Bold"/>
                                     </Border>
                                 </StackPanel>
                                 <Button HorizontalAlignment="Right" Content="+ إضافة صنف" Command="{Binding AddLineCommand}"
-                                        Style="{StaticResource SecondaryButton}" Padding="8,0" FontSize="11" ToolTip="إضافة سطر جديد للفاتورة"/>
+                                        Style="{StaticResource SecondaryButton}" Padding="12,0" FontSize="12" ToolTip="إضافة سطر جديد للفاتورة"/>
                             </Grid>
                         </Border>
 
-                        <DataGrid ItemsSource="{Binding Items}" Style="{StaticResource ModernDataGrid}" BorderThickness="0" CanUserAddRows="False">
+                        <DataGrid ItemsSource="{Binding Items}" Style="{StaticResource ModernDataGrid}" BorderThickness="0" CanUserAddRows="False" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                  ColumnHeaderHeight="40" RowHeight="42">
                             <DataGrid.Columns>
                                 <DataGridTemplateColumn Header="المنتج" Width="*">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -130,14 +214,15 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <ComboBox ItemsSource="{Binding AvailableProducts}" SelectedItem="{Binding SelectedProduct, ValidatesOnDataErrors=True, UpdateSourceTrigger=PropertyChanged}"
-                                                          DisplayMemberPath="Name" IsEditable="True" Style="{StaticResource ValidationComboBoxStyle}"/>
+                                                          DisplayMemberPath="Name" IsEditable="True" Style="{StaticResource ValidationComboBoxStyle}"
+                                                          ToolTip="اختر صنف من القائمة أو ابحث بالاسم أو الباركود"/>
                                                 <Button Grid.Column="1" Content="🔍" Command="{Binding DataContext.SearchProductSingleCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                        CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Width="28" Height="24" Margin="2,0" ToolTip="فتح نافذة بحث متقدم عن المنتجات"/>
+                                                        CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Width="28" Height="24" Margin="2,0" ToolTip="بحث متقدم عن المنتجات"/>
                                             </Grid>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="الوحدة" Width="80">
+                                <DataGridTemplateColumn Header="الوحدة" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <ComboBox ItemsSource="{Binding AvailableProductUnits}"
@@ -145,60 +230,55 @@
                                                       DisplayMemberPath="UnitName"
                                                       Style="{StaticResource ModernComboBox}"
                                                       BorderThickness="0" Background="Transparent"
-                                                      ToolTip="اختيار الوحدة — تتغير التكلفة تلقائياً حسب الوحدة المختارة"/>
+                                                      ToolTip="اختيار الوحدة"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="الكمية" Width="90">
+                                <DataGridTemplateColumn Header="الكمية" Width="100">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                             <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
-                                                      Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
-                                                      ToolTip="الكمية — أدخل القيمة أو عدّل الإجمالي لتحسب الكمية تلقائياً"/>
+                                            <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
+                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent" TextAlignment="Center"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
-                                 </DataGridTemplateColumn>
+                                </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="المتاح" Binding="{Binding AvailableStockText}" Width="80" IsReadOnly="True">
                                     <DataGridTextColumn.ElementStyle>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
                                             <Setter Property="VerticalAlignment" Value="Center"/>
+                                            <Setter Property="HorizontalAlignment" Value="Center"/>
                                             <Setter Property="FontSize" Value="11"/>
-                                            <Setter Property="Margin" Value="8,0"/>
                                         </Style>
                                     </DataGridTextColumn.ElementStyle>
                                 </DataGridTextColumn>
-                                <!-- Unit Cost with sync indicator -->
-                                <DataGridTemplateColumn Header="التكلفة" Width="100">
+                                <DataGridTemplateColumn Header="التكلفة" Width="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
-                                                         Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
-                                                         ToolTip="تكلفة الوحدة — أدخل القيمة أو عدّل الإجمالي لتحسب التكلفة تلقائياً"/>
-                                            </Grid>
+                                            <TextBox Text="{Binding UnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent" TextAlignment="Center"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Header="الإجمالي" Width="100">
+                                <DataGridTemplateColumn Header="الإجمالي" Width="120">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding LineTotalInput, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
-                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent"
-                                                     ToolTip="يمكنك تعديل الإجمالي مباشرة — سيتم إعادة حساب التكلفة أو الكمية تلقائياً"/>
+                                                     Style="{StaticResource ValidationTextBoxStyle}" BorderThickness="0" Background="Transparent" TextAlignment="Center"
+                                                     ToolTip="تعديل الإجمالي مباشرة"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Width="40">
+                                <DataGridTemplateColumn Width="50">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Button Command="{Binding DataContext.RemoveLineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                    CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" Foreground="{StaticResource ErrorBrush}" BorderBrush="Transparent" ToolTip="حذف هذا السطر من الفاتورة">
-                                                <Path Data="{StaticResource IconClose}" Fill="{StaticResource ErrorBrush}" Width="8" Height="8" Stretch="Uniform"/>
+                                                    CommandParameter="{Binding}" 
+                                                    Style="{StaticResource SecondaryButton}" 
+                                                    Background="Transparent" BorderBrush="Transparent" 
+                                                    Padding="0" MinWidth="24" MinHeight="24" Width="32" Height="32"
+                                                    ToolTip="حذف هذا الصنف">
+                                                <TextBlock Text="✖" FontSize="16" FontWeight="Bold" Foreground="#DC2626" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Button>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
@@ -208,242 +288,126 @@
                     </DockPanel>
                 </Border>
             </Grid>
+        </Grid>
 
-            <!-- Side Panel (Left side) -->
-            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <!-- Info Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+        <!-- Horizontal Summary Bar -->
+        <Border Grid.Row="2" Background="#F8F9FA" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" /> <!-- Tax & Discount -->
+                    <ColumnDefinition Width="2.5*" /> <!-- Other Charges & Account -->
+                    <ColumnDefinition Width="2*" /> <!-- Total & Paid -->
+                    <ColumnDefinition Width="2*" /> <!-- Remaining -->
+                </Grid.ColumnDefinitions>
+
+                <!-- Column 0: Tax & Discount -->
+                <StackPanel Grid.Column="0" Orientation="Vertical" Margin="4,0" VerticalAlignment="Center">
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="الضريبة:" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#333333" FontSize="13"/>
+                        <ComboBox Grid.Column="1" Height="30" 
+                                  ItemsSource="{Binding Taxes}"
+                                  SelectedValue="{Binding TaxId}"
+                                  SelectedValuePath="Id"
+                                  DisplayMemberPath="Name"
+                                  Background="White" BorderBrush="#CCCCCC"
+                                  ToolTip="اختر ضريبة القيمة المضافة المطبقة"/>
+                    </Grid>
+
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="65" /> 
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="الخصم:" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#333333" FontSize="13"/>
+                        <TextBox Grid.Column="1" Height="30" Text="{Binding InvoiceDiscount, UpdateSourceTrigger=PropertyChanged}" TextAlignment="Left" Padding="5,0" BorderBrush="#CCCCCC"
+                                 ToolTip="أدخل قيمة الخصم على الفاتورة"/>
+                        <ComboBox Grid.Column="2" Height="30" SelectedIndex="{Binding DiscountTypeIndex, FallbackValue=0}" BorderBrush="#CCCCCC" Margin="3,0,0,0"
+                                  ToolTip="نوع الخصم: مبلغ ثابت أو نسبة مئوية">
+                            <ComboBoxItem Content="مبلغ" />
+                            <ComboBoxItem Content="%" />
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Column 1: Other Charges & SubTotal -->
+                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="8,0" VerticalAlignment="Center">
+                    
+                    <!-- Linked Expenses Group -->
+                    <Border Background="#F1F5F9" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="6" Padding="8,6"
+                            ToolTip="المصاريف الإضافية والحساب المرتبط بها (الافتراضي: أجور نقل)">
                         <StackPanel>
-                            <TextBlock Text="ℹ️ تفاصيل الفاتورة" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
-
-                            <TextBlock Text="رقم الفاتورة *" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding InvoiceNo, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="رقم الفاتورة — يمكنك إدخال أي رقم تريده"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"/>
-
-                            <!-- Currency -->
-                            <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <ComboBox Grid.Column="0" ItemsSource="{Binding Currencies}"
-                                          SelectedValue="{Binding SelectedCurrencyId}"
-                                          SelectedValuePath="Id"
-                                          DisplayMemberPath="Name"
-                                          Style="{StaticResource ModernComboBox}"
-                                          ToolTip="اختر عملة الفاتورة — العملة الأساسية هي الريال السعودي"/>
-                                <TextBlock Grid.Column="1" Text="{Binding CurrencyName, StringFormat='({0})'}"
-                                           VerticalAlignment="Center" Margin="6,0,0,0"
-                                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                <TextBlock Text="المصاريف:" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#1E293B" FontWeight="SemiBold" FontSize="12" />
+                                <TextBox Grid.Column="1" Height="28" Text="{Binding OtherCharges, UpdateSourceTrigger=PropertyChanged}" TextAlignment="Left" Padding="5,0" BorderBrush="#94A3B8"
+                                         ToolTip="المصاريف الإضافية مثل أجور الشحن والنقل"/>
                             </Grid>
-
-                            <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}"
-                                       Visibility="{Binding IsBaseCurrency, Converter={StaticResource InverseBoolToVisibility}}"/>
-                            <TextBox Text="{Binding ExchangeRate, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                     Style="{StaticResource ModernTextBox}" Margin="0,0,0,6"
-                                     Visibility="{Binding IsBaseCurrency, Converter={StaticResource InverseBoolToVisibility}}"
-                                     ToolTip="سعر صرف العملة مقابل الريال السعودي — للعملات الأجنبية فقط"/>
-
-                            <TextBlock Text="الإجمالي بالريال" Style="{StaticResource LabelStyle}"
-                                       Visibility="{Binding IsBaseCurrency, Converter={StaticResource InverseBoolToVisibility}}"/>
-                            <TextBlock Text="{Binding ImportTotalInBaseCurrency, StringFormat=N2}"
-                                       Margin="0,0,0,8" FontWeight="Bold"
-                                       Visibility="{Binding IsBaseCurrency, Converter={StaticResource InverseBoolToVisibility}}"/>
-
-                            <TextBlock Text="المورد" Style="{StaticResource LabelStyle}"/>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <ComboBox ItemsSource="{Binding Suppliers}" SelectedValue="{Binding SelectedSupplierId}" 
-                                          SelectedValuePath="Id" DisplayMemberPath="Name"
-                                          ToolTip="اختر المورد — البيع النقدي لا يتطلب اختيار مورد"/>
-                                <Button Grid.Column="1" Content="🔍" Command="{Binding SearchSupplierCommand}"
-                                        Style="{StaticResource SecondaryButton}" Width="28" Margin="4,0,0,0" ToolTip="البحث عن مورد"/>
-                            </Grid>
-
-                            <TextBlock Text="المستودع" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedValue="{Binding SelectedWarehouseId}" 
-                                      SelectedValuePath="Id" DisplayMemberPath="Name" Margin="0,0,0,6"
-                                      ToolTip="اختر المستودع الذي سيتم إضافة المخزون إليه"/>
-
-                            <TextBlock Text="طريقة الدفع" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding PaymentTypeOptions}" SelectedValue="{Binding SelectedPaymentType}" 
-                                      SelectedValuePath="Value" DisplayMemberPath="Display" Margin="0,0,0,6"
-                                      ToolTip="اختر طريقة الدفع: نقداً أو آجل (دفع لاحق)"/>
-
-                            <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding Currencies}"
-                                      SelectedValue="{Binding SelectedCurrencyId}"
-                                      SelectedValuePath="Id"
-                                      DisplayMemberPath="Name"
-                                      Style="{StaticResource ModernComboBox}"
-                                      Margin="0,0,0,6"
-                                      ToolTip="اختر عملة الفاتورة — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
-                            <Grid Margin="0,0,0,6"
-                                  Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="سعر الصرف:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"/>
-                                <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
-                                         Style="{StaticResource ModernTextBox}"
-                                         ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
-                             </Grid>
-
-                            <TextBlock Text="الضريبة" Style="{StaticResource LabelStyle}"/>
-                            <ComboBox ItemsSource="{Binding Taxes}"
-                                      SelectedValue="{Binding TaxId}"
-                                      SelectedValuePath="Id"
-                                      DisplayMemberPath="Name"
-                                      Style="{StaticResource ModernComboBox}"
-                                      Margin="0,0,0,8"
-                                      ToolTip="اختر ضريبة القيمة المضافة المطبقة على الفاتورة"/>
-
-                            <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding Notes}" Height="50" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8,4"
-                                     ToolTip="أضف ملاحظات إضافية للفاتورة (اختياري)"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Financial Summary Card -->
-                    <Border Style="{StaticResource CardStyle}" Background="#F8FAFC" BorderBrush="{StaticResource PrimaryBrush}" BorderThickness="0,0,4,0">
-                        <StackPanel>
-                            <TextBlock Text="💰 الملخص المالي" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,8"/>
                             
-                                    <CheckBox Content="شامل الضريبة" IsChecked="{Binding IsTaxInclusive}" Margin="0,0,0,8"
-                                              ToolTip="تضمين قيمة الضريبة في سعر المنتج — بدلاً من إضافتها بشكل منفصل"/>
-                            
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="الضريبة (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding TaxRate, UpdateSourceTrigger=PropertyChanged}" Width="60" HorizontalAlignment="Right" TextAlignment="Center"
-                                         ToolTip="نسبة الضريبة المطبقة — تُحدد تلقائياً عند اختيار الضريبة"/>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <RadioButton Content="مبلغ" IsChecked="{Binding SelectedDiscountType, Converter={StaticResource DiscountTypeConverter}, ConverterParameter=0}" GroupName="DiscountType" Margin="0,0,12,0"/>
-                                    <RadioButton Content="نسبة" IsChecked="{Binding SelectedDiscountType, Converter={StaticResource DiscountTypeConverter}, ConverterParameter=1}" GroupName="DiscountType"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="قيمة الخصم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding InvoiceDiscount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                         Width="100" HorizontalAlignment="Right" TextAlignment="Left"
-                                         ToolTip="قيمة الخصم الإضافي على الفاتورة"/>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="مصاريف إضافية" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding OtherCharges, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
-                                         Width="100" HorizontalAlignment="Right" TextAlignment="Left"
-                                         ToolTip="مصاريف الشحن والنقل والجمارك — توزع تلقائياً على بنود الفاتورة"/>
-                            </Grid>
-
-                            <TextBlock Text="الرسوم الإضافية" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
-                            <ItemsControl ItemsSource="{Binding AdditionalFees}" Margin="0,0,0,6">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,0,0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="60"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Description}" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat=N2}"
-                                                       HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                                            <Button Grid.Column="2" Content="✕" Command="{Binding DataContext.RemoveFeeCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                                    CommandParameter="{Binding}" Style="{StaticResource SecondaryButton}" MinWidth="20" Height="20" Padding="0"/>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <Button Content="+ إضافة رسم" Command="{Binding AddFeeCommand}"
-                                    Style="{StaticResource SecondaryButton}" FontSize="11" Padding="8,2"
-                                    HorizontalAlignment="Left" Margin="0,0,0,8"
-                                    ToolTip="إضافة رسم إضافي (نقل، جمارك، تأمين، ...)"/>
-
-                            <Separator Margin="0,8"/>
-
-                            <Grid Margin="0,0,0,6">
-                                <TextBlock Text="المجموع الفرعي" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <TextBlock Text="{Binding SubTotal, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                                <TextBlock Text="قيمة الضريبة" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <TextBlock Text="{Binding TaxAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                                <TextBlock Text="مصاريف إضافية" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                <TextBlock Text="{Binding OtherCharges, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,6">
-                                <TextBlock Text="صافي الفاتورة" FontSize="15" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                                <TextBlock Text="{Binding NetTotal, StringFormat=N2}" HorizontalAlignment="Right" FontSize="16" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                            </Grid>
-
-                            <Separator Margin="0,8"/>
-
-                            <Grid Margin="0,0,0,8">
-                                <TextBlock Text="المبلغ المدفوع" Style="{StaticResource LabelStyle}" VerticalAlignment="Center" FontWeight="Bold"/>
-                                <TextBox Text="{Binding PaidAmount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}" Width="110" HorizontalAlignment="Right" FontWeight="Bold" Background="#F0F9FF" BorderBrush="#7DD3FC"
-                                         ToolTip="المبلغ المدفوع للمورد — لا يمكن أن يتجاوز صافي الفاتورة"/>
-                            </Grid>
-
-                            <Border Background="#FEF2F2" Padding="8,6" CornerRadius="4">
-                                <Grid>
-                                    <TextBlock Text="المبلغ المتبقي" FontWeight="Bold" Foreground="#DC2626"/>
-                                        <TextBlock Text="{Binding RemainingAmount, StringFormat=N2}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="15" Foreground="#DC2626"/>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Attachment Card -->
-                    <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
-                        <StackPanel>
-                            <TextBlock Text="📎 المرفقات" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,6"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Background="#F8FAFC" CornerRadius="4" Padding="6,4"
-                                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                        Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVisibility}}">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding AttachmentFileName}" FontSize="11" FontWeight="SemiBold" ToolTip="اسم الملف المرفق"/>
-                                    </StackPanel>
-                                </Border>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                    <Button Command="{Binding BrowseAttachmentCommand}"
-                                            Content="📂 استعراض"
-                                            Style="{StaticResource SmallPrimaryButton}"
-                                            ToolTip="اختر ملف PDF أو صورة لإرفاقها مع الفاتورة"/>
-                                    <Button Command="{Binding RemoveAttachmentCommand}"
-                                            Content="✕" Width="24" Height="24" FontSize="11"
-                                            Margin="4,0,0,0"
-                                            Background="Transparent" BorderThickness="0"
-                                            Foreground="#EF4444" Cursor="Hand"
-                                            Visibility="{Binding HasAttachment, Converter={StaticResource BoolToVisibility}}"
-                                            ToolTip="إزالة المرفق"/>
-                                </StackPanel>
+                                <TextBlock Text="الحساب:" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#475569" FontSize="11" />
+                                <ComboBox Grid.Column="1" Height="26" 
+                                          ItemsSource="{Binding ExpenseAccounts}" 
+                                          SelectedValue="{Binding OtherChargesAccountId}" 
+                                          SelectedValuePath="Id" 
+                                          DisplayMemberPath="Name" 
+                                          BorderBrush="#94A3B8"
+                                          ToolTip="اختر حساب المصروف للمصاريف الإضافية"/>
                             </Grid>
                         </StackPanel>
                     </Border>
                 </StackPanel>
-            </ScrollViewer>
-        </Grid>
+
+                <!-- Column 2: Total & Paid -->
+                <StackPanel Grid.Column="2" Orientation="Vertical" Margin="8,0" VerticalAlignment="Center">
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="الإجمالي:" Margin="0,0,6,0" VerticalAlignment="Center" FontWeight="Bold" FontSize="14" Foreground="#111111" />
+                        <TextBlock Grid.Column="1" Text="{Binding NetTotal, StringFormat=N2}" VerticalAlignment="Center" TextAlignment="Left" FontWeight="Bold" FontSize="18" Foreground="#2B579A"/>
+                    </Grid>
+
+                    <Grid Margin="0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="المدفوع:" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#333333" />
+                        <TextBox Grid.Column="1" Height="30" Text="{Binding PaidAmount, UpdateSourceTrigger=PropertyChanged}" TextAlignment="Left" FontWeight="Bold" FontSize="14" Padding="5,0" BorderBrush="#CCCCCC" Background="#FFFFE0"
+                                 ToolTip="أدخل المبلغ المدفوع — يجب أن لا يتجاوز الإجمالي"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Column 3: Remaining -->
+                <StackPanel Grid.Column="3" Orientation="Vertical" Margin="8,0" VerticalAlignment="Center">
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="المتبقي:" Margin="0,0,6,0" VerticalAlignment="Center" FontWeight="Bold" Foreground="#CC0000" />
+                        <TextBlock Grid.Column="1" Text="{Binding RemainingAmount, StringFormat=N2}" VerticalAlignment="Center" TextAlignment="Left" FontWeight="Bold" FontSize="18" Foreground="#CC0000"/>
+                    </Grid>
+                </StackPanel>
+                
+            </Grid>
+        </Border>
 
         <!-- Footer Actions -->
-        <Border Grid.Row="2" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="3" Background="White" Padding="12,8" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -456,7 +420,7 @@
                             Style="{StaticResource PrimaryButton}" 
                             Width="140" 
                             IsDefault="True" 
-                            TabIndex="11"
+                            TabIndex="12"
                             Margin="0,0,12,0"
                             ToolTip="ترحيل العملية نهائياً — سيتم تحديث المخزون والرصيد"/>
 
@@ -472,14 +436,14 @@
                             Command="{Binding PrintA4Command}" 
                             Style="{StaticResource SecondaryButton}" 
                             Margin="0,0,8,0" 
-                            TabIndex="14" 
+                            TabIndex="15" 
                             ToolTip="طباعة فاتورة بصيغة A4"/>
 
                     <Button Content="🧾 وصل" 
                             Command="{Binding PrintThermalCommand}" 
                             Style="{StaticResource SecondaryButton}" 
-                            Margin="0,0,4,0" 
-                            TabIndex="15" 
+                            Margin="0,0,12,0" 
+                            TabIndex="16" 
                             ToolTip="طباعة إيصال حراري"/>
 
                     <Separator Width="1" Background="{StaticResource BorderBrush}" Margin="8,4"/>
@@ -487,7 +451,8 @@
                     <Button Content="🚫 إلغاء" 
                             Command="{Binding CancelCommand}" 
                             Style="{StaticResource SecondaryButton}" 
-                            TabIndex="15"
+                            Margin="8,0,0,0" 
+                            TabIndex="14"
                             ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
                 </StackPanel>
 
@@ -502,7 +467,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="3"
+        <Border Grid.Row="0" Grid.RowSpan="4"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

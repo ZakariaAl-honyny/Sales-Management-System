@@ -13,11 +13,16 @@ public class AccountService : IAccountService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<AccountService> _logger;
+    private readonly IAccountCodeGeneratorService _codeGenerator;
 
-    public AccountService(IUnitOfWork uow, ILogger<AccountService> logger)
+    public AccountService(
+        IUnitOfWork uow,
+        ILogger<AccountService> logger,
+        IAccountCodeGeneratorService codeGenerator)
     {
         _uow = uow;
         _logger = logger;
+        _codeGenerator = codeGenerator;
     }
 
     public async Task<Result<List<AccountTreeNodeDto>>> GetTreeAsync(CancellationToken ct)
@@ -39,6 +44,9 @@ public class AccountService : IAccountService
             account.Nature,
             account.IsLeaf,
             account.CategoryId,
+            account.Level,
+            account.ColorCode,
+            account.Description,
             all.Where(c => c.ParentId == account.Id && c.IsActive)
                 .OrderBy(c => c.AccountCode)
                 .Select(c => BuildTreeNode(c, all))
@@ -78,9 +86,11 @@ public class AccountService : IAccountService
 
     public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, int userId, CancellationToken ct)
     {
+        // Step 1: Validate parent if provided
+        Account? parent = null;
         if (request.ParentId.HasValue)
         {
-            var parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
+            parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
             if (parent == null)
                 return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
             if (!parent.IsActive)
@@ -91,13 +101,47 @@ public class AccountService : IAccountService
                     ErrorCodes.ValidationError);
         }
 
-        var existing = await _uow.Accounts.FirstOrDefaultAsync(
-            a => a.AccountCode == request.AccountCode, ct);
-        if (existing != null)
-            return Result<AccountDto>.Failure("رمز الحساب موجود مسبقاً", ErrorCodes.DuplicateEntry);
+        // Step 2: Check for duplicate account by parent + nameAr
+        if (request.ParentId.HasValue)
+        {
+            var duplicateName = await _uow.Accounts.AnyAsync(
+                a => a.ParentId == request.ParentId.Value && a.NameAr == request.NameAr.Trim() && a.IsActive, ct);
+            if (duplicateName)
+                return Result<AccountDto>.Failure(
+                    $"يوجد حساب بنفس الاسم '{request.NameAr}' تحت نفس الحساب الأب",
+                    ErrorCodes.DuplicateEntry);
+        }
 
+        // Step 3: Compute level
+        byte level;
+        if (request.ParentId.HasValue && parent != null)
+        {
+            level = (byte)(parent.Level + 1);
+        }
+        else
+        {
+            level = 1;
+        }
+
+        // Leaf accounts must be detail level (4)
+        if (request.IsLeaf && level < 4)
+            level = 4;
+
+        // Ensure non-leaf accounts don't exceed level 3
+        if (!request.IsLeaf && level > 3)
+            level = 3;
+
+        // Step 4: Generate account code
+        var codeResult = await _codeGenerator.GenerateCodeAsync(request.ParentId, level, ct);
+        if (!codeResult.IsSuccess)
+            return Result<AccountDto>.Failure(codeResult.Error!, codeResult.ErrorCode);
+
+        // Step 5: Auto-generate color code from nature
+        var colorCode = IAccountCodeGeneratorService.GetColorCode(request.Nature);
+
+        // Step 6: Create the account entity
         var account = Account.Create(
-            accountCode: request.AccountCode,
+            accountCode: codeResult.Value!,
             nameAr: request.NameAr,
             nameEn: request.NameEn,
             nature: request.Nature,
@@ -105,15 +149,69 @@ public class AccountService : IAccountService
             parentId: request.ParentId,
             isSystem: request.IsSystem,
             categoryId: request.CategoryId,
-            level: request.IsLeaf ? (byte)4 : (byte)2,
+            level: level,
+            description: request.Description,
+            colorCode: colorCode,
+            notes: request.Notes,
             createdByUserId: userId);
 
-        await _uow.Accounts.AddAsync(account, ct);
-        await _uow.SaveChangesAsync(ct);
+        // Step 7: Persist atomically — account + optional opening balance journal entry
+        await _uow.ExecuteTransactionAsync(async () =>
+        {
+            await _uow.Accounts.AddAsync(account, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            // If OpeningBalance > 0, create a Journal Entry
+            if (request.OpeningBalance.HasValue && request.OpeningBalance.Value > 0)
+            {
+                var systemMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+                    m => m.MappingKey == SystemAccountKey.OpeningBalanceEquity.ToString(), ct);
+
+                // Resolve fiscal year from the current date
+                var fiscalYear = await _uow.FiscalYears.FirstOrDefaultAsync(
+                    fy => fy.IsActive, ct);
+                short fiscalYearId = fiscalYear?.Id != null && fiscalYear.Id > 0
+                    ? fiscalYear.Id
+                    : (short)DateTime.UtcNow.Year;
+
+                var entryNumber = $"OB-{DateTime.UtcNow:yyyyMMdd}-{account.Id:D4}";
+
+                var je = JournalEntry.Create(
+                    entryNumber: entryNumber,
+                    entryNo: account.Id,
+                    entryDate: DateTime.UtcNow,
+                    description: $"الرصيد الافتتاحي للحساب {account.NameAr}",
+                    entryType: JournalEntryType.OpeningBalance,
+                    fiscalYearId: fiscalYearId,
+                    currencyId: (short)1,
+                    createdBy: userId,
+                    exchangeRate: 1m,
+                    referenceType: "Account",
+                    referenceId: account.Id);
+
+                // Asset/Expense accounts are debit-normal: Dr the account, Cr OpeningBalanceEquity
+                if (account.IsDebitNormal())
+                {
+                    je.AddDebitLine(account.Id, request.OpeningBalance.Value, "الرصيد الافتتاحي");
+                    if (systemMapping != null)
+                        je.AddCreditLine(systemMapping.AccountId, request.OpeningBalance.Value, "الرصيد الافتتاحي");
+                }
+                else
+                {
+                    // Liability/Equity/Revenue are credit-normal: Cr the account, Dr OpeningBalanceEquity
+                    je.AddCreditLine(account.Id, request.OpeningBalance.Value, "الرصيد الافتتاحي");
+                    if (systemMapping != null)
+                        je.AddDebitLine(systemMapping.AccountId, request.OpeningBalance.Value, "الرصيد الافتتاحي");
+                }
+
+                await _uow.JournalEntries.AddAsync(je, ct);
+                await _uow.SaveChangesAsync(ct);
+            }
+        }, ct);
 
         _logger.LogInformation(
-            "Account {AccountCode} ({NameAr}) created — Nature {Nature}, IsLeaf {IsLeaf}",
-            account.AccountCode, account.NameAr, account.Nature, account.IsLeaf);
+            "Account {AccountCode} ({NameAr}) created — Level {Level}, Nature {Nature}, IsLeaf {IsLeaf}",
+            account.AccountCode, account.NameAr, account.Level, account.Nature, account.IsLeaf);
 
         // Reload to get parent name
         var saved = await _uow.Accounts.FirstOrDefaultAsync(
@@ -130,16 +228,36 @@ public class AccountService : IAccountService
         if (account.IsSystem)
             return Result<AccountDto>.Failure("لا يمكن تعديل حساب نظامي", ErrorCodes.InvalidOperation);
 
+        // Compute level from parent
+        Account? parent = null;
+        byte level;
         if (request.ParentId.HasValue)
         {
-            var parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
+            parent = await _uow.Accounts.GetByIdAsync(request.ParentId.Value, ct);
             if (parent == null)
                 return Result<AccountDto>.Failure("الحساب الأب غير موجود", ErrorCodes.NotFound);
             if (parent.IsLeaf)
                 return Result<AccountDto>.Failure(
                     "لا يمكن إضافة حساب فرعي لحساب تفصيلي",
                     ErrorCodes.ValidationError);
+
+            level = (byte)(parent.Level + 1);
         }
+        else
+        {
+            level = 1;
+        }
+
+        // Leaf accounts must be detail level (4)
+        if (request.IsLeaf && level < 4)
+            level = 4;
+
+        // Non-leaf accounts must not exceed level 3
+        if (!request.IsLeaf && level > 3)
+            level = 3;
+
+        // Auto-generate color code from nature
+        var colorCode = IAccountCodeGeneratorService.GetColorCode(request.Nature);
 
         account.Update(
             nameAr: request.NameAr,
@@ -148,13 +266,17 @@ public class AccountService : IAccountService
             isLeaf: request.IsLeaf,
             parentId: request.ParentId,
             categoryId: request.CategoryId,
-            level: request.IsLeaf ? (byte)4 : (byte)2,
+            level: level,
+            description: request.Description,
+            colorCode: colorCode,
+            notes: request.Notes,
             updatedByUserId: userId);
 
         await _uow.SaveChangesAsync(ct);
 
         _logger.LogInformation(
-            "Account {Id} ({AccountCode}) updated", id, account.AccountCode);
+            "Account {Id} ({AccountCode}) updated — Level {Level}, Nature {Nature}",
+            id, account.AccountCode, account.Level, account.Nature);
 
         // Reload to get parent name
         var updated = await _uow.Accounts.FirstOrDefaultAsync(
@@ -177,6 +299,12 @@ public class AccountService : IAccountService
         if (hasChildren)
             return Result.Failure(
                 "لا يمكن حذف حساب رئيسي لديه حسابات فرعية — احذف الحسابات الفرعية أولاً",
+                ErrorCodes.ReferencedByOtherEntities);
+
+        var hasTransactions = await _uow.JournalEntryLines.AnyAsync(l => l.AccountId == id, ct);
+        if (hasTransactions)
+            return Result.Failure(
+                "لا يمكن إلغاء تنشيط حساب مسجل عليه حركات مالية أو أرصدة",
                 ErrorCodes.ReferencedByOtherEntities);
 
         account.MarkAsDeleted();
@@ -202,6 +330,12 @@ public class AccountService : IAccountService
             if (hasChildren)
                 return Result.Failure(
                     "لا يمكن حذف حساب رئيسي لديه حسابات فرعية",
+                    ErrorCodes.ReferencedByOtherEntities);
+
+            var hasTransactions = await _uow.JournalEntryLines.AnyAsync(l => l.AccountId == id, ct);
+            if (hasTransactions)
+                return Result.Failure(
+                    "لا يمكن حذف حساب مسجل عليه حركات مالية نهائياً",
                     ErrorCodes.ReferencedByOtherEntities);
 
             _uow.Accounts.DeleteRange(new[] { account });
@@ -230,7 +364,11 @@ public class AccountService : IAccountService
             a.ParentAccount?.NameAr,
             a.IsSystem,
             a.IsActive,
-            a.CategoryId);
+            a.CategoryId,
+            a.Level,
+            a.Description,
+            a.ColorCode,
+            a.Notes);
     }
 
     /// <summary>

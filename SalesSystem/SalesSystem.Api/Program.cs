@@ -189,7 +189,8 @@ builder.Services.AddScoped<ISystemAccountService, SystemAccountService>();
 builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGenerator>();
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
-        builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
+builder.Services.AddScoped<IAccountCodeGeneratorService, AccountCodeGeneratorService>();
+builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
 builder.Services.AddScoped<IFiscalYearService, FiscalYearService>();
 
 // ─── New Entity Services (v4.7+) ──────────────────────────────

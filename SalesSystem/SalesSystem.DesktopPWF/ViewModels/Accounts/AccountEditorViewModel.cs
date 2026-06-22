@@ -8,13 +8,19 @@ using SalesSystem.DesktopPWF.Services.App.Toast;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Accounts;
 
+/// <summary>
+/// Editor for creating or modifying chart-of-accounts entries.
+/// The parent account selector shows a hierarchical (indented) list.
+/// AccountType and Level are auto-filled from the selected parent — the
+/// user primarily just enters the account name.
+/// </summary>
 public class AccountEditorViewModel : ViewModelBase
 {
     private readonly IAccountApiService _accountService;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
-    private readonly int? _parentAccountId;
     private readonly int? _editAccountId;
+    private List<AccountDto> _allAccounts = new();
 
     public AccountEditorViewModel(
         IAccountApiService accountService,
@@ -26,21 +32,26 @@ public class AccountEditorViewModel : ViewModelBase
         _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
-        _parentAccountId = parentAccountId;
         _editAccountId = editAccountId;
         SetDialogService(_dialogService); // RULE-227
+
+        if (parentAccountId.HasValue)
+            _selectedParentId = parentAccountId.Value;
 
         SaveCommand = new AsyncRelayCommand(SaveAsync); // ALWAYS enabled (RULE-059)
         CancelCommand = new RelayCommand(() => RequestClose());
 
         LoadedCommand = new AsyncRelayCommand(
             (Func<Task>)(async () => await ExecuteAsync(LoadInitialDataAsync)));
+
+        _ = ExecuteAsync(LoadInitialDataAsync);
     }
 
     // ── Properties ──
     public int? AccountId { get; private set; }
     public bool IsSaved { get; private set; }
     public bool IsEditing => _editAccountId.HasValue;
+    public bool IsCreating => !IsEditing;
 
     private string _windowTitle = "إضافة حساب جديد";
     public string WindowTitle
@@ -49,30 +60,14 @@ public class AccountEditorViewModel : ViewModelBase
         set => SetProperty(ref _windowTitle, value);
     }
 
-    private bool _isAccountCodeReadOnly;
-    public bool IsAccountCodeReadOnly
-    {
-        get => _isAccountCodeReadOnly;
-        set => SetProperty(ref _isAccountCodeReadOnly, value);
-    }
-
     private string _accountCode = string.Empty;
     public string AccountCode
     {
         get => _accountCode;
-        set
-        {
-            if (SetProperty(ref _accountCode, value))
-            {
-                ClearErrors(nameof(AccountCode));
-                if (string.IsNullOrWhiteSpace(value))
-                    AddError(nameof(AccountCode), "رمز الحساب مطلوب");
-                else if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"^\d{4,10}$"))
-                    AddError(nameof(AccountCode), "رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
-            }
-        }
+        set => SetProperty(ref _accountCode, value);
     }
 
+    // ── Name (the only required user input for creation) ──
     private string _nameAr = string.Empty;
     public string NameAr
     {
@@ -95,6 +90,7 @@ public class AccountEditorViewModel : ViewModelBase
         set => SetProperty(ref _nameEn, value);
     }
 
+    // ── Auto-filled from parent ──
     private byte _accountType = 1;
     public byte AccountType
     {
@@ -102,29 +98,46 @@ public class AccountEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountType, value);
     }
 
-    public List<KeyValuePair<byte, string>> AccountTypes { get; } = new()
+    /// <summary>Display string for the account type (auto-filled from parent).</summary>
+    public string AccountTypeDisplay => AccountType switch
     {
-        new(1, "أصل"),
-        new(2, "خصم"),
-        new(3, "حق ملكية"),
-        new(4, "إيراد"),
-        new(5, "مصروف")
+        1 => "أصل",
+        2 => "خصم",
+        3 => "حق ملكية",
+        4 => "إيراد",
+        5 => "مصروف",
+        _ => "غير معروف"
     };
 
-    public List<KeyValuePair<int, string>> LevelOptions { get; } = new()
-    {
-        new(1, "1 — رئيسي (مجموعة)"),
-        new(2, "2 — فرعي"),
-        new(3, "3 — فرعي فرعي"),
-        new(4, "4 — تفصيلي")
-    };
-
-    private int _level = 4;
+    private int _level = 1;
     public int Level
     {
         get => _level;
-        set => SetProperty(ref _level, value);
+        set
+        {
+            if (SetProperty(ref _level, value))
+            {
+                OnPropertyChanged(nameof(LevelDisplay));
+                if (value >= 4)
+                {
+                    AllowTransactions = true;
+                    IsAllowTransactionsEditable = false;
+                }
+                else
+                {
+                    IsAllowTransactionsEditable = true;
+                }
+            }
+        }
     }
+
+    public string LevelDisplay => Level switch
+    {
+        1 => "1 — رئيسي (مجموعة)",
+        2 => "2 — فرعي",
+        3 => "3 — فرعي فرعي",
+        _ => "4 — تفصيلي"
+    };
 
     private string _description = string.Empty;
     public string Description
@@ -133,18 +146,18 @@ public class AccountEditorViewModel : ViewModelBase
         set => SetProperty(ref _description, value);
     }
 
-    private string _colorCode = string.Empty;
-    public string ColorCode
-    {
-        get => _colorCode;
-        set => SetProperty(ref _colorCode, value);
-    }
-
-    private bool _allowTransactions = true;
+    private bool _allowTransactions;
     public bool AllowTransactions
     {
         get => _allowTransactions;
         set => SetProperty(ref _allowTransactions, value);
+    }
+
+    private bool _isAllowTransactionsEditable;
+    public bool IsAllowTransactionsEditable
+    {
+        get => _isAllowTransactionsEditable;
+        set => SetProperty(ref _isAllowTransactionsEditable, value);
     }
 
     private decimal? _openingBalance;
@@ -161,6 +174,82 @@ public class AccountEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
+    // ── Parent Account ──
+    private int? _selectedParentId;
+    public int? SelectedParentId
+    {
+        get => _selectedParentId;
+        set
+        {
+            if (SetProperty(ref _selectedParentId, value))
+            {
+                AutoFillFromParent();
+                OnPropertyChanged(nameof(SelectedParentDisplay));
+            }
+        }
+    }
+
+    public string SelectedParentDisplay
+    {
+        get
+        {
+            if (!_selectedParentId.HasValue || _selectedParentId.Value == 0)
+                return "— المستوى الأول (بدون حساب أب) —";
+            var parent = _allAccounts.FirstOrDefault(a => a.Id == _selectedParentId.Value);
+            return parent != null ? $"{parent.AccountCode} — {parent.NameAr}" : "حساب غير معروف";
+        }
+    }
+
+    /// <summary>
+    /// Hierarchical parent-account list.
+    /// Accounts are sorted by AccountCode and indented by Level.
+    /// A "root" entry (Id=0) is prepended so Level-1 accounts can be created.
+    /// </summary>
+    public List<KeyValuePair<int, string>> ParentAccountOptions
+    {
+        get
+        {
+            var options = _allAccounts
+                .Where(a => a.Level < 4 && (!_editAccountId.HasValue || a.Id != _editAccountId.Value))
+                .OrderBy(a => a.AccountCode)
+                .Select(a => new KeyValuePair<int, string>(
+                    a.Id,
+                    $"{new string('　', a.Level - 1)}{a.AccountCode} — {a.NameAr}"))
+                .ToList();
+
+            options.Insert(0, new KeyValuePair<int, string>(0, "الحساب الرئيسي (المستوى الأول)"));
+            return options;
+        }
+    }
+
+    /// <summary>
+    /// Auto-fills AccountType, Level, and AllowTransactions from the selected parent.
+    /// </summary>
+    private void AutoFillFromParent()
+    {
+        if (_selectedParentId.HasValue && _selectedParentId.Value > 0)
+        {
+            var parent = _allAccounts.FirstOrDefault(a => a.Id == _selectedParentId.Value);
+            if (parent != null)
+            {
+                AccountType = parent.AccountType;
+                Level = parent.Level + 1;
+                OnPropertyChanged(nameof(AccountTypeDisplay));
+                OnPropertyChanged(nameof(LevelDisplay));
+            }
+        }
+        else
+        {
+            // No parent → Level 1, default AccountType = Asset
+            Level = 1;
+            AccountType = 1;
+            AllowTransactions = false;
+            IsAllowTransactionsEditable = false;
+            OnPropertyChanged(nameof(AccountTypeDisplay));
+            OnPropertyChanged(nameof(LevelDisplay));
+        }
+    }
+
     // ── Commands ──
     public ICommand SaveCommand { get; private set; } = null!;
     public ICommand CancelCommand { get; private set; } = null!;
@@ -169,12 +258,7 @@ public class AccountEditorViewModel : ViewModelBase
     // ── Validation (RULE-229) ──
     private async Task<bool> ValidateAsync()
     {
-        ClearAllErrors(); // RULE-229
-
-        if (string.IsNullOrWhiteSpace(AccountCode))
-            AddError(nameof(AccountCode), "رمز الحساب مطلوب");
-        else if (!System.Text.RegularExpressions.Regex.IsMatch(AccountCode, @"^\d{4,10}$"))
-            AddError(nameof(AccountCode), "رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)");
+        ClearAllErrors();
 
         if (string.IsNullOrWhiteSpace(NameAr))
             AddError(nameof(NameAr), "اسم الحساب بالعربية مطلوب");
@@ -185,7 +269,10 @@ public class AccountEditorViewModel : ViewModelBase
         if (Level >= 4 && !AllowTransactions)
             AddError(nameof(AllowTransactions), "الحساب التفصيلي يجب أن يسمح بالحركات");
 
-        return await ValidateAllAsync(); // Shows styled validation dialog automatically
+        if (OpeningBalance.HasValue && OpeningBalance.Value < 0)
+            AddError(nameof(OpeningBalance), "الرصيد الافتتاحي لا يمكن أن يكون سالباً");
+
+        return await ValidateAllAsync();
     }
 
     // ── Save ──
@@ -195,12 +282,13 @@ public class AccountEditorViewModel : ViewModelBase
 
         await ExecuteAsync(async () =>
         {
+            var parentId = _selectedParentId.GetValueOrDefault(0) > 0 ? _selectedParentId : null;
+
             if (IsEditing)
             {
-                // ── Update existing account ──
                 var updateRequest = new UpdateAccountRequest(
                     NameAr, NameEn, AccountType, Level >= 4,
-                    _parentAccountId, null);
+                    parentId, null, Description, null);
 
                 var result = await _accountService.UpdateAsync(_editAccountId!.Value, updateRequest);
                 if (result.IsSuccess)
@@ -217,10 +305,9 @@ public class AccountEditorViewModel : ViewModelBase
             }
             else
             {
-                // ── Create new account ──
                 var createRequest = new CreateAccountRequest(
-                    AccountCode, NameAr, NameEn, AccountType, Level >= 4,
-                    _parentAccountId, false, null);
+                    NameAr, NameEn, AccountType, Level >= 4,
+                    parentId, false, null, Description, null, OpeningBalance);
 
                 var result = await _accountService.CreateAsync(createRequest);
                 if (result.IsSuccess)
@@ -240,27 +327,37 @@ public class AccountEditorViewModel : ViewModelBase
 
     private async Task LoadInitialDataAsync()
     {
+        // Load all accounts for the parent dropdown
+        var allResult = await _accountService.GetAllAsync();
+        if (allResult.IsSuccess && allResult.Value != null)
+        {
+            _allAccounts = allResult.Value;
+            OnPropertyChanged(nameof(ParentAccountOptions));
+        }
+
         if (_editAccountId.HasValue)
         {
-            // ── Edit mode: load existing account data ──
+            // ── Edit mode ──
             var result = await _accountService.GetByIdAsync(_editAccountId.Value);
             if (result.IsSuccess && result.Value != null)
             {
-                var account = result.Value;
-                AccountId = account.Id;
-                AccountCode = account.AccountCode;
-                NameAr = account.NameAr;
-                NameEn = account.NameEn ?? string.Empty;
-                AccountType = account.AccountType;
-                Level = account.Level;
-                Description = account.Description ?? string.Empty;
-                ColorCode = account.ColorCode ?? string.Empty;
-                AllowTransactions = account.AllowTransactions;
-                OpeningBalance = account.OpeningBalance;
+                var a = result.Value;
+                AccountId = a.Id;
+                AccountCode = a.AccountCode;
+                NameAr = a.NameAr;
+                NameEn = a.NameEn ?? string.Empty;
+                AccountType = a.AccountType;
+                Level = a.Level;
+                Description = a.Description ?? string.Empty;
+                AllowTransactions = a.AllowTransactions;
                 WindowTitle = "تعديل حساب";
-                IsAccountCodeReadOnly = true;
 
-                // Clear validation errors after loading data
+                _selectedParentId = a.ParentId;
+                OnPropertyChanged(nameof(SelectedParentId));
+                OnPropertyChanged(nameof(SelectedParentDisplay));
+                OnPropertyChanged(nameof(AccountTypeDisplay));
+                OnPropertyChanged(nameof(LevelDisplay));
+
                 ClearAllErrors();
             }
             else
@@ -272,16 +369,12 @@ public class AccountEditorViewModel : ViewModelBase
         }
         else
         {
-            // ── Create mode: auto-set Level based on parent if provided ──
-            if (_parentAccountId.HasValue)
+            // ── Create mode ──
+            if (_selectedParentId.HasValue)
             {
-                var result = await _accountService.GetByIdAsync(_parentAccountId.Value);
-                if (result.IsSuccess && result.Value != null)
-                {
-                    Level = result.Value.Level + 1;
-                }
+                AutoFillFromParent();
+                OnPropertyChanged(nameof(SelectedParentDisplay));
             }
         }
     }
-
 }

@@ -183,11 +183,13 @@ public class SupplierListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل تحميل الموردين", "SupplierListViewModel.LoadSuppliersAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierListViewModel.LoadSuppliersAsync", "Failed to load suppliers.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
         finally
         {
@@ -272,6 +274,7 @@ public class SupplierListViewModel : ViewModelBase
                 else
                 {
                     ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط المورد", "SupplierListViewModel.DeleteSupplierAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في حذف المورد", ErrorMessage!);
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -288,12 +291,14 @@ public class SupplierListViewModel : ViewModelBase
                     var error = deleteResult.Error ?? "فشل في حذف المورد";
                     ErrorMessage = HandleFailure(error, "SupplierListViewModel.DeleteSupplierAsync");
                     LogSystemError($"Hard delete failed for Supplier {SelectedSupplier.Id}: {error}", "SupplierListViewModel.DeleteSupplierAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في حذف المورد", ErrorMessage!);
                 }
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierListViewModel.DeleteSupplierAsync", $"[SupplierListViewModel.DeleteSupplierAsync] Failed to delete supplier with ID {SelectedSupplier?.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في حذف المورد", ErrorMessage!);
         }
         finally
         {
@@ -330,11 +335,13 @@ public class SupplierListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة المورد", "SupplierListViewModel.RestoreSupplierAsync", $"[SupplierListViewModel.RestoreSupplierAsync] Failed to restore supplier with ID {SelectedSupplier.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في استعادة المورد", ErrorMessage!);
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierListViewModel.RestoreSupplierAsync", "Failed to restore supplier.");
+            await _dialogService.ShowErrorAsync("خطأ في استعادة المورد", ErrorMessage!);
         }
         finally
         {

@@ -40,16 +40,40 @@
         <ScrollViewer Grid.Row="1">
             <Border Padding="16">
                 <StackPanel>
-                    <!-- Account Code -->
-                    <TextBlock Text="رمز الحساب *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                    <TextBox Text="{Binding AccountCode, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                    <!-- Account Code (Only visible in Edit Mode / ReadOnly) -->
+                    <TextBlock Text="رمز الحساب" Style="{StaticResource LabelStyle}" Margin="4,0,0,8" 
+                               Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBox Text="{Binding AccountCode, Mode=OneWay}"
                              Style="{StaticResource ModernTextBox}"
-                             Tag="أدخل رمز الحساب (أرقام فقط)"
-                             TabIndex="1"
-                             IsReadOnly="{Binding IsAccountCodeReadOnly}"
-                             ToolTip="رمز الحساب — أرقام فقط (4-10 خانات)، مثال: 1111"/>
-                    <TextBlock Text="رمز الحساب يجب أن يكون أرقاماً فقط (4-10 خانات)"
-                               Style="{StaticResource HelperTextStyle}"/>
+                             IsReadOnly="True"
+                             Background="#F1F5F9"
+                             Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}"
+                             ToolTip="رمز الحساب يتم توليده تلقائياً من قبل النظام"/>
+                    <TextBlock Text="رمز الحساب يُولد تلقائياً"
+                               Style="{StaticResource HelperTextStyle}"
+                               Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- Parent Account -->
+                    <TextBlock Text="الحساب الأب *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <ComboBox ItemsSource="{Binding ParentAccountOptions}"
+                              SelectedValue="{Binding SelectedParentId}"
+                              SelectedValuePath="Key"
+                              DisplayMemberPath="Value"
+                              IsEditable="True"
+                              IsReadOnly="False"
+                              TextSearch.TextPath="Value"
+                              TabIndex="1"
+                              IsEnabled="{Binding IsCreating}"
+                              Style="{StaticResource ModernComboBox}"
+                              ToolTip="اختر الحساب الأب للحساب الجديد — سيتم تحديد المستوى تلقائياً حسب الحساب الأب">
+                        <ComboBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <VirtualizingStackPanel/>
+                            </ItemsPanelTemplate>
+                        </ComboBox.ItemsPanel>
+                    </ComboBox>
+                    <TextBlock Text="عند تغيير الحساب الأب، يتم تحديث مستوى الحساب تلقائياً"
+                               Style="{StaticResource HelperTextStyle}" Margin="0,2,0,8"/>
 
                     <!-- Name Ar -->
                     <TextBlock Text="اسم الحساب (عربي) *" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
@@ -65,54 +89,52 @@
                              TabIndex="3"
                              ToolTip="اسم الحساب باللغة الإنجليزية — اختياري"/>
 
-                    <!-- AccountType + Level -->
+                    <!-- AccountType + Level (auto-filled from parent, display-only) -->
                     <Grid Margin="0,8,0,6">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Margin="0,0,4,0">
-                            <TextBlock Text="نوع الحساب *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                            <ComboBox SelectedValue="{Binding AccountType}"
-                                      ItemsSource="{Binding AccountTypes}"
-                                      SelectedValuePath="Key"
-                                      DisplayMemberPath="Value"
-                                      TabIndex="4"
-                                      ToolTip="نوع الحساب: أصل، خصم، حق ملكية، إيراد، مصروف"
-                                      Style="{StaticResource ModernComboBox}"/>
+                            <TextBlock Text="نوع الحساب" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                            <TextBox Text="{Binding NatureDisplay, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     Background="#F1F5F9"
+                                     Style="{StaticResource ModernTextBox}"
+                                     TabIndex="4"
+                                     ToolTip="نوع الحساب يتم تحديده تلقائياً من الحساب الأب"/>
+                            <TextBlock Text="يُحدد تلقائياً من الحساب الأب"
+                                       Style="{StaticResource HelperTextStyle}" Margin="0,2,0,0"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Margin="4,0,0,0">
-                            <TextBlock Text="المستوى *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                            <ComboBox ItemsSource="{Binding LevelOptions}"
-                                      SelectedValue="{Binding Level}"
-                                      SelectedValuePath="Key"
-                                      DisplayMemberPath="Value"
-                                      TabIndex="5"
-                                      Style="{StaticResource ModernComboBox}"
-                                      ToolTip="مستوى الحساب: 1=رئيسي، 2=فرعي، 3=فرعي فرعي، 4=تفصيلي"/>
+                            <TextBlock Text="مستوى الحساب" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                            <TextBox Text="{Binding LevelDisplay, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     Background="#F1F5F9"
+                                     Style="{StaticResource ModernTextBox}"
+                                     TabIndex="5"
+                                     ToolTip="مستوى الحساب يتم تحديده تلقائياً من الحساب الأب"/>
+                            <TextBlock Text="يُحدد تلقائياً من الحساب الأب"
+                                       Style="{StaticResource HelperTextStyle}" Margin="0,2,0,0"/>
                         </StackPanel>
                     </Grid>
-
-                    <!-- ColorCode -->
-                    <TextBlock Text="لون الحساب" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
-                    <TextBox Text="{Binding ColorCode}"
-                             Style="{StaticResource ModernTextBox}"
-                             Width="120"
-                             TabIndex="6"
-                             ToolTip="رمز اللون بصيغة Hex — مثال: #2196F3 للأصول"/>
 
                     <!-- AllowTransactions -->
                     <CheckBox IsChecked="{Binding AllowTransactions}" Content="يسمح بالحركات"
                               TabIndex="7"
+                              IsEnabled="{Binding IsAllowTransactionsEditable}"
                               ToolTip="تفعيل هذا الخيار للسماح بإضافة قيود يومية على هذا الحساب"
                               Margin="0,8,0,6"/>
 
                     <!-- OpeningBalance -->
-                    <TextBlock Text="الرصيد الافتتاحي" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>
+                    <TextBlock Text="الرصيد الافتتاحي" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"
+                               Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibility}}"/>
                     <TextBox Text="{Binding OpeningBalance, TargetNullValue=''}"
                              Style="{StaticResource ModernTextBox}"
                              Width="150"
+                             HorizontalAlignment="Right"
                              TabIndex="8"
+                             Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibility}}"
                              ToolTip="الرصيد الافتتاحي للحساب عند بدء استخدام النظام"/>
 
                     <!-- Description -->

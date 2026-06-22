@@ -7,6 +7,7 @@ using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.Helpers;
 using SalesSystem.DesktopPWF.Models;
 
@@ -26,6 +27,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
     private readonly IPaymentPrinter _paymentPrinter;
     private readonly ISettingsApiService _settingsService;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
     private readonly int? _paymentId;
     private readonly bool _isReadOnly;
 
@@ -58,6 +60,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
         _eventBus = eventBus;
         _paymentPrinter = App.GetService<IPaymentPrinter>();
         _settingsService = App.GetService<ISettingsApiService>();
+        _toastService = App.GetService<IToastNotificationService>();
         _dialogService = dialogService;
         SetDialogService(dialogService);
 
@@ -351,6 +354,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
             if (result.IsSuccess)
             {
                 _eventBus.Publish(new SupplierPaymentChangedMessage(result.Value!.Id));
+                _toastService.ShowSuccess("تم تحديث سند الدفع بنجاح");
                 RequestClose();
             }
             else
@@ -388,6 +392,7 @@ public class SupplierPaymentEditorViewModel : ViewModelBase
                 }
 
                 _eventBus.Publish(new SupplierPaymentChangedMessage(paymentId));
+                _toastService.ShowSuccess("تم إنشاء سند الدفع بنجاح");
                 RequestClose();
             }
             else

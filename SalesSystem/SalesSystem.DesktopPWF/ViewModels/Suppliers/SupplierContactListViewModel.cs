@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -22,6 +23,7 @@ public class SupplierContactListViewModel : ViewModelBase
     private bool _isEmpty;
     private int _supplierId;
     private string _supplierName = string.Empty;
+    private bool _includeInactive;
 
     public SupplierContactListViewModel()
     {
@@ -82,6 +84,18 @@ public class SupplierContactListViewModel : ViewModelBase
         set => SetProperty(ref _supplierName, value);
     }
 
+    public bool IncludeInactive
+    {
+        get => _includeInactive;
+        set
+        {
+            if (SetProperty(ref _includeInactive, value))
+            {
+                _ = LoadContactsAsync();
+            }
+        }
+    }
+
     #endregion
 
     #region Commands
@@ -119,7 +133,10 @@ public class SupplierContactListViewModel : ViewModelBase
             await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 Contacts.Clear();
-                foreach (var item in result.Value.OrderByDescending(x => x.Id))
+                var items = IncludeInactive
+                    ? result.Value
+                    : result.Value.Where(x => x.IsActive);
+                foreach (var item in items.OrderByDescending(x => x.Id))
                 {
                     Contacts.Add(item);
                 }
@@ -129,6 +146,7 @@ public class SupplierContactListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل جهات الاتصال", "SupplierContactListViewModel.LoadContactsAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Contacts.Count == 0;
         }
     }
@@ -199,6 +217,7 @@ public class SupplierContactListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط جهة الاتصال", "SupplierContactListViewModel.DeleteContactAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إلغاء تنشيط جهة الاتصال", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)

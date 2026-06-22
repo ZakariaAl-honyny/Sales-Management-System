@@ -8,6 +8,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.Helpers;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Transfers;
@@ -31,6 +32,9 @@ public class WarehouseTransfersListViewModel : ViewModelBase
     // Test uses SetField("_dialogService", mock) before property is accessed.
     private new IDialogService DialogService => _dialogService ??= App.GetService<IDialogService>();
     private IDialogService? _dialogService;
+
+    private IToastNotificationService? _toastService;
+    private IToastNotificationService ToastService => _toastService ??= App.GetService<IToastNotificationService>();
 
     private string _searchText = string.Empty;
     private DateTime? _dateFrom;
@@ -263,6 +267,7 @@ public class WarehouseTransfersListViewModel : ViewModelBase
 
             if (postResult.IsSuccess)
             {
+                ToastService.ShowSuccess("تم ترحيل التحويل بنجاح");
                 await LoadTransfersAsync();
             }
             else
@@ -296,6 +301,7 @@ public class WarehouseTransfersListViewModel : ViewModelBase
 
             if (cancelResult.IsSuccess)
             {
+                ToastService.ShowSuccess("تم إلغاء التحويل بنجاح");
                 await LoadTransfersAsync();
             }
             else

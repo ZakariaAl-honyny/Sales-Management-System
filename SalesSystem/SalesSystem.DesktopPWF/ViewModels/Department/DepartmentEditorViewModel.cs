@@ -116,6 +116,7 @@ public class DepartmentEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث القسم", "DepartmentEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث القسم", ErrorMessage!);
             }
         }
         else
@@ -131,6 +132,7 @@ public class DepartmentEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة القسم", "DepartmentEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة القسم", ErrorMessage!);
             }
         }
     }

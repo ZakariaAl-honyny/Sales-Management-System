@@ -117,6 +117,7 @@ public class SystemAccountMappingListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل حسابات النظام", "SystemAccountMappingListViewModel.Load");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Mappings.Count == 0;
             OnPropertyChanged(nameof(HasNoMappings));
         }

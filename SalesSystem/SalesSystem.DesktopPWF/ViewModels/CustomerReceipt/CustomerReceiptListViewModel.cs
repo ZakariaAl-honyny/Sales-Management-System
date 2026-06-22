@@ -164,6 +164,7 @@ public class CustomerReceiptListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل سندات القبض", "CustomerReceiptListViewModel.LoadReceiptsAsync", "[CustomerReceiptListViewModel.LoadReceiptsAsync] Failed to load receipts.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Receipts.Count == 0;
         }
     }
@@ -263,6 +264,7 @@ public class CustomerReceiptListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل سند القبض", "CustomerReceiptListViewModel.PostReceiptAsync", $"[CustomerReceiptListViewModel.PostReceiptAsync] Failed to post receipt {SelectedReceipt.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -300,6 +302,7 @@ public class CustomerReceiptListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء سند القبض", "CustomerReceiptListViewModel.CancelReceiptAsync", $"[CustomerReceiptListViewModel.CancelReceiptAsync] Failed to cancel receipt {SelectedReceipt.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 

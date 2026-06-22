@@ -190,6 +190,7 @@ public class AccountCategoryListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف التصنيف المحاسبي", "AccountCategoryListViewModel.Delete");
+            await _dialogService.ShowErrorAsync("خطأ في حذف التصنيف المحاسبي", ErrorMessage!);
         }
     }
 

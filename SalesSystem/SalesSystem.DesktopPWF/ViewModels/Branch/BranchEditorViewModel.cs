@@ -116,6 +116,7 @@ public class BranchEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث الفرع", "BranchEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث الفرع", ErrorMessage!);
             }
         }
         else
@@ -131,6 +132,7 @@ public class BranchEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة الفرع", "BranchEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة الفرع", ErrorMessage!);
             }
         }
     }

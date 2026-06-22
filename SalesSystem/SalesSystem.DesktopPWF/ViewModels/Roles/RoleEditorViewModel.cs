@@ -12,6 +12,7 @@ public class RoleEditorViewModel : ViewModelBase
 {
     private readonly IRoleApiService _roleService;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
 
     private string _name = string.Empty;
     private string _description = string.Empty;
@@ -23,6 +24,7 @@ public class RoleEditorViewModel : ViewModelBase
     {
         _roleService = App.GetService<IRoleApiService>();
         _dialogService = App.GetService<IDialogService>();
+        _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
         InitializeCommands();
     }
@@ -117,6 +119,7 @@ public class RoleEditorViewModel : ViewModelBase
 
         if (result.IsSuccess)
         {
+            _toastService.ShowSuccess("تم حفظ الدور بنجاح");
             RequestClose();
         }
         else

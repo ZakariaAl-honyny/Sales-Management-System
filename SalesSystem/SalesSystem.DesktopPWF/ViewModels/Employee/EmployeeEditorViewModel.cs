@@ -161,6 +161,7 @@ public class EmployeeEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث الموظف", "EmployeeEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث الموظف", ErrorMessage!);
             }
         }
         else
@@ -183,6 +184,7 @@ public class EmployeeEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة الموظف", "EmployeeEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة الموظف", ErrorMessage!);
             }
         }
     }

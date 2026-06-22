@@ -200,6 +200,7 @@ public class ReceiptVoucherListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل سندات القبض",
                 "ReceiptVoucherListViewModel.LoadVouchersOperationAsync",
                 "[ReceiptVoucherListViewModel.LoadVouchersOperationAsync] Failed to load vouchers.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Vouchers.Count == 0;
         }
     }
@@ -307,6 +308,7 @@ public class ReceiptVoucherListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل سند القبض",
                 "ReceiptVoucherListViewModel.PostVoucherOperationAsync",
                 $"[ReceiptVoucherListViewModel.PostVoucherOperationAsync] Failed to post voucher {SelectedVoucher.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -348,6 +350,7 @@ public class ReceiptVoucherListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء سند القبض",
                 "ReceiptVoucherListViewModel.CancelVoucherOperationAsync",
                 $"[ReceiptVoucherListViewModel.CancelVoucherOperationAsync] Failed to cancel voucher {SelectedVoucher.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 
@@ -389,6 +392,7 @@ public class ReceiptVoucherListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف سند القبض",
                 "ReceiptVoucherListViewModel.DeleteVoucherOperationAsync",
                 $"[ReceiptVoucherListViewModel.DeleteVoucherOperationAsync] Failed to delete voucher {SelectedVoucher.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
         }
     }
 

@@ -262,6 +262,7 @@ public class ProductCategoriesListViewModel : ViewModelBase, IDisposable
             else
             {
                 ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في حذف المجموعة", "ProductCategoriesListViewModel.DeleteCategoryAsync", $"[ProductCategoriesListViewModel.DeleteCategoryAsync] Failed to deactivate category with ID {SelectedCategory.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في حذف المجموعة", ErrorMessage!);
             }
         }
     }
@@ -288,6 +289,7 @@ public class ProductCategoriesListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة المجموعة", "ProductCategoriesListViewModel.RestoreCategoryAsync", $"[ProductCategoriesListViewModel.RestoreCategoryAsync] Failed to restore category with ID {SelectedCategory.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في استعادة المجموعة", ErrorMessage!);
         }
     }
 

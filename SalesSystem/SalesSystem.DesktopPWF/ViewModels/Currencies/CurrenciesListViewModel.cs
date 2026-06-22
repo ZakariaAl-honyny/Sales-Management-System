@@ -243,7 +243,8 @@ public class CurrenciesListViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط العملة";
+                ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط العملة", "CurrenciesListViewModel.DeleteCurrencyAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف العملة", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -258,6 +259,7 @@ public class CurrenciesListViewModel : ViewModelBase, IDisposable
             {
                 var error = deleteResult.Error ?? "فشل في حذف العملة";
                 ErrorMessage = HandleFailure(error, "CurrenciesListViewModel.DeleteCurrencyAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف العملة", ErrorMessage!);
             }
         }
     }

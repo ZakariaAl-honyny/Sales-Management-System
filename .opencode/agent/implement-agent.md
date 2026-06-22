@@ -826,6 +826,50 @@ await _dialogService.ShowErrorAsync("title", "message");
 
 NEVER use MessageBox.Show in editor ViewModels.
 
+### IncludeInactive Checkbox (v4.10.5)
+
+For list ViewModels where entities support soft-delete (IsActive property):
+
+**Property in ViewModel:**
+```csharp
+private bool _includeInactive;
+public bool IncludeInactive
+{
+    get => _includeInactive;
+    set
+    {
+        if (SetProperty(ref _includeInactive, value))
+        {
+            _ = LoadDataAsync();
+        }
+    }
+}
+```
+
+**Add CheckBox in XAML toolbar:**
+```xml
+<CheckBox Content="عرض غير النشطة" 
+          IsChecked="{Binding IncludeInactive}" 
+          VerticalAlignment="Center" 
+          FontSize="11"
+          ToolTip="عرض العناصر غير النشطة"/>
+```
+
+**Client-side filtering when API lacks includeInactive parameter:**
+After loading data into the ObservableCollection:
+```csharp
+if (!IncludeInactive)
+{
+    var toRemove = Items.Where(x => !x.IsActive).ToList();
+    foreach (var item in toRemove) Items.Remove(item);
+}
+```
+
+**When NOT to add IncludeInactive:**
+- Status-based entities (invoices with Draft/Posted/Cancelled) — use IncludeCancelled instead
+- Log/appended-only entities (audit logs, transactions, notifications) — no soft-delete
+- Sessions — use IncludeRevoked instead
+
 ### ToolTip Pattern (v4.5.1)
 
 ALL interactive XAML controls MUST have Arabic ToolTip:

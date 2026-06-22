@@ -201,6 +201,14 @@
                         </StackPanel>
                     </Button>
                 </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,2,12,2">
+                    <CheckBox Content="عرض غير النشطة" 
+                              IsChecked="{Binding IncludeInactive}" 
+                              VerticalAlignment="Center" 
+                              FontSize="11"
+                              ToolTip="عرض وحدات القياس المعطلة/غير النشطة أيضاً في القائمة"/>
+                </StackPanel>
             </WrapPanel>
         </Border>
 

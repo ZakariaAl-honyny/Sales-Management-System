@@ -205,6 +205,7 @@ public class FiscalYearEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إنشاء السنة المالية", "FiscalYearEditorViewModel.Create");
+                await _dialogService.ShowErrorAsync("خطأ في إنشاء السنة المالية", ErrorMessage!);
             }
         }
     }

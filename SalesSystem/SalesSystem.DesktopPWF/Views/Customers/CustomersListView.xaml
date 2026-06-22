@@ -65,7 +65,8 @@
                     <CheckBox Content="عرض غير النشطة" 
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
-                               FontSize="12"/>
+                               FontSize="12"
+                               ToolTip="عرض العملاء غير النشطين (المحذوفين)"/>
                 </StackPanel>
 
                 <!-- Actions Group -->
@@ -146,19 +147,19 @@
                           AutomationProperties.AutomationId="DgCustomers">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" ToolTip="تعديل بيانات العميل المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✏️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="حذف" Command="{Binding DeleteCommand}"
+                            <MenuItem Header="حذف" ToolTip="حذف العميل المحدد" Command="{Binding DeleteCommand}"
                                       Visibility="{Binding SelectedCustomer.IsActive, Converter={StaticResource BoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🗑️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="استعادة" Command="{Binding RestoreCommand}"
+                            <MenuItem Header="استعادة" ToolTip="استعادة عميل محذوف" Command="{Binding RestoreCommand}"
                                       Visibility="{Binding SelectedCustomer.IsActive, Converter={StaticResource InverseBoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="♻️"/>
@@ -182,23 +183,6 @@
                                             Width="150" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         
-                        <DataGridTextColumn Header="الرصيد الحالي" 
-                                            Binding="{Binding CurrentBalance, StringFormat=N2}" 
-                                            Width="150" 
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="VerticalAlignment" Value="Center"/>
-                                    <Setter Property="Padding" Value="0,0,12,0"/>
-                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsBalanceNegative}" Value="True">
-                                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
                         
                         <DataGridTemplateColumn Header="الحالة" Width="100" CellStyle="{StaticResource DataGridCellCenterStyle}">
                             <DataGridTemplateColumn.CellTemplate>

@@ -245,6 +245,7 @@ public async Task DeleteUnitAsync()
                 else
                 {
                     ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط الوحدة";
+                    await _dialogService.ShowErrorAsync("خطأ في حذف الوحدة", ErrorMessage);
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -260,6 +261,7 @@ public async Task DeleteUnitAsync()
                     var error = deleteResult.Error ?? "فشل في حذف الوحدة";
                     ErrorMessage = error;
                     LogSystemError($"Hard delete failed for Unit {SelectedUnit.Id}: {error}", "UnitListViewModel.DeleteUnitAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في حذف الوحدة", ErrorMessage);
                 }
             }
         }

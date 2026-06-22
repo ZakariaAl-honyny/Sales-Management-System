@@ -227,6 +227,7 @@ public class PurchaseInvoiceListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل فواتير الشراء", "PurchaseInvoiceListViewModel.LoadInvoicesAsync", "[PurchaseInvoiceListViewModel.LoadInvoicesAsync] Failed to load purchase invoices list.");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
                 IsEmpty = Invoices.Count == 0;
             }
         });

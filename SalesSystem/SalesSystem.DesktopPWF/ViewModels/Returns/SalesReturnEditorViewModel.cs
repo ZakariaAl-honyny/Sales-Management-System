@@ -375,7 +375,8 @@ public class SalesReturnEditorViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = "فشل في تحميل بيانات المرتجع";
+                ErrorMessage = result.Error ?? "فشل في تحميل بيانات المرتجع";
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage);
             }
         });
     }
@@ -641,7 +642,7 @@ public class SalesReturnEditorViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في إلغاء المرتجع";
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء المرتجع", "SalesReturnEditorViewModel.CancelReturnAsync", $"[SalesReturnEditorViewModel.CancelReturnAsync] Failed to cancel return ID {_returnId}.");
                 await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage);
             }
         });

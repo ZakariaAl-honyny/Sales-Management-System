@@ -613,7 +613,7 @@ public enum CashTransactionType : byte
 }
 ```
 
-**Auto-Account Creation:** When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1110 — النقدية"` (Cash & Cash Equivalents — a Level 3 account under Current Assets 1100). Account codes auto-increment (1111, 1112, 1113...).
+**Auto-Account Creation:** When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1101 — النقدية"` (Cash & Cash Equivalents — a Level 3 account under Current Assets `11`). Account codes auto-increment using hierarchical expanding numbering: Level 3 parent `1101` → Level 4 codes `11010001`, `11010002`, `11010003`... (8 digits total). Thread-safety via `AccountCodeGeneratorService` with `SemaphoreSlim`.
 
 **Entities:** `CashBox`, `CashTransaction`
 

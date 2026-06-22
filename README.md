@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>v4.10.4 — Phase 21 Complete: 9 DB-driven Roles, 45 Permissions, Schema-Aligned</em>
+  <em>v4.10.5 — UX Complete: Success/Failure Messages on ALL CRUD + IncludeInactive Checkboxes ✅</em>
 </p>
 
 <p align="center">
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.4%20Phase%2021%20Complete-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.5%20%7C%20UX%20Messages%20%2B%20IncludeInactive-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10.4%20%7C%20Deep%20Review%20Complete-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.5%20%7C%20CRUD%20Messages-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -72,6 +72,9 @@ The API-first architecture is designed to support **future web and mobile client
 - 📦 **Inventory Operations Complete (v4.10.3)**: All 3 BLOCKER bugs fixed — TransactionNo auto-generation via DocumentSequenceService, InventoryAdjustment stock updates via IInventoryService (atomic + audit), InventoryCount creates single Adjustment per Post (not per line). Desktop ViewModels rewritten (InventoryAdjustmentEditor, InventoryCountEditor, WarehouseTransferEditor) — full INotifyDataErrorInfo, IDisposable, EventBus cleanup. AdjustmentType validator range fixed (1-3). ReportsController CancellationToken position fixed. **0 build errors across all 11 projects.**
 - 🔍 **Accounts.md Deep Review Complete (v4.10.3)**: Systematic review of `Accounts.md` against the full AGENTS.md constitution — **43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed**. CRITICAL fixes: ReportExportController stub elimination, Permission.cs alignment (21 flags vs Section 6 matrix), CanNavigate() deny-by-default security, IsAdvancedMode guard for org/accounting screens. Major/minor fixes: Keyboard shortcuts (F3/F4/F5/F8), InvoicePrintDto + FooterNote + return print endpoints, ThermalReceiptGenerator code page parameter, JWT `jti` claim + secret length validation, SecurityAudit production endpoint, composite index on JournalEntryLine(JournalEntryId, AccountId), orphaned ViewModel registration cleanup. **0 build errors maintained.**
 - 🏛️ **Complete Deep Review — All 8 Modules Aligned to Schema (v4.10.4)**: Exhaustive structural deep review of all 59 Domain entities + 60+ EF configurations against `docs/database-schema.md` — **42+ mismatches fixed across Core, Organization, Products, Accounting, Inventory, Sales, Purchases, and Infrastructure modules**. CRITICAL fixes: SalesReturn/PurchaseReturn base class corrected from `AuditableEntity` to `DocumentEntity` (missing Status lifecycle + PostedAt/CancelledAt timestamps), `[IsActive]` filter removed from ReceiptVoucher/PaymentVoucher indexes (would have caused SQL runtime crash), missing `BranchId` FK on Warehouse configuration, `HasConversion<byte>()` + `.HasColumnType("tinyint")` for all enum columns (was `int`), `.HasColumnType("date")` for all date columns (was default `datetime2`), bare `.WithMany()` shadow FK (`SupplierPaymentId1`) fixed, `HasConversion<int>()` → `HasConversion<byte>()` for enum properties, `.HasColumnType("tinyint")` for all enum columns, `AuditLog` index direction corrected. **Old database dropped, 3 previous migrations removed, fresh `InitialCreate_v2` migration generated and applied — clean schema with zero pending changes. Build: 0 errors, 0 warnings across all 10 projects. Test suite: 1,574 passed, 0 failed.**
+- ✅ **Comprehensive XAML UI Quality Audit (v4.10.4)**: Systematic review of ALL 157 View XAML files across 48 modules — fixed 50+ files across 8 categories. ContextMenu MenuItems (15 files) now have Arabic ToolTips explaining actions. CheckBox controls (9 files) have Arabic ToolTips for "عرض غير النشطة"/"عرض الملغاة" filters. Form controls (34 controls across Purchase/Sales/Return/Transfer editors) got Arabic ToolTips explaining validation rules. ErrorMessage bars added to 19 list views that were missing them. Loading overlays (IsBusy ProgressBar) added to 6 editor views. Functional bugs fixed: ExpenseEditorView 3 ComboBoxes missing ItemsSource (non-functional), DailyClosureView duplicate Grid.Row layout collision. Hardcoded size violations fixed across 5 files (LoginView Height=40 removed, Purchase/Sales editor button Padding=16,0 removed, CashTransferView ComboBoxStyle→ModernComboBox). Success/failure user feedback audit across ALL ViewModels — 7 more ViewModels fixed with proper toasts and error dialogs. **Build: 0 errors, 0 warnings across all 6 production projects.**
+- 💬 **Complete CRUD Success/Failure Feedback (v4.10.5)**: EVERY CRUD operation (Add, Edit, Delete, Restore, Post, Cancel) across ALL 43 List ViewModels and 38 Editor ViewModels now shows user feedback — success toast for minor operations (delete/restore/post/cancel), success dialog for major operations (save/create/update), and error dialog for ALL failures after `HandleFailure()`. Garbled Arabic strings fixed in UserListViewModel. **Build: 0 errors, 0 warnings across all projects.**  
+- ✅ **IncludeInactive Checkboxes Complete (v4.10.5)**: 6 new "عرض غير النشطة" checkboxes added to CashBoxes, CustomerContacts, SupplierContacts, ProductUnits, ProductPrices, and CurrencyRates views — all with Arabic ToolTips and client-side IsActive filtering. Full ViewModel `IncludeInactive` property with auto-reload on toggle. **No silent data hiding.**  
 - 👤 **Users & Permissions (Phase 21)**: 9 DB-driven roles (System Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager), 45 granular permissions across 12 categories, UserRole enum removed, lockout at 5 attempts, AuditLog (bigint PK), PermissionManagementView
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search

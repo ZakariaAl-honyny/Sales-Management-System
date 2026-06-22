@@ -19,47 +19,76 @@
     <Grid Style="{StaticResource PageRootGridStyle}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource PageHeaderBorderStyle}">
+        <!-- Title -->
+        <TextBlock Grid.Row="0"
+                   Text="🔔  الإشعارات"
+                   Style="{StaticResource HeaderStyle}"/>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBox x:Name="SearchTextBox"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource ModernTextBox}"
+                         Width="200"
+                         ToolTip="بحث في الإشعارات"
+                         KeyDown="SearchTextBox_KeyDown"/>
+            </WrapPanel>
+        </Border>
+
+        <!-- Error Message Bar -->
+        <Border Grid.Row="2"
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="12,8"
+                Margin="0,0,0,8"
+                CornerRadius="6"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="الإشعارات" Style="{StaticResource PageHeaderTextStyle}"/>
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextWrapping="Wrap"/>
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="1" Style="{StaticResource PageContentBorderStyle}">
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+        <!-- Content Area -->
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True">
+            <DataGrid ItemsSource="{Binding NotificationsView}"
+                      SelectedItem="{Binding SelectedNotification}"
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      Style="{StaticResource ModernDataGrid}"
+                      BorderThickness="0"
+                      RowDetailsVisibilityMode="VisibleWhenSelected">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="العنوان" Binding="{Binding Title}" Width="*"/>
+                    <DataGridTextColumn Header="الرسالة" Binding="{Binding Message}" Width="2*"/>
+                    <DataGridTextColumn Header="التاريخ" Binding="{Binding CreatedAt}" Width="150"/>
+                    <DataGridCheckBoxColumn Header="مقروء" Binding="{Binding IsRead}" Width="80"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
 
-                <Border Grid.Row="0" Style="{StaticResource FilterBorderStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBox x:Name="SearchTextBox"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource FilterTextBoxStyle}"
-                                 ToolTip="بحث في الإشعارات"
-                                 KeyDown="SearchTextBox_KeyDown"/>
-                    </StackPanel>
-                </Border>
-
-                <DataGrid Grid.Row="1"
-                          ItemsSource="{Binding NotificationsView}"
-                          SelectedItem="{Binding SelectedNotification}"
-                          AutoGenerateColumns="False"
-                          IsReadOnly="True"
-                          Style="{StaticResource ModernDataGridStyle}"
-                          RowDetailsVisibilityMode="VisibleWhenSelected">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="العنوان" Binding="{Binding Title}" Width="*"/>
-                        <DataGridTextColumn Header="الرسالة" Binding="{Binding Message}" Width="2*"/>
-                        <DataGridTextColumn Header="التاريخ" Binding="{Binding CreatedAt}" Width="150"/>
-                        <DataGridCheckBoxColumn Header="مقروء" Binding="{Binding IsRead}" Width="80"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="4"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                CornerRadius="0">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4" Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
+            </StackPanel>
         </Border>
     </Grid>
 </UserControl>

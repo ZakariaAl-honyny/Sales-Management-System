@@ -579,6 +579,7 @@ public class CreatePurchaseInvoiceValidatorTests
         CurrencyId: null,
         ExchangeRate: null,
         Notes: "Test purchase invoice",
+        TaxId: null,
         Items: new List<CreatePurchaseInvoiceLineRequest>
         {
             CreateValidItem()

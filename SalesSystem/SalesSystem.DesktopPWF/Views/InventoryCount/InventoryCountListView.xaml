@@ -114,14 +114,14 @@
                           MouseDoubleClick="CountsDataGrid_MouseDoubleClick">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" ToolTip="تعديل الجرد المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon><TextBlock Text="✏️"/></MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="ترحيل" Command="{Binding PostCommand}">
+                            <MenuItem Header="ترحيل" ToolTip="ترحيل الجرد — سيتم تحديث المخزون" Command="{Binding PostCommand}">
                                 <MenuItem.Icon><TextBlock Text="🚀"/></MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="إلغاء" Command="{Binding CancelCommand}">
+                            <MenuItem Header="إلغاء" ToolTip="إلغاء الجرد المحدد" Command="{Binding CancelCommand}">
                                 <MenuItem.Icon><TextBlock Text="🚫"/></MenuItem.Icon>
                             </MenuItem>
                         </ContextMenu>

@@ -21,6 +21,7 @@ public class InventoryViewModel : ViewModelBase
     private int _pageSize = 50;
     private bool _isMovementsEmpty;
     private bool _isStocksEmpty;
+    private string? _errorMessage;
 
     public InventoryViewModel()
     {
@@ -69,6 +70,12 @@ public class InventoryViewModel : ViewModelBase
     {
         get => _isStocksEmpty;
         private set => SetProperty(ref _isStocksEmpty, value);
+    }
+
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set => SetProperty(ref _errorMessage, value);
     }
 
    

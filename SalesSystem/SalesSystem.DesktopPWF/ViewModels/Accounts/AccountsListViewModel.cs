@@ -260,7 +260,8 @@ public class AccountsListViewModel : ViewModelBase, IDisposable
             {
                 result.Add(new AccountTreeNodeDto(
                     node.Id, node.AccountCode, node.NameAr, node.AccountType,
-                    node.IsLeaf, node.CategoryId, filteredChildren));
+                    node.IsLeaf, node.CategoryId, node.Level, node.ColorCode,
+                    node.Description, filteredChildren));
             }
         }
         return result;
@@ -334,6 +335,7 @@ public class AccountsListViewModel : ViewModelBase, IDisposable
                 else
                 {
                     ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط الحساب", "DeleteAccount");
+                    await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage);
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -348,6 +350,7 @@ public class AccountsListViewModel : ViewModelBase, IDisposable
                 else
                 {
                     ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف الحساب", "DeleteAccount");
+                    await _dialogService.ShowErrorAsync("خطأ في الحذف النهائي", ErrorMessage);
                 }
             }
         });

@@ -138,6 +138,7 @@ public class ExpenseListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المصروفات", "ExpenseListViewModel.LoadExpensesAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Expenses.Count == 0;
         }
     }
@@ -220,6 +221,7 @@ public class ExpenseListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف المصروف", "ExpenseListViewModel.DeleteExpenseAsync");
+                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -255,6 +257,7 @@ public class ExpenseListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل المصروف", "ExpenseListViewModel.PostExpenseAsync");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -285,6 +288,7 @@ public class ExpenseListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء المصروف", "ExpenseListViewModel.CancelExpenseAsync");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 

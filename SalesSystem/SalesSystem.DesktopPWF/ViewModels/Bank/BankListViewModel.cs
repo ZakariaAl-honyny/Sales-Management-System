@@ -147,6 +147,7 @@ public class BankListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل البنوك", "BankListViewModel.LoadBanksAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Banks.Count == 0;
         }
     }
@@ -229,6 +230,7 @@ public class BankListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط البنك", "BankListViewModel.DeleteBankAsync");
+                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)

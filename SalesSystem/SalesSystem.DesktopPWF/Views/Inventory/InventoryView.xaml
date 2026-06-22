@@ -14,6 +14,7 @@
     <Grid Margin="24,24,24,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -25,8 +26,28 @@
                    Margin="0,0,0,24"
                    AutomationProperties.AutomationId="InventoryPageTitle"/>
 
+        <!-- Error Message Bar -->
+        <Border Grid.Row="1"
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="12,8"
+                Margin="0,0,0,8"
+                CornerRadius="6"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
         <!-- Tabs -->
-        <TabControl Grid.Row="1" Style="{StaticResource ModernTabControl}">
+        <TabControl Grid.Row="2" Style="{StaticResource ModernTabControl}">
             <!-- Movements Tab -->
             <TabItem Header="📜 حركات المخزون" AutomationProperties.AutomationId="TabMovements">
                 <Grid Margin="0,16,0,0">
@@ -321,7 +342,7 @@
         </TabControl>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="2"
+        <Border Grid.Row="0" Grid.RowSpan="3"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

@@ -3,11 +3,11 @@ using SalesSystem.Domain.Accounting.Enums;
 namespace SalesSystem.Contracts.DTOs;
 
 public record UserDto(int Id, string UserName, byte Role,
-    bool MustChangePassword, bool IsLocked,
+    bool MustChangePassword, bool IsLocked, bool IsActive,
     string? AvatarPath,
     DateTime? LastLoginAt, int LoginAttempts, int? DefaultCashBoxId)
 {
-    public bool IsActive => !IsLocked;
+    public string StatusDisplay => IsActive ? (IsLocked ? "مقفل" : "نشط") : "معطل";
 }
 
 public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
@@ -627,7 +627,11 @@ public record AccountDto(
     string? ParentAccountName,
     bool IsSystem,
     bool IsActive,
-    short? CategoryId)
+    short? CategoryId,
+    byte Level,
+    string? Description,
+    string? ColorCode,
+    string? Notes)
 {
     public string NatureDisplay => Nature switch
     {
@@ -639,17 +643,19 @@ public record AccountDto(
         _ => "غير معروف"
     };
 
-    public string LevelDisplay => IsLeaf ? "تفصيلي" : "مجموعة";
+    public string LevelDisplay => Level switch
+    {
+        1 => "مجموعة رئيسية",
+        2 => "مجموعة فرعية",
+        3 => "فرعي",
+        4 => "تفصيلي",
+        _ => $"المستوى {Level}"
+    };
 
-    // Backward-compatible property for code using AccountType
+    // Backward-compatible properties
     public byte AccountType => Nature;
+    public string AccountTypeDisplay => NatureDisplay;
     public bool AllowTransactions => IsLeaf;
-    public string? Description => null;
-    public string? ColorCode => null;
-    public decimal? OpeningBalance => null;
-    public string? Explanation => null;
-    public string? Notes => null;
-    public int Level => IsLeaf ? 4 : 2;
     public int? ParentAccountId => ParentId;
     public bool IsSystemAccount => IsSystem;
 }
@@ -661,15 +667,14 @@ public record AccountTreeNodeDto(
     byte Nature,
     bool IsLeaf,
     short? CategoryId,
+    byte Level,
+    string? ColorCode,
+    string? Description,
     List<AccountTreeNodeDto> Children)
 {
     // Backward-compatible properties
     public byte AccountType => Nature;
-    public int Level => IsLeaf ? 4 : 2;
-    public string? ColorCode => null;
     public bool AllowTransactions => IsLeaf;
-    public decimal? OpeningBalance => null;
-    public string? Explanation => null;
 }
 
 // ═══════════════════════════════════════════════════════

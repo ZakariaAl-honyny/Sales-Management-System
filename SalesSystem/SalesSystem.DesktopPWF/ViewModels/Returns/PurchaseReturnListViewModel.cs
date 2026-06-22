@@ -182,12 +182,14 @@ public class PurchaseReturnListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل مرتجعات المشتريات", "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
                 IsEmpty = Returns.Count == 0;
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "PurchaseReturnListViewModel.LoadReturnsAsync", "[PurchaseReturnListViewModel.LoadReturnsAsync] Failed to load purchase returns list.");
+            _ = _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
         finally
         {
@@ -267,10 +269,7 @@ public class PurchaseReturnListViewModel : ViewModelBase
                 }
                 else
                 {
-                    InvokeOnUIThread(() =>
-                    {
-                        dialogService.ShowError(fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
-                    });
+                    await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", fullInvoiceResult.Error ?? "فشل في تحميل تفاصيل الفاتورة");
                 }
             }
             catch (Exception ex)

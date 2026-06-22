@@ -31,6 +31,13 @@
                     <TextBlock Text="{Binding WindowTitle}" Style="{StaticResource HeaderStyle}" Foreground="White"/>
                 </StackPanel>
                 <TextBlock Text="إدارة أسعار صرف العملات وإضافة أسعار جديدة" FontSize="11" Foreground="#94A3B8" Margin="0,2,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <CheckBox Content="عرض غير النشطة" 
+                              IsChecked="{Binding IncludeInactive}" 
+                              VerticalAlignment="Center" 
+                              FontSize="11"
+                              ToolTip="عرض العملات المعطلة/غير النشطة أيضاً في القائمة"/>
+                </StackPanel>
             </StackPanel>
         </Border>
 

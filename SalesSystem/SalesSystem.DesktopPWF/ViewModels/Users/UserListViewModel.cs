@@ -165,7 +165,7 @@ public class UserListViewModel : AdminOnlyViewModel
         }
         else
         {
-            ErrorMessage = HandleFailure(result.Error ?? "��� �� ����� ����������", "UserListViewModel.LoadUsersOperationAsync", "[UserListViewModel.LoadUsersOperationAsync] Failed to load users list.");
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المستخدمين", "UserListViewModel.LoadUsersOperationAsync", "[UserListViewModel.LoadUsersOperationAsync] Failed to load users list.");
             IsEmpty = Users.Count == 0;
         }
     }
@@ -191,7 +191,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var editorVm = App.GetService<UserEditorViewModel>();
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "������ ����",
+            Title = "مستخدم جديد",
             Width = 900,
             Height = 650,
             OnClosed = (_) =>
@@ -208,7 +208,7 @@ public class UserListViewModel : AdminOnlyViewModel
         var editorVm = new UserEditorViewModel(SelectedUser);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {
-            Title = "����� ��������",
+            Title = "تعديل مستخدم",
             Width = 900,
             Height = 650,
             OnClosed = (_) =>
@@ -224,15 +224,15 @@ public class UserListViewModel : AdminOnlyViewModel
 
         if (SelectedUser.Id == CurrentUserId)
         {
-            await _dialogService.ShowErrorAsync("��� �� ����� ������", "�� ����� ����� ����� �����. ���� ��� ����� ��� ������ ����.");
+            await _dialogService.ShowErrorAsync("خطأ في تعطيل الحساب", "لا يمكن تعطيل حسابك الخاص. يرجى طلب مدير النظام للمساعدة.");
             return;
         }
 
         if (SelectedUser.IsActive)
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "����� ����� ������",
-                $"�� ��� ����� �� ����� ���� ��������: {SelectedUser.UserName}�");
+                "تأكيد تعطيل المستخدم",
+                $"هل أنت متأكد من تعطيل حساب المستخدم: {SelectedUser.UserName}؟");
             if (!confirmed) return;
 
             await ExecuteAsync(DeactivateUserOperationAsync,
@@ -241,8 +241,8 @@ public class UserListViewModel : AdminOnlyViewModel
         else
         {
             var confirmed = await _dialogService.ShowConfirmationAsync(
-                "����� ����� ������",
-                $"�� ��� ����� �� ����� ���� ��������: {SelectedUser.UserName}�");
+                "تأكيد تفعيل المستخدم",
+                $"هل أنت متأكد من تفعيل حساب المستخدم: {SelectedUser.UserName}؟");
             if (!confirmed) return;
 
             await ExecuteAsync(ActivateUserOperationAsync,
@@ -258,11 +258,12 @@ public class UserListViewModel : AdminOnlyViewModel
         if (result.IsSuccess)
         {
             await LoadUsersOperationAsync();
-            _toastService.ShowSuccess("�� ����� ������ �����");
+            _toastService.ShowSuccess("تم تعطيل المستخدم بنجاح");
         }
         else
         {
-            ErrorMessage = result.Error ?? "��� �� ����� ������";
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تعطيل الحساب", "UserListViewModel.DeactivateUserOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تعطيل المستخدم", ErrorMessage!);
         }
     }
 
@@ -283,11 +284,12 @@ public class UserListViewModel : AdminOnlyViewModel
         if (result.IsSuccess)
         {
             await LoadUsersOperationAsync();
-            _toastService.ShowSuccess("�� ����� ������ �����");
+            _toastService.ShowSuccess("تم تفعيل المستخدم بنجاح");
         }
         else
         {
-            ErrorMessage = result.Error ?? "��� �� ����� ������";
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تفعيل الحساب", "UserListViewModel.ActivateUserOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تفعيل المستخدم", ErrorMessage!);
         }
     }
 
@@ -296,10 +298,10 @@ public class UserListViewModel : AdminOnlyViewModel
         if (SelectedUser == null) return;
 
         var confirmed = await _dialogService.ShowConfirmationAsync(
-            "����� ����� ����� ���� ������",
-            $"�� ��� ����� �� ����� ����� ���� ������ ��������: {SelectedUser.UserName}�\n\n" +
-            $"���� ����� ���� ������ ���: 12345678\n" +
-            $"������� �� �������� ������� ��� ��� ����� ����.");
+            "تأكيد إعادة تعيين كلمة المرور",
+            $"هل أنت متأكد من إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.UserName}؟\n\n" +
+            $"سيتم تعيين كلمة المرور إلى: 12345678\n" +
+            $"وسيُطلب من المستخدم تغييرها عند أول تسجيل دخول.");
         if (!confirmed) return;
 
         await ExecuteAsync(ResetPasswordOperationAsync,
@@ -314,17 +316,17 @@ public class UserListViewModel : AdminOnlyViewModel
         if (result.IsSuccess)
         {
             await _dialogService.ShowInfoAsync(
-                "�� ����� ����� ���� ������",
-                $"�� ����� ����� ���� ������ ��������: {SelectedUser.UserName}\n\n" +
-                $"���� ������ �������: 12345678\n\n" +
-                $"������ �� �������� ����� ���� ������ ��� ��� ����� ����.");
+                "تم إعادة تعيين كلمة المرور",
+                $"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.UserName}\n\n" +
+                $"كلمة المرور الجديدة: 12345678\n\n" +
+                $"يرجى إبلاغ المستخدم بتغيير كلمة المرور عند أول تسجيل دخول.");
 
-            _toastService.ShowSuccess($"�� ����� ����� ���� ������ ��������: {SelectedUser.UserName}");
+            _toastService.ShowSuccess($"تم إعادة تعيين كلمة المرور للمستخدم: {SelectedUser.UserName}");
         }
         else
         {
-            ErrorMessage = result.Error ?? "��� �� ����� ����� ���� ������";
-            await _dialogService.ShowErrorAsync("��� �� ����� ����� ���� ������", ErrorMessage);
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في إعادة تعيين كلمة المرور", "UserListViewModel.ResetPasswordOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في إعادة تعيين كلمة المرور", ErrorMessage!);
         }
     }
 

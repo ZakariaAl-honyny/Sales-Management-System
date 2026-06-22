@@ -53,7 +53,7 @@
 
                 <!-- Status Filter -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
-                    <CheckBox Content="عرض غير النشطة" IsChecked="{Binding IncludeInactive}" VerticalAlignment="Center" FontSize="12"/>
+                    <CheckBox Content="عرض غير النشطة" IsChecked="{Binding IncludeInactive}" VerticalAlignment="Center" FontSize="12" ToolTip="عرض سندات القبض غير النشطة"/>
                 </StackPanel>
 
                 <!-- Actions -->
@@ -119,14 +119,14 @@
                           MouseDoubleClick="ReceiptsDataGrid_MouseDoubleClick">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" ToolTip="تعديل سند القبض المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon><TextBlock Text="✏️"/></MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="ترحيل" Command="{Binding PostCommand}">
+                            <MenuItem Header="ترحيل" ToolTip="ترحيل سند القبض — سيتم تحديث الرصيد" Command="{Binding PostCommand}">
                                 <MenuItem.Icon><TextBlock Text="🚀"/></MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="إلغاء" Command="{Binding CancelCommand}">
+                            <MenuItem Header="إلغاء" ToolTip="إلغاء سند القبض المحدد" Command="{Binding CancelCommand}">
                                 <MenuItem.Icon><TextBlock Text="🚫"/></MenuItem.Icon>
                             </MenuItem>
                         </ContextMenu>

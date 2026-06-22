@@ -29,9 +29,9 @@ public class UsersControllerTests
     {
         var users = new List<UserDto>
         {
-            new(1, "admin", (byte)1, false, false, null, null, 0, null),
-            new(2, "manager", (byte)2, false, false, null, null, 0, null),
-            new(3, "cashier", (byte)3, false, false, null, null, 0, null)
+            new(1, "admin", (byte)1, false, false, true, null, null, 0, null),
+            new(2, "manager", (byte)2, false, false, true, null, null, 0, null),
+            new(3, "cashier", (byte)3, false, false, true, null, null, 0, null)
         };
 
         _userServiceMock
@@ -79,7 +79,7 @@ public class UsersControllerTests
     [Fact]
     public async Task GivenValidUserId_WhenGetById_ThenReturnsUser()
     {
-        var user = new UserDto(1, "admin", 1, false, false, null, null, 0, null);
+        var user = new UserDto(1, "admin", 1, false, false, true, null, null, 0, null);
 
         _userServiceMock
             .Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
@@ -123,7 +123,7 @@ public class UsersControllerTests
     public async Task GivenValidCreateRequest_WhenCreate_ThenReturnsCreatedUser()
     {
         var request = new CreateUserRequest("newuser", (byte)2);
-        var createdUser = new UserDto(4, "newuser", (byte)2, false, false, null, null, 0, null);
+        var createdUser = new UserDto(4, "newuser", (byte)2, false, false, true, null, null, 0, null);
 
         _userServiceMock
             .Setup(x => x.CreateAsync(request, It.IsAny<CancellationToken>()))
@@ -198,7 +198,7 @@ public class UsersControllerTests
     public async Task GivenValidUpdateRequest_WhenUpdate_ThenReturnsUpdatedUser()
     {
         var request = new UpdateUserRequest(2, null, null, null);
-        var updatedUser = new UserDto(1, "admin", 2, false, false, null, null, 0, null);
+        var updatedUser = new UserDto(1, "admin", 2, false, false, true, null, null, 0, null);
 
         _userServiceMock
             .Setup(x => x.UpdateAsync(1, request, It.IsAny<CancellationToken>()))
@@ -231,7 +231,7 @@ public class UsersControllerTests
     public async Task GivenPasswordUpdate_WhenUpdate_ThenReturnsUpdatedUser()
     {
         var request = new UpdateUserRequest(1, null, "newpassword123", null);
-        var updatedUser = new UserDto(1, "admin", 1, false, false, null, null, 0, null);
+        var updatedUser = new UserDto(1, "admin", 1, false, false, true, null, null, 0, null);
 
         _userServiceMock
             .Setup(x => x.UpdateAsync(1, request, It.IsAny<CancellationToken>()))

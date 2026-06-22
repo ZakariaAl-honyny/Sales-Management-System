@@ -43,6 +43,7 @@ public class SettingsViewModel : ViewModelBase
     private bool _showLogo = true;
     private string _footerNote = string.Empty;
     private string _signaturePath = string.Empty;
+    private string? _errorMessage;
 
     public SettingsViewModel()
     {
@@ -61,6 +62,12 @@ public class SettingsViewModel : ViewModelBase
     }
 
     #region Properties
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set => SetProperty(ref _errorMessage, value);
+    }
+
     public string CompanyName
     {
         get => _companyName;

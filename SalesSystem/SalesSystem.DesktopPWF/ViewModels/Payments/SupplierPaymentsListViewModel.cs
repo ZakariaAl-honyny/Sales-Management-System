@@ -142,12 +142,14 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = result.Error ?? "حدث خطأ غير معروف";
+                await DialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
                 IsEmpty = Payments.Count == 0;
             }
         }
         catch (Exception ex)
         {
             ErrorMessage = HandleException(ex, "SupplierPaymentsListViewModel.LoadPaymentsAsync", "[SupplierPaymentsListViewModel.LoadPaymentsAsync] Failed to load supplier payments list.");
+            await DialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
         finally
         {
@@ -214,6 +216,7 @@ public class SupplierPaymentsListViewModel : ViewModelBase
             if (deleteResult.IsSuccess)
             {
                 await LoadPaymentsAsync();
+                await DialogService.ShowSuccessAsync("تم الحذف", "تم حذف سند الدفع بنجاح");
             }
             else
             {

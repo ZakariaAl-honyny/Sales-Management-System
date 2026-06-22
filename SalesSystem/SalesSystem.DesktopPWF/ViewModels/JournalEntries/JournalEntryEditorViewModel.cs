@@ -309,6 +309,7 @@ public class JournalEntryEditorViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ القيد", "SaveJournalEntry");
+            await _dialogService.ShowErrorAsync("خطأ في حفظ القيد المحاسبي", ErrorMessage!);
         }
     }
 

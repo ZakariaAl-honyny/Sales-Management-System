@@ -207,6 +207,7 @@ public class ExpenseEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث المصروف", "ExpenseEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث المصروف", ErrorMessage!);
             }
         }
         else
@@ -229,6 +230,7 @@ public class ExpenseEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة المصروف", "ExpenseEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة المصروف", ErrorMessage!);
             }
         }
     }

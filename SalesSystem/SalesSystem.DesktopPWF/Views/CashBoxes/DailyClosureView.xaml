@@ -165,7 +165,7 @@
         </Border>
 
         <!-- Error Message Bar -->
-        <Border Grid.Row="4"
+        <Border Grid.Row="5"
                 Background="{StaticResource ErrorLightBrush}"
                 BorderBrush="{StaticResource ErrorBrush}"
                 BorderThickness="1"
@@ -185,14 +185,14 @@
         </Border>
 
         <!-- Past Closures Section Label -->
-        <TextBlock Grid.Row="5"
+        <TextBlock Grid.Row="6"
                    Text="الإغلاقات السابقة"
                    Style="{StaticResource SectionHeaderStyle}"
                    Margin="{StaticResource StandardSectionMargin}"
                    AutomationProperties.AutomationId="PastClosuresSectionLabel"/>
 
         <!-- Past Closures DataGrid -->
-        <Border Grid.Row="6" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True" Margin="{StaticResource StandardSectionMargin}">
+        <Border Grid.Row="7" Style="{StaticResource CardStyle}" Padding="0" ClipToBounds="True" Margin="{StaticResource StandardSectionMargin}">
             <Grid>
                 <DataGrid ItemsSource="{Binding PastClosures}"
                           SelectedItem="{Binding SelectedClosure}"
@@ -274,7 +274,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="8"
+        <Border Grid.Row="0" Grid.RowSpan="9"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

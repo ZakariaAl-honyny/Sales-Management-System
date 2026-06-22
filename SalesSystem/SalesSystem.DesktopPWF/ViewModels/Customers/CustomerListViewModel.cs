@@ -175,6 +175,7 @@ public class CustomerListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", "CustomerListViewModel.LoadCustomersAsync", "[CustomerListViewModel.LoadCustomersAsync] Failed to load customers list.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Customers.Count == 0;
         }
     }
@@ -277,6 +278,7 @@ public class CustomerListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط العميل", "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في حذف العميل", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -293,6 +295,7 @@ public class CustomerListViewModel : ViewModelBase
                 var error = deleteResult.Error ?? "فشل في حذف العميل";
                 ErrorMessage = HandleFailure(error, "CustomerListViewModel.DeleteCustomerAsync", $"[CustomerListViewModel.DeleteCustomerAsync] Failed to delete customer with ID {SelectedCustomer.Id}.");
                 LogSystemError($"Hard delete failed for Customer {SelectedCustomer.Id}: {error}", "CustomerListViewModel.DeleteCustomerAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف العميل", ErrorMessage!);
             }
         }
     }
@@ -333,6 +336,7 @@ public class CustomerListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة العميل", "CustomerListViewModel.RestoreCustomerAsync", $"[CustomerListViewModel.RestoreCustomerAsync] Failed to restore customer with ID {SelectedCustomer.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في استعادة العميل", ErrorMessage!);
         }
     }
 

@@ -53,10 +53,6 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(x => x.ColorCode)
             .HasMaxLength(7);
 
-        builder.Property(x => x.OpeningBalance)
-            .HasPrecision(18, 2)
-            .HasDefaultValue(0m);
-
         builder.Property(x => x.Notes)
             .HasMaxLength(300);
 

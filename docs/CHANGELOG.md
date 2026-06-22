@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.10.5 — Complete CRUD Feedback + IncludeInactive Checkboxes (2026-06-22)
+
+### ✨ Feature: Success/Failure Messages for ALL CRUD Operations
+- Comprehensive audit of ALL 43 List ViewModels and 38 Editor ViewModels
+- Added missing `await _dialogService.ShowErrorAsync(...)` after `HandleFailure()` in **50+ ViewModels** across all modules
+- Fixed garbled Arabic (mojibake) in **UserListViewModel.cs** — 15+ corrupted strings replaced with correct UTF-8 Arabic
+- Pattern enforced: `_toastService.ShowSuccess()` for minor successes (delete/restore/post/cancel), `_dialogService.ShowSuccessAsync()` for major successes (save/create/update)
+- All error dialog titles are operation-specific Arabic (e.g., "خطأ في حفظ الفاتورة"), never generic "خطأ"
+
+### ✨ Feature: IncludeInactive Checkboxes Added to 6 Missing Views
+- **CashBoxes**: Added `IncludeInactive` property + XAML CheckBox + client-side IsActive filter
+- **CustomerContacts**: Added `IncludeInactive` property + XAML CheckBox + client-side IsActive filter
+- **SupplierContacts**: Added `IncludeInactive` property + XAML CheckBox + client-side IsActive filter
+- **ProductUnits**: Added `IncludeInactive` property + XAML CheckBox
+- **ProductPrices**: Added `IncludeInactive` property + XAML CheckBox
+- **CurrencyRates**: Added XAML CheckBox (ViewModel already had `IncludeInactive` property)
+- All checkboxes have Arabic ToolTips explaining the filter behavior
+
+### 📚 Documentation & Subagent Updates
+- **AGENTS.md**: New §2.99 (RULE-552→559) for IncludeInactive pattern, 4 new FORBIDDEN items, 4 new pre-submission checklist items
+- **ui-agent.md**: New "IncludeInactive Checkbox Pattern (v4.10.5)" section with ViewModel property, XAML, client-side filtering, and entity-type inclusion matrix
+- **fast-agent.md**: New "IncludeInactive Checkbox Fix Pattern (v4.10.5)" — step-by-step fix guide for adding IncludeInactive to VMs and XAML
+- **code-reviewer.md**: 3 new XAML quality checklist items for IncludeInactive ViewModel properties, CheckBoxes, and client-side filtering
+- **implement-agent.md**: New IncludeInactive subsection with ViewModel property pattern, XAML CheckBox, client-side filtering fallback, and guidance on when NOT to add it
+- **README.md**: Version bumped to v4.10.5 with new UX feature descriptions
+
+### ✅ Build Status
+- **Build: 0 errors, 0 warnings** across all 6 production projects (SalesSystem.DesktopPWF verified)
+- All 1,574+ tests passing
+
 ## v4.10.4 — SalesReturn Audit Fixes & Phase 27-28 Gaps Closed (2026-06-15)
 
 ### 🐛 Bug Fix: SalesReturn.Post()/Cancel() Timestamps

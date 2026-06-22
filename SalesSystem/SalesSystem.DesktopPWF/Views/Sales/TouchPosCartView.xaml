@@ -156,7 +156,6 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ============================================================ -->
@@ -320,69 +319,6 @@
             </Border>
         </Grid>
 
-        <!-- ============================================================ -->
-        <!-- BOTTOM ROW: Totals, Paid Amount, Numeric Keypad & Actions    -->
-        <!-- ============================================================ -->
-        <Border Grid.Row="1"
-                Background="{StaticResource PrimaryBrush}"
-                Padding="12,10"
-                CornerRadius="0"
-                Effect="{StaticResource DeepShadow}">
-            <StackPanel>
-                <!-- Part 1: Totals Display -->
-                <StackPanel Margin="0,0,0,6">
-                    <!-- Subtotal line -->
-                    <Grid Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="المجموع الفرعي" FontSize="12" Foreground="#CBD5E1"/>
-                        <TextBlock Grid.Column="1" Text="{Binding SubTotal, StringFormat=N2}" FontSize="13" FontWeight="SemiBold" Foreground="#CBD5E1"/>
-                    </Grid>
-                    <!-- Total line -->
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="الإجمالي" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Grid.Column="1" Text="{Binding TotalAmount, StringFormat=N2}" FontSize="18" FontWeight="Bold" Foreground="White"/>
-                    </Grid>
-                </StackPanel>
 
-                <!-- Part 2: Paid Amount with NumericKeypadControl -->
-                <Border Background="#1E293B" CornerRadius="8" Padding="10" Margin="0,0,0,6">
-                    <StackPanel>
-                        <TextBlock Text="المبلغ المدفوع" FontSize="12" Foreground="#94A3B8" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding PaidAmountString, FallbackValue='0'}" 
-                                   FontSize="24" FontWeight="Bold" Foreground="White"
-                                   HorizontalAlignment="Center"/>
-                        <controls:NumericKeypadControl InputValue="{Binding PaidAmountString, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                       Margin="0,4,0,0"
-                                                       MinHeight="120"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Part 3: Action Buttons (T015) -->
-                <UniformGrid Columns="3" Margin="0,0,0,0" Height="40">
-                    <Button Content="كاش" 
-                            Command="{Binding CashCheckoutCommand}"
-                            Style="{StaticResource CheckoutButtonStyle}"
-                            Background="#16A34A"
-                            ToolTip="إتمام البيع نقداً — سيتم ترحيل الفاتورة"/>
-                    <Button Content="شبكة" 
-                            Command="{Binding CardCheckoutCommand}"
-                            Style="{StaticResource CheckoutButtonStyle}"
-                            Background="#2563EB"
-                            ToolTip="إتمام البيع عبر بطاقة الشبكة"/>
-                    <Button Content="مسودة" 
-                            Command="{Binding DraftCommand}"
-                            Style="{StaticResource CheckoutButtonStyle}"
-                            Background="#F59E0B"
-                            ToolTip="حفظ كمسودة دون ترحيل"/>
-                </UniformGrid>
-            </StackPanel>
-        </Border>
     </Grid>
 </UserControl>

@@ -147,6 +147,7 @@ public class PartyListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الأشخاص", "PartyListViewModel.LoadPartiesAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Parties.Count == 0;
         }
     }
@@ -230,6 +231,7 @@ public class PartyListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط الشخص", "PartyListViewModel.DeletePartyAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إلغاء تنشيط الشخص", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)

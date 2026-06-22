@@ -257,6 +257,7 @@ public class InventoryAdjustmentListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل التسوية", "InventoryAdjustmentListViewModel.PostAdjustmentAsync", $"[InventoryAdjustmentListViewModel.PostAdjustmentAsync] Failed to post adjustment {SelectedAdjustment.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -294,6 +295,7 @@ public class InventoryAdjustmentListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء التسوية", "InventoryAdjustmentListViewModel.CancelAdjustmentAsync", $"[InventoryAdjustmentListViewModel.CancelAdjustmentAsync] Failed to cancel adjustment {SelectedAdjustment.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 

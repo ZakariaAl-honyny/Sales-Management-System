@@ -122,6 +122,7 @@ public class SystemAccountMappingEditorViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث حساب النظام", "SystemAccountMappingEditorViewModel.Save");
+            await _dialogService.ShowErrorAsync("خطأ في تحديث الربط المحاسبي", ErrorMessage!);
         }
     }
 }

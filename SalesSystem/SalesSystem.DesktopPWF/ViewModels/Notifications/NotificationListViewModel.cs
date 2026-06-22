@@ -163,6 +163,7 @@ public class NotificationListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الإشعارات", "NotificationListViewModel.LoadNotificationsAsync", "[NotificationListViewModel.LoadNotificationsAsync] Failed to load notifications.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Notifications.Count == 0;
         }
     }
@@ -214,6 +215,7 @@ public class NotificationListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث الإشعار", "NotificationListViewModel.MarkAsReadAsync", $"[NotificationListViewModel.MarkAsReadAsync] Failed to mark notification {SelectedNotification.Id} as read.");
+            await _dialogService.ShowErrorAsync("خطأ في تحديث الإشعار", ErrorMessage!);
         }
     }
 
@@ -237,6 +239,7 @@ public class NotificationListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث الإشعارات", "NotificationListViewModel.MarkAllAsReadAsync", "[NotificationListViewModel.MarkAllAsReadAsync] Failed to mark all notifications as read.");
+            await _dialogService.ShowErrorAsync("خطأ في تحديث الإشعارات", ErrorMessage!);
         }
     }
 

@@ -191,6 +191,7 @@ public class PaymentVoucherListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل سندات الصرف", "PaymentVoucherListViewModel.LoadVouchersOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Vouchers.Count == 0;
         }
     }
@@ -296,6 +297,7 @@ public class PaymentVoucherListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل سند الصرف", "PaymentVoucherListViewModel.PostVoucherOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -335,6 +337,7 @@ public class PaymentVoucherListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء سند الصرف", "PaymentVoucherListViewModel.CancelVoucherOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 
@@ -374,6 +377,7 @@ public class PaymentVoucherListViewModel : ViewModelBase, IDisposable
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف سند الصرف", "PaymentVoucherListViewModel.DeleteVoucherOperationAsync");
+            await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
         }
     }
 

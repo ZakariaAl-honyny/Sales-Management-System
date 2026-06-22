@@ -281,6 +281,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
     private async Task InitializeAsync()
     {
+        // Populate mock expense accounts for the UI binding
+        ExpenseAccounts.Add(new ExpenseAccountItem { Id = 1, Name = "أجور نقل" });
+        ExpenseAccounts.Add(new ExpenseAccountItem { Id = 2, Name = "تغليف" });
+        OtherChargesAccountId = 1;
+
         await LoadReferenceDataAsync();
         await LoadSettingsAsync();
         await LoadCashBoxesAsync();
@@ -516,7 +521,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _paidAmount, value))
             {
-                RecalculateTotals();
+                DueAmount = TotalAmount - _paidAmount;
+                UpdateCommandStates();
             }
         }
     }
@@ -549,6 +555,34 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         get => _errorMessage;
         set => SetProperty(ref _errorMessage, value);
+    }
+
+    // UI Binding properties for POS layout
+    private int _discountTypeIndex;
+    public int DiscountTypeIndex
+    {
+        get => _discountTypeIndex;
+        set => SetProperty(ref _discountTypeIndex, value);
+    }
+
+    private int? _otherChargesAccountId;
+    public int? OtherChargesAccountId
+    {
+        get => _otherChargesAccountId;
+        set => SetProperty(ref _otherChargesAccountId, value);
+    }
+
+    public class ExpenseAccountItem
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    private ObservableCollection<ExpenseAccountItem> _expenseAccounts = new();
+    public ObservableCollection<ExpenseAccountItem> ExpenseAccounts
+    {
+        get => _expenseAccounts;
+        set => SetProperty(ref _expenseAccounts, value);
     }
 
     // Calculated properties
@@ -843,6 +877,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الفاتورة", "SalesInvoiceEditorViewModel.LoadInvoiceAsync", $"[SalesInvoiceEditorViewModel.LoadInvoiceAsync] Failed to load invoice data for ID: {_invoiceId}");
+                await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             }
         });
     }

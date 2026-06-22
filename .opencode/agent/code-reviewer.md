@@ -62,6 +62,9 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] ALL dialog calls use Async suffix (ShowErrorAsync, ShowSuccessAsync)?
 - [ ] HandleFailure() transforms errors to user-friendly Arabic?
 - [ ] No raw HTTP response bodies in user-facing dialogs?
+- [ ] Success messages use Arabic: "تم [العملية] بنجاح" pattern?
+- [ ] Error dialog titles are operation-specific: "خطأ في حفظ الفاتورة" NOT generic "خطأ"?
+- [ ] Toast is used for minor successes, dialog for major ones?
 
 ### Logging
 - [ ] `Log.Error` used for system errors ONLY (not user validation mistakes)?
@@ -85,6 +88,26 @@ Code quality and convention enforcement for the Sales Management System.
 - [ ] Navigation MenuItems describe destination screen?
 - [ ] Empty-state buttons ("add first item") have ToolTips?
 - [ ] Error dismiss ("✕") buttons have ToolTip "إخفاء رسالة الخطأ"?
+
+### XAML Quality — Complete View Audit (v4.10.4)
+- [ ] ALL ContextMenu MenuItems have Arabic ToolTips (تعديل → "تعديل العنصر المحدد", حذف → "حذف العنصر المحدد", etc.)?
+- [ ] ALL CheckBox controls have Arabic ToolTips (عرض غير النشطة → "عرض العناصر غير النشطة", عرض الملغاة → "عرض العناصر الملغاة")?
+- [ ] ALL form controls (TextBox, ComboBox, DatePicker) in editor views have Arabic ToolTips explaining input rules?
+- [ ] No ComboBox is missing `ItemsSource` binding (functional bug)?
+- [ ] No ComboBox uses `Style="{StaticResource ComboBoxStyle}"` — uses `ModernComboBox` instead?
+- [ ] No ComboBox has BOTH `DisplayMemberPath` AND `ItemTemplate` set simultaneously?
+- [ ] Every list view has an ErrorMessage bar (Border with Visibility bound to ErrorMessage via StringNotEmptyToVisibility)?
+- [ ] Every editor view has a loading overlay (Border with IsBusy ProgressBar spanning all Grid rows)?
+- [ ] ALL list ViewModels for soft-deletable entities have `IncludeInactive` property that triggers reload?
+- [ ] ALL list XAML views for soft-deletable entities have "عرض غير النشطة" CheckBox with Arabic ToolTip?
+- [ ] Client-side filtering properly filters out inactive records when IncludeInactive is false?
+
+### Success/Failure User Feedback
+- [ ] ALL Save operations show either `_toastService.ShowSuccess()` (minor) or `_dialogService.ShowSuccessAsync()` (major)?
+- [ ] ALL Post/Cancel/Delete/Restore operations show `_toastService.ShowSuccess()`?
+- [ ] ALL failure paths have `await _dialogService.ShowErrorAsync()` after `HandleFailure()`?
+- [ ] No silent Save/Post/Cancel/Delete — user MUST see feedback?
+- [ ] No `HandleFailure()` call without corresponding dialog?
 
 ### Identifier Strategy — No Code Column (v4.5.3)
 - [ ] Product/Customer/Supplier/Warehouse entities have NO Code property?

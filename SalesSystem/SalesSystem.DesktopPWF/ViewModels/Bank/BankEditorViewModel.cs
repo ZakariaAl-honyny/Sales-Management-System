@@ -148,6 +148,7 @@ public class BankEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث البنك", "BankEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث البنك", ErrorMessage!);
             }
         }
         else
@@ -167,6 +168,7 @@ public class BankEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة البنك", "BankEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة البنك", ErrorMessage!);
             }
         }
     }

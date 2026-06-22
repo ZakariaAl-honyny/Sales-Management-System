@@ -24,7 +24,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -194,17 +193,8 @@
             </Grid>
         </Border>
 
-        <!-- Current Balance Summary -->
-        <Border Grid.Row="5" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                <TextBlock Text="الرصيد الحالي: " FontSize="14" Foreground="{StaticResource TextSecondaryBrush}"/>
-                <TextBlock Text="{Binding CurrentBalance, StringFormat=N2}" FontSize="16" FontWeight="Bold" 
-                           Foreground="{StaticResource SuccessBrush}" Margin="4,0,0,0"/>
-            </StackPanel>
-        </Border>
-
         <!-- Footer -->
-        <Border Grid.Row="6" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
+        <Border Grid.Row="5" Background="White" Padding="10,4" BorderThickness="0,1,0,0" BorderBrush="{StaticResource BorderBrush}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                 <TextBlock Text="عدد الحركات: " FontSize="13" Foreground="{StaticResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding Transactions.Count, FallbackValue=0}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="4,0,0,0"/>
@@ -212,7 +202,7 @@
         </Border>
 
         <!-- Loading Overlay -->
-        <Border Grid.Row="0" Grid.RowSpan="7"
+        <Border Grid.Row="0" Grid.RowSpan="6"
                 Background="#80FFFFFF"
                 Panel.ZIndex="1000"
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">

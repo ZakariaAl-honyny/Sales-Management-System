@@ -1265,3 +1265,226 @@ if (SelectedSourceCashBox.CurrentBalance < Amount) // ❌ removed
 14. Remove `CustomerType`/`SupplierType` radio from Customer/Supplier Editor
 15. Remove `OpeningBalance` field from Customer/Supplier/CashBox editors (balance on Account)
 16. Remove `CurrencyId` field from Customer/Supplier editors (per-transaction, not per-entity)
+
+### ContextMenu ToolTips Pattern (v4.10.4)
+
+ALL ContextMenu MenuItems MUST have Arabic ToolTips. Pattern for list views:
+
+```xml
+<ContextMenu>
+    <MenuItem Header="تعديل" Command="{Binding EditCommand}"
+              ToolTip="تعديل العنصر المحدد"/>
+    <MenuItem Header="حذف" Command="{Binding DeleteCommand}"
+              ToolTip="حذف العنصر المحدد"/>
+    <MenuItem Header="ترحيل" Command="{Binding PostCommand}"
+              ToolTip="ترحيل العنصر — سيتم تحديث المخزون والرصيد"/>
+    <MenuItem Header="إلغاء" Command="{Binding CancelCommand}"
+              ToolTip="إلغاء العنصر المحدد"/>
+    <MenuItem Header="استعادة" Command="{Binding RestoreCommand}"
+              ToolTip="استعادة عنصر محذوف"/>
+    <MenuItem Header="معاينة الطباعة" Command="{Binding PreviewCommand}"
+              ToolTip="معاينة العنصر قبل الطباعة"/>
+    <MenuItem Header="طباعة A4" Command="{Binding PrintA4Command}"
+              ToolTip="طباعة العنصر بصيغة A4"/>
+    <MenuItem Header="طباعة حرارية" Command="{Binding PrintThermalCommand}"
+              ToolTip="طباعة العنصر على طابعة حرارية"/>
+    <MenuItem Header="عرض الفاتورة" Command="{Binding ViewCommand}"
+              ToolTip="عرض تفاصيل الفاتورة"/>
+</ContextMenu>
+```
+
+Common ContextMenu actions with their required ToolTips:
+- "تعديل" → "تعديل العنصر المحدد"
+- "حذف" → "حذف العنصر المحدد"
+- "ترحيل" → "ترحيل العنصر — سيتم تحديث المخزون والرصيد"
+- "إلغاء" → "إلغاء العنصر المحدد"
+- "استعادة" → "استعادة عنصر محذوف"
+- "عرض الفاتورة" → "عرض تفاصيل الفاتورة"
+- "تعديل الفاتورة" → "تعديل الفاتورة المحددة"
+- "معاينة الطباعة" → "معاينة العنصر قبل الطباعة"
+- "طباعة A4" → "طباعة العنصر بصيغة A4"
+- "طباعة حرارية" → "طباعة العنصر على طابعة حرارية"
+- "تحديث" → "تحديث البيانات من الخادم"
+
+### CheckBox ToolTips Pattern (v4.10.4)
+
+ALL CheckBox controls must have Arabic ToolTips:
+
+```xml
+<!-- List view filter checkboxes -->
+<CheckBox Content="عرض غير النشطة" IsChecked="{Binding IncludeInactive}"
+          ToolTip="عرض العناصر غير النشطة (المحذوفة)"/>
+
+<CheckBox Content="عرض الملغاة" IsChecked="{Binding IncludeCancelled}"
+          ToolTip="عرض العناصر الملغاة"/>
+
+<CheckBox Content="عرض الفواتير الملغاة" IsChecked="{Binding IncludeCancelled}"
+          ToolTip="عرض فواتير البيع/الشراء الملغاة"/>
+```
+
+### ErrorMessage Bar Pattern (v4.10.4)
+
+Every list view MUST have an error message bar between the header and content area:
+
+```xml
+<!-- Error Message Bar — placed at Grid.Row between header and content -->
+<Border Grid.Row="2"
+        Background="#FEE2E2" BorderBrush="#FCA5A5" BorderThickness="0,0,0,1"
+        Padding="12,8"
+        Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyToVisibility}}">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="{Binding ErrorMessage}" Foreground="#DC2626" FontSize="12"
+                   VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Command="{Binding DismissErrorCommand}"
+                Background="Transparent" BorderThickness="0"
+                Content="✕" Foreground="#DC2626" FontSize="14"
+                ToolTip="إخفاء رسالة الخطأ"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyToVisibility}}"/>
+    </Grid>
+</Border>
+```
+
+The converter `StringNotEmptyToVisibility` converts a non-empty string to `Visible` and null/empty to `Collapsed`.
+
+### Loading Overlay Pattern (v4.10.4)
+
+Every editor view MUST have a loading overlay spanning all Grid.Rows:
+
+```xml
+<!-- Loading Overlay — last child of the outermost Grid -->
+<Border Grid.Row="0" Grid.RowSpan="99"
+        Background="#CCFFFFFF"
+        Panel.ZIndex="1000"
+        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+        CornerRadius="0">
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="180" Height="4"
+                     Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+        <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold"
+                   Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}"
+                   HorizontalAlignment="Center"/>
+    </StackPanel>
+</Border>
+```
+
+Usage:
+- Must be the LAST child in the Grid to render on top
+- Grid.RowSpan must cover ALL rows (use 99 if unsure, or count rows)
+- Panel.ZIndex must be high (e.g., 1000) to ensure it renders above all content
+- Background="#CCFFFFFF" provides a semi-transparent white overlay
+
+### Success/Failure Message Pattern (v4.10.4)
+
+EVERY ViewModel operation MUST provide both success and failure feedback:
+
+**Success — Minor operations (delete, restore, post, cancel):**
+```csharp
+// Use toast for minor operations
+_toastService.ShowSuccess("تم حذف العنصر بنجاح");
+_toastService.ShowSuccess("تم ترحيل الفاتورة بنجاح — سيتم تحديث المخزون والرصيد");
+```
+
+**Success — Major operations (save, create, update):**
+```csharp
+// Use dialog for major operations
+await _dialogService.ShowSuccessAsync("تم الحفظ", "تم حفظ الفاتورة بنجاح");
+```
+
+**Failure — ALL operations:**
+```csharp
+var result = await _service.SaveAsync(...);
+if (result.IsSuccess)
+{
+    _toastService.ShowSuccess("تم الحفظ بنجاح");
+    RequestClose();
+}
+else
+{
+    ErrorMessage = HandleFailure(result.Error, "SaveInvoice");
+    await _dialogService.ShowErrorAsync("خطأ في حفظ الفاتورة", ErrorMessage!);
+}
+```
+
+**Arabic Success Message Templates:**
+| Operation | Toast/Dialog | Message |
+|-----------|-------------|---------|
+| Save (create) | Dialog | "تم حفظ [العنصر] بنجاح" |
+| Save (update) | Dialog | "تم تحديث [العنصر] بنجاح" |
+| Delete (soft) | Toast | "تم حذف [العنصر] بنجاح" |
+| Permanent Delete | Toast | "تم حذف [العنصر] نهائياً" |
+| Restore | Toast | "تم استعادة [العنصر] بنجاح" |
+| Post | Toast | "تم ترحيل [العنصر] بنجاح" |
+| Cancel/Reverse | Toast | "تم إلغاء [العنصر] بنجاح" |
+| Export | Toast | "تم تصدير التقرير بنجاح" |
+
+**Arabic Error Dialog Titles:**
+| Context | Title |
+|---------|-------|
+| Invoice save | "خطأ في حفظ الفاتورة" |
+| Product save | "خطأ في حفظ المنتج" |
+| Delete | "خطأ في الحذف" |
+| Post | "خطأ في الترحيل" |
+| Cancel | "خطأ في الإلغاء" |
+| Export | "خطأ في التصدير" |
+| Load | "خطأ في تحميل البيانات" |
+
+### IncludeInactive Checkbox Pattern (v4.10.5)
+
+List views for soft-deletable entities MUST display a "عرض غير النشطة" checkbox.
+
+**ViewModel Pattern:**
+```csharp
+private bool _includeInactive;
+public bool IncludeInactive
+{
+    get => _includeInactive;
+    set
+    {
+        if (SetProperty(ref _includeInactive, value))
+        {
+            _ = LoadItemsAsync();  // Reload data when toggle changes
+        }
+    }
+}
+```
+
+**Client-Side Filtering (when API doesn't support includeInactive parameter):**
+```csharp
+private void ApplyFilters()
+{
+    var view = CollectionViewSource.GetDefaultView(ItemsCollection);
+    if (!IncludeInactive)
+    {
+        view.Filter = item => item is T t && t.IsActive;
+    }
+    else
+    {
+        view.Filter = null;
+    }
+}
+```
+
+**XAML CheckBox Pattern:**
+```xml
+<CheckBox Content="عرض غير النشطة" 
+          IsChecked="{Binding IncludeInactive}" 
+          VerticalAlignment="Center" 
+          FontSize="11"
+          ToolTip="عرض العناصر غير النشطة (المحذوفة)"/>
+```
+
+**When to add IncludeInactive:**
+| Entity Type | Add IncludeInactive? | Reason |
+|-------------|---------------------|--------|
+| Products, Customers, Suppliers, etc. (have IsActive) | ✅ YES | Soft-deletable entities |
+| Accounts (have IsActive via ActivatableEntity) | ✅ YES | Account soft-delete |
+| Currencies, Units, Taxes (have IsActive) | ✅ YES | Soft-deletable lookups |
+| Invoices, Journal Entries (status-based) | ❌ NO — use IncludeCancelled instead | Status lifecycle (Draft/Posted/Cancelled) |
+| AuditLog, InventoryTransaction (append-only) | ❌ NO | No soft-delete, log/transaction records |
+| UserSession (uses IncludeRevoked) | ❌ NO | Has its own IncludeRevoked instead |
+
+**Rule of thumb:** If the entity has `IsActive` property and soft-delete, add IncludeInactive. If it has status lifecycle (Draft/Posted/Cancelled), consider IncludeCancelled instead.

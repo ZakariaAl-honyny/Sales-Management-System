@@ -82,7 +82,8 @@
                                                      Style="{StaticResource ModernTextBox}" 
                                                      Padding="8,4" 
                                                      FontWeight="Bold"
-                                                     HorizontalContentAlignment="Center"/>
+                                                     HorizontalContentAlignment="Center"
+                                                     ToolTip="أدخل كمية المرتجع — يجب أن لا تتجاوز الكمية المسموحة"/>
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
@@ -168,7 +169,8 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
-                                             Style="{StaticResource ModernTextBox}">
+                                             Style="{StaticResource ModernTextBox}"
+                                             ToolTip="ابحث عن صنف بالاسم أو الباركود">
                                         <TextBox.InputBindings>
                                             <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
                                         </TextBox.InputBindings>
@@ -204,7 +206,8 @@
                                       SelectedValuePath="Id"
                                       DisplayMemberPath="Name"
                                       Style="{StaticResource ModernComboBox}"
-                                      Margin="0,0,0,8"/>
+                                      Margin="0,0,0,8"
+                                      ToolTip="اختر المخزن الذي سيتم إرجاع البضاعة إليه"/>
 
                             <!-- Currency -->
                             <TextBlock Text="العملة" Style="{StaticResource LabelStyle}"/>
@@ -217,7 +220,8 @@
                                           SelectedValue="{Binding SelectedCurrencyId}"
                                           SelectedValuePath="Id"
                                           DisplayMemberPath="Name"
-                                          Style="{StaticResource ModernComboBox}"/>
+                                          Style="{StaticResource ModernComboBox}"
+                                          ToolTip="اختر عملة فاتورة المرتجع"/>
                                 <TextBlock Grid.Column="1" Text="{Binding CurrencyName}" 
                                            VerticalAlignment="Center" Margin="8,0,0,0"
                                            Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
@@ -250,7 +254,8 @@
                             </StackPanel>
 
                             <TextBlock Text="تاريخ المرتجع" Style="{StaticResource LabelStyle}"/>
-                            <DatePicker SelectedDate="{Binding ReturnDate}" Style="{StaticResource ModernDatePicker}" Margin="0,0,0,8"/>
+                            <DatePicker SelectedDate="{Binding ReturnDate}" Style="{StaticResource ModernDatePicker}" Margin="0,0,0,8"
+                                       ToolTip="تاريخ عملية الإرجاع"/>
                         </StackPanel>
                     </Border>
 
@@ -345,7 +350,8 @@
                                      Style="{StaticResource ModernTextBox}" 
                                      Height="80" 
                                      AcceptsReturn="True"
-                                     VerticalContentAlignment="Top" Padding="8,4"/>
+                                     VerticalContentAlignment="Top" Padding="8,4"
+                                     ToolTip="ملاحظات إضافية حول عملية الإرجاع"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>

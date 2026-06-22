@@ -44,19 +44,28 @@
 
                     <!-- Expense Account -->
                     <TextBlock Text="حساب المصروف *" Style="{StaticResource LabelStyle}"/>
-                    <ComboBox SelectedValue="{Binding ExpenseAccountId}"
+                    <ComboBox ItemsSource="{Binding ExpenseAccountOptions}"
+                              SelectedValue="{Binding ExpenseAccountId}"
+                              SelectedValuePath="Key"
+                              DisplayMemberPath="Value"
                               ToolTip="اختر حساب المصروف — هذا الحقل إلزامي"
                               Style="{StaticResource ModernComboBox}"/>
 
                     <!-- CashBox -->
                     <TextBlock Text="الصندوق *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
-                    <ComboBox SelectedValue="{Binding CashBoxId}"
+                    <ComboBox ItemsSource="{Binding CashBoxOptions}"
+                              SelectedValue="{Binding CashBoxId}"
+                              SelectedValuePath="Key"
+                              DisplayMemberPath="Value"
                               ToolTip="اختر الصندوق — هذا الحقل إلزامي"
                               Style="{StaticResource ModernComboBox}"/>
 
                     <!-- Currency -->
                     <TextBlock Text="العملة *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
-                    <ComboBox SelectedValue="{Binding CurrencyId}"
+                    <ComboBox ItemsSource="{Binding CurrencyOptions}"
+                              SelectedValue="{Binding CurrencyId}"
+                              SelectedValuePath="Key"
+                              DisplayMemberPath="Value"
                               ToolTip="اختر العملة — هذا الحقل إلزامي"
                               Style="{StaticResource ModernComboBox}"/>
 
@@ -84,6 +93,17 @@
                 Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}, TargetNullValue=Collapsed, FallbackValue=Collapsed}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="8">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="#991B1B" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="0" Grid.RowSpan="4"
+                Background="#CCFFFFFF"
+                Panel.ZIndex="1000"
+                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="180" Height="4" Background="#E2E8F0" Foreground="{StaticResource AccentBrush}"/>
+                <TextBlock Text="جاري المعالجة..." FontSize="14" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{StaticResource PrimaryBrush}" HorizontalAlignment="Center"/>
             </StackPanel>
         </Border>
 

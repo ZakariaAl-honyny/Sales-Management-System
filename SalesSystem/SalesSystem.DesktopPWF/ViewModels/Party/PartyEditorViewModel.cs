@@ -163,6 +163,7 @@ public class PartyEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث الشخص", "PartyEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في تحديث بيانات الشخص", ErrorMessage!);
             }
         }
         else
@@ -185,6 +186,7 @@ public class PartyEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إضافة الشخص", "PartyEditorViewModel.SaveAsync");
+                await _dialogService.ShowErrorAsync("خطأ في إضافة الشخص", ErrorMessage!);
             }
         }
     }

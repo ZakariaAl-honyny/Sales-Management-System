@@ -22,6 +22,7 @@ public class LowStockViewModel : ViewModelBase
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private int? _selectedWarehouseId;
     private string _searchText = string.Empty;
+    private string? _errorMessage;
 
     public LowStockViewModel()
         : this(
@@ -86,6 +87,12 @@ public class LowStockViewModel : ViewModelBase
                 // Logic for local filtering could go here if needed
             }
         }
+    }
+
+    public string? ErrorMessage
+    {
+        get => _errorMessage;
+        set => SetProperty(ref _errorMessage, value);
     }
 
     public ICommand RefreshCommand { get; }

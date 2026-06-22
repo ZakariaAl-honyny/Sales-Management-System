@@ -157,6 +157,7 @@ public class AttachmentListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل المرفقات", "AttachmentListViewModel.LoadAttachmentsAsync", "[AttachmentListViewModel.LoadAttachmentsAsync] Failed to load attachments.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Attachments.Count == 0;
         }
     }
@@ -211,6 +212,7 @@ public class AttachmentListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في حذف المرفق", "AttachmentListViewModel.DeleteAttachmentAsync", $"[AttachmentListViewModel.DeleteAttachmentAsync] Failed to delete attachment {SelectedAttachment.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
         }
     }
 

@@ -242,7 +242,8 @@ public class TaxesListViewModel : ViewModelBase
                 }
                 else
                 {
-                    ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط الضريبة";
+                    ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في إلغاء تنشيط الضريبة", "TaxesListViewModel.DeleteTaxAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في حذف الضريبة", ErrorMessage!);
                 }
             }
             else if (strategy == DeleteStrategy.Permanent)
@@ -256,7 +257,8 @@ public class TaxesListViewModel : ViewModelBase
                 else
                 {
                     var error = deleteResult.Error ?? "فشل في حذف الضريبة";
-                    ErrorMessage = error;
+                    ErrorMessage = HandleFailure(error, "TaxesListViewModel.DeleteTaxAsync");
+                    await _dialogService.ShowErrorAsync("خطأ في حذف الضريبة", ErrorMessage!);
                     LogSystemError($"Hard delete failed for Tax {SelectedTax.Id}: {error}", "TaxesListViewModel.DeleteTaxAsync");
                 }
             }
@@ -299,8 +301,8 @@ public class TaxesListViewModel : ViewModelBase
             }
             else
             {
-                ErrorMessage = result.Error ?? "فشل في استعادة الضريبة";
-                await _dialogService.ShowErrorAsync("خطأ في الاستعادة", ErrorMessage);
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة الضريبة", "TaxesListViewModel.RestoreTaxAsync");
+                await _dialogService.ShowErrorAsync("خطأ في استعادة الضريبة", ErrorMessage!);
             }
         }
         catch (Exception ex)

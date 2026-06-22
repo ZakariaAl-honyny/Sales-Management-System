@@ -1,6 +1,7 @@
 using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows.Input;
 using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Responses;
@@ -25,6 +26,7 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
     private CashBoxDto? _selectedCashBox;
     private string? _errorMessage;
     private bool _isEmpty;
+    private bool _includeInactive;
 
     public CashBoxesListViewModel()
         : this(
@@ -100,6 +102,18 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _isEmpty, value);
     }
 
+    public bool IncludeInactive
+    {
+        get => _includeInactive;
+        set
+        {
+            if (SetProperty(ref _includeInactive, value))
+            {
+                _ = LoadCashBoxesAsync();
+            }
+        }
+    }
+
     #endregion
 
     #region Commands
@@ -165,7 +179,10 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
             InvokeOnUIThread(() =>
             {
                 CashBoxes.Clear();
-                foreach (var item in result.Value.OrderByDescending(x => x.Id))
+                var items = IncludeInactive
+                    ? result.Value
+                    : result.Value.Where(x => x.IsActive);
+                foreach (var item in items.OrderByDescending(x => x.Id))
                 {
                     CashBoxes.Add(item);
                 }
@@ -177,6 +194,7 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الصناديق النقدية",
                 "CashBoxesListViewModel.LoadCashBoxesOperationAsync",
                 "[CashBoxesListViewModel.LoadCashBoxesOperationAsync] Failed to load cash boxes from API.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = CashBoxes.Count == 0;
         }
     }
@@ -247,7 +265,7 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
             ErrorMessage = HandleFailure(error,
                 "CashBoxesListViewModel.DeactivateCashBoxOperationAsync",
                 "[CashBoxesListViewModel.DeactivateCashBoxOperationAsync] Failed to deactivate cash box.");
-            _toastService.ShowError(ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في إلغاء تنشيط الصندوق", ErrorMessage!);
         }
     }
 

@@ -23,6 +23,7 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
     private DateTime _effectiveFromDate = DateTime.Today;
     private string? _errorMessage;
     private string _windowTitle = "أسعار العملات";
+    private bool _includeInactive;
 
     public CurrencyRatesViewModel()
         : this(
@@ -119,6 +120,18 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _windowTitle, value);
     }
 
+    public bool IncludeInactive
+    {
+        get => _includeInactive;
+        set
+        {
+            if (SetProperty(ref _includeInactive, value))
+            {
+                _ = LoadCurrenciesAsync();
+            }
+        }
+    }
+
     #endregion
 
     #region Commands
@@ -158,7 +171,7 @@ public class CurrencyRatesViewModel : ViewModelBase, IDisposable
     {
         ErrorMessage = null;
 
-        var result = await _currencyService.GetAllAsync(includeInactive: false);
+        var result = await _currencyService.GetAllAsync(includeInactive: IncludeInactive);
 
         if (result.IsSuccess && result.Value != null)
         {

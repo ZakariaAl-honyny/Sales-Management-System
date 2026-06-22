@@ -249,6 +249,7 @@ public class InventoryCountListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في ترحيل الجرد", "InventoryCountListViewModel.PostCountAsync", $"[InventoryCountListViewModel.PostCountAsync] Failed to post count {SelectedCount.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
         }
     }
 
@@ -286,6 +287,7 @@ public class InventoryCountListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء الجرد", "InventoryCountListViewModel.CancelCountAsync", $"[InventoryCountListViewModel.CancelCountAsync] Failed to cancel count {SelectedCount.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في الإلغاء", ErrorMessage!);
         }
     }
 

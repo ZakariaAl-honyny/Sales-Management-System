@@ -112,7 +112,6 @@
                             Content="تسجيل الدخول"
                             Command="{Binding LoginCommand}"
                             Style="{StaticResource PrimaryButton}"
-                            Height="40"
                             FontSize="16"
                             IsDefault="True"
                             TabIndex="4"

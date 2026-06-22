@@ -162,6 +162,7 @@ public class AccountCategoryEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في تحديث التصنيف", "AccountCategoryEditorViewModel.Update");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ التصنيف المحاسبي", ErrorMessage!);
             }
         }
         else
@@ -178,6 +179,7 @@ public class AccountCategoryEditorViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إنشاء التصنيف", "AccountCategoryEditorViewModel.Create");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ التصنيف المحاسبي", ErrorMessage!);
             }
         }
     }

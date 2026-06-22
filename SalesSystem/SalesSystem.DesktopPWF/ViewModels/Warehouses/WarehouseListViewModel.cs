@@ -261,6 +261,7 @@ public class WarehouseListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = deleteResult.Error ?? "فشل في إلغاء تنشيط المستودع";
+                await DialogService!.ShowErrorAsync("خطأ في حذف المستودع", ErrorMessage);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -277,6 +278,7 @@ public class WarehouseListViewModel : ViewModelBase
                 var error = deleteResult.Error ?? "فشل في حذف المستودع";
                 ErrorMessage = error;
                 LogSystemError($"Hard delete failed for Warehouse {SelectedWarehouse.Id}: {error}", "WarehouseListViewModel.DeleteWarehouseAsync");
+                await DialogService!.ShowErrorAsync("خطأ في حذف المستودع", ErrorMessage);
             }
         }
     }

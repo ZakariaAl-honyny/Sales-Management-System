@@ -147,6 +147,7 @@ public class EmployeeListViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الموظفين", "EmployeeListViewModel.LoadEmployeesAsync");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
             IsEmpty = Employees.Count == 0;
         }
     }
@@ -230,6 +231,7 @@ public class EmployeeListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط الموظف", "EmployeeListViewModel.DeleteEmployeeAsync");
+                await _dialogService.ShowErrorAsync("خطأ في الحذف", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)

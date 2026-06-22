@@ -34,7 +34,7 @@ public static class DbSeeder
         if (!await db.Customers.AnyAsync())
         {
             var cashCustomerAccount = await db.Set<Account>()
-                .FirstAsync(a => a.AccountCode == "1131");
+                .FirstAsync(a => a.AccountCode == "11030001");
             var cashCustomerParty = Party.Create(
                 name: "عميل نقدي",
                 createdByUserId: null
@@ -46,13 +46,14 @@ public static class DbSeeder
                 accountId: cashCustomerAccount.Id,
                 createdByUserId: null
             ));
+            await db.SaveChangesAsync();
             logger?.LogInformation("Seeded default customer.");
         }
 
         if (!await db.Suppliers.AnyAsync())
         {
             var cashSupplierAccount = await db.Set<Account>()
-                .FirstAsync(a => a.AccountCode == "1321");
+                .FirstAsync(a => a.AccountCode == "21010001");
             var cashSupplierParty = Party.Create(
                 name: "المورد الافتراضي في النظام",
                 createdByUserId: null
@@ -64,6 +65,7 @@ public static class DbSeeder
                 accountId: cashSupplierAccount.Id,
                 createdByUserId: null
             ));
+            await db.SaveChangesAsync();
             logger?.LogInformation("Seeded default supplier.");
         }
 

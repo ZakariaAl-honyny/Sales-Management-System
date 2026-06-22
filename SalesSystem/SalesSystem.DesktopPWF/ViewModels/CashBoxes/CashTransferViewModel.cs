@@ -139,6 +139,7 @@ public class CashTransferViewModel : ViewModelBase
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الخزائن", "CashTransferViewModel.LoadDataOperationAsync", "[CashTransferViewModel.LoadDataOperationAsync] Failed to load cash boxes from API.");
+            await _dialogService.ShowErrorAsync("خطأ في تحميل البيانات", ErrorMessage!);
         }
     }
 
@@ -188,7 +189,7 @@ public class CashTransferViewModel : ViewModelBase
         {
             var error = HandleFailure(result.Error ?? "فشل في إتمام التحويل", "CashTransferViewModel.TransferOperationAsync", "[CashTransferViewModel.TransferOperationAsync] Failed to transfer cash.");
             ErrorMessage = error;
-            _toastService.ShowError(ErrorMessage);
+            await _dialogService.ShowErrorAsync("خطأ في التحويل", ErrorMessage!);
         }
     }
 

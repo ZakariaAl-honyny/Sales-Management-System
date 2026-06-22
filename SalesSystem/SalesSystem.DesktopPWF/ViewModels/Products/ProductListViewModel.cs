@@ -267,6 +267,7 @@ public async Task DeleteProductAsync()
             else
             {
                 ErrorMessage = HandleFailure(deleteResult.Error ?? "فشل في حذف المنتج", "ProductListViewModel.DeleteProductAsync", $"[ProductListViewModel.DeleteProductAsync] Failed to deactivate product with ID {SelectedProduct.Id}.");
+                await _dialogService.ShowErrorAsync("خطأ في حذف المنتج", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
@@ -283,6 +284,7 @@ public async Task DeleteProductAsync()
                 var error = deleteResult.Error ?? "فشل في حذف المنتج";
                 ErrorMessage = HandleFailure(error, "ProductListViewModel.DeleteProductAsync", $"[ProductListViewModel.DeleteProductAsync] Failed to permanently delete product with ID {SelectedProduct.Id}.");
                 LogSystemError($"Hard delete failed for Product {SelectedProduct.Id}: {error}", "ProductListViewModel.DeleteProductAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف المنتج", ErrorMessage!);
             }
         }
     }
@@ -319,6 +321,7 @@ public async Task DeleteProductAsync()
         else
         {
             ErrorMessage = HandleFailure(result.Error ?? "فشل في استعادة المنتج", "ProductListViewModel.RestoreProductAsync", $"[ProductListViewModel.RestoreProductAsync] Failed to restore product with ID {SelectedProduct.Id}.");
+            await _dialogService.ShowErrorAsync("خطأ في استعادة المنتج", ErrorMessage!);
         }
 }
 

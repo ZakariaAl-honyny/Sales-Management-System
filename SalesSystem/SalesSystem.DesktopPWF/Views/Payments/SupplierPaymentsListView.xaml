@@ -112,7 +112,7 @@
                           AutomationProperties.AutomationId="DgSupplierPayments">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="طباعة السند" Command="{Binding PrintCommand}"/>
+                            <MenuItem Header="طباعة السند" ToolTip="طباعة سند الدفع المحدد" Command="{Binding PrintCommand}"/>
                         </ContextMenu>
                     </DataGrid.ContextMenu>
                     <DataGrid.Columns>

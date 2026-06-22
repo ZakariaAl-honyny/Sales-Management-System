@@ -76,7 +76,8 @@
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
                                Margin="20,0,20,0"
-                               FontSize="12"/>
+                               FontSize="12"
+                               ToolTip="عرض مرتجعات الشراء الملغاة"/>
 
                     <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             ToolTip="فتح شاشة إنشاء مرتجع جديد">

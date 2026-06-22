@@ -288,6 +288,7 @@ public class UserService : IUserService
             Role: (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
             MustChangePassword: user.MustChangePassword,
             IsLocked: user.IsLocked,
+            IsActive: user.IsActive,
             AvatarPath: null,
             LastLoginAt: user.LastLoginAt,
             LoginAttempts: user.LoginAttempts,

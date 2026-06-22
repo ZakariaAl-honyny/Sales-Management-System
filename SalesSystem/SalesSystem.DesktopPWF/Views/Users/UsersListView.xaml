@@ -232,27 +232,18 @@
                                             <Style TargetType="Border" BasedOn="{StaticResource StatusBadgeStyle}">
                                                 <Setter Property="Background" Value="{StaticResource SuccessLightBrush}"/>
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Status}" Value="2">
-                                                        <Setter Property="Background" Value="{StaticResource ErrorLightBrush}"/>
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Status}" Value="3">
+                                                    <DataTrigger Binding="{Binding IsLocked}" Value="True">
                                                         <Setter Property="Background" Value="{StaticResource WarningLightBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
-                                        <TextBlock>
+                                        <TextBlock Text="{Binding StatusDisplay}">
                                             <TextBlock.Style>
                                                 <Style TargetType="TextBlock" BasedOn="{StaticResource StatusBadgeTextStyle}">
-                                                    <Setter Property="Text" Value="نشط"/>
                                                     <Setter Property="Foreground" Value="{StaticResource SuccessTextBrush}"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Status}" Value="2">
-                                                            <Setter Property="Text" Value="معطل"/>
-                                                            <Setter Property="Foreground" Value="{StaticResource ErrorTextBrush}"/>
-                                                        </DataTrigger>
-                                                        <DataTrigger Binding="{Binding Status}" Value="3">
-                                                            <Setter Property="Text" Value="مقفل"/>
+                                                        <DataTrigger Binding="{Binding IsLocked}" Value="True">
                                                             <Setter Property="Foreground" Value="{StaticResource WarningTextBrush}"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>

@@ -232,6 +232,7 @@ public class PurchaseInvoicesControllerTests : ControllerTestBase
         CurrencyId: null,
         ExchangeRate: null,
         Notes: null,
+        TaxId: null,
         Items: new List<CreatePurchaseInvoiceLineRequest>
         {
             new(ProductId: 1, ProductUnitId: 1, Quantity: 5.000m, UnitPrice: 40.00m)

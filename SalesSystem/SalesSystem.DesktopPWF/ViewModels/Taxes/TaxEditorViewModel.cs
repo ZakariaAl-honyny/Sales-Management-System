@@ -5,6 +5,7 @@ using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.DesktopPWF.Services.Api;
 using SalesSystem.DesktopPWF.Services.App;
+using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Collections.Generic;
 
 namespace SalesSystem.DesktopPWF.ViewModels.Taxes;
@@ -14,6 +15,7 @@ public class TaxEditorViewModel : ViewModelBase
     private readonly ITaxesApiService _taxesService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
+    private readonly IToastNotificationService _toastService;
     private string _name = string.Empty;
     private string _code = string.Empty;
     private decimal _rate;
@@ -28,6 +30,7 @@ public class TaxEditorViewModel : ViewModelBase
         _taxesService = App.GetService<ITaxesApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
+        _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
         InitializeCommands();
     }
@@ -154,6 +157,7 @@ public class TaxEditorViewModel : ViewModelBase
         if (result.IsSuccess && result.Value != null)
         {
             _eventBus.Publish(new TaxChangedMessage(result.Value.Id));
+            _toastService.ShowSuccess("تم حفظ الضريبة بنجاح");
             RequestClose();
         }
         else

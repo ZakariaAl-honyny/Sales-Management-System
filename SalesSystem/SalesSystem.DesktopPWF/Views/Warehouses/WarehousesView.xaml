@@ -65,7 +65,8 @@
                     <CheckBox Content="عرض غير النشطة" 
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
-                               FontSize="12"/>
+                               FontSize="12"
+                               ToolTip="عرض المستودعات غير النشطة (المحذوفة)"/>
                 </StackPanel>
 
                 <!-- Actions Group -->
@@ -142,19 +143,19 @@
                           AutomationProperties.AutomationId="DgWarehouses">
                     <DataGrid.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="تعديل" Command="{Binding EditCommand}">
+                            <MenuItem Header="تعديل" ToolTip="تعديل بيانات المستودع المحدد" Command="{Binding EditCommand}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="✏️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator/>
-                            <MenuItem Header="حذف" Command="{Binding DeleteCommand}"
+                            <MenuItem Header="حذف" ToolTip="حذف المستودع المحدد" Command="{Binding DeleteCommand}"
                                       Visibility="{Binding SelectedWarehouse.IsActive, Converter={StaticResource BoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="🗑️"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem Header="استعادة" Command="{Binding RestoreCommand}"
+                            <MenuItem Header="استعادة" ToolTip="استعادة مستودع محذوف" Command="{Binding RestoreCommand}"
                                       Visibility="{Binding SelectedWarehouse.IsActive, Converter={StaticResource InverseBoolToVisibility}}">
                                 <MenuItem.Icon>
                                     <TextBlock Text="♻️"/>

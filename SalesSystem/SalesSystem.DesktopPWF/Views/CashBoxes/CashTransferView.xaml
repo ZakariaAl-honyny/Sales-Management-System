@@ -61,7 +61,7 @@
                         <ComboBox ItemsSource="{Binding SourceCashBoxes}"
                                   SelectedItem="{Binding SelectedSourceCashBox}"
                                   DisplayMemberPath="BoxName"
-                                  Style="{StaticResource ComboBoxStyle}"
+                                  Style="{StaticResource ModernComboBox}"
                                   ToolTip="اختر الخزنة التي سيتم التحويل منها"/>
                         <TextBlock Text="{Binding SelectedSourceCashBox.AccountName, StringFormat='الحساب المرتبط: {0}'}"
                                    Style="{StaticResource HelperTextStyle}"
@@ -74,7 +74,7 @@
                         <ComboBox ItemsSource="{Binding DestinationCashBoxes}"
                                   SelectedItem="{Binding SelectedDestinationCashBox}"
                                   DisplayMemberPath="BoxName"
-                                  Style="{StaticResource ComboBoxStyle}"
+                                  Style="{StaticResource ModernComboBox}"
                                   ToolTip="اختر الخزنة التي سيتم التحويل إليها"/>
                     </StackPanel>
 

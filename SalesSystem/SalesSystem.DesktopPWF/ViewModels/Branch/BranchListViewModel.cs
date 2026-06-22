@@ -228,6 +228,7 @@ public class BranchListViewModel : ViewModelBase
             else
             {
                 ErrorMessage = HandleFailure(result.Error ?? "فشل في إلغاء تنشيط الفرع", "BranchListViewModel.DeleteBranchAsync");
+                await _dialogService.ShowErrorAsync("خطأ في حذف الفرع", ErrorMessage!);
             }
         }
         else if (strategy == DeleteStrategy.Permanent)
