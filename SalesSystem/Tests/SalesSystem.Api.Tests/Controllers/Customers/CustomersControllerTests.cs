@@ -186,7 +186,6 @@ public class CustomersControllerTests : ControllerTestBase
         CreditLimit: 1000.00m,
         IsActive: true,
         AccountId: 1,
-        PartyId: id + 100,
         AccountName: null);
 }
 

@@ -52,7 +52,7 @@ public class PurchaseService : IPurchaseService
     {
         var invoice = await _uow.PurchaseInvoices.FirstOrDefaultAsync(
             i => i.Id == id, ct,
-            "Supplier.Party", "Warehouse", "Items.Product", "Items.ProductUnit",
+            "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit",
             "Currency", "Tax");
 
         if (invoice == null)
@@ -88,7 +88,7 @@ public class PurchaseService : IPurchaseService
                  item.Product != null &&
                  item.Product.Name.ToLower().Contains(searchLower)));
 
-        var includes = new[] { "Supplier.Party", "Warehouse", "Items.Product", "Items.ProductUnit" };
+        var includes = new[] { "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit" };
 
         var (items, total) = await _uow.PurchaseInvoices.GetPagedAsync(
             predicate, q => q.OrderByDescending(i => i.InvoiceDate), page, pageSize, ct, includeInactive, includes);
@@ -277,6 +277,28 @@ public class PurchaseService : IPurchaseService
                     }
                 }
 
+                // ─── InventoryTransaction audit trail for stock increase ───────
+                var invTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (invTxSeq.IsSuccess)
+                {
+                    var invTx = InventoryTransaction.Create(
+                        invTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.Purchase,
+                        (short)invoice.WarehouseId,
+                        InventoryReferenceType.PurchaseInvoice,
+                        invoice.Id,
+                        $"شراء - فاتورة رقم {invoice.InvoiceNo}",
+                        userId);
+                    for (int i = 0; i < itemsList.Count; i++)
+                    {
+                        var item = itemsList[i];
+                        var landedUnitCost = landedCosts.GetValueOrDefault(i, item.UnitPrice);
+                        invTx.AddLine(InventoryTransactionLine.Create(
+                            invTx.Id, item.ProductUnitId, item.Quantity, landedUnitCost, null, null, (short)invoice.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
+                }
+
                 // ─── Auto-update product costs via pricing service ───────────────
                 for (int i = 0; i < itemsList.Count; i++)
                 {
@@ -372,6 +394,20 @@ public class PurchaseService : IPurchaseService
         if (invoice.Status == InvoiceStatus.Cancelled)
             return Result<PurchaseInvoiceDto>.Failure("الفاتورة ملغاة بالفعل", ErrorCodes.InvalidOperation);
 
+        // GUARD: Check for posted returns referencing this invoice
+        var hasReturns = await _uow.PurchaseReturns.AnyAsync(
+            r => r.PurchaseInvoiceId.HasValue && r.PurchaseInvoiceId.Value == id && r.Status == InvoiceStatus.Posted, ct);
+        if (hasReturns)
+            return Result<PurchaseInvoiceDto>.Failure("لا يمكن إلغاء فاتورة عليها مرتجعات مسجلة. استخدم إلغاء المرتجع أولاً.",
+                ErrorCodes.InvalidOperation);
+
+        // GUARD: Check for supplier payments applied to this invoice
+        var hasPayments = await _uow.SupplierPaymentApplications.AnyAsync(
+            a => a.PurchaseInvoiceId == id, ct);
+        if (hasPayments)
+            return Result<PurchaseInvoiceDto>.Failure("لا يمكن إلغاء فاتورة تم سداد جزء من قيمتها. استخدم مرتجع بدلاً من الإلغاء.",
+                ErrorCodes.InvalidOperation);
+
         return await _uow.ExecuteTransactionAsync<Result<PurchaseInvoiceDto>>(async () =>
         {
             try
@@ -401,6 +437,26 @@ public class PurchaseService : IPurchaseService
                             _logger.LogWarning("فشل عكس المخزون لإلغاء فاتورة الشراء: {Error}", stockResult.Error);
                             return Result<PurchaseInvoiceDto>.Failure(stockResult.Error!);
                         }
+                    }
+
+                    // InventoryTransaction audit trail for stock decrease (cancellation)
+                    var cancelInvTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (cancelInvTxSeq.IsSuccess)
+                    {
+                        var invTx = InventoryTransaction.Create(
+                            cancelInvTxSeq.Value.ToString("D6"),
+                            InventoryTransactionType.PurchaseReturn,
+                            (short)invoice.WarehouseId,
+                            InventoryReferenceType.PurchaseInvoice,
+                            invoice.Id,
+                            $"إلغاء شراء - فاتورة رقم {invoice.InvoiceNo}",
+                            userId);
+                        foreach (var item in invoice.Items)
+                        {
+                            invTx.AddLine(InventoryTransactionLine.Create(
+                                invTx.Id, item.ProductUnitId, item.Quantity, item.UnitPrice, null, null, (short)invoice.WarehouseId));
+                        }
+                        await _uow.InventoryTransactions.AddAsync(invTx, ct);
                     }
 
                     // Reverse cash transaction if applicable
@@ -435,7 +491,7 @@ public class PurchaseService : IPurchaseService
             i.Id,
             i.InvoiceNo,
             i.SupplierId,
-            i.Supplier?.Party?.Name ?? "غير معروف",
+            i.Supplier?.Name ?? "غير معروف",
             i.WarehouseId,
             i.Warehouse?.Name ?? "غير معروف",
             i.InvoiceDate,

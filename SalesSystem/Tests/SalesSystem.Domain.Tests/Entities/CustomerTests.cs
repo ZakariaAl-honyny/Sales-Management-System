@@ -7,16 +7,17 @@ namespace SalesSystem.Domain.Tests.Entities;
 public class CustomerTests
 {
     [Fact]
-    public void Create_GivenValidPartyId_ShouldCreateCustomer()
+    public void Create_GivenValidName_ShouldCreateCustomer()
     {
         var customer = Customer.Create(
-            partyId: 1,
+            name: "Test Customer",
             accountId: 1,
             creditLimit: 0,
             createdByUserId: 1
         );
 
         customer.Id.Should().Be(0);
+        customer.Name.Should().Be("Test Customer");
         customer.CreditLimit.Should().Be(0);
     }
 
@@ -24,7 +25,7 @@ public class CustomerTests
     public void Create_GivenCreditLimit_ShouldSetCreditLimit()
     {
         var customer = Customer.Create(
-            partyId: 1,
+            name: "Test Customer",
             accountId: 1,
             creditLimit: 500m,
             createdByUserId: 1
@@ -34,18 +35,18 @@ public class CustomerTests
     }
 
     [Fact]
-    public void Create_GivenInvalidPartyId_ShouldThrowDomainException()
+    public void Create_GivenEmptyName_ShouldThrowDomainException()
     {
-        var action = () => Customer.Create(partyId: 0, accountId: 1, createdByUserId: 1);
+        var action = () => Customer.Create(name: "", accountId: 1, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
-            .WithMessage("*معرّف الطرف غير صالح*");
+            .WithMessage("*اسم العميل مطلوب*");
     }
 
     [Fact]
     public void Create_GivenNegativeCreditLimit_ShouldThrowDomainException()
     {
-        var action = () => Customer.Create(partyId: 1, accountId: 1, creditLimit: -100m, createdByUserId: 1);
+        var action = () => Customer.Create(name: "Test Customer", accountId: 1, creditLimit: -100m, createdByUserId: 1);
 
         action.Should().Throw<DomainException>()
             .WithMessage("*حد الائتمان لا يمكن أن يكون سالباً*");
@@ -54,20 +55,22 @@ public class CustomerTests
     [Fact]
     public void Update_GivenValidData_ShouldUpdateCustomer()
     {
-        var customer = Customer.Create(partyId: 1, accountId: 1, creditLimit: 1000m, createdByUserId: 1);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, creditLimit: 1000m, createdByUserId: 1);
 
         customer.Update(
+            name: "Updated Customer",
             creditLimit: 5000m,
             updatedByUserId: 1
         );
 
+        customer.Name.Should().Be("Updated Customer");
         customer.CreditLimit.Should().Be(5000m);
     }
 
     [Fact]
     public void CheckCreditLimit_ZeroLimit_ShouldReturnTrue()
     {
-        var customer = Customer.Create(partyId: 1, accountId: 1, creditLimit: 0m, createdByUserId: 1);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, creditLimit: 0m, createdByUserId: 1);
 
         var result = customer.CheckCreditLimit(10000m);
 
@@ -77,7 +80,7 @@ public class CustomerTests
     [Fact]
     public void CheckCreditLimit_UnderLimit_ShouldReturnTrue()
     {
-        var customer = Customer.Create(partyId: 1, accountId: 1, creditLimit: 1000m, createdByUserId: 1);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, creditLimit: 1000m, createdByUserId: 1);
 
         var result = customer.CheckCreditLimit(500m);
 
@@ -87,7 +90,7 @@ public class CustomerTests
     [Fact]
     public void MarkAsDeleted_ShouldSetIsActiveFalse()
     {
-        var customer = Customer.Create(partyId: 1, accountId: 1, createdByUserId: 1);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, createdByUserId: 1);
 
         customer.MarkAsDeleted();
 

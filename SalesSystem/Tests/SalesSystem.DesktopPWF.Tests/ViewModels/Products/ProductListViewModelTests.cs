@@ -53,8 +53,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: "1234567890123", Name: "منتج أول", CategoryId: 1, CategoryName: "فئة أولى", ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج ثاني", CategoryId: 1, CategoryName: "فئة أولى", ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج أول", CategoryId: 1, CategoryName: "فئة أولى", ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج ثاني", CategoryId: 1, CategoryName: "فئة أولى", ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -93,7 +93,7 @@ public class ProductListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync())
             .ReturnsAsync(Result<List<ProductDto>>.Success(new List<ProductDto>
             {
-                new(Id: 1, Barcode: null, Name: "منتج تجريبي", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+                new(Id: 1, Name: "منتج تجريبي", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
             }));
 
         await _viewModel.LoadProductsAsync();
@@ -109,7 +109,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
         var productToDelete = new ProductDto(
-            Id: 5, Barcode: null, Name: "منتج للحذف", CategoryId: 1, CategoryName: null,
+            Id: 5, Name: "منتج للحذف", CategoryId: 1, CategoryName: null,
             ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
 
         _mockProductService
@@ -142,7 +142,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenDeleteFails_ShowsErrorMessage()
     {
         var productToDelete = new ProductDto(
-            Id: 5, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null,
+            Id: 5, Name: "منتج", CategoryId: 1, CategoryName: null,
             ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
 
         _mockProductService
@@ -169,7 +169,7 @@ public class ProductListViewModelTests : IDisposable
     public async Task DeleteCommand_WhenProductSelected_PublishesEvent()
     {
         var productToDelete = new ProductDto(
-            Id: 5, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null,
+            Id: 5, Name: "منتج", CategoryId: 1, CategoryName: null,
             ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
 
         _mockProductService
@@ -203,9 +203,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: null, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج خالد", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 3, Barcode: null, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 2m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج خالد", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 3, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 2m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -236,8 +236,8 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: null, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج خالد", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج أحمد", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج خالد", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -261,12 +261,13 @@ public class ProductListViewModelTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchText_SearchByBarcode_FiltersProducts()
+    public async Task SearchText_SearchByBarcode_ReturnsNoResults()
     {
+        // Barcode removed from Product entity — search is now by name only
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: "1234567890123", Name: "منتج بالباركود", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج بدون باركود", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج بالباركود", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج بدون باركود", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -286,7 +287,7 @@ public class ProductListViewModelTests : IDisposable
                 count++;
             }
         }
-        count.Should().Be(1);
+        count.Should().Be(0);
     }
 
     #endregion
@@ -317,7 +318,7 @@ public class ProductListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
+        var product = new ProductDto(Id: 1, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
         _viewModel.SelectedProduct = product;
 
         propertyChangedEvents.Should().Contain("SelectedProduct");
@@ -348,7 +349,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
+        var product = new ProductDto(Id: 1, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
         _viewModel.SelectedProduct = product;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -363,7 +364,7 @@ public class ProductListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_CanExecute_WhenProductSelected()
     {
-        var product = new ProductDto(Id: 1, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
+        var product = new ProductDto(Id: 1, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true);
         _viewModel.SelectedProduct = product;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -415,7 +416,7 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: null, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -433,12 +434,13 @@ public class ProductListViewModelTests : IDisposable
     #region FilterProducts Tests
 
     [Fact]
-    public async Task FilterProducts_WhenSearchByBarcode_FiltersCorrectly()
+    public async Task FilterProducts_WhenSearchByBarcode_ReturnsNoResults()
     {
+        // Barcode removed from Product entity — search is now by name only
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: "1234567890123", Name: "منتج أ", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج ب", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج أ", CategoryId: 1, CategoryName: null, ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج ب", CategoryId: 1, CategoryName: null, ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService
@@ -458,7 +460,7 @@ public class ProductListViewModelTests : IDisposable
                 count++;
             }
         }
-        count.Should().Be(1);
+        count.Should().Be(0);
     }
 
     [Fact]
@@ -466,9 +468,9 @@ public class ProductListViewModelTests : IDisposable
     {
         var products = new List<ProductDto>
         {
-            new(Id: 1, Barcode: null, Name: "منتج أ", CategoryId: 1, CategoryName: "إلكترونيات", ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 2, Barcode: null, Name: "منتج ب", CategoryId: 2, CategoryName: "ملابس", ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
-            new(Id: 3, Barcode: null, Name: "منتج ج", CategoryId: 1, CategoryName: "إلكترونيات", ReorderLevel: 2m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
+            new(Id: 1, Name: "منتج أ", CategoryId: 1, CategoryName: "إلكترونيات", ReorderLevel: 5m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 2, Name: "منتج ب", CategoryId: 2, CategoryName: "ملابس", ReorderLevel: 3m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true),
+            new(Id: 3, Name: "منتج ج", CategoryId: 1, CategoryName: "إلكترونيات", ReorderLevel: 2m, Description: null, TrackExpiry: false, ImagePath: null, IsActive: true)
         };
 
         _mockProductService

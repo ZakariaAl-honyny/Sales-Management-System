@@ -204,46 +204,7 @@ var price = productUnit.Prices
 
 ---
 
-### 2.5c Party Entity Pattern (v4.10)
 
-```csharp
-// Customers and Suppliers share contact data via Parties table
-public class Party
-{
-    public string Name { get; private set; }
-    public string? Phone { get; private set; }
-    public string? Email { get; private set; }
-    public string? Address { get; private set; }
-    public string? TaxNumber { get; private set; }
-    public string? Notes { get; private set; }
-}
-
-// Customer — NO direct Name/Phone/Email fields
-public class Customer
-{
-    public int PartyId { get; private set; }          // FK → Parties (mandatory)
-    public Party Party { get; private set; }          // Navigation
-    public int AccountId { get; private set; }        // FK → Accounts (mandatory)
-    public int? CategoryId { get; private set; }      // FK → AccountCategories
-    
-    // NO OpeningBalance, CurrentBalance, CurrencyId, CustomerGroupId
-    // NO Name, Phone, Email, Address (use Party.Name etc.)
-}
-
-// Supplier — same pattern
-public class Supplier
-{
-    public int PartyId { get; private set; }
-    public Party Party { get; private set; }
-    public int AccountId { get; private set; }
-    
-    // NO OpeningBalance, CurrentBalance, CurrencyId, SupplierType
-}
-```
-
-**Schema Reference:** See `docs/database-schema.md` Module 3 (Customers & Suppliers) — `Parties`, `Customers`, and `Suppliers` table definitions.
-
----
 
 ### 2.5d Units (Independent Table) (v4.10)
 
@@ -968,7 +929,7 @@ All table definitions, column types, constraints, indexes, and FK relationships 
 |--------|-------------|--------|
 | 1 — Security & Users | `# 3) Security & Identity` | Users, Roles, Permissions, AuditLogs, UserSessions |
 | 2 — Sales & Purchases | `# 4) Sales & Purchases` | SalesInvoices, SalesInvoiceLines, PurchaseInvoices, PurchaseInvoiceLines, SalesReturns, PurchaseReturns |
-| 3 — Customers & Suppliers | `# 5) Customers & Suppliers` | Parties, Customers, Suppliers |
+| 3 — Customers & Suppliers | `# 5) Customers & Suppliers` | Customers, Suppliers |
 | 4 — Products & Inventory | `# 6) Products & Inventory` | Products, Categories, Units, ProductUnits, UnitBarcodes, ProductPrices, ProductImages |
 | 5 — Inventory Transactions | `# 7) Inventory Transactions` | InventoryBatches, WarehouseStocks, InventoryTransactions, InventoryTransactionLines, WarehouseTransfers, WarehouseTransferLines |
 | 6 — Cash & Banking | `# 8) Cash & Banking` | CashBoxes, CashTransactions, DailyClosures, Cheques |

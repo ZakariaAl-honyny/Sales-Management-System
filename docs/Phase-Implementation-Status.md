@@ -1,7 +1,7 @@
 # Phase Implementation Status
 
-> **Last Updated**: June 15, 2026
-> **Current Version**: v4.10.3 (Accounts.md Deep Review Complete: 43 gaps found, 8 CRITICAL + 15 Major + 20 Minor fixed)
+> **Last Updated**: June 23, 2026
+> **Current Version**: v4.10.4 (SalesQuotation Module Implemented ✅. Invoices Details Review Completed Jun 23, 2026: 5 gaps found — Cancel guard conditions, CashBox payment rollback on Post/Cancel, BeginTransactionAsync → ExecuteTransactionAsync, button labeling. All 5 fixed. Build: 0 errors, 0 warnings. Phase 27/28 Plans: Draft/Post/Cancel architecture validated, landed cost, price enforcement, flexible input, Arabic Business Rules. Desktop Print API: Return print methods added for sales-returns + purchase-returns.)
 > **Source Analysis**: `docs/all new Anylysis for update system features/`
 
 ---
@@ -15,20 +15,20 @@
 | 💱 **20** | **Currencies Module** | ✅ Completed | ~1,800 | Currency entity, ExchangeRateHistory, Multi-currency invoice support, Desktop CRUD |
 | 👤 **21** | **Users & Permissions** | ✅ Completed | ~2,333 | 4 roles, 33 permissions, passwordless creation, AuditLog, lockout, session tracking |
 | 📒 **22** | **Chart of Accounts** | ✅ Completed | ~3,500 | 60-account hierarchy, 4 levels, dual-mode Desktop UI, SystemAccountMappings updated |
-| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | Party entity (shared contact data), AccountId mandatory (auto-created under `"1130"` — العملاء/Accounts Receivable), CheckCreditLimit returns bool, NO CustomerGroup/SupplierType/CustomerType in V1 |
+| 👥 **23** | **Customers Module** | ✅ Completed | ~2,100 | Direct contact fields (Name, Phone, Email, Address, TaxNumber) on Customer entity, AccountId mandatory (auto-created under `"1130"` — العملاء/Accounts Receivable), CheckCreditLimit returns bool, NO CustomerGroup/SupplierType/CustomerType in V1 |
 | 🤖 **24** | **Accounting Integration** | ✅ Completed | ~700 | IAccountingIntegrationService, auto journal entries for all money ops, payment reversals, per-entity account routing (Customer.AccountId/Supplier.AccountId), PurchaseReturnAccountId, single Sales Revenue account |
 | 📦 **25** | **Products Module** | ✅ Completed | ~3,100 | Multi-currency pricing via ProductPrices per (ProductUnit × CurrencyId), FIFO batches (InventoryBatches), NO PriceLevel in V1, ProductImages, DefaultPurchaseUnitId/DefaultSalesUnitId |
-| 🏭 **26** | **Warehouses Module** | 📝 Planned | — | Warehouse types (Main/Store/Showroom), WarehouseTransfers replace StockTransfers, InventoryTransactions replace InventoryMovements, NO physical count in V1 |
-| 🛒 **27** | **Purchases Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, landed cost via OtherCharges on invoice header, NO PurchaseOrders in V1, standalone returns with PurchaseInvoiceLineId link |
-| 💳 **28** | **Sales Module** | 📝 Planned | — | Multi-currency via CurrencyId FK, profit display per line, NO SalesQuotations in V1, barcode POS, credit limit enforcement (CheckCreditLimit returns bool) |
+| 🏭 **26** | **Warehouses Module** | 🟡 Partial | ~3,200 | ✅ Inventory Operations (Transfers/Transactions/Adjustments/Counts) at Domain+Service+API+Desktop. ❌ Warehouse entity still missing Type/ManagerName/AccountId FK enhancements. Physical Count deferred to V2. |
+| 🛒 **27** | **Purchases Module** | 🟡 Partial — OtherCharges ✅, Standalone Returns ✅ | ~2,281 (plan) + ~1,800 (code) | ✅ OtherCharges + landed cost via AdditionalChargeAllocator (RULE-480-486). ✅ Standalone purchase returns with nullable PurchaseInvoiceId (RULE-487-492), AccountingIntegration entries, PostedAt/CancelledAt timestamps. ✅ Flexible Input on purchase lines with FlexibleInputCalculator. ✅ Per-entity supplier account routing. ❌ PurchaseOrder (v2.0 plan exists, not implemented). ❌ AdditionalCharge entity (OtherCharges decimal + Allocator handles it in V1). |
+| 💳 **28** | **Sales Module** | 🟡 Partial — SalesQuotation ✅, PriceEnforcement ✅, FlexibleInput ✅, DeliveryChargesRevenue ✅ | ~1,894 (plan) + ~3,500 (code) | ✅ SalesQuotation (5-state lifecycle, full stack Domain→Desktop). ✅ Price Enforcement (PreventBelowRetailPrice blocks, AllowBelowCostSale warns). ✅ Flexible Input (FlexibleInputCalculator, editable LineTotal). ✅ DeliveryChargesRevenue (separate account 1533). ✅ Multi-currency, Draft/Post/Cancel, Cancel vs Return distinction, barcode POS, profit display, credit limit, accounting integration. ❌ Sales Quotation scenarios (9 scenarios from v2.0 plan not coded as test cases). |
 | 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CustomerReceipts (سندات قبض) with multi-invoice allocation, SupplierPayments with multi-invoice allocation, ReceiptVouchers/PaymentVouchers replace CashTransactions, NO Cheques/DailyClosure in V1 |
 | 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing, ReceiptVouchers (سندات قبض) and PaymentVouchers (سندات صرف) for manual entries |
 | 📊 **31** | **Reports** | 📝 Planned | — | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
-| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Party entity with shared contact data, AccountId mandatory (auto-created under `"1320"` — الموردون/Accounts Payable), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
+| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Direct contact fields (Name, Phone, Email, Address, TaxNumber) on Supplier entity, AccountId mandatory (auto-created under `"1320"` — الموردون/Accounts Payable), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
 
 ---
 
-## 🔄 v4.10 — Schema Refactoring (82 → 65 Tables)
+## 🔄 v4.10 — Schema Refactoring (82 → 66 Tables)
 
 ### Removed Tables (17)
 | Old Table | Replacement | Reason |
@@ -51,10 +51,9 @@
 | InventoryOperations | — | Merged into InventoryTransactions |
 | StockWriteOffs | — | Covered by InventoryAdjustments |
 
-### Added Tables (8)
+### Added Tables (7)
 | New Table | Module | Purpose |
 |-----------|--------|---------|
-| Parties | Core | Shared contact data for Customers/Suppliers/Employees |
 | ProductPrices | Products | Multi-currency pricing per unit |
 | InventoryBatches | Inventory | FIFO/FEFO batch tracking |
 | InventoryTransactions | Inventory | Structured stock movement tracking |
@@ -231,51 +230,147 @@
 
 ---
 
-## 📝 Phase 26 — Warehouses Module (Planned)
+## 🟡 Phase 26 — Warehouses Module (Partial — Inventory Operations ✅)
 
-**Key Entities**: `Warehouse` (enhanced)
+**Key Entities**: `Warehouse` (enhanced), `WarehouseTransfer` ✅, `WarehouseTransferLine` ✅, `InventoryTransaction` ✅, `InventoryTransactionLine` ✅, `InventoryAdjustment` ✅, `InventoryAdjustmentLine` ✅, `InventoryCount` ✅, `InventoryCountLine` ✅
 
-**Features Planned**:
-- Warehouse types: Main (1), Store (2), Showroom (3)
-- Additional fields: ManagerName, AccountId FK, Address, Phone
-- StockAdjustmentType enum: Addition=1, Deduction=2, Correction=3
-- StockIssueReason enum: SalesReturn=1, Damage=2, Expiry=3, InternalUse=4, Other=5
-- Physical Count deferred to V2
-- Every inventory operation creates InventoryMovement record
+### ✅ Completed — Inventory Operations (Full Stack)
+- **WarehouseTransfer** / **WarehouseTransferLine**: Domain entities with Draft/Posted/Cancelled lifecycle, service with `PostAsync()` (decreases source stock, increases destination stock), EF config, API controller, Desktop ViewModels (Editor with LoadWarehouses/LoadProducts/AddLine/RemoveLine/SaveDraft/Post)
+- **InventoryTransaction** / **InventoryTransactionLine**: Replaces old InventoryMovement — Transaction stores ReferenceType/ReferenceId/WarehouseId/Notes, TransactionLine stores ProductUnitId/Quantity/UnitCost/BatchNo/ExpiryDate. Service auto-generates TransactionNo via DocumentSequenceService when `<= 0`
+- **InventoryAdjustment** / **InventoryAdjustmentLine**: `PostAsync()` updates WarehouseStocks per line via `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` (atomic + audit trail). Supports Addition=1, Deduction=2, Correction=3
+- **InventoryCount** / **InventoryCountLine**: `PostAsync()` creates ONE Adjustment per Post with `ReferenceType = "InventoryCount"`. Count lines store ExpectedQuantity/ActualQuantity/Difference
+- **Desktop ViewModels**: All implement `IDisposable` with EventBus cleanup, `IToastNotificationService` for minor success, loading overlays, INotifyDataErrorInfo validation
+- **Key Rules Enforced**: RULE-507 through RULE-516
 
-**Key Rules**: RULE-396 through RULE-400
+### 📝 Remaining — Warehouse Entity Enhancements
+- Warehouse still missing: `Type` (Main/Store/Showroom enum), `ManagerName`, `AccountId` FK linking to Chart of Accounts inventory account
+- These are planned as the next enhancement to the Warehouses module
 
----
-
-## 📝 Phase 27 — Purchases Module (Planned)
-
-**Key Entities**: `PurchaseInvoice` (enhanced), `AdditionalCharge`, `PurchaseOrder`
-
-**Features Planned**:
-- Multi-currency: CurrencyId + ExchangeRate on purchase invoice
-- Landed cost: `AdditionalCharge` entity distributes transport/customs/handling across items
-- Purchase Order entity: separate table, Draft/Approved/Received/Cancelled lifecycle
-- Partial PO receipt via PurchaseInvoice
-- Standalone purchase returns (not linked to original invoice)
-- Single attachment for invoice image
-
-**Key Rules**: RULE-401 through RULE-405
+**Key Rules**: RULE-396 through RULE-400, RULE-467 through RULE-470
 
 ---
 
-## 📝 Phase 28 — Sales Module (Planned)
+## 🟡 Phase 27 — Purchases Module (Partial — OtherCharges ✅, Standalone Returns ✅)
 
-**Key Entities**: `SalesInvoice` (enhanced), `SalesQuotation`
+**Plan Version**: 2.0 (2,281 lines — enriched Jun 23, 2026)  
+**Source Analysis**: `Sales and Purchases new details.md`, `Invoices Details.md`, `Accounts.md`, `accounts summry.md`  
+**Plan File**: `docs/Phase 27 — Purchases Module Implementation Plan.md`
 
-**Features Planned**:
-- Multi-currency: CurrencyId + ExchangeRate on sales invoice
-- Profit display per line: SalePrice - AverageCost
-- Price override with permission check
-- Sales Quotation entity: expiry date, Draft/Confirmed/Expired/Converted lifecycle
-- Continuous barcode scanning POS mode (keyboard wedge scanner)
-- Credit limit enforcement: `Customer.CheckCreditLimit()` before posting
+**Key Entities**: `PurchaseInvoice` (enhanced), `AdditionalCharge` (deferred — OtherCharges decimal handles it), `PurchaseOrder` (deferred to V2)
 
-**Key Rules**: RULE-406 through RULE-410
+### ✅ Completed Features
+
+#### OtherCharges & Landed Cost (RULE-480-486)
+- `PurchaseInvoice.OtherCharges` (decimal) with guard `otherCharges < 0` — included in `RecalculateTotals()` as `NetTotal = SubTotal - Discount + Tax + OtherCharges`
+- `AllocateAdditionalCharges()` in `PurchaseService.PostAsync()` — distributes OtherCharges proportionally by line total: `lineShare = (LineTotal / SubTotal) × OtherCharges`, `landedUnitCost = UnitCost + (lineShare / Quantity)`
+- Inventory stock increase and batch creation use `landedUnitCost` — NOT raw UnitCost
+- `OtherCharges` in Create/Update/Desktop/AccountingIntegration for purchase invoices
+- Extracted to standalone `AdditionalChargeAllocator` helper class for DRY + testability
+
+#### Standalone Purchase Returns (RULE-487-492)
+- `PurchaseInvoiceId` is `int?` (nullable) — supports standalone returns (no linked invoice)
+- `PurchaseReturn.Post()` sets `PostedAt = DateTime.UtcNow`; `Cancel()` sets `CancelledAt = DateTime.UtcNow`
+- `AccountingIntegrationService` has `CreatePurchaseReturnEntryAsync()` (Dr AP / Cr PurchaseReturnAccount) + `ReversePurchaseReturnEntryAsync()` (reversal)
+- `GET /api/v1/purchase-returns/returned-quantities/{invoiceId:int}` endpoint for returning previously returned quantities
+- Desktop VM does NOT hardcode `ProductUnitId: 1` — uses actual ProductUnitId from line items
+
+#### Draft/Post/Cancel (RULE-019-021)
+- Full lifecycle: Draft→Posted→Cancelled, same pattern as SalesInvoice
+- Two-button strategy: Draft saves without accounting/stock; Post commits all
+- Cancellation reverses stock + journal entries
+
+#### Multi-Currency & Supplier Auto-Account
+- `CurrencyId` + `ExchangeRate` on purchase invoice entity, DTO, service, UI
+- Supplier auto-creates Level-4 detail account under parent `"1320"` (Accounts Payable/الموردون) — via `SupplierService.AutoCreateSupplierAccountAsync()`
+
+#### Flexible Input
+- `FlexibleInputCalculator` + `PurchaseInvoiceLineViewModel` with `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` guards
+- LineTotal column is editable
+- Calculator only called when `_lastModifiedField == Total` (Quantity/Price changes compute directly)
+
+**Accounting Integration**:
+- **Purchase Post**: Dr Inventory, Dr VAT Input, Cr Cash/AP — uses landed cost for inventory valuation
+- **Purchase Cancel**: Full reversal (Dr↔Cr)
+- **Purchase Return**: Dr AP / Cr PurchaseReturnAccount (per-entity supplier account routing)
+- **Cross-ref to Phase 24**: AccountingIntegrationService.CreatePurchasePostEntryAsync() / CreatePurchaseReturnEntryAsync()
+
+### 📝 Remaining (V2 / Future)
+- **PurchaseOrder entity**: v2.0 plan exists (Draft/Approved/Received/Cancelled lifecycle), not implemented
+- **AdditionalCharge entity**: OtherCharges decimal + Allocator handles landed cost in V1; dedicated entity deferred to V2
+- **12 Purchase Scenarios**: v2.0 plan doc has them, not coded as unit tests
+- **Single attachment**: Invoice image attachment deferred
+
+**Key Rules**: RULE-401 through RULE-405, RULE-455 through RULE-462 (per-entity account routing), RULE-475 through RULE-492 (OtherCharges, Purchase Return standalone, landed cost)
+
+### 📋 Invoices Details Review (Jun 23, 2026)
+A comprehensive review of `Invoices Details.md` validated the Draft/Post/Cancel architecture for purchases. All patterns match: two-button strategy (Save Draft + Save & Post), atomic transactions via `ExecuteTransactionAsync`, stock/cost/journal entry flow. Bug C-9 (cancel guard conditions) was also fixed for PurchaseService.CancelAsync — now checks for posted returns and supplier payments before allowing cancel.
+
+---
+
+## 🟡 Phase 28 — Sales Module (Comprehensive — SalesQuotation ✅, PriceEnforcement ✅, FlexibleInput ✅, DeliveryChargesRevenue ✅)
+
+**Plan Version**: 2.0 (1,894 lines — enriched Jun 23, 2026)  
+**Source Analysis**: `Sales and Purchases new details.md`, `Invoices Details.md`, `Accounts.md`, `accounts summry.md`  
+**Plan File**: `docs/Phase 28 — Sales Module Implementation Plan.md`
+
+**Key Entities**: `SalesInvoice` (enhanced), `SalesQuotation` ✅, `SalesQuotationItem` ✅, `SalesReturn`
+
+### ✅ Completed — SalesQuotation (NEW Module — Full Stack)
+- **Domain**: `SalesQuotation` entity (AuditableEntity — no stock/accounting impact), `SalesQuotationItem` entity, `QuotationStatus` enum (Draft/Sent/Accepted/Converted/Rejected)
+- **Lifecycle**: Draft→Sent→Accepted→Converted (or Rejected). Terminal: Converted, Rejected
+- **Domain methods**: `Send()`, `Accept()` (guards ValidUntil expiry), `ConvertToInvoice(int invoiceId)`, `Reject(string? reason)`, `Cancel()`
+- **EF Config**: Table `SalesQuotations` (unique QuotationNo), `SalesQuotationItems`, all FKs Restrict, HasQueryFilter hides Rejected, proper decimal precision
+- **Contracts**: `SalesQuotationDto`, `SalesQuotationItemDto`, `CreateSalesQuotationRequest`, `UpdateSalesQuotationRequest`, `SalesQuotationResponse`
+- **Application Service**: `ISalesQuotationService` / `SalesQuotationService` — 9 methods incl. `ConvertToInvoiceAsync` (creates draft SalesInvoice), thread-safe auto-numbering via DocumentSequenceService
+- **Print Support**: `BuildFromSalesQuotationAsync` in InvoicePrintDtoBuilder, print data methods in IPrintDataService/PrintDataService
+- **API Controller**: `SalesQuotationsController` — 8 endpoints GET/POST/PUT + send/accept/reject/convert/cancel actions, ManagerAndAbove auth for writes
+- **Validators**: `CreateSalesQuotationRequestValidator`, `UpdateSalesQuotationRequestValidator`
+- **Desktop API**: `ISalesQuotationApiService` / `SalesQuotationApiService` — full HTTP client
+- **Desktop List VM**: `SalesQuotationListViewModel` — search, date/status filter, ICollectionView, EventBus subscription, commands (New/View/Edit/Send/Accept/Reject/Convert/Cancel)
+- **Desktop Editor VM**: `SalesQuotationEditorViewModel` — 9-service DI, line items management, Validate() with dialog, SaveAsync/SendAsync
+- **Desktop Views**: `SalesQuotationsListView.xaml` (RTL DataGrid, ContextMenu, toolbar, loading overlay), `SalesQuotationEditorView.xaml` (full editor with items grid, summary, terms)
+- **Navigation**: MainWindow sidebar "عروض السعر" under المبيعات, DataTemplate registration
+- **DI Registration**: All services registered in App.xaml.cs and Program.cs
+- **Build**: 0 errors, 0 warnings across all 6 projects
+
+### ✅ Already Implemented (Prior)
+- **Multi-currency**: CurrencyId + ExchangeRate on sales invoice (entity, DTO, service, UI)
+- **Draft/Post/Cancel architecture**: Full lifecycle in domain + service
+- **Cancel vs Return distinction**: Cancel reverses entire invoice; Return is separate transaction
+- **DeliveryChargesRevenue account**: SystemAccountKey=21, seeded, used in AccountingIntegration
+- **Price Enforcement**: `PreventBelowRetailPrice` blocks; `AllowBelowCostSale` warns only (RULE-506)
+- **Flexible Input**: FlexibleInputCalculator + InvoiceLineViewModel with _lastModifiedField guard
+- **Barcode POS mode**: StartContinuousScanAsync + ProcessBarcodeAsync + Touch POS mode
+- **Profit display per line**: `Profit` computed property in InvoiceLineViewModel
+- **Credit limit enforcement**: Customer.CheckCreditLimit() + service validation
+- **Accounting Integration**: All 4 methods (CreateSalesPostEntryAsync, ReverseSalesPostEntryAsync, CreateSalesReturnEntryAsync, ReverseSalesReturnEntryAsync)
+- **Return Print Endpoints**: Desktop IPrintApiService + PrintApiService now have sales-return and purchase-return print methods (a4, thermal, PDF)
+
+**Accounting Integration**:
+- **Sales Post (Revenue side)**: Dr Cash/AR = TotalAmount, Cr SalesRevenue = SubTotal - Discount, Cr DeliveryChargesRevenue = OtherCharges, Cr VatOutput = TaxAmount
+- **Sales Post (COGS side)**: Dr COGS (per line: AverageCost × Qty), Cr Inventory (per line, by batch)
+- **Sales Cancel (Revenue reversal)**: Dr SalesRevenue + Dr DeliveryChargesRevenue + Dr VatOutput / Cr Cash/AR
+- **Sales Cancel (COGS reversal)**: Dr Inventory / Cr COGS (stock returns to original batch)
+- **Sales Return**: Dr SalesReturnsAccount / Cr CustomerAccount (revenue side) + Dr Inventory@currentCost / Cr COGS@currentCost (cost side)
+- **Cross-ref to Phase 24**: AccountingIntegrationService.CreateSalesPostEntryAsync() / ReverseSalesPostEntryAsync() / CreateSalesReturnEntryAsync()
+
+**Key Rules**: RULE-406 through RULE-410, RULE-475 through RULE-478 (Price Enforcement), RULE-493 through RULE-495 (DeliveryChargesRevenue), RULE-496 through RULE-498 (Flexible Input), RULE-517 through RULE-519 (SalesReturn timestamps + journal entries)
+
+### 📋 Invoices Details Review (Jun 23, 2026)
+A comprehensive review of `Invoices Details.md` validated the Sales Draft/Post/Cancel architecture. **5 gaps found and all 5 fixed:**
+| Gap | Fix | Severity |
+|-----|-----|----------|
+| G-03: Cancel guard conditions — no check for returns/payments before cancel | Added `AnyAsync` checks for SalesReturns + CustomerReceiptApplications in SalesService.CancelAsync | CRITICAL |
+| G-01: CashBox payment failure silently ignored in Post | Changed from log-only to `return Result.Failure` (triggers rollback via ExecuteTransactionAsync) | CRITICAL |
+| G-02: CashBox payment reversal failure silently ignored in Cancel | Same fix — returns failure, triggers rollback | CRITICAL |
+| G-04: Manual BeginTransactionAsync used (breaks retry strategy) | Refactored to use `ExecuteTransactionAsync` matching PurchaseService pattern | HIGH |
+| G-06: "Delete" button misleadingly labeled | Re-labeled from "🗑️ حذف" to "🚫 إلغاء الفاتورة" with clearer tooltip | MEDIUM |
+
+### 📝 Remaining (V2 / Future)
+- 9 Sales Scenarios as coded test cases (v2.0 plan doc has them, not coded as unit tests)
+- PriceOverride permission checks for non-admin price changes (currently no access control on price override)
+- Customer portal / self-service quotation acceptance
+- Bulk quotation operations (send/accept/reject multiple)
 
 ---
 
@@ -524,6 +619,11 @@ System MUST seed on first run:
 | C-6 | MEDIUM | InvoiceNo generation uses lastId+1 (not thread-safe) | ✅ Fixed (Phase 24) |
 | C-7 | MEDIUM | NetRevenue clamped to 0 when discount > subtotal (unbalanced entries) | ✅ Fixed (Phase 24) |
 | C-8 | MEDIUM | JournalEntriesController accepts client-supplied CreatedBy | ✅ Fixed (Phase 24) |
+| C-9 | CRITICAL | Cancel guard conditions missing — SalesService/PurchaseService allow cancelling invoices with posted returns or payments against them | ✅ Fixed (G-03) |
+| C-10 | CRITICAL | CashBox payment failure silently ignored in Sales Post — invoice proceeds without payment record if cash recording fails | ✅ Fixed (G-01) |
+| C-11 | CRITICAL | CashBox payment reversal failure silently ignored in Sales Cancel — cancel proceeds without reversing payment | ✅ Fixed (G-02) |
+| C-12 | HIGH | SalesService.CancelAsync uses manual BeginTransactionAsync instead of ExecuteTransactionAsync — violates RULE-275 (breaks retry strategy) | ✅ Fixed (G-04) |
+| C-13 | MEDIUM | "Delete" button misleadingly labeled in SalesInvoiceEditor — button labeled "🗑️ حذف" performs Cancel (full reversal), not delete | ✅ Fixed (G-06) |
 
 ---
 
@@ -573,3 +673,9 @@ Phase 32 — Suppliers Module      (AccountId FK, SupplierType, CreditLimit, Ope
 | Analysis Part 5 | `all new Anylysis for update system features/Analysis Part 5.md` |
 | Phase 18 Implementation Plan | `Phase 18 — Accounting Foundation Implementation Plan.md` |
 | Phase 22 Implementation Plan | `Phase 22 — Chart of Accounts Module Implementation Plan.md` |
+| Phase 27 Implementation Plan (v2.0) | `Phase 27 — Purchases Module Implementation Plan.md` |
+| Phase 28 Implementation Plan (v2.0) | `Phase 28 — Sales Module Implementation Plan.md` |
+| Sales & Purchases Scenarios | `all new Anylysis for update system features/Sales and Purchases new details.md` |
+| Invoice Details (Draft/Post/Cancel) | `all new Anylysis for update system features/Invoices Details.md` |
+| Account Creation Patterns | `all new Anylysis for update system features/Accounts.md` |
+| Account Service Flow | `all new Anylysis for update system features/accounts summry.md` |

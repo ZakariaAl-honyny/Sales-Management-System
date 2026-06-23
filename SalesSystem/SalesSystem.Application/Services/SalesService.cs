@@ -93,13 +93,13 @@ public class SalesService : ISalesService
             (!to.HasValue || i.InvoiceDate <= to.Value) &&
             (searchLower == null ||
              (searchId.HasValue && i.Id == searchId.Value) ||
-             (i.Customer != null && i.Customer.Party.Name.ToLower().Contains(searchLower)) ||
+             (i.Customer != null && i.Customer.Name.ToLower().Contains(searchLower)) ||
              (i.Notes != null && i.Notes.ToLower().Contains(searchLower)) ||
              i.Items.Any(item =>
                  item.Product != null &&
                  item.Product.Name.ToLower().Contains(searchLower)));
 
-        var includes = new[] { "Customer.Party", "Warehouse", "Items.Product" };
+        var includes = new[] { "Customer", "Warehouse", "Items.Product" };
 
         var (items, total) = await _uow.SalesInvoices.GetPagedAsync(
             predicate, q => q.OrderByDescending(i => i.InvoiceDate), page, pageSize, ct, includeInactive, includes);
@@ -370,6 +370,26 @@ public class SalesService : ISalesService
                     }
                 }
 
+                // 3a. Create InventoryTransaction audit trail for stock decrease
+                var invTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (invTxSeq.IsSuccess)
+                {
+                    var invTx = InventoryTransaction.Create(
+                        invTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.Sale,
+                        (short)invoice.WarehouseId,
+                        InventoryReferenceType.SalesInvoice,
+                        invoice.Id,
+                        $"بيع - فاتورة رقم {invoice.InvoiceNo}",
+                        userId);
+                    foreach (var item in invoice.Items)
+                    {
+                        invTx.AddLine(InventoryTransactionLine.Create(
+                            invTx.Id, item.ProductUnitId, item.Quantity, item.UnitPrice, null, null, (short)invoice.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
+                }
+
                 // 4. FIFO/FEFO Batch Allocation — deduct from specific batches
                 foreach (var item in invoice.Items)
                 {
@@ -431,8 +451,9 @@ public class SalesService : ISalesService
 
                     if (!cashResult.IsSuccess)
                     {
-                        _logger.LogWarning("Payment voucher recording failed for invoice {Id}: {Error}",
+                        _logger.LogError("Payment voucher recording failed for invoice {Id}: {Error}",
                             invoice.Id, cashResult.Error);
+                        return Result<SalesInvoiceDto>.Failure(cashResult.Error!);
                     }
                 }
 
@@ -519,9 +540,22 @@ public class SalesService : ISalesService
         if (invoice.Status == InvoiceStatus.Cancelled)
             return Result<SalesInvoiceDto>.Failure("الفاتورة ملغاة بالفعل", ErrorCodes.InvalidOperation);
 
-        return await _uow.ExecuteAsync(async () =>
+        // GUARD: Check for posted returns referencing this invoice
+        var hasReturns = await _uow.SalesReturns.AnyAsync(
+            r => r.SalesInvoiceId == id && r.Status == InvoiceStatus.Posted, ct);
+        if (hasReturns)
+            return Result<SalesInvoiceDto>.Failure("لا يمكن إلغاء فاتورة عليها مرتجعات مسجلة. استخدم إلغاء المرتجع أولاً.",
+                ErrorCodes.InvalidOperation);
+
+        // GUARD: Check for customer receipts applied to this invoice
+        var hasPayments = await _uow.CustomerReceiptApplications.AnyAsync(
+            a => a.SalesInvoiceId == id, ct);
+        if (hasPayments)
+            return Result<SalesInvoiceDto>.Failure("لا يمكن إلغاء فاتورة تم تحصيل جزء من قيمتها. استخدم مرتجع بدلاً من الإلغاء.",
+                ErrorCodes.InvalidOperation);
+
+        return await _uow.ExecuteTransactionAsync<Result<SalesInvoiceDto>>(async () =>
         {
-            await using var transaction = await _uow.BeginTransactionAsync(ct);
             try
             {
                 if (invoice.Status == InvoiceStatus.Posted)
@@ -540,10 +574,29 @@ public class SalesService : ISalesService
 
                         if (!stockResult.IsSuccess)
                         {
-                            await transaction.RollbackAsync(ct);
                             _logger.LogWarning("Stock increase reversal failed for sales invoice cancel: {Error}", stockResult.Error);
                             return Result<SalesInvoiceDto>.Failure(stockResult.Error!);
                         }
+                    }
+
+                    // 3a. Create InventoryTransaction audit trail for stock reversal (cancellation)
+                    var cancelInvTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (cancelInvTxSeq.IsSuccess)
+                    {
+                        var invTx = InventoryTransaction.Create(
+                            cancelInvTxSeq.Value.ToString("D6"),
+                            InventoryTransactionType.SaleReturn,
+                            (short)invoice.WarehouseId,
+                            InventoryReferenceType.SalesInvoice,
+                            invoice.Id,
+                            $"إلغاء بيع - فاتورة رقم {invoice.InvoiceNo}",
+                            userId);
+                        foreach (var item in invoice.Items)
+                        {
+                            invTx.AddLine(InventoryTransactionLine.Create(
+                                invTx.Id, item.ProductUnitId, item.Quantity, item.UnitPrice, null, null, (short)invoice.WarehouseId));
+                        }
+                        await _uow.InventoryTransactions.AddAsync(invTx, ct);
                     }
 
                     // Create offsetting payment voucher if invoice had cash box
@@ -562,8 +615,9 @@ public class SalesService : ISalesService
 
                         if (!cashResult.IsSuccess)
                         {
-                            _logger.LogWarning("Payment voucher recording failed during cancellation of invoice {Id}: {Error}",
+                            _logger.LogError("Payment reversal failed during sales invoice cancel {Id}: {Error}",
                                 invoice.Id, cashResult.Error);
+                            return Result<SalesInvoiceDto>.Failure(cashResult.Error!);
                         }
                     }
 
@@ -571,7 +625,6 @@ public class SalesService : ISalesService
                     var reversalResult = await _accountingService.ReverseSalesPostEntryAsync(invoice, userId, ct);
                     if (!reversalResult.IsSuccess)
                     {
-                        await transaction.RollbackAsync(ct);
                         _logger.LogWarning("Journal entry reversal failed for sales invoice cancel {Id}: {Error}", invoice.Id, reversalResult.Error);
                         return Result<SalesInvoiceDto>.Failure(reversalResult.Error!);
                     }
@@ -583,7 +636,6 @@ public class SalesService : ISalesService
 
                 invoice.Cancel();
                 await _uow.SaveChangesAsync(ct);
-                await transaction.CommitAsync(ct);
 
                 _logger.LogInformation("Sales Invoice cancelled: ID {Id} by User {UserId}", invoice.Id, userId);
 
@@ -591,13 +643,11 @@ public class SalesService : ISalesService
             }
             catch (DomainException ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogWarning(ex, "Domain exception cancelling sales invoice {Id}: {Message}", id, ex.Message);
                 return Result<SalesInvoiceDto>.Failure(ex.Message);
             }
             catch (Exception ex)
             {
-                await transaction.RollbackAsync(ct);
                 _logger.LogError(ex, "Error cancelling sales invoice {Id}", id);
                 return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء إلغاء الفاتورة");
             }
@@ -645,7 +695,7 @@ public class SalesService : ISalesService
             i.Id,
             i.InvoiceNo,
             i.CustomerId,
-            i.Customer?.Party?.Name ?? "عميل نقدي",
+            i.Customer?.Name ?? "عميل نقدي",
             i.WarehouseId,
             i.Warehouse?.Name ?? "غير معروف",
             i.InvoiceDate,

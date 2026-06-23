@@ -604,6 +604,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _mockProductCategoryService.Object,
             _mockUnitService.Object,
             _mockPriceService.Object,
+            null, // ITaxesApiService? taxService (optional)
             invoiceId);
     }
 
@@ -612,7 +613,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         // Setup empty collections to avoid null references
         var customers = new List<CustomerDto>
         {
-            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, CreditLimit: 0, IsActive: true, PartyId: 1, AccountId: 1)
+            new CustomerDto(Id: 1, Name: "عميل 1", Phone: null, Email: null, Address: null, TaxNumber: null, CreditLimit: 0, IsActive: true, AccountId: 1)
         };
         var warehouses = new List<WarehouseDto>
         {
@@ -634,7 +635,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 Name: "منتج 1",
                 CategoryId: 1,
                 CategoryName: null,
-                Barcode: null,
                 Description: null,
                 ReorderLevel: 10,
                 TrackExpiry: false,
@@ -645,7 +645,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 Name: "منتج 2",
                 CategoryId: 1,
                 CategoryName: null,
-                Barcode: null,
                 Description: null,
                 ReorderLevel: 5,
                 TrackExpiry: false,

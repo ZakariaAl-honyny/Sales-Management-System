@@ -50,12 +50,12 @@ public record ProductDto(
     string Name,
     int CategoryId,
     string? CategoryName,
-    string? Barcode,
     string? Description,
     decimal ReorderLevel,
     bool TrackExpiry,
     string? ImagePath,
     bool IsActive,
+    string? Barcode = null,
     decimal CurrentStock = 0)
 {
     public bool IsOutOfStock => CurrentStock <= 0;
@@ -83,10 +83,10 @@ public record WarehouseStockDto(
     decimal AvgCost);
 
 public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address,
-    string? TaxNumber, bool IsActive, int PartyId,
+    string? TaxNumber, bool IsActive,
     int AccountId, string? AccountName = null, int? CategoryId = null);
 public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address,
-    string? TaxNumber, decimal CreditLimit, bool IsActive, int PartyId,
+    string? TaxNumber, decimal CreditLimit, bool IsActive,
     int AccountId, string? AccountName = null, int? CategoryId = null)
 {
     public bool HasCreditLimit => CreditLimit > 0;
@@ -955,4 +955,52 @@ public record AccountBalanceReportDto(
     decimal DebitBalance,
     decimal CreditBalance,
     decimal NetBalance);
+
+public record SalesQuotationDto(
+    int Id,
+    int QuotationNo,
+    int CustomerId,
+    string? CustomerName,
+    int WarehouseId,
+    string? WarehouseName,
+    short? CurrencyId,
+    decimal? ExchangeRate,
+    DateTime QuotationDate,
+    DateTime ValidUntil,
+    byte Status,
+    decimal SubTotal,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    string? Notes,
+    string? TermsAndConditions,
+    string? CreatedByUserName,
+    DateTime CreatedAt,
+    bool IsActive,
+    List<SalesQuotationItemDto>? Items = null)
+{
+    public string StatusDisplay => Status switch
+    {
+        1 => "مسودة",
+        2 => "مرسلة",
+        3 => "مقبولة",
+        4 => "محولة لفاتورة",
+        5 => "مرفوضة",
+        _ => "غير معروف"
+    };
+}
+
+public record SalesQuotationItemDto(
+    int Id,
+    int QuotationId,
+    int ProductId,
+    string? ProductName,
+    int ProductUnitId,
+    string? UnitName,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal DiscountAmount,
+    decimal TaxAmount,
+    decimal LineTotal,
+    string? Notes);
 

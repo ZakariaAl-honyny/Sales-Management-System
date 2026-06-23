@@ -15,13 +15,12 @@ public class EmployeeEditorViewModel : ViewModelBase
     private readonly IToastNotificationService _toastService;
 
     private int _employeeId;
-    private int _partyId;
+    private string _name = string.Empty;
     private int _employeeNo;
     private DateTime _hireDate = DateTime.Today;
     private int? _departmentId;
     private decimal _salary;
     private string? _notes;
-    private string? _partyName;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -47,16 +46,19 @@ public class EmployeeEditorViewModel : ViewModelBase
         set => SetProperty(ref _isEditMode, value);
     }
 
-    public int PartyId
+    public string Name
     {
-        get => _partyId;
-        set => SetProperty(ref _partyId, value);
-    }
-
-    public string? PartyName
-    {
-        get => _partyName;
-        set => SetProperty(ref _partyName, value);
+        get => _name;
+        set
+        {
+            if (SetProperty(ref _name, value))
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    AddError(nameof(Name), "اسم الموظف مطلوب");
+                else
+                    ClearErrors(nameof(Name));
+            }
+        }
     }
 
     public int EmployeeNo
@@ -115,8 +117,7 @@ public class EmployeeEditorViewModel : ViewModelBase
     public void LoadEmployee(EmployeeDto employee)
     {
         _employeeId = employee.Id;
-        _partyId = employee.PartyId;
-        _partyName = employee.PartyName;
+        _name = employee.Name;
         _employeeNo = employee.EmployeeNo;
         _hireDate = employee.HireDate;
         _departmentId = employee.DepartmentId;
@@ -130,8 +131,8 @@ public class EmployeeEditorViewModel : ViewModelBase
     {
         ClearAllErrors();
 
-        if (_partyId <= 0)
-            AddError(nameof(PartyId), "يجب اختيار شخص (Party)");
+        if (string.IsNullOrWhiteSpace(Name))
+            AddError(nameof(Name), "اسم الموظف مطلوب");
         if (_hireDate == default || _hireDate > DateTime.Today)
             AddError(nameof(HireDate), "تاريخ التوظيف غير صالح");
 
@@ -147,6 +148,10 @@ public class EmployeeEditorViewModel : ViewModelBase
         if (IsEditMode)
         {
             var request = new UpdateEmployeeRequest(
+                Name: _name,
+                Phone: null,
+                Email: null,
+                Address: null,
                 DepartmentId: _departmentId,
                 Salary: _salary > 0 ? _salary : null,
                 Notes: _notes);
@@ -167,9 +172,12 @@ public class EmployeeEditorViewModel : ViewModelBase
         else
         {
             var request = new CreateEmployeeRequest(
-                PartyId: _partyId,
+                Name: _name,
                 EmployeeNo: _employeeNo > 0 ? _employeeNo : 0,
                 HireDate: _hireDate,
+                Phone: null,
+                Email: null,
+                Address: null,
                 DepartmentId: _departmentId,
                 Salary: _salary,
                 Notes: _notes);

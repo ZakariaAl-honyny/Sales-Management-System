@@ -15,35 +15,29 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         // ─── String properties ──────────────────────────────
         builder.Property(p => p.Name).IsRequired().HasMaxLength(200);
-        // Barcode is varchar(50) for ASCII-only barcodes — not nvarchar
-        builder.Property(p => p.Barcode)
-            .HasColumnType("varchar(50)")
-            .HasMaxLength(50)
-            .IsRequired(false)
-            .HasComment("Primary barcode for quick lookup — ASCII-only, not a unique identifier");
         builder.Property(p => p.Description).HasMaxLength(500);
         builder.Property(p => p.ImagePath).HasMaxLength(500);
 
+        // ─── Barcode ────────────────────────────────────────
+        builder.Property(p => p.Barcode)
+            .HasColumnType("varchar")
+            .HasMaxLength(50)
+            .IsRequired(false)
+            .HasComment("Primary barcode for quick lookup — ASCII-only, not a unique identifier");
+
+        builder.HasIndex(p => p.Barcode)
+            .IsUnique(false)
+            .HasDatabaseName("IX_Products_Barcode")
+            .HasFilter("[Barcode] IS NOT NULL AND [IsActive] = 1");
+
         // ─── Numeric properties ─────────────────────────────
         builder.Property(p => p.ReorderLevel).HasPrecision(18, 3);
-
-        // ─── Indexes ───────────────────────────────────────────
-        builder.HasIndex(p => p.Barcode)
-            .IsUnique()
-            .HasFilter("[Barcode] IS NOT NULL AND [IsActive] = 1")
-            .HasDatabaseName("IX_Products_Barcode");
 
         // ─── Relationships ─────────────────────────────────────
         builder.HasOne(p => p.ProductCategory)
             .WithMany()
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(p => p.Tax)
-            .WithMany()
-            .HasForeignKey(p => p.TaxId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
 
         // Units — dynamic UOM collection
         builder.HasMany(p => p.Units)

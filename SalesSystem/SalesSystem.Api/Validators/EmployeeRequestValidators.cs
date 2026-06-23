@@ -7,9 +7,6 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
 {
     public CreateEmployeeRequestValidator()
     {
-        RuleFor(x => x.PartyId)
-            .GreaterThan(0).WithMessage("معرف الطرف مطلوب");
-
         RuleFor(x => x.EmployeeNo)
             .GreaterThan(0).WithMessage("رقم الموظف يجب أن يكون أكبر من صفر");
 

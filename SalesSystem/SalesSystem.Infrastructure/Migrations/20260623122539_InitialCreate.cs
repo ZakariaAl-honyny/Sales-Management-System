@@ -162,29 +162,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Parties",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Phone = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
-                    Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    Address = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
-                    TaxNumber = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
-                    Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<int>(type: "int", nullable: true),
-                    UpdatedByUserId = table.Column<int>(type: "int", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Parties", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Permissions",
                 columns: table => new
                 {
@@ -326,7 +303,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     CategoryId = table.Column<short>(type: "smallint", nullable: true),
                     Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     ColorCode = table.Column<string>(type: "nvarchar(7)", maxLength: 7, nullable: true),
-                    OpeningBalance = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
                     Notes = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -384,7 +360,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "CompanySettings",
                 columns: table => new
                 {
-                    Id = table.Column<byte>(type: "tinyint", nullable: false, defaultValue: (byte)1),
+                    Id = table.Column<byte>(type: "tinyint", nullable: false),
                     CompanyName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Phone = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
                     Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
@@ -435,6 +411,36 @@ namespace SalesSystem.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Products",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CategoryId = table.Column<int>(type: "int", nullable: false),
+                    ReorderLevel = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
+                    TrackExpiry = table.Column<bool>(type: "bit", nullable: false),
+                    ImagePath = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    Barcode = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: true, comment: "Primary barcode for quick lookup — ASCII-only, not a unique identifier"),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedByUserId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByUserId = table.Column<int>(type: "int", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Products", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Products_ProductCategories_CategoryId",
+                        column: x => x.CategoryId,
+                        principalTable: "ProductCategories",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "RolePermissions",
                 columns: table => new
                 {
@@ -456,43 +462,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         name: "FK_RolePermissions_Roles_RoleId",
                         column: x => x.RoleId,
                         principalTable: "Roles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Products",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                    Barcode = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: true, comment: "Primary barcode for quick lookup — ASCII-only, not a unique identifier"),
-                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    CategoryId = table.Column<int>(type: "int", nullable: false),
-                    TaxId = table.Column<short>(type: "smallint", nullable: true),
-                    ReorderLevel = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
-                    TrackExpiry = table.Column<bool>(type: "bit", nullable: false),
-                    ImagePath = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    CreatedByUserId = table.Column<int>(type: "int", nullable: true),
-                    UpdatedByUserId = table.Column<int>(type: "int", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Products", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_Products_ProductCategories_CategoryId",
-                        column: x => x.CategoryId,
-                        principalTable: "ProductCategories",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Products_Taxes_TaxId",
-                        column: x => x.TaxId,
-                        principalTable: "Taxes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -557,7 +526,12 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    PartyId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    TaxNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     CategoryId = table.Column<int>(type: "int", nullable: true),
                     CreditLimit = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
@@ -576,12 +550,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         principalTable: "Accounts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Customers_Parties_PartyId",
-                        column: x => x.PartyId,
-                        principalTable: "Parties",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -590,13 +558,16 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    PartyId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     DepartmentId = table.Column<short>(type: "smallint", nullable: true),
                     AccountId = table.Column<int>(type: "int", nullable: true),
                     EmployeeNo = table.Column<int>(type: "int", nullable: false),
                     HireDate = table.Column<DateTime>(type: "date", nullable: false),
                     Salary = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
-                    Notes = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedByUserId = table.Column<int>(type: "int", nullable: true),
@@ -618,12 +589,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         principalTable: "Departments",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Employees_Parties_PartyId",
-                        column: x => x.PartyId,
-                        principalTable: "Parties",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -632,7 +597,12 @@ namespace SalesSystem.Infrastructure.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    PartyId = table.Column<int>(type: "int", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    Address = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    TaxNumber = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: true),
+                    Notes = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     AccountId = table.Column<int>(type: "int", nullable: false),
                     CategoryId = table.Column<int>(type: "int", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -648,12 +618,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         name: "FK_Suppliers_Accounts_AccountId",
                         column: x => x.AccountId,
                         principalTable: "Accounts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Suppliers_Parties_PartyId",
-                        column: x => x.PartyId,
-                        principalTable: "Parties",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -717,7 +681,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     Status = table.Column<byte>(type: "tinyint", nullable: false, defaultValue: (byte)1),
                     Notes = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
-                    CreatedByUserId = table.Column<int>(type: "int", nullable: false, defaultValue: 0)
+                    CreatedByUserId = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    PostedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CancelledAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -768,7 +734,9 @@ namespace SalesSystem.Infrastructure.Migrations
                     Notes = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
                     Status = table.Column<byte>(type: "tinyint", nullable: false, defaultValue: (byte)1),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
-                    CreatedByUserId = table.Column<int>(type: "int", nullable: false, defaultValue: 0)
+                    CreatedByUserId = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    PostedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CancelledAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -1118,6 +1086,57 @@ namespace SalesSystem.Infrastructure.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_SalesInvoices_Warehouses_WarehouseId",
+                        column: x => x.WarehouseId,
+                        principalTable: "Warehouses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SalesQuotations",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    QuotationNo = table.Column<int>(type: "int", nullable: false),
+                    QuotationDate = table.Column<DateTime>(type: "date", nullable: false),
+                    ValidUntil = table.Column<DateTime>(type: "date", nullable: true),
+                    CustomerId = table.Column<int>(type: "int", nullable: false),
+                    WarehouseId = table.Column<short>(type: "smallint", nullable: false),
+                    CurrencyId = table.Column<short>(type: "smallint", nullable: false),
+                    ExchangeRate = table.Column<decimal>(type: "decimal(18,6)", precision: 18, scale: 6, nullable: true),
+                    PaymentType = table.Column<byte>(type: "tinyint", nullable: false),
+                    SubTotal = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    DiscountAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    TaxAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    TotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    TermsAndConditions = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    Status = table.Column<byte>(type: "tinyint", nullable: false),
+                    ConvertedToInvoiceId = table.Column<int>(type: "int", nullable: true),
+                    RejectionReason = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedByUserId = table.Column<int>(type: "int", nullable: true),
+                    UpdatedByUserId = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SalesQuotations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotations_Currencies_CurrencyId",
+                        column: x => x.CurrencyId,
+                        principalTable: "Currencies",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotations_Customers_CustomerId",
+                        column: x => x.CustomerId,
+                        principalTable: "Customers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotations_Warehouses_WarehouseId",
                         column: x => x.WarehouseId,
                         principalTable: "Warehouses",
                         principalColumn: "Id",
@@ -1598,6 +1617,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     WarehouseId = table.Column<short>(type: "smallint", nullable: false),
                     CurrencyId = table.Column<short>(type: "smallint", nullable: false),
                     TotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    ReturnedDiscountAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    ReturnedTaxAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    ReturnedChargeAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    TaxId = table.Column<short>(type: "smallint", nullable: true),
                     Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Status = table.Column<byte>(type: "tinyint", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -1632,6 +1655,44 @@ namespace SalesSystem.Infrastructure.Migrations
                         name: "FK_SalesReturns_Warehouses_WarehouseId",
                         column: x => x.WarehouseId,
                         principalTable: "Warehouses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SalesQuotationItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    SalesQuotationId = table.Column<int>(type: "int", nullable: false),
+                    ProductId = table.Column<int>(type: "int", nullable: false),
+                    ProductUnitId = table.Column<int>(type: "int", nullable: false),
+                    Quantity = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    DiscountAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    LineTotal = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SalesQuotationItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotationItems_ProductUnits_ProductUnitId",
+                        column: x => x.ProductUnitId,
+                        principalTable: "ProductUnits",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotationItems_Products_ProductId",
+                        column: x => x.ProductId,
+                        principalTable: "Products",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SalesQuotationItems_SalesQuotations_SalesQuotationId",
+                        column: x => x.SalesQuotationId,
+                        principalTable: "SalesQuotations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -1850,6 +1911,10 @@ namespace SalesSystem.Infrastructure.Migrations
                     WarehouseId = table.Column<short>(type: "smallint", nullable: false),
                     CurrencyId = table.Column<short>(type: "smallint", nullable: false),
                     TotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    ReturnedDiscountAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    ReturnedTaxAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    ReturnedChargeAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, defaultValue: 0m),
+                    TaxId = table.Column<short>(type: "smallint", nullable: true),
                     Notes = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
                     Status = table.Column<byte>(type: "tinyint", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -1991,6 +2056,7 @@ namespace SalesSystem.Infrastructure.Migrations
                     QuantityReceived = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false, comment: "الكمية المستلمة في الدفعة"),
                     QuantityRemaining = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false, comment: "الكمية المتبقية في الدفعة"),
                     UnitCost = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false, comment: "تكلفة الوحدة عند الشراء"),
+                    IsClosed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false, comment: "هل الدفعة مغلقة (تم استهلاكها بالكامل)"),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     CreatedByUserId = table.Column<int>(type: "int", nullable: true),
@@ -1999,6 +2065,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_InventoryBatches", x => x.Id);
+                    table.CheckConstraint("CHK_InventoryBatches_IsClosed_Consistency", "([IsClosed] = 0 AND [QuantityRemaining] > 0) OR ([IsClosed] = 1 AND [QuantityRemaining] <= 0)");
                     table.CheckConstraint("CHK_InventoryBatches_QuantityReceived_NonNegative", "[QuantityReceived] >= 0");
                     table.CheckConstraint("CHK_InventoryBatches_QuantityRemaining_NonNegative", "[QuantityRemaining] >= 0");
                     table.CheckConstraint("CHK_InventoryBatches_UnitCost_NonNegative", "[UnitCost] >= 0");
@@ -2221,9 +2288,14 @@ namespace SalesSystem.Infrastructure.Migrations
                 column: "CategoryId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Customers_PartyId",
+                name: "IX_Customers_Name",
                 table: "Customers",
-                column: "PartyId");
+                column: "Name");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Customers_Phone",
+                table: "Customers",
+                column: "Phone");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DocumentSequences_DocumentType",
@@ -2248,9 +2320,14 @@ namespace SalesSystem.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Employees_PartyId",
+                name: "IX_Employees_Name",
                 table: "Employees",
-                column: "PartyId");
+                column: "Name");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Employees_Phone",
+                table: "Employees",
+                column: "Phone");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Expenses_CashBoxId",
@@ -2460,16 +2537,6 @@ namespace SalesSystem.Infrastructure.Migrations
                 descending: new[] { false, false, true });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Parties_Name",
-                table: "Parties",
-                column: "Name");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Parties_Phone",
-                table: "Parties",
-                column: "Phone");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_PaymentVouchers_AccountId",
                 table: "PaymentVouchers",
                 column: "AccountId");
@@ -2518,18 +2585,12 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "IX_Products_Barcode",
                 table: "Products",
                 column: "Barcode",
-                unique: true,
                 filter: "[Barcode] IS NOT NULL AND [IsActive] = 1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Products_CategoryId",
                 table: "Products",
                 column: "CategoryId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Products_TaxId",
-                table: "Products",
-                column: "TaxId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductUnits_ProductId_UnitId",
@@ -2719,6 +2780,42 @@ namespace SalesSystem.Infrastructure.Migrations
                 column: "WarehouseId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotationItems_ProductId",
+                table: "SalesQuotationItems",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotationItems_ProductUnitId",
+                table: "SalesQuotationItems",
+                column: "ProductUnitId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotationItems_SalesQuotationId",
+                table: "SalesQuotationItems",
+                column: "SalesQuotationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotations_CurrencyId",
+                table: "SalesQuotations",
+                column: "CurrencyId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotations_CustomerId",
+                table: "SalesQuotations",
+                column: "CustomerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotations_QuotationNo",
+                table: "SalesQuotations",
+                column: "QuotationNo",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SalesQuotations_WarehouseId",
+                table: "SalesQuotations",
+                column: "WarehouseId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SalesReturnLines_SalesInvoiceLineId",
                 table: "SalesReturnLines",
                 column: "SalesInvoiceLineId");
@@ -2806,9 +2903,14 @@ namespace SalesSystem.Infrastructure.Migrations
                 column: "CategoryId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Suppliers_PartyId",
+                name: "IX_Suppliers_Name",
                 table: "Suppliers",
-                column: "PartyId");
+                column: "Name");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Suppliers_Phone",
+                table: "Suppliers",
+                column: "Phone");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SystemAccountMappings_AccountId",
@@ -3015,6 +3117,9 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "RolePermissions");
 
             migrationBuilder.DropTable(
+                name: "SalesQuotationItems");
+
+            migrationBuilder.DropTable(
                 name: "SalesReturnLines");
 
             migrationBuilder.DropTable(
@@ -3070,6 +3175,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Permissions");
+
+            migrationBuilder.DropTable(
+                name: "SalesQuotations");
 
             migrationBuilder.DropTable(
                 name: "SalesInvoiceLines");
@@ -3129,6 +3237,9 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "Customers");
 
             migrationBuilder.DropTable(
+                name: "Taxes");
+
+            migrationBuilder.DropTable(
                 name: "Warehouses");
 
             migrationBuilder.DropTable(
@@ -3138,13 +3249,7 @@ namespace SalesSystem.Infrastructure.Migrations
                 name: "ProductCategories");
 
             migrationBuilder.DropTable(
-                name: "Taxes");
-
-            migrationBuilder.DropTable(
                 name: "Accounts");
-
-            migrationBuilder.DropTable(
-                name: "Parties");
 
             migrationBuilder.DropTable(
                 name: "Branches");

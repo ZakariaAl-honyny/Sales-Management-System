@@ -13,6 +13,21 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasKey(e => e.Id);
 
         // ─── Property Configurations ──────────────────────
+
+        // Direct contact fields (replaces Party relationship)
+        builder.Property(e => e.Name)
+            .IsRequired()
+            .HasMaxLength(200);
+
+        builder.Property(e => e.Phone)
+            .HasMaxLength(20);
+
+        builder.Property(e => e.Email)
+            .HasMaxLength(100);
+
+        builder.Property(e => e.Address)
+            .HasMaxLength(500);
+
         builder.Property(e => e.EmployeeNo)
             .IsRequired();
 
@@ -25,15 +40,18 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasDefaultValue(0m);
 
         builder.Property(e => e.Notes)
-            .HasMaxLength(300);
+            .HasMaxLength(1000);
 
         // ─── Indexes ──────────────────────────────────────
         builder.HasIndex(e => e.EmployeeNo)
             .IsUnique()
             .HasDatabaseName("IX_Employees_EmployeeNo");
 
-        builder.HasIndex(e => e.PartyId)
-            .HasDatabaseName("IX_Employees_PartyId");
+        builder.HasIndex(e => e.Name)
+            .HasDatabaseName("IX_Employees_Name");
+
+        builder.HasIndex(e => e.Phone)
+            .HasDatabaseName("IX_Employees_Phone");
 
         builder.HasIndex(e => e.DepartmentId)
             .HasDatabaseName("IX_Employees_DepartmentId");
@@ -42,12 +60,6 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .HasDatabaseName("IX_Employees_AccountId");
 
         // ─── Foreign Keys ─────────────────────────────────
-        builder.HasOne(e => e.Party)
-            .WithMany()
-            .HasForeignKey(e => e.PartyId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
-
         builder.HasOne(e => e.Department)
             .WithMany()
             .HasForeignKey(e => e.DepartmentId)

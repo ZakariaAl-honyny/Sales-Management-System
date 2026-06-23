@@ -109,3 +109,8 @@ public record ReceiptVoucherChangedMessage(int VoucherId);
 /// </summary>
 public record InventoryTransactionChangedMessage(int TransactionId);
 
+/// <summary>
+/// Published when a sales quotation is created, sent, accepted, rejected, converted, or cancelled.
+/// Carries the quotation ID only — NO data payload (RULE-034).
+/// </summary>
+public record SalesQuotationChangedMessage(int QuotationId);

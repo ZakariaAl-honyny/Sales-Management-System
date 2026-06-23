@@ -26,14 +26,13 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <Border Padding="16">
                 <StackPanel>
-                    <!-- PartyId (Name lookup) -->
-                    <TextBlock Text="الشخص (Party) *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
-                    <TextBox Text="{Binding PartyName, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                    <!-- Name -->
+                    <TextBlock Text="الاسم *" Style="{StaticResource LabelStyle}" Margin="4,0,0,8"/>
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                              Style="{StaticResource ModernTextBox}"
-                             Tag="اسم الشخص المرتبط"
+                             Tag="أدخل اسم الموظف"
                              TabIndex="1"
-                             IsReadOnly="True"
-                             ToolTip="الشخص المرتبط بالموظف"/>
+                             ToolTip="أدخل اسم الموظف — هذا الحقل إلزامي"/>
 
                     <!-- EmployeeNo -->
                     <TextBlock Text="الرقم الوظيفي" Style="{StaticResource LabelStyle}" Margin="4,12,0,8"/>

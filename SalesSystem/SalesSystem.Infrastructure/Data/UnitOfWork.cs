@@ -57,7 +57,6 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<ProductPrice>? _productPrices;
 
     // New entity repositories (v4.7+)
-    private IGenericRepository<Party>? _parties;
     private IGenericRepository<Attachment>? _attachments;
     private IGenericRepository<Notification>? _notifications;
     private IGenericRepository<Branch>? _branches;
@@ -78,6 +77,10 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     private IGenericRepository<CustomerContact>? _customerContacts;
     private IGenericRepository<SupplierContact>? _supplierContacts;
+
+    // === Sales Quotation Module ===
+    private IGenericRepository<SalesQuotation>? _salesQuotations;
+    private IGenericRepository<SalesQuotationItem>? _salesQuotationItems;
 
     // === New Inventory Module (v4.10+) ===
     private IGenericRepository<InventoryTransaction>? _inventoryTransactions;
@@ -129,7 +132,6 @@ public class UnitOfWork : IUnitOfWork
     public IGenericRepository<InventoryBatch> InventoryBatches => _inventoryBatches ??= new GenericRepository<InventoryBatch>(_context);
     public IGenericRepository<ProductPrice> ProductPrices => _productPrices ??= new GenericRepository<ProductPrice>(_context);
     // New entity repositories (v4.7+)
-    public IGenericRepository<Party> Parties => _parties ??= new GenericRepository<Party>(_context);
     public IGenericRepository<Attachment> Attachments => _attachments ??= new GenericRepository<Attachment>(_context);
     public IGenericRepository<Notification> Notifications => _notifications ??= new GenericRepository<Notification>(_context);
     public IGenericRepository<Branch> Branches => _branches ??= new GenericRepository<Branch>(_context);
@@ -151,6 +153,10 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     public IGenericRepository<CustomerContact> CustomerContacts => _customerContacts ??= new GenericRepository<CustomerContact>(_context);
     public IGenericRepository<SupplierContact> SupplierContacts => _supplierContacts ??= new GenericRepository<SupplierContact>(_context);
+
+    // === Sales Quotation Module ===
+    public IGenericRepository<SalesQuotation> SalesQuotations => _salesQuotations ??= new GenericRepository<SalesQuotation>(_context);
+    public IGenericRepository<SalesQuotationItem> SalesQuotationItems => _salesQuotationItems ??= new GenericRepository<SalesQuotationItem>(_context);
 
     // === New Inventory Module (v4.10+) ===
     public IGenericRepository<InventoryTransaction> InventoryTransactions => _inventoryTransactions ??= new GenericRepository<InventoryTransaction>(_context);

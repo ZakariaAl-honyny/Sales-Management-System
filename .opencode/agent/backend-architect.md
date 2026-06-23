@@ -1,6 +1,7 @@
 ---
 name: "Backend Architect"
-reasoningEffect: high
+reasoningEffect: max
+model: opencode/deepseek-v4-flash-free
 role: "ASP.NET Core 10 Clean Architecture specialist"
 activation: "When working on backend code"
 mode: subagent
@@ -368,6 +369,31 @@ NEVER use `:byte` — use `:int:min(1):max(N)` per RULE-345.
 - Customer Editor has NO CustomerGroup dropdown, AccountId selection, CustomerType/SupplierType radio, or OpeningBalance input — AccountName is display-only after save
 - Supplier Editor has NO OpeningBalance input — follows same rules as Customer
 
+## Phase 25 — Products Module (v4.10.6 — Aligned to Analysis)
+
+### Product Entity — No TaxId, Barcode Present, Min 2 Units
+- **RULE-543**: `Product` entity MUST NOT have `TaxId` — Tax is invoice-level only (`SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`)
+- **RULE-544**: Product creation MUST be atomic across 3 tables: `Products` + `ProductUnits` + `ProductPrices` — wrapped in `_uow.ExecuteTransactionAsync<Result<ProductDto>>()`
+- **RULE-545**: Opening stock is a SEPARATE inventory transaction — NEVER stored on `Product` entity fields
+- `Product` entity has `Barcode` property (`Products.Barcode varchar(50) null unique filtered per database-schema.md line 437`)
+- `Product.ValidateUnits()` enforces minimum 2 units (RULE-067) — throws DomainException if < 2
+- `Product.RemoveUnit()` guards at 2 units — cannot remove below minimum
+- ProductDto includes `Barcode` (string?) — NO TaxId
+- CreateProductRequest includes `Barcode` (string?) — NO TaxId, NO OpeningQuantity/OpeningUnitCost
+
+### ExecuteTransactionAsync for Account+Entity Services
+- **RULE-546**: Services creating BOTH an Account AND an entity MUST wrap in `ExecuteTransactionAsync`
+- **RULE-547**: `CustomerService.CreateAsync`, `SupplierService.CreateAsync`, `CashBoxService.CreateAsync`, `BankService.CreateAsync` MUST use ExecuteTransactionAsync
+- Pattern: `await _uow.ExecuteTransactionAsync<Result<T>>(async () => { ... }, ct)` — single transaction for account + entity + SaveChanges
+
+### Customer/Supplier — Direct Fields, No Parties Entity
+- Parties entity REMOVED entirely — contact fields stored directly on Customer, Supplier, Employee
+- Customer/Supplier have: Name, Phone, Email, Address, TaxNumber, Notes directly on entity
+- Customer/Supplier have NO OpeningBalance, CurrentBalance, CurrencyId, CustomerGroup, SupplierType
+- AccountId is MANDATORY (non-nullable int) — auto-created by service
+
+---
+
 ## Phase 24 — Accounting Integration Patterns (v4.6.9+)
 
 ### When creating AccountingIntegrationService methods:
@@ -505,3 +531,21 @@ When you encounter any code related to these areas, apply fixes automatically:
 14. Old `InventoryMovement` → Replace with `InventoryTransaction`/`InventoryTransactionLine`
 15. CustomerGroup/SupplierType references in V1 → Remove (deferred to V2)
 16. OpeningBalance/CurrentBalance on Customer/Supplier/CashBox → Remove (balance lives on linked Account)
+17. Missing `ExecuteTransactionAsync` on transaction operations → Wrap in `ExecuteTransactionAsync` (ALL 22 operations per RULE-560)
+18. Missing `InventoryTransaction` audit trail → Add `InventoryTransaction.Create()` + `AddLine()` per product in Post/Cancel (RULE-561)
+19. `ExpenseService` without journal entries → Inject `IAccountingIntegrationService`, create `Dr ExpenseAccount / Cr CashBox.Account` on Post, reversal on Cancel (RULE-562)
+20. `DeleteAsync`/`CancelAsync` missing `SaveChangesAsync` → Add `SaveChangesAsync` before return (RULE-564)
+21. `InventoryTransaction` inside `IncreaseStockAsync`/`DecreaseStockAsync` → Move to service wrappers to prevent duplicates (RULE-565)
+
+### 💡 Transaction Atomicity Checklist (v4.10.7)
+
+When implementing or reviewing ANY service method that affects stock, cash, or accounting:
+
+- [ ] Is the method wrapped in `ExecuteTransactionAsync`? (Check ALL 22 operations listed in RULE-560)
+- [ ] Does the method create `InventoryTransaction` + `InventoryTransactionLine` for stock changes? (RULE-561)
+- [ ] Does `ExpenseService` inject `IAccountingIntegrationService` + `IDocumentSequenceService`? (RULE-562)
+- [ ] Does `DeleteAsync`/`CancelAsync` call `SaveChangesAsync` before returning? (RULE-564)
+- [ ] Is `InventoryTransaction` created in the service wrapper (NOT in `IncreaseStockAsync`/`DecreaseStockAsync`)? (RULE-565)
+- [ ] Does `AccountingIntegrationService` return `Result<int>` (never throw)? (RULE-388)
+- [ ] Is `DocumentSequenceService.GetNextIntAsync()` used for sequences (NOT `Max() + 1`)? (RULE-384)
+- [ ] No `BeginTransactionAsync` used directly — all via `ExecuteTransactionAsync`? (RULE-275)

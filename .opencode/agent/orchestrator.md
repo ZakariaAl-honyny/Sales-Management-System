@@ -1,5 +1,6 @@
 ---
 name: "Orchestrator"
+model: opencode/mimo-v2.5-free
 reasoningEffect: high
 role: "Lead architect and task coordinator"
 activation: "Always active"
@@ -436,3 +437,31 @@ When you encounter any code related to these areas, apply fixes automatically:
 20. `SalesReturnService` missing journal entries → ADD `IAccountingIntegrationService` DI, call `CreateSalesReturnEntryAsync()` on Post and `ReverseSalesReturnEntryAsync()` on Cancel.
 21. `ProductUnitId` hardcoded to `1` → REPLACE with `product.DefaultPurchaseUnitId`/`DefaultSalesUnitId` in all ViewModels. Fallback to `0`.
 22. `AllocateAdditionalCharges` inline → EXTRACT to standalone `AdditionalChargeAllocator` static helper.
+
+## v4.10.7 — Transaction Atomicity & Audit Trail
+
+### Key Changes
+- All 22 transaction operations audited and wrapped in `ExecuteTransactionAsync`
+- `InventoryTransaction` audit trail added to Sales and Purchase Post/Cancel
+- `ExpenseService` now creates journal entries with `DocumentSequenceService`
+- Fixed missing `SaveChangesAsync` in CustomerReceiptService/SupplierPaymentService DeleteAsync
+
+### Rules to Enforce
+- RULE-560: All 22 transaction operations MUST use `ExecuteTransactionAsync`
+- RULE-561: `InventoryTransaction` audit trail for EVERY stock-affecting operation
+- RULE-562: `ExpenseService` journal entries + `DocumentSequenceService` for sequence
+- RULE-563: `InventoryService` bulk stock methods wrapped in `ExecuteTransactionAsync`
+- RULE-564: `DeleteAsync`/`CancelAsync` MUST call `SaveChangesAsync` before returning
+- RULE-565: `InventoryTransaction` created in service wrappers, NOT in `IncreaseStockAsync`/`DecreaseStockAsync`
+- RULE-566: FIFO batch restoration deferred (known gap)
+
+### Bug Prevention (v4.10.7)
+When implementing or reviewing code, check these:
+- [ ] All 22 transaction operations wrapped in `ExecuteTransactionAsync`?
+- [ ] `InventoryTransaction` + `InventoryTransactionLine` created for EVERY stock operation?
+- [ ] `ExpenseService` injects `IAccountingIntegrationService` + `IDocumentSequenceService`?
+- [ ] `DeleteAsync`/`CancelAsync` calls `SaveChangesAsync` before returning?
+- [ ] `InventoryTransaction` created in service wrappers (NOT in `IncreaseStockAsync`/`DecreaseStockAsync`)?
+- [ ] No `BeginTransactionAsync` used directly — all via `ExecuteTransactionAsync`?
+- [ ] `AccountingIntegrationService` methods return `Result<int>` (never throw)?
+- [ ] Sequence generation uses `DocumentSequenceService` (NOT `Max() + 1`)?

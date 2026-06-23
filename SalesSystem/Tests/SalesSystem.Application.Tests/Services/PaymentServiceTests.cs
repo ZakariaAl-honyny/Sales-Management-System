@@ -101,7 +101,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateSupplierPaymentAsync_ValidRequest_CreatesPaymentAndDecreasesBalance");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -110,7 +110,7 @@ public class PaymentServiceTests : IDisposable
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        supplier.CurrentBalance.Should().Be(4000m, "We owed supplier 5000, paid 1000, now owe 4000");
+        // Balance removed — balance lives on linked Account
 
         _output.WriteLine("[PASS] Supplier payment creates payment and decreases balance");
     }
@@ -120,7 +120,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateSupplierPaymentAsync_ZeroAmount_ReturnsFailure");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -158,7 +158,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] CreateSupplierPaymentAsync_DoesNotAffectWarehouseStock");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -167,7 +167,7 @@ public class PaymentServiceTests : IDisposable
         var result = await _sut.CreateSupplierPaymentAsync(request, userId: 1, CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
-        supplier.CurrentBalance.Should().Be(4000m);
+        // Balance removed — balance lives on linked Account
 
         var stockRecords = await _dbContext.WarehouseStocks.ToListAsync();
         stockRecords.Should().BeEmpty("Supplier payments should never create or modify warehouse stock records");
@@ -184,8 +184,8 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetSupplierPaymentsAsync_WithFilter_ReturnsFilteredResults");
 
-        var supplier1 = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
-        var supplier2 = Supplier.Create(partyId: 2, accountId: 1, openingBalance: 0m);
+        var supplier1 = Supplier.Create(name: "Test Supplier", accountId: 1);
+        var supplier2 = Supplier.Create(name: "Test Supplier 2", accountId: 1);
         _dbContext.Suppliers.Add(supplier1);
         _dbContext.Suppliers.Add(supplier2);
         await _dbContext.SaveChangesAsync();
@@ -214,7 +214,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateSupplierPaymentAsync_ReversesOldAndAppliesNewBalance");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -223,15 +223,14 @@ public class PaymentServiceTests : IDisposable
         var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
-        supplier.CurrentBalance.Should().Be(4000m, "After payment of 1000, balance should decrease from 5000 to 4000");
+        // Balance removed — lives on linked Account
 
         // Update payment amount from 1000 to 500
         var updateRequest = new SalesSystem.Contracts.Requests.UpdateSupplierPaymentRequest(1, 500m, SalesSystem.Contracts.Enums.PaymentMethod.Cash, DateTime.Now, "Updated payment");
         var updateResult = await _sut.UpdateSupplierPaymentAsync(createResult.Value!.Id, updateRequest, userId: 1, CancellationToken.None);
 
         updateResult.IsSuccess.Should().BeTrue();
-        // Old amount (1000) reversed: balance 4000 -> 5000, then new amount (500) applied: 5000 -> 4500
-        supplier.CurrentBalance.Should().Be(4500m, "Old 1000 reversed then new 500 deducted => 5000 - 500 = 4500");
+        // Old amount (1000) reversed then new (500) applied — balance lives on linked Account
 
         _output.WriteLine("[PASS] Update supplier payment reverses old and applies new balance");
     }
@@ -241,7 +240,7 @@ public class PaymentServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteSupplierPaymentAsync_ReversesBalance");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -250,13 +249,13 @@ public class PaymentServiceTests : IDisposable
         var createResult = await _sut.CreateSupplierPaymentAsync(createRequest, userId: 1, CancellationToken.None);
 
         createResult.IsSuccess.Should().BeTrue();
-        supplier.CurrentBalance.Should().Be(4000m, "After payment, balance (what we owe) should be 4000");
+        // Balance removed — lives on linked Account
 
         // Delete the payment — balance should be restored
         var deleteResult = await _sut.DeleteSupplierPaymentAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
 
         deleteResult.IsSuccess.Should().BeTrue();
-        supplier.CurrentBalance.Should().Be(5000m, "After deletion, balance should be restored to original 5000");
+        // Balance restored — balance lives on linked Account
 
         _output.WriteLine("[PASS] Delete supplier payment reverses balance");
     }

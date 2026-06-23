@@ -1,6 +1,7 @@
 ---
 name: "Implement Agent"
-reasoningEffect: high
+model: opencode/deepseek-v4-flash-free
+reasoningEffect: max
 role: "Production-quality C# code writer"
 activation: "When implementing features"
 mode: subagent
@@ -23,12 +24,13 @@ Write production-quality C# code that exactly implements the patterns from AGENT
 
 ## Code Patterns
 
-### Domain Entity Pattern — Product (65-table schema — no price/cost on entity)
+### Domain Entity Pattern — Product (65-table schema — TaxId on invoices only, Barcode on entity)
 ```csharp
 public class Product : BaseEntity
 {
     // Private setters — immutable after creation
     public string Name { get; private set; }
+    public string? Barcode { get; private set; }       // Products.Barcode varchar(50) null unique filtered
     public int CategoryId { get; private set; }
     public Category? Category { get; private set; }
     public string? Description { get; private set; }
@@ -41,7 +43,8 @@ public class Product : BaseEntity
     private readonly List<ProductUnit> _units = new();
     public IReadOnlyCollection<ProductUnit> Units => _units.AsReadOnly();
 
-    // NO PurchasePrice, SalePrice, WholesalePrice, RetailPrice, Barcode, AvgCost, OpeningQuantity on Product
+    // NO PurchasePrice, SalePrice, WholesalePrice, RetailPrice, TaxId, AvgCost, OpeningQuantity on Product
+    // TaxId is on SalesInvoices/PurchaseInvoices only (invoice-level, NOT product-level)
 
     // Protected constructor for EF Core
     protected Product() { }
@@ -49,7 +52,8 @@ public class Product : BaseEntity
     // Static factory method with validation
     public static Product Create(string name, int categoryId, int createdByUserId,
         string? description = null, bool trackExpiry = false,
-        int? defaultPurchaseUnitId = null, int? defaultSalesUnitId = null)
+        int? defaultPurchaseUnitId = null, int? defaultSalesUnitId = null,
+        string? barcode = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المنتج مطلوب");
@@ -58,6 +62,7 @@ public class Product : BaseEntity
         return new Product
         {
             Name = name.Trim(),
+            Barcode = barcode?.Trim(),
             CategoryId = categoryId,
             Description = description?.Trim(),
             TrackExpiry = trackExpiry,
@@ -68,8 +73,46 @@ public class Product : BaseEntity
             CreatedAt = DateTime.UtcNow
         };
     }
+
+    // RULE-067: Product MUST have minimum 2 units (base + one additional)
+    public void ValidateUnits()
+    {
+        if (_units.Count < 2)
+            throw new DomainException("المنتج يجب أن يحتوي على وحدتين على الأقل: وحدة أساسية + وحدة إضافية");
+    }
+
+    // RULE-067: Cannot remove below minimum 2 units
+    public void RemoveUnit(ProductUnit unit)
+    {
+        if (_units.Count <= 2)
+            throw new DomainException("لا يمكن حذف الوحدة — يجب أن يحتوي المنتج على وحدتين على الأقل");
+        // ... remove logic
+    }
 }
 ```
+
+**RULE-543: TaxId is on invoices only (NOT on Product entity)**
+- `SalesInvoices.TaxId` and `PurchaseInvoices.TaxId` are the source of truth for tax rate
+- `Tax` entity determines the rate applied at sale/purchase time
+- Product catalog does NOT store tax — it's determined per transaction
+
+**RULE-544: Product creation = 3 tables atomic via ExecuteTransactionAsync**
+```csharp
+// Service.CreateAsync MUST wrap in ExecuteTransactionAsync:
+return await _uow.ExecuteTransactionAsync<Result<ProductDto>>(async () =>
+{
+    var product = Product.Create(...);
+    await _uow.Products.AddAsync(product, ct);
+    // ... add ProductUnits, ProductPrices ...
+    await _uow.SaveChangesAsync(ct);
+    return Result<ProductDto>.Success(MapToDto(product));
+}, ct);
+```
+
+**RULE-545: Opening stock is separate inventory transaction**
+- NOT stored on Product entity (no OpeningQuantity/OpeningUnitCost fields)
+- Use `InventoryAdjustments` with Type=Opening or `InventoryBatches` for initial stock
+- Product creation handles catalog data only (name, category, units, prices)
 
 ### ProductPrices Entity Pattern (per unit × currency × effective dates)
 ```csharp
@@ -360,6 +403,40 @@ public async Task<Result<ProductDto>> CreateAsync(CreateProductRequest req, Canc
     _logger.LogInformation("تم إنشاء المنتج {ProductId}", product.Id);
     return Result<ProductDto>.Success(MapToDto(product));
 }
+```
+
+### ExecuteTransactionAsync for Account+Entity Services (RULE-546/RULE-547)
+Services that create BOTH an Account AND an entity MUST wrap both writes in `ExecuteTransactionAsync`:
+```csharp
+// CORRECT — CustomerService.CreateAsync wraps account + entity in single transaction:
+return await _uow.ExecuteTransactionAsync<Result<CustomerDto>>(async () =>
+{
+    // Step 1: Auto-create GL Account
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
+    var account = Account.Create(...);
+    await _uow.Accounts.AddAsync(account, ct);
+
+    // Step 2: Create entity with AccountId
+    var customer = Customer.Create(..., account.Id);
+    await _uow.Customers.AddAsync(customer, ct);
+
+    // Step 3: Single SaveChanges — atomic
+    await _uow.SaveChangesAsync(ct);
+    return Result<CustomerDto>.Success(MapToDto(customer, account));
+}, ct);
+
+// Services that MUST use this pattern:
+// - CustomerService.CreateAsync (Account under "1130 — العملاء")
+// - SupplierService.CreateAsync (Account under "1320 — الموردون")
+// - CashBoxService.CreateAsync (Account under "1110 — النقدية")
+// - BankService.CreateAsync (Account under "1120 — البنوك")
+// - SalesService.CreateAsync (multi-table: Invoice + Lines + Stock)
+// - ProductService.CreateAsync (3 tables: Products + ProductUnits + ProductPrices)
+
+// WRONG — Creating account and entity separately without transaction:
+var account = await CreateAccountAsync(...);  // ❌ Account saved
+var customer = await CreateCustomerAsync(account.Id);  // ❌ If this fails, orphaned account
+// MUST use ExecuteTransactionAsync wrapping BOTH
 ```
 
 ### ⚠️ Transaction Strategy — CRITICAL
@@ -2768,3 +2845,16 @@ When implementing code in the Users & Permissions domain, ALWAYS apply these fix
 8. **RolePermission**: Use `ExecuteTransactionAsync()` for atomic update operations.
 9. **Desktop screens exist**: PasswordChangeView, AuditLogListView, PermissionManagementView — all already implemented. Don't create duplicates.
 10. **45 permissions minimum**: DbSeeder must seed at least 45 permissions across 12+ categories with 9-role assignments.
+
+## Auto-Fix Rules (Phase 27 — Transaction Atomicity & Audit Trail)
+
+When implementing or reviewing code, ALWAYS apply these fixes automatically:
+
+1. **ExpenseService**: MUST inject `IAccountingIntegrationService` + `IDocumentSequenceService`. PostAsync creates `Dr ExpenseAccount / Cr CashBox.Account`. CancelAsync reverses. Sequence uses `GetNextIntAsync("Expense", ct)` — NEVER `ToListIgnoreFiltersAsync().Max() + 1`.
+2. **All 22 transaction operations MUST use `ExecuteTransactionAsync`**: SalesService.Post/Cancel, PurchaseService.Post/Cancel, SalesReturnService.Post/Cancel, PurchaseReturnService.Post/Cancel, CustomerReceiptService.Create/Post/Cancel/Delete, SupplierPaymentService.Create/Post/Cancel/Delete, ExpenseService.Create/Post/Cancel, InventoryAdjustmentService.Post/Cancel, InventoryCountService.Post/Cancel, WarehouseTransferService.Create/Post/Cancel, ReceiptVoucherService.Post/Cancel, PaymentVoucherService.Post/Cancel, InventoryService.CreateTransfer/PostTransfer/CancelTransfer.
+3. **InventoryTransaction audit trail**: EVERY stock-affecting operation MUST create `InventoryTransaction.Create()` + `AddLine()` per product. Types: Sale=3, Purchase=1, SaleReturn=4, PurchaseReturn=2, Adjustment=8, Count=7, TransferOut=5, TransferIn=6. Created INSIDE service wrappers (NOT inside IncreaseStockAsync/DecreaseStockAsync).
+4. **DeleteAsync/CancelAsync MUST call `SaveChangesAsync`**: Missing SaveChangesAsync = silent rollback. Check CustomerReceiptService, SupplierPaymentService, and any soft-delete operation.
+5. **No BeginTransactionAsync directly**: ALL multi-save operations MUST use `ExecuteTransactionAsync` (RULE-275). The execution strategy does not support user-initiated transactions.
+6. **FIFO batch restoration NOT implemented yet**: Stock restored via `IncreaseStockAsync()` but batch `QuantityRemaining` is not decremented back. This is a known gap — do NOT attempt to implement without storing original batch allocations.
+7. **AccountingIntegrationService methods MUST return Result<int>**: NEVER throw. NEVER own transactions — caller wraps in ExecuteTransactionAsync.
+8. **CreateExpenseEntryAsync**: Dr ExpenseAccount / Cr CashBox.Account. Load CashBox.AccountId via `_uow.CashBoxes.GetByIdAsync()`. Return `Result<int>` with journal entry ID.

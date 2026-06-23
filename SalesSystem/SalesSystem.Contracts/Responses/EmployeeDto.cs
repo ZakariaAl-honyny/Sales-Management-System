@@ -2,8 +2,10 @@ namespace SalesSystem.Contracts.Responses;
 
 public record EmployeeDto(
     int Id,
-    int PartyId,
-    string? PartyName,
+    string Name,
+    string? Phone,
+    string? Email,
+    string? Address,
     int EmployeeNo,
     DateTime HireDate,
     int? DepartmentId,

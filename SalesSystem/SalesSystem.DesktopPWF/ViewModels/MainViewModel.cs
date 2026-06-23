@@ -35,7 +35,6 @@ using SalesSystem.DesktopPWF.ViewModels.Department;
 using SalesSystem.DesktopPWF.ViewModels.Employee;
 using SalesSystem.DesktopPWF.ViewModels.Bank;
 using SalesSystem.DesktopPWF.ViewModels.Payments;
-using SalesSystem.DesktopPWF.ViewModels.Party;
 using SalesSystem.DesktopPWF.ViewModels.Expense;
 using SalesSystem.DesktopPWF.ViewModels.CustomerReceipt;
 using SalesSystem.DesktopPWF.ViewModels.PaymentVouchers;
@@ -119,6 +118,7 @@ public class MainViewModel : ViewModelBase
         });
         NavigateToSalesInvoicesCommand = new RelayCommand(() => NavigateTo<SalesInvoiceListViewModel>());
         NavigateToSalesReturnsCommand = new RelayCommand(() => NavigateTo<SalesReturnListViewModel>());
+        NavigateToSalesQuotationsCommand = new RelayCommand(() => NavigateTo<SalesQuotationListViewModel>());
 
         // Purchases section
         NavigateToPurchasesCommand = new RelayCommand(() => NavigateTo<PurchaseInvoiceListViewModel>());
@@ -205,7 +205,6 @@ public class MainViewModel : ViewModelBase
         NavigateToDepartmentsCommand = new RelayCommand(() => NavigateTo<DepartmentListViewModel>());
         NavigateToEmployeesCommand = new RelayCommand(() => NavigateTo<EmployeeListViewModel>());
         NavigateToBanksCommand = new RelayCommand(() => NavigateTo<BankListViewModel>());
-        NavigateToPartiesCommand = new RelayCommand(() => NavigateTo<PartyListViewModel>());
         NavigateToExpensesCommand = new RelayCommand(() => NavigateTo<ExpenseListViewModel>());
 
         // Customer Receipts
@@ -369,6 +368,9 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى مرتجعات المبيعات</summary>
     public ICommand NavigateToSalesReturnsCommand { get; }
+
+    /// <summary>نقل إلى عروض السعر — عرض وإدارة عروض الأسعار للعملاء</summary>
+    public ICommand NavigateToSalesQuotationsCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Purchases Section Commands
@@ -604,9 +606,6 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة البنوك — عرض وإضافة وتعديل بيانات البنوك</summary>
     public ICommand NavigateToBanksCommand { get; }
 
-    /// <summary>نقل إلى إدارة الجهات — عرض وإضافة وتعديل الجهات الخارجية</summary>
-    public ICommand NavigateToPartiesCommand { get; }
-
     /// <summary>نقل إلى إدارة المصروفات — عرض وإضافة وتعديل المصروفات</summary>
     public ICommand NavigateToExpensesCommand { get; }
 
@@ -775,6 +774,7 @@ public class MainViewModel : ViewModelBase
             // ════ Sales ════
             "Sales"            => _sessionService.CanAccess(Permission.SalesInvoice),
             "SalesReturns"     => _sessionService.CanAccess(Permission.SalesReturn),
+            "SalesQuotations"  => _sessionService.CanAccess(Permission.SalesInvoice),
             "Pos"              => _sessionService.CanAccess(Permission.SalesInvoice),
             "Customers"        => _sessionService.CanAccess(Permission.CustomerView),
             "CustomerPayments" => _sessionService.CanAccess(Permission.CustomerView),
@@ -876,6 +876,7 @@ public class MainViewModel : ViewModelBase
             nameof(TouchPosViewModel)              => "Pos",
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
+            nameof(SalesQuotationListViewModel)     => "SalesQuotations",
             nameof(PurchaseInvoiceListViewModel)    => "Purchases",
             // PurchaseOrderListViewModel removed — V1-deferred
             nameof(PurchaseReturnListViewModel)     => "PurchaseReturns",
@@ -932,7 +933,6 @@ public class MainViewModel : ViewModelBase
             nameof(DepartmentListViewModel)           => "Departments",
             nameof(EmployeeListViewModel)             => "Employees",
             nameof(BankListViewModel)                 => "Banks",
-            nameof(PartyListViewModel)                => "Parties",
             nameof(ExpenseListViewModel)              => "Expenses",
             // Customer Receipts
             nameof(CustomerReceiptListViewModel)      => "CustomerPayments",

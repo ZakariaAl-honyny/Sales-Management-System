@@ -119,7 +119,7 @@
                                             Width="80" 
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                         <DataGridTextColumn Header="الاسم" 
-                                            Binding="{Binding PartyName}" 
+                                            Binding="{Binding Name}" 
                                             Width="*" 
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
                         <DataGridTextColumn Header="القسم" 

@@ -27,7 +27,7 @@ public class CustomerService : ICustomerService
     public async Task<Result<CustomerDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var customer = await _uow.Customers.FirstOrDefaultAsync(
-            c => c.Id == id, ct, "Party");
+            c => c.Id == id, ct);
         if (customer == null)
             return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
@@ -41,11 +41,11 @@ public class CustomerService : ICustomerService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search;
-            predicate = c => c.Party.Name.Contains(s) || (c.Party.Phone != null && c.Party.Phone.Contains(s));
+            predicate = c => c.Name.Contains(s) || (c.Phone != null && c.Phone.Contains(s));
         }
 
         var (items, total) = await _uow.Customers.GetPagedAsync(
-            predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive, "Party");
+            predicate, q => q.OrderByDescending(c => c.Id), page, pageSize, ct, includeInactive);
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<CustomerDto>>.Success(PagedResult<CustomerDto>.Create(dtos, total, page, pageSize));
@@ -53,50 +53,43 @@ public class CustomerService : ICustomerService
 
     public async Task<Result<CustomerDto>> CreateAsync(CreateCustomerRequest request, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<CustomerDto>>(async () =>
         {
-            // Step 1: Auto-create account under AR parent (1130 — العملاء)
-            var accountResult = await AutoCreateCustomerAccountAsync(request.Name, userId, ct);
-            if (!accountResult.IsSuccess)
-                return Result<CustomerDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
-            var accountId = accountResult.Value;
+            try
+            {
+                // Step 1: Auto-create account under AR parent (1130 — العملاء)
+                var accountResult = await AutoCreateCustomerAccountAsync(request.Name, userId, ct);
+                if (!accountResult.IsSuccess)
+                    return Result<CustomerDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
+                var accountId = accountResult.Value;
 
-            // Step 2: Create Party record (Name, Phone, Email, Address, TaxNumber)
-            var party = Party.Create(
-                name: request.Name,
-                phone: request.Phone,
-                email: request.Email,
-                address: request.Address,
-                taxNumber: request.TaxNumber,
-                createdByUserId: userId);
-            await _uow.Parties.AddAsync(party, ct);
-            await _uow.SaveChangesAsync(ct);
+                // Step 2: Create Customer record with direct contact fields
+                var customer = Customer.Create(
+                    name: request.Name,
+                    accountId: accountId,
+                    phone: request.Phone,
+                    email: request.Email,
+                    address: request.Address,
+                    taxNumber: request.TaxNumber,
+                    creditLimit: request.CreditLimit,
+                    createdByUserId: userId);
+                await _uow.Customers.AddAsync(customer, ct);
+                await _uow.SaveChangesAsync(ct);
 
-            // Step 3: Create Customer record with PartyId FK (separate from Customer.Id)
-            var customer = Customer.Create(
-                partyId: party.Id,
-                accountId: accountId,
-                creditLimit: request.CreditLimit,
-                createdByUserId: userId);
-            await _uow.Customers.AddAsync(customer, ct);
-            await _uow.SaveChangesAsync(ct);
+                _logger.LogInformation("Customer created: {CustomerName} (ID: {CustomerId})", customer.Name, customer.Id);
 
-            _logger.LogInformation("Customer created: {CustomerName} (ID: {CustomerId})", party.Name, customer.Id);
-
-            // Re-fetch with navigation properties for DTO mapping
-            var saved = await _uow.Customers.FirstOrDefaultAsync(
-                c => c.Id == customer.Id, ct, "Party");
-            return Result<CustomerDto>.Success(MapToDto(saved!));
-        }
-        catch (DomainException ex)
-        {
-            return Result<CustomerDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while creating customer");
-            return Result<CustomerDto>.Failure("حدث خطأ أثناء إضافة العميل.");
-        }
+                return Result<CustomerDto>.Success(MapToDto(customer));
+            }
+            catch (DomainException ex)
+            {
+                return Result<CustomerDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while creating customer");
+                return Result<CustomerDto>.Failure("حدث خطأ أثناء إضافة العميل.");
+            }
+        }, ct);
     }
 
     public async Task<Result<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request, int userId, CancellationToken ct)
@@ -104,21 +97,17 @@ public class CustomerService : ICustomerService
         try
         {
             var customer = await _uow.Customers.FirstOrDefaultIgnoreFiltersAsync(
-                c => c.Id == id, ct, "Party");
+                c => c.Id == id, ct);
             if (customer == null)
                 return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
-            // Update Party record (contact data)
-            customer.Party.Update(
+            // Update customer fields including contact information
+            customer.Update(
                 name: request.Name,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
-                updatedByUserId: userId);
-
-            // Update customer-specific fields
-            customer.Update(
                 creditLimit: request.CreditLimit,
                 updatedByUserId: userId);
 
@@ -131,11 +120,9 @@ public class CustomerService : ICustomerService
             await _uow.Customers.UpdateAsync(customer, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Customer updated: {CustomerName} (ID: {CustomerId})", customer.Party.Name, customer.Id);
+            _logger.LogInformation("Customer updated: {CustomerName} (ID: {CustomerId})", customer.Name, customer.Id);
 
-            var updated = await _uow.Customers.FirstOrDefaultAsync(
-                c => c.Id == customer.Id, ct, "Party");
-            return Result<CustomerDto>.Success(MapToDto(updated!));
+            return Result<CustomerDto>.Success(MapToDto(customer));
         }
         catch (DomainException ex)
         {
@@ -191,18 +178,17 @@ public class CustomerService : ICustomerService
         {
             Expression<Func<Customer, bool>>? predicate = null;
             if (!string.IsNullOrWhiteSpace(search))
-                predicate = c => c.Party.Name.Contains(search);
+                predicate = c => c.Name.Contains(search);
 
             var (items, total) = await _uow.Customers.GetPagedAsync(
                 predicate,
                 q => q.OrderByDescending(c => c.Id),
-                page, pageSize, ct,
-                includePaths: new[] { "Party" });
+                page, pageSize, ct);
 
             var dtos = items.Select(c =>
             {
                 return new CustomerBalanceReportDto(
-                    c.Id, c.Party.Name, c.Party.Phone, null,
+                    c.Id, c.Name, c.Phone, null,
                     CreditLimit: c.CreditLimit,
                     CurrentBalance: 0,
                     BalanceStatus: c.CreditLimit > 0 ? "له حد ائتماني" : "بدون حد ائتماني"
@@ -226,13 +212,13 @@ public class CustomerService : ICustomerService
             var (items, total) = await _uow.Customers.GetPagedAsync(
                 null,
                 q => q.OrderByDescending(c => c.Id),
-                page, pageSize, ct, false, "Party");
+                page, pageSize, ct, false);
 
             var dtos = items.Select(c =>
             {
                 var agingBucket = c.CreditLimit > 0 ? "له حد ائتماني" : "بدون حد ائتماني";
                 return new CustomerAgingReportDto(
-                    c.Id, c.Party.Name, c.Party.Phone, 0,
+                    c.Id, c.Name, c.Phone, 0,
                     agingBucket, DateTime.UtcNow);
             }).ToList();
 
@@ -328,14 +314,13 @@ public class CustomerService : ICustomerService
     {
         return new CustomerDto(
             c.Id,
-            c.Party.Name,
-            c.Party.Phone,
-            c.Party.Email,
-            c.Party.Address,
-            c.Party.TaxNumber,
+            c.Name,
+            c.Phone,
+            c.Email,
+            c.Address,
+            c.TaxNumber,
             c.CreditLimit,
             c.IsActive,
-            PartyId: c.PartyId,
             AccountId: c.AccountId,
             CategoryId: c.CategoryId
         );

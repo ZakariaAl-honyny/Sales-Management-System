@@ -13,51 +13,64 @@ namespace SalesSystem.Application.Services;
 public class ExpenseService : IExpenseService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IAccountingIntegrationService _accountingService;
+    private readonly IDocumentSequenceService _sequenceService;
     private readonly ILogger<ExpenseService> _logger;
 
-    public ExpenseService(IUnitOfWork uow, ILogger<ExpenseService> logger)
+    public ExpenseService(
+        IUnitOfWork uow,
+        IAccountingIntegrationService accountingService,
+        IDocumentSequenceService sequenceService,
+        ILogger<ExpenseService> logger)
     {
         _uow = uow;
+        _accountingService = accountingService;
+        _sequenceService = sequenceService;
         _logger = logger;
     }
 
     public async Task<Result<ExpenseDto>> CreateAsync(CreateExpenseRequest request, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<ExpenseDto>>(async () =>
         {
-            var expenseNo = await GetNextExpenseNumberAsync(ct);
+            try
+            {
+                var seqResult = await _sequenceService.GetNextIntAsync("Expense", ct);
+                if (!seqResult.IsSuccess)
+                    return Result<ExpenseDto>.Failure("فشل في توليد رقم المصروف");
+                var expenseNo = seqResult.Value;
 
-            var expense = Expense.Create(
-                expenseNo,
-                request.ExpenseDate,
-                request.ExpenseAccountId,
-                request.CashBoxId,
-                (short)request.CurrencyId,
-                request.Amount,
-                request.Notes,
-                userId);
+                var expense = Expense.Create(
+                    expenseNo,
+                    request.ExpenseDate,
+                    request.ExpenseAccountId,
+                    request.CashBoxId,
+                    (short)request.CurrencyId,
+                    request.Amount,
+                    request.Notes,
+                    userId);
 
-            await _uow.Expenses.AddAsync(expense, ct);
-            await _uow.SaveChangesAsync(ct);
+                await _uow.Expenses.AddAsync(expense, ct);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Expense created (No: {ExpenseNo}, ID: {Id}) by User {UserId}",
-                expense.ExpenseNo, expense.Id, userId);
+                _logger.LogInformation("Expense created (No: {ExpenseNo}, ID: {Id}) by User {UserId}",
+                    expense.ExpenseNo, expense.Id, userId);
 
-            // Reload with navigation properties for the response
-            var created = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == expense.Id, ct, "ExpenseAccount", "CashBox", "Currency");
-            return Result<ExpenseDto>.Success(MapToDto(created!));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation creating expense: {Message}", ex.Message);
-            return Result<ExpenseDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating expense");
-            return Result<ExpenseDto>.Failure("حدث خطأ أثناء إنشاء المصروف");
-        }
+                var created = await _uow.Expenses.FirstOrDefaultAsync(
+                    e => e.Id == expense.Id, ct, "ExpenseAccount", "CashBox", "Currency");
+                return Result<ExpenseDto>.Success(MapToDto(created!));
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation creating expense: {Message}", ex.Message);
+                return Result<ExpenseDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating expense");
+                return Result<ExpenseDto>.Failure("حدث خطأ أثناء إنشاء المصروف");
+            }
+        }, ct);
     }
 
     public async Task<Result<ExpenseDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -83,7 +96,6 @@ public class ExpenseService : IExpenseService
     {
         try
         {
-            // Build predicate
             System.Linq.Expressions.Expression<Func<Expense, bool>>? predicate = null;
 
             if (from.HasValue || to.HasValue || !string.IsNullOrWhiteSpace(search))
@@ -138,7 +150,6 @@ public class ExpenseService : IExpenseService
 
             _logger.LogInformation("Expense {Id} updated by User {UserId}", id, userId);
 
-            // Reload to get fresh navigation properties
             var updated = await _uow.Expenses.FirstOrDefaultAsync(
                 e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
             return Result<ExpenseDto>.Success(MapToDto(updated!));
@@ -181,74 +192,89 @@ public class ExpenseService : IExpenseService
 
     public async Task<Result<ExpenseDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<ExpenseDto>>(async () =>
         {
-            var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
-            if (expense == null)
-                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+            try
+            {
+                var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                if (expense == null)
+                    return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
-            expense.Post();
-            expense.SetUpdatedBy(userId);
-            await _uow.SaveChangesAsync(ct);
+                // Post the expense entity
+                expense.Post();
+                expense.SetUpdatedBy(userId);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Expense {Id} posted by User {UserId}", id, userId);
+                // Create journal entry: Dr ExpenseAccount / Cr CashBox.Account
+                var jeResult = await _accountingService.CreateExpenseEntryAsync(expense, userId, ct);
+                if (!jeResult.IsSuccess)
+                    return Result<ExpenseDto>.Failure(jeResult.Error!);
 
-            var posted = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
-            return Result<ExpenseDto>.Success(MapToDto(posted!));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation posting expense {Id}: {Message}", id, ex.Message);
-            return Result<ExpenseDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error posting expense {Id}", id);
-            return Result<ExpenseDto>.Failure("حدث خطأ أثناء ترحيل المصروف");
-        }
+                _logger.LogInformation("Expense {Id} posted by User {UserId}", id, userId);
+
+                var posted = await _uow.Expenses.FirstOrDefaultAsync(
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                return Result<ExpenseDto>.Success(MapToDto(posted!));
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation posting expense {Id}: {Message}", id, ex.Message);
+                return Result<ExpenseDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error posting expense {Id}", id);
+                return Result<ExpenseDto>.Failure("حدث خطأ أثناء ترحيل المصروف");
+            }
+        }, ct);
     }
 
     public async Task<Result<ExpenseDto>> CancelAsync(int id, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<ExpenseDto>>(async () =>
         {
-            var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
-            if (expense == null)
-                return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
+            try
+            {
+                var expense = await _uow.Expenses.FirstOrDefaultAsync(
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                if (expense == null)
+                    return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
-            expense.Cancel();
-            await _uow.SaveChangesAsync(ct);
+                bool wasPosted = expense.Status == InvoiceStatus.Posted;
 
-            _logger.LogInformation("Expense {Id} cancelled", id);
+                // Cancel the expense entity
+                expense.Cancel();
+                await _uow.SaveChangesAsync(ct);
 
-            var cancelled = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
-            return Result<ExpenseDto>.Success(MapToDto(cancelled!));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation cancelling expense {Id}: {Message}", id, ex.Message);
-            return Result<ExpenseDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cancelling expense {Id}", id);
-            return Result<ExpenseDto>.Failure("حدث خطأ أثناء إلغاء المصروف");
-        }
+                // If was posted, create reversal journal entry: Dr CashBox.Account / Cr ExpenseAccount
+                if (wasPosted)
+                {
+                    var jeResult = await _accountingService.ReverseExpenseEntryAsync(expense, 0, ct);
+                    if (!jeResult.IsSuccess)
+                        return Result<ExpenseDto>.Failure(jeResult.Error!);
+                }
+
+                _logger.LogInformation("Expense {Id} cancelled", id);
+
+                var cancelled = await _uow.Expenses.FirstOrDefaultAsync(
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                return Result<ExpenseDto>.Success(MapToDto(cancelled!));
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation cancelling expense {Id}: {Message}", id, ex.Message);
+                return Result<ExpenseDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling expense {Id}", id);
+                return Result<ExpenseDto>.Failure("حدث خطأ أثناء إلغاء المصروف");
+            }
+        }, ct);
     }
 
     // ─── Private Helpers ─────────────────────────────────
-
-    private async Task<int> GetNextExpenseNumberAsync(CancellationToken ct)
-    {
-        var all = await _uow.Expenses.ToListIgnoreFiltersAsync(ct);
-        if (all.Count == 0)
-            return 1;
-        return all.Max(e => e.ExpenseNo) + 1;
-    }
 
     private static ExpenseDto MapToDto(Expense expense)
     {

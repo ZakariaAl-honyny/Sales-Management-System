@@ -76,61 +76,64 @@ public class CashBoxService : ICashBoxService
 
     public async Task<Result<CashBoxDto>> CreateAsync(CreateCashBoxRequest request, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<CashBoxDto>>(async () =>
         {
-            int accountId;
-
-            // Resolve the chart-of-accounts account: either use the provided AccountId
-            // or auto-create a Level-4 detail account under parent "1110 — النقدية".
-            if (request.AccountId.HasValue && request.AccountId.Value > 0)
+            try
             {
-                accountId = request.AccountId.Value;
+                int accountId;
 
-                var accountExists = await _uow.Accounts.AnyAsync(
-                    a => a.Id == accountId, ct);
-                if (!accountExists)
-                    return Result<CashBoxDto>.Failure(
-                        "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+                // Resolve the chart-of-accounts account: either use the provided AccountId
+                // or auto-create a Level-4 detail account under parent "1110 — النقدية".
+                if (request.AccountId.HasValue && request.AccountId.Value > 0)
+                {
+                    accountId = request.AccountId.Value;
+
+                    var accountExists = await _uow.Accounts.AnyAsync(
+                        a => a.Id == accountId, ct);
+                    if (!accountExists)
+                        return Result<CashBoxDto>.Failure(
+                            "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+                }
+                else
+                {
+                    var accountResult = await CreateCashBoxAccountAsync(request.Name, userId, ct);
+                    if (!accountResult.IsSuccess || accountResult.Value == null)
+                        return Result<CashBoxDto>.Failure(
+                            accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للصندوق");
+
+                    accountId = accountResult.Value.Id;
+                }
+
+                // Create the cash box domain entity — AccountId is always resolved before this call
+                var box = CashBox.Create(
+                    request.Name,
+                    request.BranchId,
+                    accountId,
+                    description: request.Description,
+                    createdByUserId: userId);
+
+                await _uow.CashBoxes.AddAsync(box, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "CashBox created: {Name} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
+                    box.Name, box.Id, box.AccountId, userId);
+
+                var created = await _uow.CashBoxes.FirstOrDefaultAsync(
+                    b => b.Id == box.Id, ct, "Account");
+                return Result<CashBoxDto>.Success(MapToDto(created!));
             }
-            else
+            catch (DomainException ex)
             {
-                var accountResult = await CreateCashBoxAccountAsync(request.Name, userId, ct);
-                if (!accountResult.IsSuccess || accountResult.Value == null)
-                    return Result<CashBoxDto>.Failure(
-                        accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للصندوق");
-
-                accountId = accountResult.Value.Id;
+                _logger.LogWarning(ex, "Domain rule violation creating cash box: {Message}", ex.Message);
+                return Result<CashBoxDto>.Failure(ex.Message);
             }
-
-            // Create the cash box domain entity — AccountId is always resolved before this call
-            var box = CashBox.Create(
-                request.Name,
-                request.BranchId,
-                accountId,
-                description: request.Description,
-                createdByUserId: userId);
-
-            await _uow.CashBoxes.AddAsync(box, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "CashBox created: {Name} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
-                box.Name, box.Id, box.AccountId, userId);
-
-            var created = await _uow.CashBoxes.FirstOrDefaultAsync(
-                b => b.Id == box.Id, ct, "Account");
-            return Result<CashBoxDto>.Success(MapToDto(created!));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation creating cash box: {Message}", ex.Message);
-            return Result<CashBoxDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating cash box");
-            return Result<CashBoxDto>.Failure("حدث خطأ أثناء إنشاء الصندوق النقدي");
-        }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating cash box");
+                return Result<CashBoxDto>.Failure("حدث خطأ أثناء إنشاء الصندوق النقدي");
+            }
+        }, ct);
     }
 
     public async Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, int userId, CancellationToken ct)

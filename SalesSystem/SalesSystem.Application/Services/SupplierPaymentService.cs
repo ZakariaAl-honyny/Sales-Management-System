@@ -41,7 +41,7 @@ public class SupplierPaymentService : ISupplierPaymentService
             var paymentNo = seqResult.Value;
 
             // Validate supplier exists
-            var supplier = await _uow.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId, ct, "Party");
+            var supplier = await _uow.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId, ct);
             if (supplier == null)
                 return Result<SupplierPaymentDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -96,7 +96,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 predicate: p =>
                     (string.IsNullOrEmpty(search) ||
                      (searchPaymentNo.HasValue && p.PaymentNo == searchPaymentNo.Value) ||
-                     (p.Supplier != null && p.Supplier.Party != null && p.Supplier.Party.Name.Contains(search))) &&
+                     (p.Supplier != null && p.Supplier.Name.Contains(search))) &&
                     (!fromDate.HasValue || p.PaymentDate >= fromDate.Value) &&
                     (!toDate.HasValue || p.PaymentDate <= toDate.Value),
                 orderConfig: q => q.OrderByDescending(p => p.PaymentDate),
@@ -104,7 +104,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 pageSize,
                 ct,
                 ignoreQueryFilters: false,
-                includePaths: new[] { "Supplier", "Supplier.Party" });
+                includePaths: new[] { "Supplier" });
 
             var dtos = items.Select(p => MapToDto(p, p.Supplier)).ToList();
 
@@ -123,7 +123,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier", "Supplier.Party");
+                p => p.Id == id, ct, "Supplier");
             if (payment == null)
                 return Result<SupplierPaymentDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -141,7 +141,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier", "Supplier.Party");
+                p => p.Id == id, ct, "Supplier");
             if (payment == null)
                 return Result<SupplierPaymentDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -153,7 +153,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 if (amountChanged)
                 {
                     var supplierAccountId = payment.Supplier?.AccountId ?? 0;
-                    var supplierName = payment.Supplier?.Party?.Name ?? "";
+                    var supplierName = payment.Supplier?.Name ?? "";
 
                     var oldAmount = payment.Amount;
 
@@ -242,7 +242,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier", "Supplier.Party");
+                p => p.Id == id, ct, "Supplier");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -252,7 +252,7 @@ public class SupplierPaymentService : ISupplierPaymentService
                 payment.SetUpdatedBy(userId);
 
                 // Create journal entry: Dr AP / Cr Cash
-                var supplierName = payment.Supplier?.Party?.Name ?? "";
+                var supplierName = payment.Supplier?.Name ?? "";
                 var entryResult = await _accountingService.CreateSupplierPaymentEntryAsync(
                     payment, supplierName, userId, ct);
                 if (!entryResult.IsSuccess)
@@ -281,27 +281,30 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier", "Supplier.Party");
+                p => p.Id == id, ct, "Supplier");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
-            // If already posted, reverse the journal entry first
-            if (payment.Status == InvoiceStatus.Posted)
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
             {
-                var supplierAccountId = payment.Supplier?.AccountId ?? 0;
-                var supplierName = payment.Supplier?.Party?.Name ?? "";
-                var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
-                    payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
-                if (!reverseResult.IsSuccess)
-                    return Result.Failure(reverseResult.Error!);
-            }
+                // If already posted, reverse the journal entry first
+                if (payment.Status == InvoiceStatus.Posted)
+                {
+                    var supplierAccountId = payment.Supplier?.AccountId ?? 0;
+                    var supplierName = payment.Supplier?.Name ?? "";
+                    var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
+                        payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
+                    if (!reverseResult.IsSuccess)
+                        return Result.Failure(reverseResult.Error!);
+                }
 
-            payment.Cancel();
-            payment.SetUpdatedBy(userId);
-            await _uow.SaveChangesAsync(ct);
+                payment.Cancel();
+                payment.SetUpdatedBy(userId);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Supplier payment {Id} cancelled by User {UserId}", id, userId);
-            return Result.Success();
+                _logger.LogInformation("Supplier payment {Id} cancelled by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (DomainException ex)
         {
@@ -320,29 +323,33 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier", "Supplier.Party");
+                p => p.Id == id, ct, "Supplier");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
             if (payment.Status == InvoiceStatus.Cancelled)
                 return Result.Failure("سند الصرف ملغي بالفعل", ErrorCodes.InvalidOperation);
 
-            // If already posted, reverse the journal entry first
-            if (payment.Status == InvoiceStatus.Posted)
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
             {
-                var supplierAccountId = payment.Supplier?.AccountId ?? 0;
-                var supplierName = payment.Supplier?.Party?.Name ?? "";
-                var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
-                    payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
-                if (!reverseResult.IsSuccess)
-                    return Result.Failure(reverseResult.Error!);
-            }
+                // If already posted, reverse the journal entry first
+                if (payment.Status == InvoiceStatus.Posted)
+                {
+                    var supplierAccountId = payment.Supplier?.AccountId ?? 0;
+                    var supplierName = payment.Supplier?.Name ?? "";
+                    var reverseResult = await _accountingService.ReverseSupplierPaymentEntryAsync(
+                        payment.Id, payment.Amount, supplierName, supplierAccountId, userId, ct);
+                    if (!reverseResult.IsSuccess)
+                        return Result.Failure(reverseResult.Error!);
+                }
 
-            payment.UpdateTimestamp();
-            _uow.SupplierPayments.DeleteRange(new[] { payment });
+                payment.UpdateTimestamp();
+                _uow.SupplierPayments.DeleteRange(new[] { payment });
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Supplier payment {Id} deleted (cancelled) by User {UserId}", id, userId);
-            return Result.Success();
+                _logger.LogInformation("Supplier payment {Id} deleted (cancelled) by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (Exception ex)
         {
@@ -359,7 +366,7 @@ public class SupplierPaymentService : ISupplierPaymentService
             payment.Id,
             payment.PaymentNo.ToString(),
             payment.SupplierId,
-            supplier?.Party?.Name ?? string.Empty,
+            supplier?.Name ?? string.Empty,
             payment.Amount,
             (byte)payment.PaymentMethod,
             (int?)payment.CurrencyId,

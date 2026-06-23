@@ -16,7 +16,7 @@
         </i:EventTrigger>
     </i:Interaction.Triggers>
 
-    <Grid Style="{StaticResource PageRootGridStyle}">
+    <Grid Margin="16,16,16,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
             <RowDefinition Height="Auto"/> <!-- Toolbar -->
@@ -28,15 +28,15 @@
         <TextBlock Grid.Row="0"
                    Text="↩️  مرتجعات المشتريات"
                    Style="{StaticResource HeaderStyle}"
+                   Margin="0,0,0,12"
                    AutomationProperties.AutomationId="PurchaseReturnsPageTitle"/>
 
-        <!-- Toolbar -->
         <!-- Toolbar -->
         <Border Grid.Row="1" Style="{StaticResource ToolbarStyle}">
             <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <!-- Search Section -->
                 <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
-                    <TextBlock Text="البحث" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Text="البحث" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <TextBox Width="200"
                              Style="{StaticResource ModernTextBox}"
                              Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
@@ -47,38 +47,28 @@
                             <KeyBinding Key="Return" Command="{Binding RefreshCommand}"/>
                         </TextBox.InputBindings>
                     </TextBox>
-                </StackPanel>
-
-                <!-- Date Range Section -->
-                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
-                    <TextBlock Text="من" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                    <DatePicker Style="{StaticResource ModernDatePicker}" Width="130"
-                                SelectedDate="{Binding DateFrom}" 
-                                AutomationProperties.AutomationId="DpFromDate"/>
-
-                    <TextBlock Text="إلى" VerticalAlignment="Center" Margin="12,0,8,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                    <DatePicker Style="{StaticResource ModernDatePicker}" Width="130"
-                                SelectedDate="{Binding DateTo}" 
-                                AutomationProperties.AutomationId="DpToDate"/>
-                </StackPanel>
-
-                <!-- Actions Section -->
-                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
-                    <Button Command="{Binding SearchInvoiceForReturnCommand}" Style="{StaticResource PrimaryButton}"
-                            ToolTip="البحث في البيانات">
+                    <Button Command="{Binding SearchInvoiceForReturnCommand}" 
+                            Style="{StaticResource PrimaryButton}"
+                            Margin="8,0,0,0"
+                            ToolTip="اضغط هنا للبحث عن المرتجعات حسب البيانات التي أدخلتها">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="بحث" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                </StackPanel>
 
+                <!-- Filter Section -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
                     <CheckBox Content="عرض الملغاة" 
                                IsChecked="{Binding IncludeInactive}" 
                                VerticalAlignment="Center" 
-                               Margin="20,0,20,0"
                                FontSize="12"
                                ToolTip="عرض مرتجعات الشراء الملغاة"/>
+                </StackPanel>
 
+                <!-- Actions Section -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
                     <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
                             ToolTip="فتح شاشة إنشاء مرتجع جديد">
                         <StackPanel Orientation="Horizontal">
@@ -86,9 +76,9 @@
                             <TextBlock Text="مرتجع جديد" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    
+
                     <Button Command="{Binding RefreshCommand}" Style="{StaticResource SecondaryButton}"
-                            ToolTip="تحديث قائمة البيانات">
+                            ToolTip="تحديث قائمة المرتجعات من الخادم">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="🔄" VerticalAlignment="Center"/>
                         </StackPanel>
@@ -97,30 +87,23 @@
             </WrapPanel>
         </Border>
 
-        <!-- Error Notification Banner -->
+        <!-- Error Message Bar -->
         <Border Grid.Row="2" 
-                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}"
                 Background="{StaticResource ErrorLightBrush}" 
                 BorderBrush="{StaticResource ErrorBrush}"
-                BorderThickness="1" 
-                CornerRadius="6" 
-                Padding="12,8" 
-                Margin="{StaticResource StandardSectionMargin}">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="⚠️" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorTextBrush}" VerticalAlignment="Center" FontSize="12"/>
-                <Button Grid.Column="2" Content="✕" 
-                        Command="{Binding RefreshCommand}" 
-                        Background="Transparent" BorderThickness="0" 
-                        Foreground="{StaticResource ErrorTextBrush}"
-                        VerticalAlignment="Center"
-                        ToolTip="إخفاء رسالة الخطأ"/>
-            </Grid>
+                BorderThickness="1"
+                Padding="10,6"
+                Margin="0,0,0,16"
+                CornerRadius="8"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,10,0" VerticalAlignment="Center" FontSize="16"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
         </Border>
 
         <!-- DataGrid Area -->
@@ -136,6 +119,21 @@
                     <DataGrid.InputBindings>
                         <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding ViewCommand}" />
                     </DataGrid.InputBindings>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="عرض المرتجع" ToolTip="عرض تفاصيل مرتجع الشراء" Command="{Binding ViewCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="👁️"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator/>
+                            <MenuItem Header="تحديث" ToolTip="تحديث البيانات من الخادم" Command="{Binding RefreshCommand}">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="🔄"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="رقم المرتجع" 
                                             Binding="{Binding ReturnNo}" 

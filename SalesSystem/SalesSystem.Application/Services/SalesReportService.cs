@@ -30,11 +30,11 @@ public class SalesReportService : ISalesReportService
 
             var invoices = await _uow.SalesInvoices.ToListAsync(
                 si => si.Status == InvoiceStatus.Posted && si.InvoiceDate >= from && si.InvoiceDate <= to,
-                q => q.Include(si => si.Customer).ThenInclude(c => c!.Party),
+                q => q.Include(si => si.Customer),
                 ct);
 
             var grouped = invoices
-                .GroupBy(si => new { si.CustomerId, CustomerName = si.Customer?.Party?.Name ?? "عميل نقدي" })
+                .GroupBy(si => new { si.CustomerId, CustomerName = si.Customer?.Name ?? "عميل نقدي" })
                 .Select(g => new SalesByCustomerDto(
                     g.Key.CustomerId,
                     g.Key.CustomerName,

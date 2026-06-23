@@ -22,6 +22,8 @@ public enum SaleMode : byte { Retail = 1, Wholesale = 2 }
 /// </summary>
 public enum DiscountType : byte { Amount = 0, Percentage = 1 }
 
+public enum QuotationStatus : byte { Draft = 1, Sent = 2, Accepted = 3, Converted = 4, Rejected = 5 }
+
 /// <summary>
 /// أنواع معاملات الخزينة النقدية (للتوافق مع التقارير المالية القديمة — سيتم استبدالها بـ ReceiptVoucher/PaymentVoucher)
 /// </summary>

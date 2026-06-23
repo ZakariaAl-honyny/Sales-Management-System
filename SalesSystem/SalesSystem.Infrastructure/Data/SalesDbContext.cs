@@ -13,7 +13,6 @@ public class SalesDbContext : DbContext
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Department> Departments => Set<Department>();
-    public DbSet<Party> Parties => Set<Party>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<WarehouseStock> WarehouseStocks => Set<WarehouseStock>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
@@ -57,6 +56,8 @@ public class SalesDbContext : DbContext
     public DbSet<InventoryCount> InventoryCounts => Set<InventoryCount>();
     public DbSet<InventoryCountLine> InventoryCountLines => Set<InventoryCountLine>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<SalesQuotation> SalesQuotations => Set<SalesQuotation>();
+    public DbSet<SalesQuotationItem> SalesQuotationItems => Set<SalesQuotationItem>();
 
     public SalesDbContext(DbContextOptions<SalesDbContext> options) : base(options) { }
 

@@ -321,11 +321,14 @@ public class InventoryService : IInventoryService
             transfer.AddLine(line);
         }
 
-        await _uow.WarehouseTransfers.AddAsync(transfer, ct);
-        await _uow.SaveChangesAsync(ct);
+        return await _uow.ExecuteTransactionAsync<Result<WarehouseTransferDto>>(async () =>
+        {
+            await _uow.WarehouseTransfers.AddAsync(transfer, ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Warehouse Transfer Draft created: #{No}", transfer.TransferNo);
-        return await GetTransferByIdAsync(transfer.Id, ct);
+            _logger.LogInformation("Warehouse Transfer Draft created: #{No}", transfer.TransferNo);
+            return await GetTransferByIdAsync(transfer.Id, ct);
+        }, ct);
     }
 
     public async Task<Result<WarehouseTransferDto>> PostTransferAsync(
@@ -352,22 +355,25 @@ public class InventoryService : IInventoryService
             if (!validation.IsSuccess) return Result<WarehouseTransferDto>.Failure(validation.Error!);
         }
 
-        transfer.Post();
-
-        // Decrease from source, increase to destination
-        foreach (var line in transfer.Lines)
+        return await _uow.ExecuteTransactionAsync<Result<WarehouseTransferDto>>(async () =>
         {
-            var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
-            if (productUnit == null) continue;
+            transfer.Post();
 
-            await DecreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
-            await IncreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
-        }
+            // Decrease from source, increase to destination
+            foreach (var line in transfer.Lines)
+            {
+                var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                if (productUnit == null) continue;
 
-        await _uow.SaveChangesAsync(ct);
+                await DecreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
+                await IncreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
+            }
 
-        _logger.LogInformation("Warehouse Transfer Posted: #{No}", transfer.TransferNo);
-        return await GetTransferByIdAsync(transfer.Id, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Warehouse Transfer Posted: #{No}", transfer.TransferNo);
+            return await GetTransferByIdAsync(transfer.Id, ct);
+        }, ct);
     }
 
     public async Task<Result<WarehouseTransferDto>> CancelTransferAsync(
@@ -382,26 +388,30 @@ public class InventoryService : IInventoryService
         if (transfer.Status == InvoiceStatus.Cancelled)
             return Result<WarehouseTransferDto>.Failure("التحويل ملغي بالفعل");
 
-        bool wasPosted = transfer.Status == InvoiceStatus.Posted;
-        transfer.Cancel();
+        var wasPosted = transfer.Status == InvoiceStatus.Posted;
 
-        if (wasPosted)
+        return await _uow.ExecuteTransactionAsync<Result<WarehouseTransferDto>>(async () =>
         {
-            // Reverse: increase back to source, decrease from destination
-            foreach (var line in transfer.Lines)
+            transfer.Cancel();
+
+            if (wasPosted)
             {
-                var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
-                if (productUnit == null) continue;
+                // Reverse: increase back to source, decrease from destination
+                foreach (var line in transfer.Lines)
+                {
+                    var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                    if (productUnit == null) continue;
 
-                await IncreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
-                await DecreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
+                    await IncreaseStockAsync(productUnit.ProductId, transfer.SourceWarehouseId, line.Quantity, null, userId, ct);
+                    await DecreaseStockAsync(productUnit.ProductId, transfer.DestinationWarehouseId, line.Quantity, null, userId, ct);
+                }
             }
-        }
 
-        await _uow.SaveChangesAsync(ct);
+            await _uow.SaveChangesAsync(ct);
 
-        _logger.LogInformation("Warehouse Transfer Cancelled: #{No}", transfer.TransferNo);
-        return await GetTransferByIdAsync(transfer.Id, ct);
+            _logger.LogInformation("Warehouse Transfer Cancelled: #{No}", transfer.TransferNo);
+            return await GetTransferByIdAsync(transfer.Id, ct);
+        }, ct);
     }
 
     public async Task<Result<WarehouseTransferDto>> GetTransferByIdAsync(int id, CancellationToken ct)

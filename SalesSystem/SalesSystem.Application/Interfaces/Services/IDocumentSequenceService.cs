@@ -1,4 +1,5 @@
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 
 namespace SalesSystem.Application.Interfaces.Services;
 
@@ -18,4 +19,14 @@ public interface IDocumentSequenceService
     /// </summary>
     /// <param name="sequenceKey">Document type key (e.g., "SalesInvoice", "PurchaseInvoice").</param>
     Task<Result<int>> GetNextIntAsync(string sequenceKey, CancellationToken ct);
+
+    /// <summary>
+    /// Gets all document sequences for admin management.
+    /// </summary>
+    Task<Result<List<DocumentSequenceDto>>> GetAllAsync(CancellationToken ct);
+
+    /// <summary>
+    /// Updates the next number for a document sequence (manual reset).
+    /// </summary>
+    Task<Result<DocumentSequenceDto>> UpdateSequenceAsync(int id, int nextNumber, CancellationToken ct);
 }

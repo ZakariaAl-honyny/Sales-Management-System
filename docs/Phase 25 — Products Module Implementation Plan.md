@@ -1,7 +1,7 @@
 # Phase 25 — Products Module: Comprehensive Enhancement & Implementation Plan
 
-> **Version**: 1.0 — Full rewrite based on Analysis Parts 1–5, Global Analysis, and codebase audit
-> **Scope**: Complete Products module overhaul — Pricing per unit and currency (no retail/wholesale levels), FIFO batch tracking, Assembly/BOM, Product images, Min stock alerts, Enhanced barcode management, Default seeds
+> **Version**: 2.0 — Updated per accounts Details.md: ❌ Parties removed (not referenced), ❌ PriceLevel removed (NOT in V1), ❌ UnitBarcode deferred, ❌ ProductBarcode deprecated, ✅ InventoryBatch schema aligned with database-schema.md
+> **Scope**: Complete Products module overhaul — Pricing per unit and currency (NO PriceLevel in V1 — per ProductUnit × CurrencyId only), FIFO batch tracking (aligned to InventoryBatches schema: BatchNo, QtyReceived/QtyRemaining, IsClosed), Assembly/BOM, Product images, Min stock alerts, Barcode on Product entity only (one barcode per product), Default seeds
 
 ---
 
@@ -46,9 +46,10 @@ Desktop → (HttpClient) → Api → Application Services → Infrastructure →
 
 **Stock/Costing flow:**
 ```text
-PurchaseInvoice → Create InventoryBatch (FIFO) → Update WarehouseStock 
+PurchaseInvoice → Create InventoryBatches (FIFO) → Update WarehouseStock 
                → UpdateProductPricingService → ProductPriceHistory
 SaleInvoice    → Deduct from InventoryBatches (FIFO/FEFO) → Update WarehouseStock
+               → InventoryTransaction/InventoryTransactionLine records
 ```
 
 ---
@@ -107,7 +108,7 @@ SaleInvoice    → Deduct from InventoryBatches (FIFO/FEFO) → Update Warehouse
 | `SupplierPrice` | `decimal(18,2)` | ✅ | Keep (catalog reference) |
 | `LastPurchasePrice` | `decimal(18,2)` | ✅ | Keep (informational) |
 | `SortOrder` | `int` | ✅ | Keep |
-| Barcodes collection | `List<UnitBarcode>` | ✅ | Keep |
+| Barcodes collection | `List<UnitBarcode>` | ❌ Deferred | **DEFER** — not used in V1 (barcode is on Product entity, not per-unit) |
 
 **New fields**:
 - `CurrencyId` → ❌ Missing → **ADD** (moved to ProductPrice per analysis)
@@ -117,7 +118,7 @@ SaleInvoice    → Deduct from InventoryBatches (FIFO/FEFO) → Update Warehouse
 - `UpdatePurchaseCost()` — keep
 - `UpdateSalesPrice()` — **REMOVE** (pricing is now in ProductPrice)
 - `GetPriceByUnit()` — **REMOVE** (use ProductPrice)
-- `AddBarcode()` — keep
+- `AddBarcode()` — **DEFER** (not used in V1 — barcode stored on Product entity only)
 - `CalculateCostFromBaseUnitCost()` — keep
 - `ToBaseUnitQuantity()` — keep
 
@@ -207,7 +208,7 @@ Per Analysis: one barcode per product, so a separate table `ProductBarcode` is r
 | Component | Status |
 |-----------|--------|
 | `InventoryBatch` entity + config | ❌ NOT EXIST — must create |
-| `InventoryBatchAllocation` entity | ❌ NOT EXIST — must create |
+| `InventoryBatchAllocation` via `InventoryTransactionLine.BatchId` | ❌ NOT EXIST — tracks batch allocation through InventoryTransactionLines FK (no separate entity) |
 | `BillOfMaterials` entity + config | ❌ NOT EXIST — must create |
 | `BillOfMaterialsItem` entity | ❌ NOT EXIST — must create |
 | `ProductImage` entity + config | ❌ NOT EXIST — must create |
@@ -238,12 +239,12 @@ Purchase → UpdateProductPricingService → WeightedAverage formula
 
 **Required flow** (FIFO):
 ```text
-Purchase → Create InventoryBatch (LotNumber, Qty, UnitCost, ExpiryDate)
+Purchase → Create InventoryBatches (BatchNo, QtyReceived, UnitCost, ExpiryDate)
          → UpdateProductPricingService (optional — keep WeightedAverage as alternative)
-         → InventoryMovement record
-Sale → Deduct from InventoryBatches (earliest lot first)
+         → InventoryTransaction record
+Sale → Deduct from InventoryBatches (earliest batch first)
      → If HasExpiry: FEFO (earliest expiry first)
-     → InventoryMovement record
+     → InventoryTransaction record
 ```
 
 **Decision Options**:
@@ -289,7 +290,7 @@ Sale → Deduct from InventoryBatches (earliest lot first)
 - ProductId + WarehouseId
 - Quantity (remaining)
 - UnitCost (in base currency)
-- LotNumber (auto-generated or user-provided)
+- BatchNo (auto-generated or user-provided)
 - ExpiryDate (optional — for FEFO)
 - ReceivedDate
 - SourceInvoiceId
@@ -369,7 +370,7 @@ These must be system-wide seeds, not per-user data. No seed data exists for eith
 
 ### 4.3 ProductPrice Entity — NEW
 
-Stores price per unit + currency + price level combination.
+Stores price per unit + currency combination. **NO PriceLevel in V1** — pricing is per (ProductUnit × CurrencyId) only, no Retail/Wholesale/VIP/Distributor levels.
 
 | # | Field | Type | Default | Required | Constraints |
 |---|-------|------|---------|----------|-------------|
@@ -385,43 +386,40 @@ Stores price per unit + currency + price level combination.
 
 **Seed data**: Each product's base unit gets a default price entry for the base currency (Phase 20 dependency).
 
-### 4.4 InventoryBatch Entity — NEW (FIFO Foundation)
+### 4.4 InventoryBatches Entity — NEW (FIFO Foundation)
+
+> ⚠️ **Schema Alignment**: This definition matches `docs/database-schema.md` Section 5.2. Key differences from earlier drafts: no `ProductUnitId` (batch is per product, not per unit), uses `BatchNo`/`QuantityReceived`/`QuantityRemaining`/`IsClosed` instead of `LotNumber`/`Quantity`/`OriginalQuantity`/`IsActive`.
 
 | # | Field | Type | Default | Required | Constraints |
 |---|-------|------|---------|----------|-------------|
 | 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
-| 2 | `ProductId` | `int FK` | — | ✅ | FK→Products, Restrict |
-| 3 | `ProductUnitId` | `int FK` | — | ✅ | FK→ProductUnits, Restrict |
-| 4 | `WarehouseId` | `int FK` | — | ✅ | FK→Warehouses, Restrict |
-| 5 | `LotNumber` | `nvarchar(50)` | Auto-generated | ✅ | — |
-| 6 | `Quantity` | `decimal(18,3)` | — | ✅ | `CHECK >= 0` (remaining) |
-| 7 | `OriginalQuantity` | `decimal(18,3)` | — | ✅ | `CHECK > 0` |
-| 8 | `UnitCost` | `decimal(18,2)` | — | ✅ | In base currency |
-| 9 | `ExpiryDate` | `datetime2?` | `null` | ❌ | For FEFO |
-| 10 | `ReceivedDate` | `datetime2` | `GETUTCDATE()` | ✅ | — |
-| 11 | `PurchaseInvoiceId` | `int FK?` | `null` | ❌ | FK→PurchaseInvoices |
-| 12 | `IsOpeningBatch` | `bit` | `false` | ❌ | True for opening stock |
-| 13 | `IsActive` | `bit` | `true` | ❌ | Global QF |
+| 2 | `BatchNo` | `nvarchar(50)` | Auto-generated | ✅ | Internal batch number |
+| 3 | `ProductId` | `int FK` | — | ✅ | FK→Products, Restrict |
+| 4 | `WarehouseId` | `smallint FK` | — | ✅ | FK→Warehouses, Restrict (smallint per schema) |
+| 5 | `PurchaseInvoiceId` | `int FK?` | `null` | ❌ | FK→PurchaseInvoices |
+| 6 | `PurchaseInvoiceLineId` | `int FK?` | `null` | ❌ | FK→PurchaseInvoiceLines |
+| 7 | `SupplierBatchNo` | `nvarchar(100)?` | `null` | ❌ | Supplier's batch reference |
+| 8 | `ExpiryDate` | `date?` | `null` | ❌ | For FEFO tracking (date type per schema) |
+| 9 | `QuantityReceived` | `decimal(18,3)` | — | ✅ | `CHECK >= 0` |
+| 10 | `QuantityRemaining` | `decimal(18,3)` | — | ✅ | `CHECK >= 0` |
+| 11 | `UnitCost` | `decimal(18,2)` | — | ✅ | In base currency |
+| 12 | `IsClosed` | `bit` | `false` | ❌ | `1` when QtyRemaining = 0, `0` when QtyRemaining > 0 |
 
 **Key behaviors**:
-- On purchase: create InventoryBatch with `Qty = OriginalQuantity`, `Quantity = OriginalQuantity`
-- On sale: deduct from batches (FIFO or FEFO), reduce `Quantity`, create `InventoryMovement` records
-- When `Quantity = 0`: lot is fully consumed (keep for history, mark inactive)
-- `LotNumber` auto-format: `B-{YYYYMMDD}-{Sequence:000}` (e.g., `B-20260605-001`)
+- On purchase: create InventoryBatches row with `BatchNo` auto-formatted `B-{YYYYMMDD}-{Sequence:000}`, `QuantityReceived = QuantityRemaining = purchase qty`
+- On sale: deduct from batches (FIFO or FEFO), reduce `QuantityRemaining`, update `IsClosed` when fully consumed
+- When `QuantityRemaining = 0`: set `IsClosed = 1` (keep for history, no soft-delete)
+- Batch allocation tracked via `InventoryTransactionLines.BatchId` FK (see database-schema.md §5.4) — NOT via separate `InventoryBatchAllocation` entity
 
-### 4.5 InventoryBatchAllocation Entity — NEW
+### 4.5 Batch Allocation Tracking — Via InventoryTransactionLines
 
-Tracks which sales invoice items consumed from which purchase lot.
+> ⚠️ **Schema-Accurate**: There is NO separate `InventoryBatchAllocation` entity in the final schema. Batch allocation is tracked through `InventoryTransactionLines.BatchId` (int? FK → InventoryBatches(Id)) as defined in `docs/database-schema.md` Section 5.4.
 
-| # | Field | Type | Default | Required | Constraints |
-|---|-------|------|---------|----------|-------------|
-| 1 | `Id` | `int PK` | Auto-Increment | ✅ | — |
-| 2 | `InventoryBatchId` | `int FK` | — | ✅ | FK→InventoryBatches, Restrict |
-| 3 | `SalesInvoiceLineId` | `int FK?` | `null` | ❌ | FK→SalesInvoiceLines |
-| 4 | `SalesReturnItemId` | `int FK?` | `null` | ❌ | FK→SalesReturnItems |
-| 5 | `Quantity` | `decimal(18,3)` | — | ✅ | `CHECK > 0` |
-| 6 | `UnitCost` | `decimal(18,2)` | — | ✅ | Cost at time of allocation |
-| 7 | `CreatedAt` | `datetime2` | `GETUTCDATE()` | ✅ | — |
+**How allocation works**:
+- Every stock movement (sale, purchase return, transfer) creates an `InventoryTransaction` + `InventoryTransactionLine` record
+- `InventoryTransactionLine.BatchId` FK links each movement to the specific `InventoryBatches` batch consumed
+- Fields on `InventoryTransactionLine`: `ProductId`, `ProductUnitId`, `BatchId`, `Quantity`, `UnitCost`, `TotalCost`
+- No separate `InventoryBatchAllocation` entity needed — the transaction line IS the allocation record
 
 ### 4.6 BillOfMaterials Entity — NEW (Assembly Products)
 
@@ -509,8 +507,8 @@ Add these fields to support multi-currency pricing history + price validity peri
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| InventoryBatch entity | ❌ Missing | Full build — core of FIFO |
-| InventoryBatchAllocation entity | ❌ Missing | Track sale→lot consumption |
+| InventoryBatch entity | ❌ Missing | Full build — core of FIFO (per schema: BatchNo, QtyReceived/QtyRemaining, IsClosed) |
+| InventoryTransactionLine.BatchId FK allocation | ❌ Missing | Add BatchId FK to InventoryTransactionLines to track batch consumption (no separate InventoryBatchAllocation entity) |
 | FIFO allocation service | ❌ Missing | Create IFifoAllocationService |
 | FEFO logic | ❌ Missing | Extend allocation for expiry-based sorting |
 | CostingMethod.FIFO = 4 | ❌ Missing | Add to enum + service |
@@ -571,12 +569,12 @@ Add these fields to support multi-currency pricing history + price validity peri
 **FIFO Allocation Algorithm**:
 ```
 Input: ProductId, WarehouseId, QuantityNeeded
-1. Query InventoryBatches WHERE ProductId AND WarehouseId AND Quantity > 0
-2. ORDER BY (useFefo ? ExpiryDate ASC : ReceivedDate ASC, Id ASC)
-3. For each lot:
-   - TakeQuantity = Min(QuantityNeeded, lot.Quantity)
-   - Create InventoryBatchAllocation record
-   - lot.Quantity -= TakeQuantity
+1. Query InventoryBatches WHERE ProductId AND WarehouseId AND QuantityRemaining > 0
+2. ORDER BY (useFefo ? ExpiryDate ASC : Id ASC)
+3. For each batch:
+   - TakeQuantity = Min(QuantityNeeded, batch.QuantityRemaining)
+   - Create InventoryTransactionLine with BatchId FK
+   - batch.DeductQuantity(TakeQuantity)
    - QuantityNeeded -= TakeQuantity
    - If QuantityNeeded == 0: break
 4. If QuantityNeeded > 0: return error "Insufficient stock"
@@ -734,17 +732,15 @@ These are NOT stored as database rows — they are displayed as suggestions in t
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/InventoryBatch.cs` | NEW — full entity with guard clauses |
-| `Domain/Entities/InventoryBatchAllocation.cs` | NEW — allocation tracking |
+| `Domain/Entities/InventoryBatch.cs` | NEW — full entity with guard clauses (per schema: BatchNo, QuantityReceived, QuantityRemaining, IsClosed) |
 | `Infrastructure/Data/Configurations/InventoryBatchConfiguration.cs` | NEW — Fluent API config |
-| `Infrastructure/Data/Configurations/InventoryBatchAllocationConfiguration.cs` | NEW — Fluent API config |
-| `Infrastructure/Data/Migrations/` | NEW migration: 2 new tables |
+| `Infrastructure/Data/Migrations/` | NEW migration: 1 new table + add BatchId FK to InventoryTransactionLines |
 
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the canonical `InventoryBatches` table definition. Note: Named `InventoryBatches` in the final schema (not `InventoryBatches`).
+> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` §5.2 for the canonical `InventoryBatches` table definition. Note: named `InventoryBatches` in the schema (plural table name).
 
 > See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions (all FKs use `DeleteBehavior.Restrict`, explicit precision on decimals, CHECK constraints).
 
-> See `docs/database-schema.md` for the canonical DDL definitions. Note: Named `InventoryBatches` in the final schema.
+> See `docs/database-schema.md` §5.4 for `InventoryTransactionLine.BatchId` FK — batch allocation is tracked through this FK, not a separate entity.
 
 **Estimate**: ~3 hours
 
@@ -763,14 +759,14 @@ These are NOT stored as database rows — they are displayed as suggestions in t
 > See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
 **Key implementation details**:
-- `AddPurchaseBatchesAsync`: Converts quantity to base unit first → creates InventoryBatch
+- `AddPurchaseBatchesAsync`: Creates InventoryBatches row with BatchNo, QuantityReceived, QuantityRemaining
 - `DeductFromBatchesAsync`: FEFO if product.HasExpiry, otherwise FIFO
 - Batch operations inside transactions (RULE-003)
-- Every allocation = `InventoryMovement` record (RULE-029)
+- Every allocation recorded via `InventoryTransactionLine.BatchId` FK (no separate InventoryBatchAllocation entity)
 
 **Logging** (RULE-035):
-- `Log.Information("InventoryBatch {LotNumber} created: Product {ProductId}, Qty {Qty}, Cost {Cost}", ...)`
-- `Log.Information("FIFO allocation: {Qty} units from Lot {LotId} to InvoiceItem {ItemId}", ...)`
+- `Log.Information("InventoryBatch {BatchNo} created: Product {ProductId}, QtyReceived {Qty}, Cost {Cost}", ...)`
+- `Log.Information("FIFO allocation: {Qty} units from Batch {BatchId} to InvoiceItem {ItemId}", ...)`
 
 **Estimate**: ~4 hours
 
@@ -801,8 +797,8 @@ These are NOT stored as database rows — they are displayed as suggestions in t
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/ProductPrice.cs` | NEW — per-unit, per-currency, per-level pricing |
-| `Domain/Enums/PriceLevel.cs` | 🔴 NOT in V1 — pricing is per (ProductUnit × CurrencyId) only; no Retail/Wholesale levels |
+| `Domain/Entities/ProductPrice.cs` | NEW — per-unit, per-currency pricing (NO PriceLevel in V1 — per ProductUnit × CurrencyId only) |
+| 🔴 `Domain/Enums/PriceLevel.cs` | **DO NOT CREATE** — PriceLevel is NOT in V1; pricing is per (ProductUnit × CurrencyId) only, no Retail/Wholesale levels |
 | `Infrastructure/Data/Configurations/ProductPriceConfiguration.cs` | NEW — Fluent API config |
 | `Application/Interfaces/Services/IProductPriceService.cs` | NEW — interface |
 | `Application/Services/ProductPriceService.cs` | NEW — implementation with price lookup + history |
@@ -961,13 +957,13 @@ Task<Result> DeletePriceAsync(int id, CancellationToken ct);
 
 ### Task 11.1 — Add Opening Stock Section to Product Creation Flow
 
-**Problem**: Analysis Part 3 (lines 1663-1695) requires that when creating a new product, users can enter an opening quantity to create the initial stock balance immediately. This must create a `InventoryBatch` with `IsOpeningBatch = true` and an `InventoryMovement` record.
+**Problem**: Analysis Part 3 (lines 1663-1695) requires that when creating a new product, users can enter an opening quantity to create the initial stock balance immediately. This must create an `InventoryBatches` row with `IsClosed = false` and an `InventoryTransaction` record.
 
 **Design**:
 - Add an "Opening Stock" expandable section to the Product Editor (Tab 1: Basic Info or a dedicated area)
 - Fields: Warehouse (dropdown), Quantity (decimal(18,3)), Unit Cost (decimal(18,2)), Expiry Date (if HasExpiry)
 - Optional: user can skip and add stock later
-- On save: create `InventoryBatch` with `IsOpeningBatch = true` + `InventoryMovement`
+- On save: create `InventoryBatches` row with `QuantityReceived = QuantityRemaining = opening qty` + `InventoryTransaction` (TransactionType = OpeningBalance) + `InventoryTransactionLine` with BatchId FK
 
 **Files**:
 
@@ -1144,8 +1140,8 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 | 2 | `AddAvgCost_HasExpiry_TrackBatches_ToProducts` | None — additive columns |
 | 3 | `CreateProductPrices` | Requires ProductUnits table + Currencies table (Phase 20) |
 | 4 | `CreateProductImages` | Requires Products table |
-| 5 | `CreateInventoryBatches` | Requires Products + Warehouses + ProductUnits tables |
-| 6 | `CreateInventoryBatchAllocations` | Requires InventoryBatches table |
+| 5 | `CreateInventoryBatches` | Requires Products + Warehouses tables |
+| 6 | `AddBatchIdToInventoryTransactionLines` | Requires InventoryBatches + InventoryTransactionLines tables |
 | 7 | `CreateBillOfMaterials` | Requires Products table |
 
 **Data preservation**: All migrations are additive — no data loss. Legacy columns are kept in tables, not dropped.
@@ -1166,12 +1162,12 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 |------|-----------|---------------|---------|
 | **RULE-001** | `decimal(18,2)` for ALL money | ProductPrice.Price, InventoryBatch.UnitCost, Product.AvgCost | ✅ |
 | **RULE-002** | `decimal(18,3)` for ALL quantities | InventoryBatch.Quantity, BillOfMaterials.QuantityRequired, Product.MinStockLevel | ✅ |
-| **RULE-003** | Multi-table ops in transaction | FIFO allocation + stock deduction + InventoryMovement in single transaction | ✅ |
+| **RULE-003** | Multi-table ops in transaction | FIFO allocation + stock deduction + InventoryTransaction in single transaction | ✅ |
 | **RULE-006** | ALL services return `Result<T>` | IFifoAllocationService, IProductPriceService, IAssemblyService | ✅ |
 | **RULE-008** | ALL text columns `nvarchar` | All new entities | ✅ |
 | **RULE-016** | BaseEntity audit fields | All new entities inherit BaseEntity | ✅ |
 | **RULE-024** | Services inject `IUnitOfWork` | All new services | ✅ |
-| **RULE-029** | EVERY stock change = InventoryMovement | FIFO allocation + product image + assembly production | ✅ |
+| **RULE-029** | EVERY stock change = InventoryTransaction | FIFO allocation + product image + assembly production | ✅ |
 | **RULE-035** | Serilog for logging | All services | ✅ |
 | **RULE-036** | Log critical operations | Batch creation, price changes, assembly production | ✅ |
 | **RULE-037** | NEVER log passwords/conn strings | Verified | ✅ |
@@ -1187,7 +1183,7 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 | **RULE-060** | ProductUnit conversion factor | ProductUnit.BaseConversionFactor | ✅ |
 | **RULE-061** | Base unit factor = 1 | ProductUnit.IsBaseUnit enforced (CHK constraint) | ✅ |
 | **RULE-062** | Derived units factor > 1 | ProductUnit.CreateDerivedUnit guard | ✅ |
-| **RULE-063** | UnitBarcode stores ALL barcodes | UnitBarcode entity — barcode per unit | ✅ |
+| **RULE-063** | UnitBarcode stores ALL barcodes per product-unit combination | ⚠️ DEFERRED — V1 uses one barcode directly on Product entity (Product.Barcode) — UnitBarcode entity is hidden/deprecated pending V2 multi-barcode support | ⏳ |
 | **RULE-064** | SmartUnitFormatter selects display unit | UI only — deferred | ⏳ |
 | **RULE-065** | Pricing per ProductUnit (not Product) | ProductPrice entity with ProductUnitId | ✅ |
 | **RULE-066** | Cost cascade: purchase cost → unit cost | UpdateProductPricingService with FIFO option | ✅ |
@@ -1253,7 +1249,7 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 | **Image upload failing silently** | **MEDIUM** — user thinks image saved | Medium | Validate file size (max 5MB) + format (JPG/PNG) + return clear error message |
 | **MinStockAlert flooding EventBus** | **LOW** — UI performance degradation | Low | Batch alerts into single message per warehouse; throttle to max 1 alert per product per day |
 | **Legacy field deprecation breaking existing code** | **MEDIUM** — compilation errors | Medium | Use `[Obsolete]` attribute with `error: false` first; change to `error: true` in next phase |
-| **Barcode uniqueness violation after migration** | **MEDIUM** — duplicate barcodes across units | Low | Query all UnitBarcodes before auto-generating to ensure uniqueness; add DB unique index on BarcodeValue |
+| **Barcode uniqueness violation after migration** | **MEDIUM** — duplicate barcodes across products | Low | Ensure DB unique index on `Product.Barcode` column; validate uniqueness at service layer before saving |
 | **Product editor becoming too complex (6 tabs)** | **LOW** — user confusion | Low | Tab labels use clear Arabic names with ⓘ help icons; default to Basic Info tab on open |
 | **PriceLevel excluded from V1** | **LOW** — pricing per (ProductUnit × CurrencyId) only, no level concept | Low | Removed entirely from V1 — UI falls back to flat per-currency price per unit |
 
@@ -1263,7 +1259,7 @@ Already covered in Task 1. This task ensures all seed blocks are properly guarde
 
 | Scenario | Action |
 |----------|--------|
-| **InventoryBatch migration causes issues** | `DROP TABLE InventoryBatchAllocations; DROP TABLE InventoryBatches;` |
+| **InventoryBatch migration causes issues** | `DROP TABLE InventoryBatches;` + remove `BatchId` FK from `InventoryTransactionLines` |
 | **ProductPrice migration causes issues** | `DROP TABLE ProductPrices;` |
 | **ProductImage migration causes issues** | `DROP TABLE ProductImages;` |
 | **BillOfMaterials migration causes issues** | `DROP TABLE BillOfMaterials;` |
@@ -1371,17 +1367,21 @@ Test `Create()` factory and all 7 sub-module validations:
 
 public class ProductPriceTests
 {
+    /// <summary>
+    /// NOTE: PriceLevel is NOT in V1. ProductPrice entity has NO PriceLevel property.
+    /// Pricing is per (ProductUnit × CurrencyId) only — no Retail/Wholesale/VIP/Distributor levels.
+    /// The factory method accepts: (productUnitId, currencyId, price, createdByUserId).
+    /// </summary>
+
     [Fact]
     public void Create_SetsAllFieldsCorrectly()
     {
         var price = ProductPrice.Create(
             productUnitId: 1, currencyId: 1,
-            priceLevel: PriceLevel.Retail, price: 50m,
-            createdByUserId: 1);
+            price: 50m, createdByUserId: 1);
 
         Assert.Equal(1, price.ProductUnitId);
         Assert.Equal(1, price.CurrencyId);
-        Assert.Equal(PriceLevel.Retail, price.PriceLevel);
         Assert.Equal(50m, price.Price);
         Assert.True(price.IsActive);
         Assert.NotNull(price.EffectiveFrom);
@@ -1392,21 +1392,21 @@ public class ProductPriceTests
     public void Create_WithNegativePrice_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            ProductPrice.Create(1, 1, PriceLevel.Retail, -10m, createdByUserId: 1));
+            ProductPrice.Create(1, 1, -10m, createdByUserId: 1));
         Assert.Contains("السعر لا يمكن أن يكون سالباً", ex.Message);
     }
 
     [Fact]
     public void Create_WithZeroPrice_IsAllowed()
     {
-        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 0m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, 0m, createdByUserId: 1);
         Assert.Equal(0m, price.Price);
     }
 
     [Fact]
     public void SetPrice_UpdatesPriceAndEffectiveFrom()
     {
-        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, 50m, createdByUserId: 1);
         price.SetPrice(75m, 2);
 
         Assert.Equal(75m, price.Price);
@@ -1416,7 +1416,7 @@ public class ProductPriceTests
     [Fact]
     public void SetPrice_WithNegativePrice_ThrowsDomainException()
     {
-        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, 50m, createdByUserId: 1);
         var ex = Assert.Throws<DomainException>(() =>
             price.SetPrice(-5m, 2));
         Assert.Contains("السعر لا يمكن أن يكون سالباً", ex.Message);
@@ -1425,7 +1425,7 @@ public class ProductPriceTests
     [Fact]
     public void Deactivate_SetsIsActiveFalseAndEffectiveTo()
     {
-        var price = ProductPrice.Create(1, 1, PriceLevel.Retail, 50m, createdByUserId: 1);
+        var price = ProductPrice.Create(1, 1, 50m, createdByUserId: 1);
         price.Deactivate(2);
 
         Assert.False(price.IsActive);
@@ -1435,103 +1435,126 @@ public class ProductPriceTests
 
 public class InventoryBatchTests
 {
+    /// <summary>
+    /// NOTE: Schema aligned with database-schema.md §5.2 (InventoryBatches).
+    /// Fields: BatchNo (not LotNumber), QuantityReceived/QuantityRemaining (not Quantity/OriginalQuantity),
+    /// IsClosed (not IsActive), no ProductUnitId, WarehouseId is smallint.
+    /// Factory: InventoryBatch.Create(productId, warehouseId, batchNo, quantityReceived, unitCost, 
+    ///           expiryDate, purchaseInvoiceId, purchaseInvoiceLineId, supplierBatchNo, createdByUserId)
+    /// </summary>
+
     [Fact]
-    public void Create_WithValidInputs_CreatesLotCorrectly()
+    public void Create_WithValidInputs_CreatesBatchCorrectly()
     {
-        var lot = InventoryBatch.Create(
-            productId: 1, productUnitId: 1, warehouseId: 2,
-            lotNumber: "B-20260605-001",
-            quantity: 100m, unitCost: 25m,
-            expiryDate: new DateTime(2027, 6, 5),
-            receivedDate: DateTime.UtcNow,
-            purchaseInvoiceId: null, isOpeningBatch: false,
+        var batch = InventoryBatch.Create(
+            productId: 1, warehouseId: 2,
+            batchNo: "B-20260605-001",
+            quantityReceived: 100m, unitCost: 25m,
+            expiryDate: new DateOnly(2027, 6, 5),
+            purchaseInvoiceId: 10, purchaseInvoiceLineId: 20,
+            supplierBatchNo: "SUP-BATCH-001",
             createdByUserId: 1);
 
-        Assert.Equal(1, lot.ProductId);
-        Assert.Equal(1, lot.ProductUnitId);
-        Assert.Equal(2, lot.WarehouseId);
-        Assert.Equal("B-20260605-001", lot.LotNumber);
-        Assert.Equal(100m, lot.Quantity);
-        Assert.Equal(100m, lot.OriginalQuantity);
-        Assert.Equal(25m, lot.UnitCost);
-        Assert.False(lot.IsOpeningBatch);
-        Assert.True(lot.IsActive);
+        Assert.Equal(1, batch.ProductId);
+        Assert.Equal(2, batch.WarehouseId);
+        Assert.Equal("B-20260605-001", batch.BatchNo);
+        Assert.Equal(100m, batch.QuantityReceived);
+        Assert.Equal(100m, batch.QuantityRemaining); // Initially equal to QuantityReceived
+        Assert.Equal(25m, batch.UnitCost);
+        Assert.Equal(10, batch.PurchaseInvoiceId);
+        Assert.Equal(20, batch.PurchaseInvoiceLineId);
+        Assert.Equal("SUP-BATCH-001", batch.SupplierBatchNo);
+        Assert.False(batch.IsClosed); // Not closed when QuantityRemaining > 0
     }
 
     [Fact]
-    public void Create_WithZeroQuantity_ThrowsDomainException()
+    public void Create_WithZeroQuantityReceived_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            InventoryBatch.Create(1, 1, 1, "LOT001", 0m, 25m, null, DateTime.UtcNow, null, false, null));
-        Assert.Contains("الكمية يجب أن تكون أكبر من الصفر", ex.Message);
+            InventoryBatch.Create(1, 1, "BATCH001", 0m, 25m, null, null, null, null, 1));
+        Assert.Contains("الكمية المستلمة يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
     [Fact]
-    public void Create_WithNegativeQuantity_ThrowsDomainException()
+    public void Create_WithNegativeQuantityReceived_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            InventoryBatch.Create(1, 1, 1, "LOT001", -10m, 25m, null, DateTime.UtcNow, null, false, null));
-        Assert.Contains("الكمية يجب أن تكون أكبر من الصفر", ex.Message);
+            InventoryBatch.Create(1, 1, "BATCH001", -10m, 25m, null, null, null, null, 1));
+        Assert.Contains("الكمية المستلمة يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
     [Fact]
     public void Create_WithZeroUnitCost_ThrowsDomainException()
     {
         var ex = Assert.Throws<DomainException>(() =>
-            InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 0m, null, DateTime.UtcNow, null, false, null));
-        Assert.Contains("التكلفة يجب أن تكون أكبر من الصفر", ex.Message);
+            InventoryBatch.Create(1, 1, "BATCH001", 100m, 0m, null, null, null, null, 1));
+        Assert.Contains("تكلفة الوحدة يجب أن تكون أكبر من الصفر", ex.Message);
     }
 
     [Fact]
-    public void Create_WithOpeningBatch_SetsFlag()
+    public void DeductQuantity_ReducesQuantityRemaining()
     {
-        var lot = InventoryBatch.Create(1, 1, 1, "OPN-20260605-001",
-            100m, 25m, null, DateTime.UtcNow, null, isOpeningBatch: true, null);
-        Assert.True(lot.IsOpeningBatch);
-    }
-
-    [Fact]
-    public void DeductQuantity_ReducesRemainingQuantity()
-    {
-        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
-        lot.DeductQuantity(30m);
-        Assert.Equal(70m, lot.Quantity);
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(30m);
+        Assert.Equal(70m, batch.QuantityRemaining);
+        Assert.False(batch.IsClosed); // Still has stock
     }
 
     [Fact]
     public void DeductQuantity_WithExcessiveAmount_ThrowsDomainException()
     {
-        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
         var ex = Assert.Throws<DomainException>(() =>
-            lot.DeductQuantity(150m));
+            batch.DeductQuantity(150m));
         Assert.Contains("الكمية المطلوبة أكبر من المتاحة في الدفعة", ex.Message);
     }
 
     [Fact]
-    public void AddReturnQuantity_IncreasesRemainingQuantity()
+    public void DeductQuantity_WhenFullyConsumed_SetsIsClosed()
     {
-        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
-        lot.DeductQuantity(50m);
-        lot.AddReturnQuantity(20m);
-        Assert.Equal(70m, lot.Quantity);
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(100m);
+        Assert.Equal(0m, batch.QuantityRemaining);
+        Assert.True(batch.IsClosed);
     }
 
     [Fact]
-    public void AddReturnQuantity_ExceedingOriginal_ThrowsDomainException()
+    public void AddReturnQuantity_IncreasesQuantityRemaining()
     {
-        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
-        lot.DeductQuantity(50m);
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(50m);
+        batch.AddReturnQuantity(20m);
+        Assert.Equal(70m, batch.QuantityRemaining);
+    }
+
+    [Fact]
+    public void AddReturnQuantity_ExceedingQuantityReceived_ThrowsDomainException()
+    {
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(50m);
         var ex = Assert.Throws<DomainException>(() =>
-            lot.AddReturnQuantity(60m));
-        Assert.Contains("لا يمكن إرجاع كمية أكبر من الكمية الأصلية للدفعة", ex.Message);
+            batch.AddReturnQuantity(60m));
+        Assert.Contains("لا يمكن إرجاع كمية أكبر من الكمية الأصلية المستلمة للدفعة", ex.Message);
     }
 
     [Fact]
-    public void IsFullyConsumed_WhenQuantityZero_ReturnsTrue()
+    public void AddReturnQuantity_ReopensClosedBatch()
     {
-        var lot = InventoryBatch.Create(1, 1, 1, "LOT001", 100m, 25m, null, DateTime.UtcNow, null, false, null);
-        lot.DeductQuantity(100m);
-        Assert.Equal(0m, lot.Quantity);
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(100m);
+        Assert.True(batch.IsClosed);
+        batch.AddReturnQuantity(20m);
+        Assert.Equal(20m, batch.QuantityRemaining);
+        Assert.False(batch.IsClosed); // Reopened
+    }
+
+    [Fact]
+    public void IsFullyConsumed_WhenQuantityRemainingZero_ReturnsTrue()
+    {
+        var batch = InventoryBatch.Create(1, 1, "BATCH001", 100m, 25m, null, null, null, null, 1);
+        batch.DeductQuantity(100m);
+        Assert.Equal(0m, batch.QuantityRemaining);
+        Assert.True(batch.IsClosed);
     }
 }
 
@@ -1628,7 +1651,7 @@ See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Te
 
 See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for canonical table definitions.
 
-> **Note**: `InventoryBatches` / `InventoryBatchAllocation` entities are named `InventoryBatches` / `InventoryBatchAllocation` in the final schema. `PriceLevel` is NOT in V1 — pricing is per (ProductUnit × CurrencyId) only.
+> **Note**: `InventoryBatches` entity matches `docs/database-schema.md` §5.2 — fields: `BatchNo`, `QuantityReceived`, `QuantityRemaining`, `IsClosed`. Batch allocation is tracked via `InventoryTransactionLines.BatchId` FK (no separate `InventoryBatchAllocation` entity). `PriceLevel` is NOT in V1 — pricing is per (ProductUnit × CurrencyId) only.
 
 **Estimate**: ~2.5 hours
 
@@ -1649,7 +1672,7 @@ See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Te
 | 19.1 | Product.Create() factory + guards + units | `ProductTests.cs` | 2h |
 | 19.2 | ProductUnit, ProductPrice, InventoryBatch, BOM entities | `ProductUnitTests.cs`, `InventoryBatchTests.cs`, `BillOfMaterialsTests.cs` | 3h |
 | 19.3 | ProductService CRUD + opening stock batch | `ProductServiceTests.cs` | 2h |
-| 19.4 | OpeningStock: InventoryBatch + InventoryMovement + WarehouseStock | `ProductServiceOpeningStockTests.cs` | 2h |
+| 19.4 | OpeningStock: InventoryBatch + InventoryTransaction + WarehouseStock | `ProductServiceOpeningStockTests.cs` | 2h |
 | 19.5 | FIFO/FEFO allocation algorithm + multi-lot spanning | `FifoAllocationServiceTests.cs` | 4h |
 | 19.6 | Pricing fallback chain + price history recording | `ProductPriceServiceTests.cs` | 3h |
 | 19.7 | FluentValidation: Product, ProductPrice requests | `ProductRequestValidatorTests.cs` | 2h |

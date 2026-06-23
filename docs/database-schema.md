@@ -1,7 +1,7 @@
 # Database Schema Design
 # Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 64 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
+# 65 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 
@@ -33,7 +33,7 @@ Five base classes control column inheritance:
 Status values for DocumentEntity: `1=Draft, 2=Posted, 3=Cancelled`
 
 ## Inheritance Rules by Table Category
-- **Admin entities** (Parties, Customers, etc.): `ActivatableEntity` — has IsActive for soft delete
+- **Admin entities** (Customers, Suppliers, etc.): `ActivatableEntity` — has IsActive for soft delete
 - **Document entities** (Invoices, Vouchers, etc.): `DocumentEntity` — has Status (Draft/Posted/Cancelled)
 - **Junction tables** (UserRoles, RolePermissions, etc.): `Entity` — no audit fields needed
 - **Live balances** (WarehouseStocks): `AuditableEntity` — no soft delete, tracks who updated
@@ -57,30 +57,18 @@ Default schema: **`dbo`**
 
 ---
 
-## Module 1: Core, Parties & Security (النواة، الأطراف والأمان)
+## Module 1: Core & Security (النواة والأمان)
 
-### 1.1 Parties
+### 1.1 Customers
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
 | `Name` | nvarchar(200) not null | |
-| `Phone` | nvarchar(30) null | |
+| `Phone` | nvarchar(20) null | |
 | `Email` | nvarchar(100) null | |
-| `Address` | nvarchar(300) null | |
-| `TaxNumber` | nvarchar(50) null | |
-| `Notes` | nvarchar(500) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK → Users(Id) | |
-| `UpdatedByUserId` | int null FK → Users(Id) | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-| **Indexes** | `(Name)`, `(Phone)` | |
-
-### 1.2 Customers
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `Address` | nvarchar(500) null | |
+| `TaxNumber` | nvarchar(30) null | |
+| `Notes` | nvarchar(1000) null | |
 | `AccountId` | int not null FK → Accounts(Id) | every customer = an account |
 | `CategoryId` | int null FK → AccountCategories(Id) | |
 | `CreditLimit` | decimal(18,2) not null default 0 | |
@@ -89,9 +77,9 @@ Default schema: **`dbo`**
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
-| **Indexes** | `AccountId`, `CategoryId`, `PartyId` | |
+| **Indexes** | `AccountId`, `CategoryId`, `Name`, `Phone` | |
 
-### 1.3 CustomerContacts
+### 1.2 CustomerContacts
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -107,21 +95,27 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.4 Suppliers
+### 1.3 Suppliers
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `Name` | nvarchar(200) not null | |
+| `Phone` | nvarchar(20) null | |
+| `Email` | nvarchar(100) null | |
+| `Address` | nvarchar(500) null | |
+| `TaxNumber` | nvarchar(30) null | |
+| `Notes` | nvarchar(1000) null | |
 | `AccountId` | int not null FK → Accounts(Id) | every supplier = an account |
 | `CategoryId` | int null FK → AccountCategories(Id) | |
+| `CreditLimit` | decimal(18,2) not null default 0 | |
 | `IsActive` | bit not null default 1 | |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
-| **Indexes** | `AccountId`, `CategoryId`, `PartyId` | |
+| **Indexes** | `AccountId`, `CategoryId`, `Name`, `Phone` | |
 
-### 1.5 SupplierContacts
+### 1.4 SupplierContacts
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -137,7 +131,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.6 Departments
+### 1.5 Departments
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | **smallint** PK | |
@@ -149,24 +143,27 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.7 Employees
+### 1.6 Employees
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `PartyId` | int not null FK → Parties(Id) | shared party data |
+| `Name` | nvarchar(200) not null | |
+| `Phone` | nvarchar(20) null | |
+| `Email` | nvarchar(100) null | |
+| `Address` | nvarchar(500) null | |
 | `DepartmentId` | smallint null FK → Departments(Id) | |
 | `AccountId` | int null FK → Accounts(Id) | optional, auto-created when needed |
 | `EmployeeNo` | int not null | |
 | `HireDate` | date not null | |
 | `Salary` | decimal(18,2) not null default 0 | |
-| `Notes` | nvarchar(300) null | |
+| `Notes` | nvarchar(1000) null | |
 | `IsActive` | bit not null default 1 | |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.8 Roles
+### 1.7 Roles
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | **smallint** PK | |
@@ -178,7 +175,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.9 Users
+### 1.8 Users
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -196,7 +193,7 @@ Default schema: **`dbo`**
 | `UpdatedAt` | datetime2 null | |
 | **Index** | `UNIQUE(UserName)` | |
 
-### 1.10 UserRoles
+### 1.9 UserRoles
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -204,7 +201,7 @@ Default schema: **`dbo`**
 | `RoleId` | smallint not null FK → Roles(Id) | |
 | **UK** | `UNIQUE(UserId, RoleId)` | |
 
-### 1.11 Permissions
+### 1.10 Permissions
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -217,7 +214,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.12 RolePermissions
+### 1.11 RolePermissions
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -225,14 +222,14 @@ Default schema: **`dbo`**
 | `PermissionId` | int not null FK → Permissions(Id) | |
 | **UK** | `UNIQUE(RoleId, PermissionId)` | |
 
-### 1.13 UserBranches
+### 1.12 UserBranches
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
 | `UserId` | int not null FK → Users(Id) | |
 | `BranchId` | smallint not null FK → Branches(Id) | |
 
-### 1.14 UserSessions
+### 1.13 UserSessions
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -439,7 +436,6 @@ Default schema: **`dbo`**
 | `Name` | nvarchar(200) not null | |
 | `Barcode` | varchar(50) null | unique filtered `Barcode IS NOT NULL AND IsActive=1` |
 | `CategoryId` | int not null FK → ProductCategories(Id) | |
-| `TaxId` | smallint null FK → Taxes(Id) | |
 | `Description` | nvarchar(500) null | |
 | `TrackExpiry` | bit not null default 0 | |
 | `ImagePath` | nvarchar(500) null | primary image |
@@ -493,7 +489,10 @@ Default schema: **`dbo`**
 **Design Notes:**
 - NO `ProductCost`, `StockQuantity`, or `UnitPrice` stored directly on Products table
 - Cost comes from `InventoryBatches`, stock from `WarehouseStocks`, prices from `ProductPrices`
-- Barcode is `varchar(50)` (ASCII-only), not `nvarchar`
+- Barcode is `varchar(50)` (ASCII-only), not `nvarchar` — one barcode per product
+- Tax is on **invoice level** (`SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`) — NOT on Products (per analysis: same product may be exempt or taxable depending on invoice context)
+- Opening stock is a **separate inventory transaction** (InventoryAdjustment + InventoryBatches + WarehouseStocks + JournalEntry) — NOT columns on Products
+- Product creation = Products + ProductUnits + ProductPrices only (3 tables, atomic via `ExecuteTransactionAsync`)
 - Pricing is per `ProductUnit` × `CurrencyId` with effective date ranges
 - Units are decoupled from products via the `ProductUnits` junction table
 
@@ -956,10 +955,50 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `AppliedAmount` | decimal(18,2) not null | |
 | **Notes** | Optional — only created when user explicitly distributes payment to specific invoices | |
 
+### 6.7 SalesQuotations
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `QuotationNo` | int not null | user-facing number, UNIQUE |
+| `QuotationDate` | date not null | |
+| `ValidUntil` | date null | optional expiry date |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `ExchangeRate` | decimal(18,6) null | |
+| `PaymentType` | tinyint not null | 1=Cash, 2=Credit |
+| `SubTotal` | decimal(18,2) not null | SUM(LineTotal) |
+| `DiscountAmount` | decimal(18,2) not null | header-level discount |
+| `TaxAmount` | decimal(18,2) not null | |
+| `TotalAmount` | decimal(18,2) not null | SubTotal - Discount + Tax |
+| `Notes` | nvarchar(500) null | |
+| `TermsAndConditions` | nvarchar(2000) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Sent, 3=Accepted, 4=Converted, 5=Rejected |
+| `ConvertedToInvoiceId` | int null FK → SalesInvoices(Id) | set when converted to invoice |
+| `RejectionReason` | nvarchar(1000) null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **UK** | `UNIQUE(QuotationNo)` | |
+
+### 6.8 SalesQuotationItems
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SalesQuotationId` | int not null FK → SalesQuotations(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitPrice` | decimal(18,2) not null | |
+| `DiscountAmount` | decimal(18,2) not null default 0 | line-level discount |
+| `LineTotal` | decimal(18,2) not null | (Qty × UnitPrice) − Discount |
+| `Notes` | nvarchar(500) null | |
+
 **Design Notes:**
 - NO CustomerPayments table (replaced by CustomerReceipts)
-- NO SalesQuotations table (removed from V1)
-- NO DiscountAmount per line (only at invoice header level)
+- SalesQuotations ARE full V1 citizens — 5-state lifecycle, full stack (Domain/EF/Service/Controller/Desktop), no stock/accounting impact until converted
+- SalesQuotationItems DO support per-line DiscountAmount (unlike SalesInvoiceLines which only have header discount)
 - SalesReturnLines link to SalesInvoiceLineId (not ProductId directly)
 
 ---
@@ -1012,7 +1051,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `Id` | int PK | |
 | `ReturnNo` | int not null | unique |
 | `ReturnDate` | date not null | |
-| `PurchaseInvoiceId` | int not null FK → PurchaseInvoices(Id) | |
+| `PurchaseInvoiceId` | int null FK → PurchaseInvoices(Id) | null for standalone returns (RULE-487) |
 | `SupplierId` | int not null FK → Suppliers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
 | `CurrencyId` | smallint not null FK → Currencies(Id) | |
@@ -1035,7 +1074,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 |--------|------|-------|
 | `Id` | int PK | |
 | `PurchaseReturnId` | int not null FK → PurchaseReturns(Id) | |
-| `PurchaseInvoiceLineId` | int not null FK → PurchaseInvoiceLines(Id) | links to original line |
+| `PurchaseInvoiceLineId` | int null FK → PurchaseInvoiceLines(Id) | null for standalone returns |
 | `Quantity` | decimal(18,3) not null | |
 | `Amount` | decimal(18,2) not null | |
 
@@ -1127,12 +1166,12 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 
 | Module | Table Count | Tables |
 |--------|------------|--------|
-| 1. Core, Parties & Security | 14 | Parties, Customers, CustomerContacts, Suppliers, SupplierContacts, Departments, Employees, Roles, Users, UserRoles, Permissions, RolePermissions, UserBranches, UserSessions |
+| 1. Core & Security | 13 | Customers, CustomerContacts, Suppliers, SupplierContacts, Departments, Employees, Roles, Users, UserRoles, Permissions, RolePermissions, UserBranches, UserSessions |
 | 2. Organization, Currencies & Settings | 11 | Branches, Warehouses, Currencies, CurrencyRates, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments |
 | 3. Products | 5 | ProductCategories, Products, Units, ProductUnits, ProductPrices |
 | 4. Accounting | 10 | AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings |
 | 5. Inventory | 10 | WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, InventoryCounts, InventoryCountLines, InventoryAdjustments, InventoryAdjustmentLines, WarehouseTransfers, WarehouseTransferLines |
-| 6. Sales | 6 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications |
+| 6. Sales | 8 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications, SalesQuotations, SalesQuotationItems |
 | 7. Purchases | 6 | PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications |
 | 8. Infrastructure & Support | 2 | AuditLogs, SystemLogs |
 | **Total** | **65** | |

@@ -72,10 +72,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingCustomer_ReturnsDto");
 
-        var party = Party.Create("Test Customer", PartyType.Customer, 1, phone: "1234567890", createdByUserId: null);
-        _dbContext.Parties.Add(party);
-        await _dbContext.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, 1, openingBalance: 0m, createdByUserId: null);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, createdByUserId: null);
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
@@ -116,7 +113,7 @@ public class CustomerServiceTests : IDisposable
         result.IsSuccess.Should().BeTrue();
         result.Value!.Name.Should().Be("New Customer");
         result.Value.OpeningBalance.Should().Be(1000m);
-        result.Value.CurrentBalance.Should().Be(1000m);
+        // CurrentBalance removed — balance lives on linked Account
 
         _output.WriteLine("[PASS] CreateAsync creates customer correctly");
     }
@@ -130,10 +127,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesCustomer");
 
-        var party = Party.Create("Original Name", PartyType.Customer, 1, phone: "1234567890", createdByUserId: null);
-        _dbContext.Parties.Add(party);
-        await _dbContext.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, 1, openingBalance: 0m, createdByUserId: null);
+        var customer = Customer.Create(name: "Original Name", accountId: 1, createdByUserId: null);
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
@@ -168,10 +162,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_DeactivateCustomer_MarksAsDeleted");
 
-        var party = Party.Create("Test Customer", PartyType.Customer, 1, createdByUserId: null);
-        _dbContext.Parties.Add(party);
-        await _dbContext.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, 1, openingBalance: 0m, createdByUserId: null);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, createdByUserId: null);
         customer.Restore();
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
@@ -195,10 +186,7 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingCustomer_SoftDeletes");
 
-        var party = Party.Create("Test Customer", PartyType.Customer, 1, createdByUserId: null);
-        _dbContext.Parties.Add(party);
-        await _dbContext.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, 1, openingBalance: 0m, createdByUserId: null);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, createdByUserId: null);
         _dbContext.Customers.Add(customer);
         await _dbContext.SaveChangesAsync();
 
@@ -235,13 +223,8 @@ public class CustomerServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var party1 = Party.Create("Ahmed", PartyType.Customer, 1, createdByUserId: null);
-        _dbContext.Parties.Add(party1);
-        var party2 = Party.Create("Mohamed", PartyType.Customer, 1, createdByUserId: null);
-        _dbContext.Parties.Add(party2);
-        await _dbContext.SaveChangesAsync();
-        var customer1 = Customer.Create(party1.Id, 1, openingBalance: 0m, createdByUserId: null);
-        var customer2 = Customer.Create(party2.Id, 1, openingBalance: 0m, createdByUserId: null);
+        var customer1 = Customer.Create(name: "Ahmed", accountId: 1, createdByUserId: null);
+        var customer2 = Customer.Create(name: "Mohamed", accountId: 1, createdByUserId: null);
         _dbContext.Customers.Add(customer1);
         _dbContext.Customers.Add(customer2);
         await _dbContext.SaveChangesAsync();
@@ -262,10 +245,7 @@ public class CustomerServiceTests : IDisposable
 
         for (int i = 1; i <= 15; i++)
         {
-            var party = Party.Create($"Customer {i}", PartyType.Customer, 1, createdByUserId: null);
-            _dbContext.Parties.Add(party);
-            await _dbContext.SaveChangesAsync();
-            var customer = Customer.Create(party.Id, 1, openingBalance: 0m, createdByUserId: null);
+            var customer = Customer.Create(name: $"Customer {i}", accountId: 1, createdByUserId: null);
             _dbContext.Customers.Add(customer);
         }
         await _dbContext.SaveChangesAsync();

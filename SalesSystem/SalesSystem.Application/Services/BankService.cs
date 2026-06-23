@@ -61,63 +61,66 @@ public class BankService : IBankService
 
     public async Task<Result<BankDto>> CreateAsync(CreateBankRequest request, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<BankDto>>(async () =>
         {
-            int accountId;
-
-            // Resolve the chart-of-accounts account: either use the provided AccountId
-            // or auto-create a Level-4 detail account under parent "1120 — البنوك".
-            if (request.AccountId.HasValue && request.AccountId.Value > 0)
+            try
             {
-                accountId = request.AccountId.Value;
+                int accountId;
 
-                var accountExists = await _uow.Accounts.AnyAsync(
-                    a => a.Id == accountId, ct);
-                if (!accountExists)
-                    return Result<BankDto>.Failure(
-                        "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+                // Resolve the chart-of-accounts account: either use the provided AccountId
+                // or auto-create a Level-4 detail account under parent "1120 — البنوك".
+                if (request.AccountId.HasValue && request.AccountId.Value > 0)
+                {
+                    accountId = request.AccountId.Value;
+
+                    var accountExists = await _uow.Accounts.AnyAsync(
+                        a => a.Id == accountId, ct);
+                    if (!accountExists)
+                        return Result<BankDto>.Failure(
+                            "الحساب المحاسبي المحدد غير موجود", ErrorCodes.NotFound);
+                }
+                else
+                {
+                    var accountResult = await AutoCreateBankAccountAsync(request.Name, userId, ct);
+                    if (!accountResult.IsSuccess || accountResult.Value == null)
+                        return Result<BankDto>.Failure(
+                            accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للبنك");
+
+                    accountId = accountResult.Value.Id;
+                }
+
+                // Create the bank domain entity — AccountId is always resolved before this call
+                var bank = Bank.Create(
+                    request.Name,
+                    accountId,
+                    accountNumber: request.AccountNumber,
+                    iban: request.Iban,
+                    createdByUserId: userId);
+
+                await _uow.Banks.AddAsync(bank, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "Bank created: {Name} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
+                    bank.Name, bank.Id, bank.AccountId, userId);
+
+                // Reload with Account navigation property for the response
+                var created = await _uow.Banks.FirstOrDefaultAsync(
+                    b => b.Id == bank.Id, ct, "Account");
+
+                return Result<BankDto>.Success(MapToDto(created!));
             }
-            else
+            catch (DomainException ex)
             {
-                var accountResult = await AutoCreateBankAccountAsync(request.Name, userId, ct);
-                if (!accountResult.IsSuccess || accountResult.Value == null)
-                    return Result<BankDto>.Failure(
-                        accountResult.Error ?? "فشل إنشاء الحساب المحاسبي للبنك");
-
-                accountId = accountResult.Value.Id;
+                _logger.LogWarning(ex, "Domain rule violation creating bank: {Message}", ex.Message);
+                return Result<BankDto>.Failure(ex.Message);
             }
-
-            // Create the bank domain entity — AccountId is always resolved before this call
-            var bank = Bank.Create(
-                request.Name,
-                accountId,
-                accountNumber: request.AccountNumber,
-                iban: request.Iban,
-                createdByUserId: userId);
-
-            await _uow.Banks.AddAsync(bank, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation(
-                "Bank created: {Name} (ID: {Id}, AccountId: {AccountId}) by User {UserId}",
-                bank.Name, bank.Id, bank.AccountId, userId);
-
-            // Reload with Account navigation property for the response
-            var created = await _uow.Banks.FirstOrDefaultAsync(
-                b => b.Id == bank.Id, ct, "Account");
-
-            return Result<BankDto>.Success(MapToDto(created!));
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation creating bank: {Message}", ex.Message);
-            return Result<BankDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating bank");
-            return Result<BankDto>.Failure("حدث خطأ أثناء إنشاء البنك");
-        }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating bank");
+                return Result<BankDto>.Failure("حدث خطأ أثناء إنشاء البنك");
+            }
+        }, ct);
     }
 
     public async Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request, int userId, CancellationToken ct)

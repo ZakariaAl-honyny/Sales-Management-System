@@ -92,7 +92,7 @@ public class PurchaseServiceTests : IDisposable
             _mockSequenceService.Object,
             _mockLogger.Object);
 
-        _testSupplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        _testSupplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _testWarehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
         _testProduct = Product.Create("Test Product", categoryId: 1);
 
@@ -218,7 +218,7 @@ public class PurchaseServiceTests : IDisposable
         _output.WriteLine("[TEST] PostAsync_DraftInvoice_PostsSuccessfully");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -277,7 +277,7 @@ public class PurchaseServiceTests : IDisposable
         _output.WriteLine("[TEST] CancelAsync_PostedInvoice_ReversesStockAndBalance");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 1000m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -315,7 +315,7 @@ public class PurchaseServiceTests : IDisposable
         _output.WriteLine("[TEST] CancelAsync_DraftInvoice_NoStockEffect");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);

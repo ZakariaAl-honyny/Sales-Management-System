@@ -1,6 +1,7 @@
 ---
 name: "Code Reviewer"
 reasoningEffect: high
+model: opencode/mimo-v2.5-free
 role: "Code quality and convention enforcement"
 activation: "Before merging any feature branch"
 mode: all
@@ -734,3 +735,14 @@ When you encounter any code related to these areas, apply fixes automatically:
 65. `Notification.Category` as string ??? CHANGE to `NotificationCategory` (byte enum). Remove duplicate Category column.
 66. `SalesReturnLines`/`PurchaseReturnLines` referencing `ProductId` ??? MUST reference original `SalesInvoiceLineId`/`PurchaseInvoiceLineId` per schema (FK links to invoice line, not product).
 67. Customer.CategoryId/Supplier.CategoryId (`int?`) without FK to AccountCategory ??? ADD explicit FK or document as loose property (int vs smallint mismatch).
+
+### Transaction Atomicity Review Items (v4.10.7)
+
+68. Transaction operation NOT wrapped in `ExecuteTransactionAsync` ??? ALL 22 operations MUST use `ExecuteTransactionAsync` (RULE-560). Check: SalesService, PurchaseService, SalesReturnService, PurchaseReturnService, CustomerReceiptService, SupplierPaymentService, ExpenseService, InventoryAdjustmentService, InventoryCountService, WarehouseTransferService, ReceiptVoucherService, PaymentVoucherService, InventoryService.
+69. Missing `InventoryTransaction` audit trail ??? EVERY stock-affecting operation MUST create `InventoryTransaction.Create()` + `AddLine()` per product (RULE-561). Check Post AND Cancel methods.
+70. `ExpenseService` without `IAccountingIntegrationService` ??? ADD DI injection, journal entries (Dr ExpenseAccount / Cr CashBox.Account on Post, reversal on Cancel), `IDocumentSequenceService` for sequence (RULE-562).
+71. `DeleteAsync`/`CancelAsync` missing `SaveChangesAsync` ??? ADD `await _uow.SaveChangesAsync(ct)` before return (RULE-564). Check CustomerReceiptService, SupplierPaymentService.
+72. `InventoryTransaction` created inside `IncreaseStockAsync`/`DecreaseStockAsync` ??? MOVE to service wrappers to prevent duplicate records (RULE-565).
+73. `BeginTransactionAsync` used directly instead of `ExecuteTransactionAsync` ??? CHANGE to `ExecuteTransactionAsync` (RULE-275). The execution strategy does not support user-initiated transactions.
+74. `ExpenseService` sequence using `ToListIgnoreFiltersAsync().Max() + 1` ??? CHANGE to `IDocumentSequenceService.GetNextIntAsync("Expense", ct)` (RULE-562). Not thread-safe under concurrency.
+75. `AccountingIntegrationService` methods throwing exceptions instead of returning `Result<int>` ??? CHANGE to `Result<int>.Success(entryId)` / `Result<int>.Failure(...)` (RULE-388).

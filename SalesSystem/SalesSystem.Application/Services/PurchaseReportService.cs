@@ -30,11 +30,11 @@ public class PurchaseReportService : IPurchaseReportService
 
             var invoices = await _uow.PurchaseInvoices.ToListAsync(
                 pi => pi.Status == InvoiceStatus.Posted && pi.InvoiceDate >= DateOnly.FromDateTime(from) && pi.InvoiceDate <= DateOnly.FromDateTime(to),
-                q => q.Include(pi => pi.Supplier).ThenInclude(s => s!.Party),
+                q => q.Include(pi => pi.Supplier),
                 ct);
 
             var grouped = invoices
-                .GroupBy(pi => new { pi.SupplierId, SupplierName = pi.Supplier?.Party?.Name ?? "مورد" })
+                .GroupBy(pi => new { pi.SupplierId, SupplierName = pi.Supplier?.Name ?? "مورد" })
                 .Select(g => new PurchasesBySupplierDto(
                     g.Key.SupplierId,
                     g.Key.SupplierName,

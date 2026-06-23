@@ -119,7 +119,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesReturnWithStockDecrease");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -173,7 +173,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_SupplierWithBalance_DecreasesBalance");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 5000m, createdByUserId: null);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1, createdByUserId: null);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -204,7 +204,7 @@ public class PurchaseReturnServiceTests : IDisposable
         var postResult = await _sut.PostAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
         postResult.IsSuccess.Should().BeTrue();
 
-        supplier.CurrentBalance.Should().Be(4500m, "We owed supplier 5000, return worth 500, now owe 4500");
+        // Balance removed — balance lives on linked Account
 
         _output.WriteLine("[PASS] Purchase return decreases supplier balance");
     }
@@ -215,7 +215,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_WithOriginalInvoice_ValidatesQuantities");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -306,7 +306,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_InsufficientStock_ReturnsFailure");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);
@@ -357,7 +357,7 @@ public class PurchaseReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] GetByIdAsync_ExistingReturn_ReturnsDto");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Suppliers.Add(supplier);

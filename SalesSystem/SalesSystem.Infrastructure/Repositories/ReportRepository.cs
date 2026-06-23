@@ -24,7 +24,7 @@ public class ReportRepository : IReportRepository
         var endDate = to.Date.AddDays(1).AddTicks(-1);
 
         return await _context.SalesInvoices
-            .Include(i => i.Customer).ThenInclude(c => c!.Party)
+            .Include(i => i.Customer)
             .Where(i => i.Status == InvoiceStatus.Posted &&
                         i.InvoiceDate >= startDate &&
                         i.InvoiceDate <= endDate &&
@@ -33,7 +33,7 @@ public class ReportRepository : IReportRepository
             .Select(i => new SalesReportDto(
                 i.InvoiceDate,
                 i.Id,
-                i.Customer != null ? i.Customer.Party.Name : "عميل نقدي",
+                i.Customer != null ? i.Customer.Name : "عميل نقدي",
                 i.SubTotal,
                 i.DiscountAmount,
                 i.TaxAmount,
@@ -53,7 +53,7 @@ public class ReportRepository : IReportRepository
         var toDateOnly = DateOnly.FromDateTime(endDate);
 
         return await _context.PurchaseInvoices
-            .Include(i => i.Supplier).ThenInclude(s => s!.Party)
+            .Include(i => i.Supplier)
             .Where(i => i.Status == InvoiceStatus.Posted &&
                         i.InvoiceDate >= fromDateOnly &&
                         i.InvoiceDate <= toDateOnly &&
@@ -62,7 +62,7 @@ public class ReportRepository : IReportRepository
             .Select(i => new PurchaseReportDto(
                 i.InvoiceDate.ToDateTime(TimeOnly.MinValue),
                 i.Id,
-                i.Supplier != null ? i.Supplier.Party.Name : "غير معروف",
+                i.Supplier != null ? i.Supplier.Name : "غير معروف",
                 i.SubTotal,
                 i.DiscountAmount,
                 i.TaxAmount,
@@ -137,17 +137,16 @@ public class ReportRepository : IReportRepository
     {
         var query = _context.Customers
             .Include(c => c.Account)
-            .Include(c => c.Party)
             .AsQueryable();
 
         if (customerId.HasValue)
             query = query.Where(c => c.Id == customerId.Value);
 
         return await query
-            .OrderBy(c => c.Party.Name)
+            .OrderBy(c => c.Name)
             .Select(c => new CustomerFinancialBalanceDto(
                 c.Id,
-                c.Party.Name,
+                c.Name,
                 0m,
                 _context.SalesInvoices.Where(i => i.CustomerId == c.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.NetTotal),
                 _context.SalesReturns.Where(r => r.CustomerId == c.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
@@ -162,17 +161,16 @@ public class ReportRepository : IReportRepository
     {
         var query = _context.Suppliers
             .Include(s => s.Account)
-            .Include(s => s.Party)
             .AsQueryable();
 
         if (supplierId.HasValue)
             query = query.Where(s => s.Id == supplierId.Value);
 
         return await query
-            .OrderBy(s => s.Party.Name)
+            .OrderBy(s => s.Name)
             .Select(s => new SupplierBalanceReportDto(
                 s.Id,
-                s.Party.Name,
+                s.Name,
                 0m,
                 _context.PurchaseInvoices.Where(i => i.SupplierId == s.Id && i.Status == InvoiceStatus.Posted).Sum(i => i.NetTotal),
                 _context.PurchaseReturns.Where(r => r.SupplierId == s.Id && r.Status == InvoiceStatus.Posted).Sum(r => r.TotalAmount),
@@ -461,7 +459,6 @@ public class ReportRepository : IReportRepository
             var salesQuery = _context.SalesReturnLines
                 .Include(srl => srl.SalesReturn)
                     .ThenInclude(sr => sr!.Customer)
-                        .ThenInclude(c => c!.Party)
                 .Include(srl => srl.SalesInvoiceLine)
                     .ThenInclude(sil => sil.Product)
                 .Where(srl => srl.SalesReturn!.Status == InvoiceStatus.Posted)
@@ -485,7 +482,7 @@ public class ReportRepository : IReportRepository
                     srl.SalesReturn!.ReturnNo.ToString(),
                     srl.SalesReturn.ReturnDate,
                     "مبيعات",
-                    srl.SalesReturn.Customer != null ? srl.SalesReturn.Customer.Party.Name : null,
+                    srl.SalesReturn.Customer != null ? srl.SalesReturn.Customer.Name : null,
                     srl.SalesInvoiceLine!.Product!.Name,
                     srl.Quantity,
                     srl.Amount,
@@ -503,7 +500,6 @@ public class ReportRepository : IReportRepository
             var purchaseQuery = _context.PurchaseReturnLines
                 .Include(prl => prl.PurchaseReturn)
                     .ThenInclude(pr => pr!.Supplier)
-                        .ThenInclude(s => s!.Party)
                 .Include(prl => prl.PurchaseInvoiceLine)
                     .ThenInclude(pil => pil.Product)
                 .Where(prl => prl.PurchaseReturn!.Status == InvoiceStatus.Posted)
@@ -527,7 +523,7 @@ public class ReportRepository : IReportRepository
                     prl.PurchaseReturn!.ReturnNo.ToString(),
                     prl.PurchaseReturn.ReturnDate.ToDateTime(TimeOnly.MinValue),
                     "مشتريات",
-                    prl.PurchaseReturn.Supplier.Party.Name,
+                    prl.PurchaseReturn.Supplier.Name,
                     prl.PurchaseInvoiceLine!.Product!.Name,
                     prl.Quantity,
                     prl.Amount,
@@ -559,7 +555,6 @@ public class ReportRepository : IReportRepository
             {
                 // Query customers with their posted sales invoices for aging computation
                 var customersQuery = _context.Customers
-                    .Include(c => c.Party)
                     .Where(c => c.IsActive)
                     .AsQueryable();
 
@@ -591,7 +586,7 @@ public class ReportRepository : IReportRepository
                     }
 
                     result.Add(new AgingReportDto(
-                        customer.Party.Name,
+                        customer.Name,
                         totalBalance,
                         current,
                         days1To30,
@@ -605,7 +600,6 @@ public class ReportRepository : IReportRepository
             else // Suppliers
             {
                 var suppliersQuery = _context.Suppliers
-                    .Include(s => s.Party)
                     .Where(s => s.IsActive)
                     .AsQueryable();
 
@@ -638,7 +632,7 @@ public class ReportRepository : IReportRepository
                     }
 
                     result.Add(new AgingReportDto(
-                        supplier.Party.Name,
+                        supplier.Name,
                         totalBalance,
                         current,
                         days1To30,

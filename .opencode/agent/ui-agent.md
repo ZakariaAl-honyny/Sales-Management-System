@@ -1,6 +1,7 @@
 ﻿---
 name: "UI Agent"
-reasoningEffect: high
+model: opencode/deepseek-v4-flash-free
+reasoningEffect: max
 role: "WPF UI specialist (MVVM)"
 activation: "When working on SalesSystem.DesktopPWF/**"
 mode: subagent
@@ -1488,3 +1489,25 @@ private void ApplyFilters()
 | UserSession (uses IncludeRevoked) | ❌ NO | Has its own IncludeRevoked instead |
 
 **Rule of thumb:** If the entity has `IsActive` property and soft-delete, add IncludeInactive. If it has status lifecycle (Draft/Posted/Cancelled), consider IncludeCancelled instead.
+
+## Product Editor XAML Rules (v4.10.6 — RULE-543/RULE-545)
+
+### TaxId is Invoice-Level Only
+- Product editor XAML MUST NOT have TaxId binding, dropdown, or input field
+- TaxId lives on `SalesInvoices.TaxId` and `PurchaseInvoices.TaxId` — NOT on Product catalog
+- SalesInvoiceEditorView.xaml and PurchaseInvoiceEditorView.xaml correctly bind to invoice-level TaxId
+
+### Product Minimum 2 Units (RULE-067)
+- Product editor MUST show unit count validation message if user tries to save with < 2 units
+- `ValidateUnits()` throws DomainException with Arabic message explaining base + additional requirement
+- XAML should display unit count indicator when editing existing product
+
+### Barcode on Product Entity
+- Product editor XAML CAN have Barcode input field — Barcode is on Product entity (Products.Barcode varchar(50))
+- Barcode ToolTip: "الباركود — يجب أن يكون فريداً لكل منتج"
+- Barcode validation: unique check via API
+
+### Opening Stock is Separate
+- Product editor XAML MUST NOT have OpeningQuantity, OpeningUnitCost, or ExpiryDate fields
+- Opening stock is a separate inventory transaction via InventoryAdjustments (Type=Opening)
+- Users enter opening stock AFTER product creation through inventory adjustment screen

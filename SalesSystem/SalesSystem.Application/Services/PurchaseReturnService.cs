@@ -22,6 +22,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     private readonly IDocumentSequenceService _sequenceService;
     private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly IAccountingIntegrationService _accountingService;
+    private readonly IFifoAllocationService _fifoAllocationService;
     private readonly ILogger<PurchaseReturnService> _logger;
 
     public PurchaseReturnService(
@@ -30,6 +31,7 @@ public class PurchaseReturnService : IPurchaseReturnService
         IDocumentSequenceService sequenceService,
         ISystemSettingsRepository systemSettingsRepo,
         IAccountingIntegrationService accountingService,
+        IFifoAllocationService fifoAllocationService,
         ILogger<PurchaseReturnService> logger)
     {
         _uow = uow;
@@ -37,13 +39,14 @@ public class PurchaseReturnService : IPurchaseReturnService
         _sequenceService = sequenceService;
         _systemSettingsRepo = systemSettingsRepo;
         _accountingService = accountingService;
+        _fifoAllocationService = fifoAllocationService;
         _logger = logger;
     }
 
     public async Task<Result<PurchaseReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Supplier.Party", "Warehouse", "Items.Product", "Items.ProductUnit", "Currency");
+            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit", "Currency");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود", ErrorCodes.NotFound);
@@ -64,7 +67,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             q => q.OrderByDescending(r => r.ReturnDate).Skip((page - 1) * pageSize).Take(pageSize),
             ct,
             false,
-            "Supplier.Party", "Warehouse", "Lines.PurchaseInvoiceLine.Product");
+            "Supplier", "Warehouse", "Lines.PurchaseInvoiceLine.Product");
 
         var dtos = items.Select(MapToDto).ToList();
 
@@ -148,7 +151,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "PurchaseInvoice", "Supplier.Party");
+            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "PurchaseInvoice", "Supplier");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
@@ -204,6 +207,55 @@ public class PurchaseReturnService : IPurchaseReturnService
 
                 await _uow.SaveChangesAsync(ct);
 
+                // ─── FIFO Batch Deduction ────────────────────────────────────────
+                // Deduct from earliest batches for each returned item
+                foreach (var item in pr.Lines)
+                {
+                    var productId = item.PurchaseInvoiceLine?.ProductId ?? 0;
+                    if (productId <= 0 || item.Quantity <= 0) continue;
+
+                    var fifoResult = await _fifoAllocationService.DeductFromBatchesAsync(
+                        productId,
+                        pr.WarehouseId,
+                        item.Quantity,
+                        SalesInvoiceLineId: null,   // purchase return — not linked to a sales line
+                        createdByUserId: userId,
+                        ct: ct);
+
+                    if (!fifoResult.IsSuccess)
+                    {
+                        _logger.LogWarning("FIFO batch deduction failed for purchase return {Id}, Product {ProductId}: {Error}",
+                            pr.Id, productId, fifoResult.Error);
+                        return Result<PurchaseReturnDto>.Failure(fifoResult.Error!);
+                    }
+                }
+
+                // ─── InventoryTransaction Audit Trail ────────────────────────────
+                var prTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (prTxSeq.IsSuccess)
+                {
+                    var prInvTx = InventoryTransaction.Create(
+                        prTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.PurchaseReturn,
+                        pr.WarehouseId,
+                        InventoryReferenceType.PurchaseReturn,
+                        pr.Id,
+                        $"مرتجع شراء - رقم {pr.ReturnNo}",
+                        userId);
+                    foreach (var item in pr.Lines)
+                    {
+                        var productId = item.PurchaseInvoiceLine?.ProductId ?? 0;
+                        if (productId <= 0) continue;
+                        prInvTx.AddLine(InventoryTransactionLine.Create(
+                            prInvTx.Id,
+                            item.ProductUnitId,
+                            item.Quantity,
+                            item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
+                            null, null, pr.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(prInvTx, ct);
+                }
+
                 // Create accounting entry for the purchase return
                 var entryResult = await _accountingService.CreatePurchaseReturnEntryAsync(pr, userId, ct);
                 if (!entryResult.IsSuccess)
@@ -227,7 +279,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "Supplier.Party");
+            r => r.Id == id, ct, "Lines.PurchaseInvoiceLine.Product", "Supplier");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود");
@@ -252,6 +304,58 @@ public class PurchaseReturnService : IPurchaseReturnService
                             unitCost: item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
                             userId: userId,
                             ct: ct);
+                    }
+
+                    // ─── FIFO Batch Restoration ───────────────────────────────────
+                    // Restore batches since goods are coming back
+                    foreach (var item in pr.Lines)
+                    {
+                        var productId = item.PurchaseInvoiceLine?.ProductId ?? 0;
+                        if (productId <= 0 || item.Quantity <= 0) continue;
+
+                        var batchResult = await _fifoAllocationService.AddPurchaseBatchesAsync(
+                            productId,
+                            pr.WarehouseId,
+                            item.Quantity,
+                            item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
+                            batchNo: $"CNL-PR-{pr.Id}-{item.Id}",
+                            expiryDate: null,
+                            purchaseInvoiceId: null,
+                            isOpeningBatch: false,
+                            ct: ct);
+
+                        if (!batchResult.IsSuccess)
+                        {
+                            _logger.LogWarning("Batch restoration failed for purchase return cancel {Id}, Product {ProductId}: {Error}",
+                                pr.Id, productId, batchResult.Error);
+                            return Result<PurchaseReturnDto>.Failure(batchResult.Error!);
+                        }
+                    }
+
+                    // ─── InventoryTransaction Reversal Audit Trail ────────────────
+                    var prCancelTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (prCancelTxSeq.IsSuccess)
+                    {
+                        var prCancelInvTx = InventoryTransaction.Create(
+                            prCancelTxSeq.Value.ToString("D6"),
+                            InventoryTransactionType.Purchase,   // reversing the return
+                            pr.WarehouseId,
+                            InventoryReferenceType.PurchaseReturn,
+                            pr.Id,
+                            $"إلغاء مرتجع شراء - رقم {pr.ReturnNo}",
+                            userId);
+                        foreach (var item in pr.Lines)
+                        {
+                            var productId = item.PurchaseInvoiceLine?.ProductId ?? 0;
+                            if (productId <= 0) continue;
+                            prCancelInvTx.AddLine(InventoryTransactionLine.Create(
+                                prCancelInvTx.Id,
+                                item.ProductUnitId,
+                                item.Quantity,
+                                item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
+                                null, null, pr.WarehouseId));
+                        }
+                        await _uow.InventoryTransactions.AddAsync(prCancelInvTx, ct);
                     }
 
                     // Reverse the accounting entry for the posted purchase return
@@ -321,7 +425,7 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.SupplierId,
-            r.Supplier?.Party?.Name ?? "غير معروف",
+            r.Supplier?.Name ?? "غير معروف",
             r.PurchaseInvoiceId,
             r.PurchaseInvoiceId.HasValue, // LinkToInvoice = true when linked to an invoice
             r.ReturnDate,

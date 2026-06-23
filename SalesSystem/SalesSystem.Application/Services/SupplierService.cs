@@ -26,7 +26,7 @@ public class SupplierService : ISupplierService
     public async Task<Result<SupplierDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var supplier = await _uow.Suppliers.FirstOrDefaultAsync(
-            s => s.Id == id, ct, "Party");
+            s => s.Id == id, ct);
         if (supplier == null)
             return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -40,11 +40,11 @@ public class SupplierService : ISupplierService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search;
-            predicate = sup => sup.Party.Name.Contains(s) || (sup.Party.Phone != null && sup.Party.Phone.Contains(s));
+            predicate = sup => sup.Name.Contains(s) || (sup.Phone != null && sup.Phone.Contains(s));
         }
 
         var (items, total) = await _uow.Suppliers.GetPagedAsync(
-            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive, "Party");
+            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive);
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, total, page, pageSize));
@@ -52,48 +52,42 @@ public class SupplierService : ISupplierService
 
     public async Task<Result<SupplierDto>> CreateAsync(CreateSupplierRequest request, int userId, CancellationToken ct)
     {
-        try
+        return await _uow.ExecuteTransactionAsync<Result<SupplierDto>>(async () =>
         {
-            // Step 1: Auto-create account under AP parent (1320 — الموردون)
-            var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
-            if (!accountResult.IsSuccess)
-                return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
-            var accountId = accountResult.Value;
+            try
+            {
+                // Step 1: Auto-create account under AP parent (1320 — الموردون)
+                var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
+                if (!accountResult.IsSuccess)
+                    return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
+                var accountId = accountResult.Value;
 
-            // Step 2: Create Party record (Name, Phone, Email, Address, TaxNumber)
-            var party = Party.Create(
-                name: request.Name,
-                phone: request.Phone,
-                email: request.Email,
-                address: request.Address,
-                taxNumber: request.TaxNumber,
-                createdByUserId: userId);
-            await _uow.Parties.AddAsync(party, ct);
-            await _uow.SaveChangesAsync(ct);
+                // Step 2: Create Supplier record with direct contact fields
+                var supplier = Supplier.Create(
+                    name: request.Name,
+                    accountId: accountId,
+                    phone: request.Phone,
+                    email: request.Email,
+                    address: request.Address,
+                    taxNumber: request.TaxNumber,
+                    createdByUserId: userId);
+                await _uow.Suppliers.AddAsync(supplier, ct);
+                await _uow.SaveChangesAsync(ct);
 
-            // Step 3: Create Supplier record with PartyId FK (separate from Supplier.Id)
-            var supplier = Supplier.Create(
-                partyId: party.Id,
-                accountId: accountId,
-                createdByUserId: userId);
-            await _uow.Suppliers.AddAsync(supplier, ct);
-            await _uow.SaveChangesAsync(ct);
+                _logger.LogInformation("Supplier created: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
 
-            _logger.LogInformation("Supplier created: {SupplierName} (ID: {SupplierId})", party.Name, supplier.Id);
-
-            var saved = await _uow.Suppliers.FirstOrDefaultAsync(
-                s => s.Id == supplier.Id, ct, "Party");
-            return Result<SupplierDto>.Success(MapToDto(saved!));
-        }
-        catch (DomainException ex)
-        {
-            return Result<SupplierDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while creating supplier");
-            return Result<SupplierDto>.Failure("حدث خطأ أثناء إضافة المورد.");
-        }
+                return Result<SupplierDto>.Success(MapToDto(supplier));
+            }
+            catch (DomainException ex)
+            {
+                return Result<SupplierDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while creating supplier");
+                return Result<SupplierDto>.Failure("حدث خطأ أثناء إضافة المورد.");
+            }
+        }, ct);
     }
 
     public async Task<Result<SupplierDto>> UpdateAsync(int id, UpdateSupplierRequest request, int userId, CancellationToken ct)
@@ -101,22 +95,18 @@ public class SupplierService : ISupplierService
         try
         {
             var supplier = await _uow.Suppliers.FirstOrDefaultIgnoreFiltersAsync(
-                s => s.Id == id, ct, "Party");
+                s => s.Id == id, ct);
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-            // Update Party record (contact data)
-            supplier.Party.Update(
+            // Update supplier fields including contact information
+            supplier.Update(
                 name: request.Name,
                 phone: request.Phone,
                 email: request.Email,
                 address: request.Address,
                 taxNumber: request.TaxNumber,
                 updatedByUserId: userId);
-
-            // Supplier has no domain-specific fields beyond Party contact data.
-            // CategoryId is managed through a separate endpoint.
-            supplier.Update(updatedByUserId: userId);
 
             if (request.IsActive != supplier.IsActive)
             {
@@ -127,11 +117,9 @@ public class SupplierService : ISupplierService
             await _uow.Suppliers.UpdateAsync(supplier, ct);
             await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Party.Name, supplier.Id);
+            _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
 
-            var updated = await _uow.Suppliers.FirstOrDefaultAsync(
-                s => s.Id == supplier.Id, ct, "Party");
-            return Result<SupplierDto>.Success(MapToDto(updated!));
+            return Result<SupplierDto>.Success(MapToDto(supplier));
         }
         catch (DomainException ex)
         {
@@ -266,13 +254,12 @@ public class SupplierService : ISupplierService
     {
         return new SupplierDto(
             s.Id,
-            s.Party.Name,
-            s.Party.Phone,
-            s.Party.Email,
-            s.Party.Address,
-            s.Party.TaxNumber,
+            s.Name,
+            s.Phone,
+            s.Email,
+            s.Address,
+            s.TaxNumber,
             s.IsActive,
-            PartyId: s.PartyId,
             AccountId: s.AccountId,
             CategoryId: s.CategoryId
         );

@@ -1,8 +1,8 @@
 # Phase 27 — Purchases Module: Comprehensive Implementation Plan
 
-> **Version**: 1.1 — Built from analysis of Analysis Part 1–5, Global Analysis, full codebase audit, and user requirements
+> **Version**: 2.0 — Enriched with 12 purchase scenarios + exact journal entries (from Sales and Purchases new details.md), Draft vs Post two-button strategy (from Invoices Details.md), supplier auto-account creation (from Accounts.md), Arabic business rules (from Business Rules.md), and cross-reference to Phase 24/25
 > **Fixes applied**: FIFO batch costing, partial PO→Invoice receive workflow, AdditionalCharge.AccountId FK, PurchaseReturn LinkToInvoice mode, decimal precision audit, Arabic DomainException guards
-> **Scope**: Enhance existing Purchase Invoice module with multi-currency, additional fees, attachments, auto accounting entries, purchase orders (NEW), and purchase return enhancements for V1
+> **Scope**: Enhance existing Purchase Invoice module with multi-currency, additional fees, attachments, auto accounting entries, purchase orders (NEW), purchase return enhancements, two-button (Draft/Post) workflow, and supplier auto-account creation for V1
 
 ---
 
@@ -15,11 +15,20 @@
 5.  [Gap Analysis](#5-gap-analysis)
     - 5.6 [FIFO Batch Costing on Purchase Receipt](#56-fifo-batch-costing-on-purchase-receipt)
 6.  [Architectural Decisions](#6-architectural-decisions)
+    - 6.10 [Discount on Purchase — Inventory Cost Reduction](#610-discount-on-purchase--inventory-cost-reduction)
 7. [Non-V1 Items (Deferred)](#7-non-v1-items-deferred)
-8. [Implementation Tasks](#8-implementation-tasks)
-9. [Compliance Matrix (55+ Rules)](#9-compliance-matrix-55-rules)
-10. [Risks & Mitigations](#10-risks--mitigations)
-11. [Rollback Plan](#11-rollback-plan)
+8. [Purchase Scenarios — 12 Detailed Scenarios](#8-purchase-scenarios--12-detailed-scenarios)
+9. [Draft vs Post vs Cancel vs Return — Detailed Workflow](#9-draft-vs-post-vs-cancel-vs-return--detailed-workflow)
+10. [Arabic Business Rules & User Error Prevention](#10-arabic-business-rules--user-error-prevention)
+11. [Cross-Reference: Phase 24 (Accounting) & Phase 25 (Inventory)](#11-cross-reference-phase-24-accounting--phase-25-inventory)
+12. [Implementation Tasks](#12-implementation-tasks)
+    - 12.11 [Two-Button Strategy: Save Draft / Save & Post](#1211-two-button-strategy-save-draft--save--post)
+    - 12.12 [Supplier Auto-Account Creation](#1212-supplier-auto-account-creation)
+13. [Compliance Matrix (55+ Rules)](#13-compliance-matrix-55-rules)
+14. [Risks & Mitigations](#14-risks--mitigations)
+    - 14.1 [Discount on Purchase Risk](#141-discount-on-purchase-directly-reducing-inventory-cost)
+    - 14.2 [Two-Button Strategy Risk](#142-two-button-strategy-confusion)
+15. [Rollback Plan](#15-rollback-plan)
 
 ---
 
@@ -38,12 +47,20 @@ Based on full codebase audit + user requirements from analysis documents, the Pu
 ```text
 Purchase Order (Draft/Approved/Received) → Purchase Invoice (Draft) → Purchase Invoice (Posted)
                                                                          ↓
-                                                            Stock Increase (InventoryMovement)
-                                                            Cost Update (UpdateProductPricingService)
-                                                            Supplier Balance Update
-                                                            Auto Journal Entry (GL)
-                                                            Auto Supplier Payment (Cash purchases)
-                                                            CashBox Transaction
+                                                            InventoryTransaction (Purchase type)
+                                                            ↓
+                                                            InventoryBatch creation (FIFO lot)
+                                                            ↓
+                                                            WarehouseStock increment
+                                                            + Cost update (UpdateProductPricingService)
+                                                            + Supplier balance update
+                                                            ↓
+                                                            Journal Entry (double-entry GL)
+                                                            - Dr InventoryAsset (net cost after discount + fees)
+                                                            - Cr Cash/SupplierPayable/AP
+                                                            ↓
+                                                            Auto Supplier Payment (if PaidAmount > 0)
+                                                            + CashBox Transaction (if Cash payment)
 ```
 
 ### Invoice Lifecycle (Existing — Unchanged)
@@ -650,6 +667,34 @@ Although a purchase order adds scope, it is:
 
 Invoice numbers are sequential ints per RULE-254. Purchase Orders have their own `OrderNo` sequence. There is no requirement to embed PO reference in invoice number — the link is through the optional `PurchaseOrderId` FK on the invoice service (not stored on the invoice entity itself, but tracked during creation).
 
+### 6.10 Discount on Purchase — Inventory Cost Reduction
+
+**Decision**: Purchase discounts directly reduce inventory cost. There is NO separate "خصم مسموح به" (Discount Allowed) account for purchases in V1.
+
+**Rationale** (per analysis):
+- "الخصم يخفض تكلفة المخزون" (Discount reduces inventory cost)
+- The inventory is valued at the net paid cost, not the nominal cost
+- Example: 100 units @ 50 with 500 discount → Inventory value = 4,500 → UnitCost = 45 (not 50)
+- This matches the perpetual inventory system where all costs flow through the inventory asset account
+
+**Journal entry impact**:
+```text
+Without discount:  Dr Inventory 5,000 / Cr Cash 5,000
+With discount:     Dr Inventory 4,500 / Cr Cash 4,500
+```
+
+**Batch UnitCost impact**:
+```text
+UnitCost after discount = (LineTotal net of discount + allocated fees) ÷ Qty
+```
+
+**No separate discount account needed** in V1 because:
+1. Perpetual inventory values goods at net cost
+2. Purchase discount tracking (for reporting) can use the DiscountAmount field on the invoice
+3. V2 can introduce a "خصم مسموح به" account if supplier discount reporting becomes critical
+
+Invoice numbers are sequential ints per RULE-254. Purchase Orders have their own `OrderNo` sequence. There is no requirement to embed PO reference in invoice number — the link is through the optional `PurchaseOrderId` FK on the invoice service (not stored on the invoice entity itself, but tracked during creation).
+
 ---
 
 ## 7. Non-V1 Items (Deferred)
@@ -671,7 +716,425 @@ These features appeared in analysis but are **deferred** to future versions:
 
 ---
 
-## 8. Implementation Tasks
+## 8. Purchase Scenarios — 12 Detailed Scenarios with Exact Journal Entries
+
+> **Source**: `docs/all new Anylysis for update system features/Sales and Purchases new details.md` (lines 1742–4299)
+> **Key Principle**: Purchases *create* inventory (unlike sales which *consume* inventory). Every purchase posted creates an `InventoryBatch`, updates `WarehouseStocks`, and generates a double-entry `JournalEntry`.
+
+### 8.1 Scenario 1 — Cash Purchase (Full Payment)
+
+**Example**:
+```text
+Supplier: شركة الأمل
+Item: مياه أروى
+Qty: 100 units
+Unit Cost: 50
+Total: 5,000
+Paid: 5,000
+```
+
+**Before Post (Draft)**:
+- Creates `PurchaseInvoices` + `PurchaseInvoiceLines` only
+- NO stock, NO batch, NO journal entry
+
+**On Post** (inside single transaction):
+1. `PurchaseInvoices.Status = Posted`
+2. `InventoryTransaction` created (type: Purchase)
+3. `InventoryBatch` created: `BatchNo=1001, QtyReceived=100, QtyRemaining=100, UnitCost=50`
+4. `WarehouseStocks` incremented: +100
+5. **Journal Entry**:
+   ```
+   المخزون (Inventory Asset)        Dr 5,000
+       الصندوق (Cash Box)               Cr 5,000
+   ```
+
+---
+
+### 8.2 Scenario 2 — Credit Purchase (Full Deferred)
+
+**Example**: Same items, Paid = 0
+
+**Journal Entry** (steps 1-4 identical):
+```
+المخزون (Inventory Asset)        Dr 5,000
+    المورد (Supplier Payable)         Cr 5,000
+```
+
+---
+
+### 8.3 Scenario 3 — Mixed Purchase (Partial Payment)
+
+**Example**: Total = 5,000, Paid = 2,000, Remaining = 3,000
+
+**Journal Entry**:
+```
+المخزون (Inventory Asset)        Dr 5,000
+    الصندوق (Cash Box)               Cr 2,000
+    المورد (Supplier Payable)         Cr 3,000
+```
+
+---
+
+### 8.4 Scenario 4 — Purchase with Supplier Discount
+
+**Example**: Goods = 5,000, Discount = 500, Net = 4,500
+
+**CRITICAL RULE**: Discount reduces inventory cost directly (no separate discount account for purchases in V1).
+
+**Journal Entry**:
+```
+المخزون (Inventory Asset)        Dr 4,500
+    الصندوق/المورد (Cash/AP)          Cr 4,500
+```
+
+**UnitCost calculation**:
+```text
+Net cost after discount = 4,500
+UnitCost = 4,500 ÷ 100 = 45  (NOT 50)
+```
+
+> **Decision**: Discount on purchase directly reduces inventory cost. NO separate "خصم مسموح به" account in V1. The inventory is valued at the net paid cost. This matches the analysis recommendation: "الخصم يخفض تكلفة المخزون" (discount reduces inventory cost).
+
+---
+
+### 8.5 Scenario 5 — Purchase with Recoverable VAT
+
+**Example**: Goods after discount = 4,500, VAT 15% = 675
+
+**Journal Entry** (VAT recoverable → separate debit):
+```
+المخزون (Inventory Asset)             Dr 4,500
+ضريبة المدخلات (Input VAT)            Dr 675
+    الصندوق/المورد (Cash/AP)              Cr 5,175
+```
+
+> **Rule**: VAT does NOT enter inventory cost when recoverable. Input VAT goes to a separate account (ضريبة المدخلات). Only the net-of-tax amount capitalizes to inventory.
+
+---
+
+### 8.6 Scenario 6 — Zero-Rated or Exempt Tax
+
+If `TaxRate = 0` or `Zero Rated` or `Exempt`:
+- No tax journal line is created
+- Only the base Dr/Cr entries exist
+- `TaxId` is still stored on the invoice for reporting purposes
+
+---
+
+### 8.7 Scenario 7 — Purchase with Additional Fees (Landed Cost)
+
+**Example**: Goods after discount = 4,500, Transport fee = 200
+
+**Decision**: ✅ Fees load onto inventory cost. "النقل جزء من تكلفة الشراء."
+
+**Journal Entry**:
+```
+المخزون (Inventory Asset)        Dr 4,700  ← 4,500 + 200
+    الصندوق (Cash Box)               Cr 4,700
+```
+
+**UnitCost calculation**:
+```text
+Inventory value = 4,500 + 200 = 4,700
+UnitCost = 4,700 ÷ 100 = 47  (NOT 45)
+```
+
+> **Fee Distribution**: Fees are distributed proportionally across items. If multiple items exist, fee allocation uses the selected `DistributionMethod` (ByCost = proportional to LineTotal, or ByQuantity = proportional to Quantity). The distributed fee amount is stored on each `PurchaseInvoiceLine.AdditionalFeesAmount` and the total on `PurchaseInvoice.AdditionalFeesTotal`.
+
+---
+
+### 8.8 Scenario 8 — Purchase with Expiry Date
+
+If `Product.TrackExpiry = true`:
+- `ExpiryDate` field is REQUIRED on the line item before posting
+- Stored on `InventoryBatch.ExpiryDate` for FEFO tracking
+- If `TrackExpiry = false`, the field is hidden
+
+---
+
+### 8.9 Scenario 9 — Multiple Batches Per Product
+
+Each purchase creates a **new** `InventoryBatch` — never merged with existing batches. This enables FIFO/FEFO cost allocation:
+```text
+Batch A: 100 units @ 50 (first purchase)
+Batch B: 200 units @ 55 (second purchase — separate batch)
+```
+
+---
+
+### 8.10 Scenario 10 — Supplier Payment (Post-Purchase Settlement)
+
+**Example**: Supplier balance = 5,000, Paid = 2,000
+
+Creates `SupplierPayment` record with optional `SupplierPaymentApplication` distribution.
+
+**Journal Entry**:
+```
+المورد (Supplier Payable)         Dr 2,000
+    الصندوق (Cash Box)               Cr 2,000
+```
+
+---
+
+### 8.11 Scenario 11 — Full Purchase Return
+
+**Example**: 20 units returned to supplier
+
+System creates `PurchaseReturn` + `PurchaseReturnLines`, deducts from the **original** `InventoryBatch`.
+
+**Journal Entry**:
+```
+المورد (Supplier Payable)         Dr (cost of returned goods)
+    المخزون (Inventory Asset)         Cr (cost of returned goods)
+```
+
+---
+
+### 8.12 Scenario 12 — Partial Purchase Return
+
+**Example**: Purchased 100, returned 20
+
+System:
+1. Retrieves original `PurchaseInvoiceLine`
+2. Retrieves original `InventoryBatch` cost
+3. Computes proportional discount, tax, and fee amounts
+4. Deducts 20 units from original batch
+5. Reverses only the proportional amount
+
+**Journal Entry** (proportional reversal):
+```
+المورد (Supplier Payable)         Dr (20% of original amount)
+    المخزون (Inventory Asset)         Cr (20% of original amount)
+```
+
+### 8.13 Computation Order (Both Sales & Purchases)
+
+The system MUST follow a **fixed computation order** for consistency in invoices, accounting, and returns:
+
+```text
+SubTotal (sum of line items)
+↓
+Discount (applied to SubTotal)
+↓
+Tax (calculated on SubTotal AFTER discount)
+↓
+OtherCharges (additional fees, delivery, etc.)
+↓
+NetTotal = (SubTotal - Discount) + Tax + OtherCharges
+```
+
+**For purchase inventory costing specifically**:
+```text
+InventoryCost = SubTotal - Discount + OtherCharges
+(Tax is excluded from inventory cost when recoverable)
+```
+
+---
+
+## 9. Draft vs Post vs Cancel vs Return — Detailed Workflow
+
+> **Source**: `docs/all new Anylysis for update system features/Invoices Details.md`
+
+### 9.1 The Two-Button Strategy
+
+Modern POS systems support TWO distinct save modes:
+
+| Button | Effect | When to Use |
+|--------|--------|-------------|
+| **حفظ كمسودة** (Save Draft) | Creates records with Status=Draft. NO stock/batch/journal impact. | User is still negotiating, expects changes. |
+| **حفظ وترحيل** (Save & Post) | ALL operations in one transaction: Save + Stock + Batch + Journal + Payment. Status=Posted. | Most common — customer confirmed, payment ready. |
+
+### 9.2 What Happens in Each Mode
+
+| Operation | Save Draft | Save & Post |
+|-----------|------------|-------------|
+| PurchaseInvoice + Lines created | ✅ | ✅ |
+| Status | Draft (1) | Posted (2) |
+| InventoryTransaction created | ❌ | ✅ |
+| InventoryBatch created | ❌ | ✅ |
+| WarehouseStock updated | ❌ | ✅ |
+| Journal Entry created | ❌ | ✅ |
+| SupplierPayment auto-created | ❌ | ✅ (if PaidAmount > 0) |
+| CashBox Transaction | ❌ | ✅ (if Cash payment) |
+| Can be edited? | ✅ | ❌ (cancel + re-create) |
+| Can be cancelled? | ✅ (no reversal needed) | ✅ (full reversal) |
+
+### 9.3 Cancel vs Return — Critical Distinction
+
+| Aspect | Cancel (إلغاء) | Return (مرتجع) |
+|--------|---------------|----------------|
+| **When** | Invoice created by mistake (e.g., 1 min ago) | Goods actually returned to supplier |
+| **What happens** | Full reversal of ALL effects | Proportional reversal of returned items only |
+| **Stock impact** | Full reversal of batch + stock | Partial deduction from original batch |
+| **Journal entry** | Reverses original Dr↔Cr entirely | Creates proportional reversal entry |
+| **Linked to invoice** | Direct Status change: Posted→Cancelled | New PurchaseReturn document referencing invoice |
+| **Allowed after partial return?** | ❌ Not allowed | ✅ |
+| **Allowed after payment?** | ❌ Not allowed | ✅ |
+
+### 9.4 Cancel Business Rules
+
+```
+✅ ALLOWED if:
+   - No returns exist against this invoice
+   - No payments collected (PaidAmount == 0 for posted)
+   - No subsequent operations linked
+
+❌ BLOCKED if:
+   - Partial return already processed
+   - Payment already made against invoice
+   - Invoice is already Cancelled (terminal state)
+```
+
+### 9.5 Post Business Rules
+
+```text
+✅ ALLOWED if:
+   - Status == Draft
+   - At least one line item with Quantity > 0
+   - All line items have valid ProductUnitId
+   - Supplier exists and is active
+   - Warehouse exists and is active
+
+❌ BLOCKED if:
+   - Status != Draft (already Posted or Cancelled)
+   - No line items
+   - Any line has Quantity <= 0
+   - Any line has UnitCost < 0
+```
+
+---
+
+## 10. Arabic Business Rules & User Error Prevention
+
+> **Source**: `docs/all new Anylysis for update system features/Sales and Purchases new details.md` (lines 3636–3659, 4217–4241) and `docs/all new Anylysis for update system features/Business Rules.md`
+
+### 10.1 Core Inventory Rules (المشتريات — قواعد المخزون)
+
+```text
+✅ لا يتم إنشاء Batch قبل الترحيل.      (Batch created ONLY on Post)
+✅ لا يتم تحديث WarehouseStocks قبل الترحيل.
+✅ لا يسمح بكمية صفر.
+✅ لا يسمح بسعر سالب.
+✅ لا يسمح بفاتورة بلا أصناف.
+✅ لا يسمح بمرتجع أكبر من الكمية المشتراة.
+✅ المرتجع دائماً مرتبط بفاتورة شراء أصلية.  (Linked to original invoice)
+✅ الخصم يخفض تكلفة المخزون.                   (Discount reduces inventory cost)
+✅ رسوم الشراء تزيد تكلفة المخزون.             (Fees increase inventory cost)
+✅ الضريبة لا تدخل في تكلفة المخزون إذا كانت قابلة للاسترداد.
+```
+
+### 10.2 UI Interaction Rules (قواعد واجهة المستخدم)
+
+```text
+✅ تحديث السعر فور تغيير الوحدة.              (Price updates on unit change)
+✅ تحديث الكمية فور تغيير الوحدة.              (Qty display updates on unit change)
+✅ عرض الكمية المتاحة بالوحدة المختارة.         (Show stock in selected unit)
+✅ عدم السماح بترحيل فاتورة بلا أصناف.
+✅ عدم السماح بكمية صفر.
+✅ عدم السماح بسعر صفر (إذا كانت السياسة تمنع ذلك).
+✅ عدم السماح بمرتجع أكبر من المشتريات الأصلية.
+✅ عدم إنشاء Batch قبل الترحيل.                (Repeated for emphasis)
+✅ عدم تعديل Batch بعد الترحيل.                (Batch immutable after post)
+✅ عدم تعديل فاتورة شراء مرحلة.                (No editing posted invoices)
+✅ الإلغاء أو المرتجع فقط.                     (Cancel or return — no edit)
+```
+
+### 10.3 Document Lifecycle Rules (Business Rules.md)
+
+| Entity | Create | Edit | Post | Cancel | Soft Delete | Hard Delete |
+|--------|--------|------|------|--------|-------------|-------------|
+| Purchase Invoice | ✅ Draft only | ✅ Draft only | Draft→Posted | Draft/Posted | — | ❌ |
+| Purchase Return | ✅ Draft only | ✅ Draft only | Draft→Posted | Draft/Posted | — | ❌ |
+| Purchase Order | ✅ Draft only | ✅ Draft only | N/A (status only) | Draft/Approved | — | ❌ |
+
+### 10.4 Transaction Rollback Guarantee
+
+```text
+Either ALL operations succeed, OR nothing is saved.
+The entire Post flow is wrapped in a single Database Transaction:
+  1. Save Invoice + Lines
+  2. Create InventoryTransaction
+  3. Create InventoryBatch
+  4. Update WarehouseStocks
+  5. Create JournalEntry
+  6. Create SupplierPayment (if applicable)
+  7. Update Status = Posted
+→ Commit only if ALL 7 steps succeed
+→ Rollback if ANY step fails
+```
+
+---
+
+## 11. Cross-Reference: Phase 24 (Accounting) & Phase 25 (Inventory)
+
+The Purchases module is tightly coupled with Phase 24 (Accounting Engine Automation) and Phase 25 (Products/Inventory). This section documents the integration points.
+
+### 11.1 Integration with Phase 24 — Accounting Engine
+
+| Purchase Operation | Journal Entry Required | Phase 24 Method |
+|-------------------|----------------------|-----------------|
+| Purchase Post (Cash) | Dr Inventory / Cr Cash | `AccountingIntegrationService.CreatePurchasePostEntryAsync()` |
+| Purchase Post (Credit) | Dr Inventory / Cr AP | `AccountingIntegrationService.CreatePurchasePostEntryAsync()` |
+| Purchase Post (Mixed) | Dr Inventory / Cr Cash + Cr AP | `AccountingIntegrationService.CreatePurchasePostEntryAsync()` |
+| Purchase Cancel | Reverse entry (Dr↔Cr swapped) | `AccountingIntegrationService.ReversePurchasePostEntryAsync()` |
+| Purchase Return (Full) | Dr AP / Cr Inventory | `AccountingIntegrationService.CreatePurchaseReturnEntryAsync()` |
+| Purchase Return (Partial) | Dr AP / Cr Inventory (proportional) | `AccountingIntegrationService.CreatePurchaseReturnEntryAsync()` |
+| Supplier Payment | Dr AP / Cr Cash | `AccountingIntegrationService.CreateSupplierPaymentEntryAsync()` |
+
+**Key Rule (from Section 8)**: Purchase discounts directly reduce inventory cost — NO separate discount account. This is implemented in Phase 24 by the `AccountingIntegrationService.CreatePurchasePostEntryAsync()` method which uses `netInventoryCost = SubTotal - DiscountAmount + OtherCharges` for the Dr Inventory line.
+
+### 11.2 Integration with Phase 25 — Inventory/Batches
+
+| Purchase Operation | Inventory Impact | Phase 25 Entity |
+|-------------------|-----------------|-----------------|
+| Purchase Post | Creates InventoryBatch + updates WarehouseStock | `InventoryBatch`, `WarehouseStock` |
+| Purchase Cancel | Reverses batch + stock | Same entities, quantity reversal |
+| Purchase Return | Deducts from original batch | `InventoryBatch.QtyRemaining` reduction |
+| Expiry Tracking | Stores ExpiryDate on batch | `InventoryBatch.ExpiryDate` (FEFO) |
+
+**Critical Sequence** (enforced by transaction):
+```text
+PurchaseInvoice.Post()
+  1. Save invoice + lines (Status = Posted)
+  2. Create InventoryTransaction (ReferenceType = "PurchaseInvoice", ReferenceId = invoice.Id)
+  3. For each line:
+     a. Create InventoryBatch (BatchNo auto-gen, QtyReceived = QtyInBaseUnit)
+     b. Update WarehouseStock (+QtyInBaseUnit)
+  4. Call UpdateProductPricingService.WeightedAverage() for cost cascade
+  5. Create Journal Entry (via AccountingIntegrationService)
+  6. Create SupplierPayment + CashBox transaction (if PaidAmount > 0)
+→ All in one DB transaction
+```
+
+### 11.3 Unit Conversion During Purchase
+
+When the user buys in a non-base unit (e.g., 5 cartons where 1 carton = 24 pieces):
+
+```text
+UI shows:  Quantity = 5, Unit = Carton, UnitCost = 3,000
+System converts to base unit:
+  BaseQty    = 5 × 24 = 120 pieces
+  BaseCost   = 3,000 / 24 = 125 per piece
+
+Batch stores: QuantityReceived = 120 (base unit)
+WarehouseStock increments: +120 (base unit)
+Journal Entry: Dr Inventory = 5 × 3,000 = 15,000
+FIFO works on: 120 pieces @ 125 each
+```
+
+### 11.4 Purchase Returns from Batch (FIFO)
+
+When returning goods, the system MUST deduct from the **original** `InventoryBatch` that was created during purchase posting:
+
+| Return Type | Batch Behavior |
+|-------------|---------------|
+| Full Return | `InventoryBatch.QtyRemaining -= fullQty`; if `QtyRemaining = 0`, batch is effectively consumed |
+| Partial Return | `InventoryBatch.QtyRemaining -= returnQty`; batch remains active for remaining quantity |
+| Standalone Return | No original batch — use current `AvgCost` from `ProductUnit.AverageCost` |
+
+---
+
+## 12. Implementation Tasks
 
 All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Arabic ToolTips (RULE-185-190), and UI Compact styles (RULE-262-274).
 
@@ -1074,9 +1537,159 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 **Estimate**: ~2 hours
 
+---
 
+### Task 11.11 — Two-Button Strategy: Save Draft / Save & Post ✅
 
-### Task 15 — Comprehensive Unit Tests (Purchases Module)
+> **Source**: `docs/all new Anylysis for update system features/Invoices Details.md` — Two-button strategy analysis
+
+**Objective**: Implement the two distinct save modes for ALL purchase document editors (Invoice, Return, Order).
+
+**Analogy**: The same pattern should be applied to Sales Invoice editor for consistency (per Invoices Details.md recommendation).
+
+**Desktop UI Changes** (`PurchaseInvoiceEditorView.xaml`):
+
+Replace the single Save button with TWO buttons in the footer:
+
+```xml
+<!-- Footer: Two-button strategy -->
+<StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+    <Button Content="💾 حفظ كمسودة"
+            Command="{Binding SaveDraftCommand}"
+            Style="{StaticResource SecondaryButton}"
+            ToolTip="حفظ الفاتورة كمسودة — لا يتم تحديث المخزون أو إنشاء قيود محاسبية"
+            MinWidth="140"/>
+    <Button Content="🚀 حفظ وترحيل"
+            Command="{Binding SaveAndPostCommand}"
+            Style="{StaticResource PrimaryButton}"
+            ToolTip="حفظ الفاتورة وترحيلها فوراً — سيتم تحديث المخزون والتكلفة ورصيد المورد"
+            MinWidth="140"/>
+</StackPanel>
+```
+
+**ViewModel Commands** (`PurchaseInvoiceEditorViewModel.cs`):
+
+| Command | Behavior |
+|---------|----------|
+| `SaveDraftCommand` | Calls `PurchaseService.CreateAsync()` with no post. Status remains Draft. Form stays open for editing. |
+| `SaveAndPostCommand` | Calls `PurchaseService.CreateAndPostAsync()` — single transaction: Create + Post. Status becomes Posted. Form closes. |
+
+**Service Method** (`PurchaseService.cs`):
+
+```csharp
+/// <summary>
+/// Creates and immediately posts a purchase invoice in one atomic transaction.
+/// Implements the "Save & Post" two-button strategy from Invoices Details.md.
+/// </summary>
+public async Task<Result<PurchaseInvoiceDto>> CreateAndPostAsync(
+    CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct)
+{
+    // Step 1: Validate stock (if needed — purchases always increase stock)
+    // Step 2: Begin transaction
+    await using var transaction = await _uow.BeginTransactionAsync(ct);
+    try
+    {
+        // Step 3: Create invoice as Draft
+        var createResult = await CreateAsync(request, userId, ct);
+        if (!createResult.IsSuccess)
+            return createResult;
+
+        // Step 4: Post immediately
+        var postResult = await PostAsync(createResult.Value.Id, userId, ct);
+        if (!postResult.IsSuccess)
+            return postResult;
+
+        await transaction.CommitAsync(ct);
+        return postResult;
+    }
+    catch (Exception ex)
+    {
+        await transaction.RollbackAsync(ct);
+        Log.Error(ex, "CreateAndPostAsync failed for purchase invoice");
+        return Result<PurchaseInvoiceDto>.Failure("فشل في حفظ وترحيل فاتورة الشراء");
+    }
+}
+```
+
+**Validation on Save & Post**: Runs ALL validations PLUS post-specific checks (stock sufficiency, batch readiness).
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `Desktop/Views/Purchases/PurchaseInvoiceEditorView.xaml` | Replace single Save button with two-button footer |
+| `Desktop/ViewModels/Purchases/PurchaseInvoiceEditorViewModel.cs` | Add `SaveDraftCommand` + `SaveAndPostCommand` + `_mode` field |
+| `Application/Services/PurchaseService.cs` | Add `CreateAndPostAsync()` method |
+| `Application/Interfaces/Services/IPurchaseService.cs` | Add `CreateAndPostAsync()` to interface |
+| `Desktop/Views/Purchases/PurchaseOrderEditorView.xaml` | Same two-button pattern for POs |
+| `Desktop/ViewModels/Purchases/PurchaseOrderEditorViewModel.cs` | Same two-command pattern for POs |
+| `Desktop/Views/Returns/PurchaseReturnEditorView.xaml` | Same two-button pattern for returns |
+
+**ToolTips** (RULE-185-190):
+- Save Draft: `"💾 حفظ الفاتورة كمسودة — لا يتم تحديث المخزون أو إنشاء قيود محاسبية"`
+- Save & Post: `"🚀 حفظ وترحيل الفاتورة فوراً — سيتم تحديث المخزون والتكلفة ورصيد المورد"`
+
+**Estimate**: ~3 hours
+
+---
+
+### Task 11.12 — Supplier Auto-Account Creation (Accounts.md)
+
+> **Source**: `docs/all new Anylysis for update system features/Accounts.md` — "رابعاً: حساب المورد"
+
+**Objective**: When a supplier is created WITHOUT an `AccountId`, the service auto-creates a Level-4 detail account under the parent `"1320 — الموردون"` (Accounts Payable) in the Chart of Accounts — matching the same pattern as CashBox and Customer auto-account creation.
+
+**Pattern** (mirrors `CashBoxService` auto-creation under `"1110 — النقدية"`):
+
+```csharp
+// SupplierService auto-account creation (when Supplier.AccountId is null):
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1320", ct); // الموردون
+if (parentAccount == null)
+    return Result<SupplierDto>.Failure("حساب الموردون (1320) غير موجود — يرجى التأكد من seeding شجرة الحسابات");
+
+var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+var nextNumber = (int.Parse(maxCode ?? "13200001") + 1);
+var newCode = nextNumber.ToString().PadLeft(8, '0').Substring(0, 8); // 8-digit detail account
+
+var account = Account.Create(
+    accountCode: newCode,
+    nameAr: supplier.Name,
+    nameEn: supplier.Name,
+    nature: AccountNature.Credit,      // Liabilities have Credit nature
+    isLeaf: true,
+    parentId: parentAccount.Id,
+    isSystem: false,
+    categoryId: parentAccount.CategoryId,
+    level: 4,                          // Detail account
+    description: $"حساب المورد: {supplier.Name}",
+    colorCode: "#F44336",              // Red for Liabilities
+    notes: null,
+    createdByUserId: userId
+);
+
+await _uow.Accounts.AddAsync(account, ct);
+supplier.SetAccountId(account.Id);
+```
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `Application/Services/SupplierService.cs` | Add `AutoCreateSupplierAccountAsync()` method |
+| `Application/Interfaces/Services/ISupplierService.cs` | Add `AutoCreateSupplierAccountAsync()` to interface |
+| `Api/Controllers/SuppliersController.cs` | Add `POST /api/v1/suppliers/{id}/auto-create-account` endpoint |
+| `Application/Services/SupplierService.cs` | Update `CreateAsync()` to auto-create account when `request.AccountId` is null |
+| `Application/Services/SupplierService.cs` | Wrap account creation + supplier creation in `ExecuteTransactionAsync()` |
+
+**Verification**: After auto-creation, the Chart of Accounts shows:
+```text
+الموردون (1320)
+   └── [Supplier Name] (1320XXXX)
+```
+
+**Estimate**: ~2 hours
+
+---
 
 **Test projects**:
 - `SalesSystem.Domain.Tests/Entities/Purchases/`
@@ -1467,7 +2080,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 ---
 
-## 9. Compliance Matrix (55+ Rules)
+## 13. Compliance Matrix (55+ Rules)
 
 | Rule | Directive | Where Applied | Verdict |
 |------|-----------|---------------|---------|
@@ -1542,7 +2155,7 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 ---
 
-## 10. Risks & Mitigations
+## 14. Risks & Mitigations
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|------|------------|--------|------------|
@@ -1557,15 +2170,17 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | 9 | **SupplierPayment auto-creation duplicates CashBox transaction** | Medium | Medium | Ensure `SupplierPayment` record is separate from `CashTransaction`. The CashBox transaction records cash movement; SupplierPayment records accounts payable settlement |
 | 10 | **Line-level percentage discount with fee allocation** — complex math | Medium | Medium | Compute: LineTotal = (Qty × UnitCost) - lineDiscount. Then allocate fees on computed LineTotal. Document calculation order clearly |
 | 11 | **Purchase Return without original invoice** — no FIFO batch to return to | Medium | Medium | Use `LinkToInvoice = false` (standalone mode). Items selected manually. Stock return uses current AvgCost (not batch-specific). Log warning: "Standalone return — no original batch found, using AvgCost" |
-| 12 | **Migration rollback complexity** — 6+ new tables/columns | Low | High | Script all rollback commands in Section 11. Test rollback before deployment |
+| 12 | **Migration rollback complexity** — 6+ new tables/columns | Low | High | Script all rollback commands in Section 15. Test rollback before deployment |
+| 13 | **Discount on purchase directly reducing inventory cost** — no separate discount account may confuse accountants | Medium | Medium | Document clearly in user manual. DiscountAmount on invoice provides audit trail. V2 can add "خصم مسموح به" account if needed |
+| 14 | **Two-button strategy confusion** — users may not understand difference between "Save Draft" and "Save & Post" | Medium | Medium | Clear Arabic ToolTips on both buttons. "Save & Post" is PRIMARY (large, green). "Save Draft" is SECONDARY (smaller). Default focus on "Save & Post" |
 
 ---
 
-## 11. Rollback Plan
+## 15. Rollback Plan
 
 All SQL commands are ORDERED by dependency (child tables first).
 
-### 11.1 Rollback All Phase 27 Changes
+### 15.1 Rollback All Phase 27 Changes
 
 ```sql
 -- ═══════════════════════════════════════════
@@ -1620,7 +2235,7 @@ COMMIT TRANSACTION;
 GO
 ```
 
-### 11.2 Post-Rollback Verification
+### 15.2 Post-Rollback Verification
 
 Verify with these queries:
 
@@ -1642,7 +2257,7 @@ WHERE parent_object_id = OBJECT_ID('PurchaseInvoices');
 -- Expected: original count (before Phase 27 additions)
 ```
 
-### 11.3 Code Rollback
+### 15.3 Code Rollback
 
 1. Revert all entity changes in `SalesSystem.Domain/Entities/`
 2. Revert all configuration changes in `Infrastructure/Data/Configurations/`
@@ -1655,7 +2270,7 @@ WHERE parent_object_id = OBJECT_ID('PurchaseInvoices');
 9. Update all DTOs and Requests to remove new fields
 10. Revert migration to previous version: `dotnet ef migrations remove`
 
-### 11.4 Data Preservation (Before Migration)
+### 15.4 Data Preservation (Before Migration)
 
 Always take a backup before applying Phase 27 migration:
 

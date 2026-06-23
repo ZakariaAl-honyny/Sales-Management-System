@@ -1272,17 +1272,16 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(barcode)) return false;
 
-        // Search in the loaded products
-        var product = Products.FirstOrDefault(p => p.Barcode == barcode);
+        // Search by name in loaded products
+        var product = Products.FirstOrDefault(p => p.Name.Contains(barcode, StringComparison.OrdinalIgnoreCase));
         
         if (product == null)
         {
-            // Try fetching from API
+            // Try fetching from API via barcode (stub — barcode lookup returns not found until UnitBarcode is implemented)
             var result = await _productService.GetByBarcodeAsync(barcode);
             if (result.IsSuccess && result.Value != null)
             {
                 product = result.Value;
-                // Optionally add to local list if it's missing but we probably want to keep local list consistent with categories etc.
             }
             else
             {

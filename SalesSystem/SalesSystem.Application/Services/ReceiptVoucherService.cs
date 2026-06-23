@@ -195,44 +195,47 @@ public class ReceiptVoucherService : IReceiptVoucherService
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
-            voucher.Post(userId);
+            return await _uow.ExecuteTransactionAsync<Result<ReceiptVoucherDto>>(async () =>
+            {
+                voucher.Post(userId);
 
-            // Create journal entry: Dr Cash (default cash account) / Cr Account (credited account)
-            var cashResult = await _systemAccountService.GetMappingAsync(SystemAccountKey.DefaultCash, null, ct);
-            if (!cashResult.IsSuccess || cashResult.Value == null)
-                return Result<ReceiptVoucherDto>.Failure("الحساب النقدي النظامي غير مهيأ");
+                // Create journal entry: Dr Cash (default cash account) / Cr Account (credited account)
+                var cashResult = await _systemAccountService.GetMappingAsync(SystemAccountKey.DefaultCash, null, ct);
+                if (!cashResult.IsSuccess || cashResult.Value == null)
+                    return Result<ReceiptVoucherDto>.Failure("الحساب النقدي النظامي غير مهيأ");
 
-            var defaultCashAccountId = cashResult.Value.AccountId;
+                var defaultCashAccountId = cashResult.Value.AccountId;
 
-            var journalRequest = new CreateJournalEntryRequest(
-                EntryDate: voucher.VoucherDate,
-                Description: $"قيد سند قبض رقم {voucher.VoucherNo}",
-                EntryType: JournalEntryType.CustomerReceipt,
-                ReferenceType: "ReceiptVoucher",
-                ReferenceId: voucher.Id,
-                ReferenceNumber: voucher.VoucherNo.ToString(),
-                Lines: new List<JournalEntryLineRequest>
-                {
-                    new(defaultCashAccountId, voucher.TotalAmount, 0, "سند قبض - الجانب المدين (النقدية)"),
-                    new(voucher.AccountId, 0, voucher.TotalAmount, $"سند قبض - الجانب الدائن ({voucher.Account?.NameAr ?? "الحساب"})")
-                }
-            );
+                var journalRequest = new CreateJournalEntryRequest(
+                    EntryDate: voucher.VoucherDate,
+                    Description: $"قيد سند قبض رقم {voucher.VoucherNo}",
+                    EntryType: JournalEntryType.CustomerReceipt,
+                    ReferenceType: "ReceiptVoucher",
+                    ReferenceId: voucher.Id,
+                    ReferenceNumber: voucher.VoucherNo.ToString(),
+                    Lines: new List<JournalEntryLineRequest>
+                    {
+                        new(defaultCashAccountId, voucher.TotalAmount, 0, "سند قبض - الجانب المدين (النقدية)"),
+                        new(voucher.AccountId, 0, voucher.TotalAmount, $"سند قبض - الجانب الدائن ({voucher.Account?.NameAr ?? "الحساب"})")
+                    }
+                );
 
-            var entryResult = await _journalEntryService.CreateJournalEntryAsync(journalRequest, userId, ct);
-            if (!entryResult.IsSuccess)
-                return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
+                var entryResult = await _journalEntryService.CreateJournalEntryAsync(journalRequest, userId, ct);
+                if (!entryResult.IsSuccess)
+                    return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
 
-            var postResult = await _journalEntryService.PostJournalEntryAsync(entryResult.Value, userId, ct);
-            if (!postResult.IsSuccess)
-                return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
+                var postResult = await _journalEntryService.PostJournalEntryAsync(entryResult.Value, userId, ct);
+                if (!postResult.IsSuccess)
+                    return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
 
-            await _uow.SaveChangesAsync(ct);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("ReceiptVoucher {Id} posted by User {UserId}", id, userId);
+                _logger.LogInformation("ReceiptVoucher {Id} posted by User {UserId}", id, userId);
 
-            var posted = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
-            return Result<ReceiptVoucherDto>.Success(MapToDto(posted!));
+                var posted = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                return Result<ReceiptVoucherDto>.Success(MapToDto(posted!));
+            }, ct);
         }
         catch (DomainException ex)
         {
@@ -257,47 +260,50 @@ public class ReceiptVoucherService : IReceiptVoucherService
 
             var wasPosted = voucher.Status == VoucherStatus.Posted;
 
-            voucher.Cancel(userId);
-
-            // If posted, reverse the journal entry
-            if (wasPosted)
+            return await _uow.ExecuteTransactionAsync<Result<ReceiptVoucherDto>>(async () =>
             {
-                var cashResult = await _systemAccountService.GetMappingAsync(SystemAccountKey.DefaultCash, null, ct);
-                if (!cashResult.IsSuccess || cashResult.Value == null)
-                    return Result<ReceiptVoucherDto>.Failure("الحساب النقدي النظامي غير مهيأ");
+                voucher.Cancel(userId);
 
-                var defaultCashAccountId = cashResult.Value.AccountId;
+                // If posted, reverse the journal entry
+                if (wasPosted)
+                {
+                    var cashResult = await _systemAccountService.GetMappingAsync(SystemAccountKey.DefaultCash, null, ct);
+                    if (!cashResult.IsSuccess || cashResult.Value == null)
+                        return Result<ReceiptVoucherDto>.Failure("الحساب النقدي النظامي غير مهيأ");
 
-                var reverseRequest = new CreateJournalEntryRequest(
-                    EntryDate: DateTime.UtcNow,
-                    Description: $"قيد عكس سند قبض رقم {voucher.VoucherNo}",
-                    EntryType: JournalEntryType.Manual,
-                    ReferenceType: "ReceiptVoucher",
-                    ReferenceId: voucher.Id,
-                    ReferenceNumber: $"{voucher.VoucherNo}-REV",
-                    Lines: new List<JournalEntryLineRequest>
-                    {
-                        new(voucher.AccountId, voucher.TotalAmount, 0, $"عكس سند قبض - الجانب المدين ({voucher.Account?.NameAr ?? "الحساب"})"),
-                        new(defaultCashAccountId, 0, voucher.TotalAmount, "عكس سند قبض - الجانب الدائن (النقدية)")
-                    }
-                );
+                    var defaultCashAccountId = cashResult.Value.AccountId;
 
-                var entryResult = await _journalEntryService.CreateJournalEntryAsync(reverseRequest, userId, ct);
-                if (!entryResult.IsSuccess)
-                    return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
+                    var reverseRequest = new CreateJournalEntryRequest(
+                        EntryDate: DateTime.UtcNow,
+                        Description: $"قيد عكس سند قبض رقم {voucher.VoucherNo}",
+                        EntryType: JournalEntryType.Manual,
+                        ReferenceType: "ReceiptVoucher",
+                        ReferenceId: voucher.Id,
+                        ReferenceNumber: $"{voucher.VoucherNo}-REV",
+                        Lines: new List<JournalEntryLineRequest>
+                        {
+                            new(voucher.AccountId, voucher.TotalAmount, 0, $"عكس سند قبض - الجانب المدين ({voucher.Account?.NameAr ?? "الحساب"})"),
+                            new(defaultCashAccountId, 0, voucher.TotalAmount, "عكس سند قبض - الجانب الدائن (النقدية)")
+                        }
+                    );
 
-                var postResult = await _journalEntryService.PostJournalEntryAsync(entryResult.Value, userId, ct);
-                if (!postResult.IsSuccess)
-                    return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
-            }
+                    var entryResult = await _journalEntryService.CreateJournalEntryAsync(reverseRequest, userId, ct);
+                    if (!entryResult.IsSuccess)
+                        return Result<ReceiptVoucherDto>.Failure(entryResult.Error!);
 
-            await _uow.SaveChangesAsync(ct);
+                    var postResult = await _journalEntryService.PostJournalEntryAsync(entryResult.Value, userId, ct);
+                    if (!postResult.IsSuccess)
+                        return Result<ReceiptVoucherDto>.Failure(postResult.Error!);
+                }
 
-            _logger.LogInformation("ReceiptVoucher {Id} cancelled by User {UserId}", id, userId);
+                await _uow.SaveChangesAsync(ct);
 
-            var cancelled = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
-            return Result<ReceiptVoucherDto>.Success(MapToDto(cancelled!));
+                _logger.LogInformation("ReceiptVoucher {Id} cancelled by User {UserId}", id, userId);
+
+                var cancelled = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
+                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                return Result<ReceiptVoucherDto>.Success(MapToDto(cancelled!));
+            }, ct);
         }
         catch (DomainException ex)
         {

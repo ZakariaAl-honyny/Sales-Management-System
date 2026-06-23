@@ -12,6 +12,30 @@
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource BackgroundBrush}">
 
+    <Window.Resources>
+        <Style x:Key="ValidationTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}">
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                    <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=(Validation.Errors)[0].ErrorContent}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ValidationComboBoxStyle" TargetType="ComboBox">
+            <Style.Triggers>
+                <Trigger Property="Validation.HasError" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Window.InputBindings>
+        <KeyBinding Key="F3" Command="{Binding SearchProductCommand}"/>
+    </Window.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/> <!-- Header -->
@@ -22,14 +46,16 @@
         <!-- Header -->
         <Border Grid.Row="0" Background="{StaticResource PrimaryBrush}" Padding="12,6">
             <Grid>
-                <StackPanel Orientation="Horizontal">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Grid.Column="0">
                     <Path Data="{StaticResource IconInvoice}" Fill="White" Width="20" Height="20" Margin="0,0,12,0" Stretch="Uniform"/>
-                    <TextBlock Text="↩️ " FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="📥  تحرير مرتجع شراء" FontSize="16" FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
                 </StackPanel>
-
-                <Border HorizontalAlignment="Right" VerticalAlignment="Center" 
-                        Background="{Binding Status, Converter={StaticResource InvoiceStatusToBrushConverter}}" 
+                <Border Grid.Column="1"
+                        Background="{Binding Status, Converter={StaticResource InvoiceStatusToBrushConverter}}"
                         CornerRadius="4" Padding="8,4"
                         Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}">
                     <TextBlock Text="{Binding StatusText}" Foreground="White" FontWeight="Bold"/>
@@ -78,9 +104,9 @@
                                 <DataGridTemplateColumn Header="كمية المرتجع" Width="110">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
-                                            <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}" 
-                                                     Style="{StaticResource ModernTextBox}" 
-                                                     Padding="8,4" 
+                                            <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}"
+                                                     Style="{StaticResource ValidationTextBoxStyle}"
+                                                     Padding="8,4"
                                                      FontWeight="Bold"
                                                      HorizontalContentAlignment="Center"
                                                      ToolTip="أدخل كمية المرتجع — يجب أن لا تتجاوز الكمية المسموحة"/>
@@ -145,10 +171,10 @@
                                         </Style>
                                     </TextBlock.Style>
                                 </TextBlock>
-                                <ToggleButton Grid.Column="1" 
+                                <ToggleButton Grid.Column="1"
                                               IsChecked="{Binding IsStandaloneMode}"
                                               Command="{Binding ToggleStandaloneModeCommand}"
-                                              Content="تبديل" 
+                                              Content="تبديل"
                                               Style="{StaticResource SecondaryButton}"
                                               FontSize="12" Padding="8,4"/>
                             </Grid>
@@ -168,16 +194,16 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" 
+                                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource ModernTextBox}"
                                              ToolTip="ابحث عن صنف بالاسم أو الباركود">
                                         <TextBox.InputBindings>
                                             <KeyBinding Key="Enter" Command="{Binding ProcessBarcodeCommand}"/>
                                         </TextBox.InputBindings>
                                     </TextBox>
-                                    <Button Grid.Column="1" Content="🔍" 
+                                    <Button Grid.Column="1" Content="🔍"
                                             Command="{Binding SearchInvoiceCommand}"
-                                            Style="{StaticResource SecondaryButton}" 
+                                            Style="{StaticResource SecondaryButton}"
                                             Width="36" Margin="4,0,0,0" ToolTip="البحث عن فاتورة"/>
                                 </Grid>
 
@@ -222,15 +248,15 @@
                                           DisplayMemberPath="Name"
                                           Style="{StaticResource ModernComboBox}"
                                           ToolTip="اختر عملة فاتورة المرتجع"/>
-                                <TextBlock Grid.Column="1" Text="{Binding CurrencyName}" 
+                                <TextBlock Grid.Column="1" Text="{Binding CurrencyName}"
                                            VerticalAlignment="Center" Margin="8,0,0,0"
                                            Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                             </Grid>
 
                             <!-- Exchange Rate -->
                             <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding ExchangeRate, StringFormat=N4, UpdateSourceTrigger=PropertyChanged}" 
-                                     Style="{StaticResource ModernTextBox}" 
+                            <TextBox Text="{Binding ExchangeRate, StringFormat=N4, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
                                      Margin="0,0,0,8"
                                      ToolTip="سعر صرف العملة مقابل العملة الأساسية"
                                      IsReadOnly="{Binding IsBaseCurrency}"/>
@@ -247,8 +273,8 @@
                             <!-- Discount Rate (visible when percentage) -->
                             <StackPanel Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="نسبة الخصم" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding DiscountRate, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" 
-                                         Style="{StaticResource ModernTextBox}" 
+                                <TextBox Text="{Binding DiscountRate, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource ModernTextBox}"
                                          Margin="0,0,0,8"
                                          ToolTip="نسبة الخصم (مثلاً 10 = 10%)"/>
                             </StackPanel>
@@ -346,9 +372,9 @@
                     <Border Style="{StaticResource CardStyle}">
                         <StackPanel>
                             <TextBlock Text="📝 ملاحظات" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,0,12"/>
-                            <TextBox Text="{Binding Notes}" 
-                                     Style="{StaticResource ModernTextBox}" 
-                                     Height="80" 
+                            <TextBox Text="{Binding Notes}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     Height="80"
                                      AcceptsReturn="True"
                                      VerticalContentAlignment="Top" Padding="8,4"
                                      ToolTip="ملاحظات إضافية حول عملية الإرجاع"/>
@@ -411,11 +437,11 @@
                             ToolTip="إغلاق النافذة دون حفظ"/>
                 </StackPanel>
 
-                <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 
-                           Foreground="{StaticResource ErrorBrush}" 
-                           FontWeight="SemiBold" 
-                           HorizontalAlignment="Center"
-                           TextWrapping="Wrap" 
+                <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}"
+                           Foreground="{StaticResource ErrorBrush}"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Left"
+                           TextWrapping="Wrap"
                            Margin="0,8,0,0"
                            Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibility}}"/>
             </Grid>
@@ -428,7 +454,7 @@
                 Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <ProgressBar IsIndeterminate="True" Width="200" Height="4" Background="#E3E8EE" Foreground="{StaticResource PrimaryBrush}"/>
-                <TextBlock Text="جاري المعالجة..." FontSize="14" Margin="0,12,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                <TextBlock Text="جاري معالجة المرتجع..." FontSize="14" Margin="0,12,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
             </StackPanel>
         </Border>
     </Grid>

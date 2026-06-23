@@ -591,7 +591,7 @@ public class FinancialReportService : IFinancialReportService
                    && si.InvoiceDate <= to,
                 q => q.OrderBy(si => si.InvoiceDate),
                 ct: ct,
-                includePaths: "Customer.Party");
+                includePaths: "Customer");
 
             foreach (var invoice in salesInvoices)
             {
@@ -602,7 +602,7 @@ public class FinancialReportService : IFinancialReportService
 
                 vatItems.Add(new VatReportDto(
                     invoice.Id.ToString(), invoice.InvoiceDate,
-                    invoice.Customer?.Party?.Name, taxableAmount, taxRate, invoice.TaxAmount));
+                    invoice.Customer?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
             var purchaseInvoices = await _uow.PurchaseInvoices.ToListAsync(
@@ -612,7 +612,7 @@ public class FinancialReportService : IFinancialReportService
                    && pi.InvoiceDate <= DateOnly.FromDateTime(to),
                 q => q.OrderBy(pi => pi.InvoiceDate),
                 ct: ct,
-                includePaths: "Supplier.Party");
+                includePaths: "Supplier");
 
             foreach (var invoice in purchaseInvoices)
             {
@@ -623,7 +623,7 @@ public class FinancialReportService : IFinancialReportService
 
                 vatItems.Add(new VatReportDto(
                     invoice.Id.ToString(), invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue),
-                    invoice.Supplier?.Party?.Name, taxableAmount, taxRate, invoice.TaxAmount));
+                    invoice.Supplier?.Name, taxableAmount, taxRate, invoice.TaxAmount));
             }
 
             vatItems = vatItems.OrderBy(v => v.InvoiceDate).ToList();

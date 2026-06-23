@@ -26,7 +26,7 @@ public class EmployeeService : IEmployeeService
     {
         try
         {
-            var employees = await _uow.Employees.ToListAsync(ct, "Party", "Department");
+            var employees = await _uow.Employees.ToListAsync(ct, "Department");
             var dtos = employees.Select(MapToDto).ToList();
             return Result<List<EmployeeDto>>.Success(dtos);
         }
@@ -41,7 +41,7 @@ public class EmployeeService : IEmployeeService
     {
         try
         {
-            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == id, ct, "Party", "Department");
+            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == id, ct, "Department");
             if (employee == null)
                 return Result<EmployeeDto>.Failure("الموظف غير موجود", ErrorCodes.NotFound);
 
@@ -58,11 +58,6 @@ public class EmployeeService : IEmployeeService
     {
         try
         {
-            // Validate Party exists
-            var partyExists = await _uow.Parties.AnyAsync(p => p.Id == request.PartyId, ct);
-            if (!partyExists)
-                return Result<EmployeeDto>.Failure("الطرف المحدد غير موجود", ErrorCodes.NotFound);
-
             // Validate Department exists (if provided)
             if (request.DepartmentId.HasValue)
             {
@@ -72,22 +67,26 @@ public class EmployeeService : IEmployeeService
             }
 
             var employee = Employee.Create(
-                request.PartyId,
-                request.EmployeeNo,
-                request.HireDate,
-                (short?)request.DepartmentId,
-                request.Salary,
-                request.Notes);
+                name: request.Name,
+                employeeNo: request.EmployeeNo,
+                hireDate: request.HireDate,
+                phone: request.Phone,
+                email: request.Email,
+                address: request.Address,
+                notes: request.Notes,
+                departmentId: (short?)request.DepartmentId,
+                salary: request.Salary,
+                createdByUserId: null);
 
             await _uow.Employees.AddAsync(employee, ct);
             await _uow.SaveChangesAsync(ct);
 
             // Reload with includes for the DTO
-            employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == employee.Id, ct, "Party", "Department");
+            employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == employee.Id, ct, "Department");
 
             _logger.LogInformation(
-                "Employee created: #{EmployeeNo} (ID: {Id}, PartyId: {PartyId})",
-                employee!.EmployeeNo, employee.Id, request.PartyId);
+                "Employee created: #{EmployeeNo} (ID: {Id})",
+                employee!.EmployeeNo, employee.Id);
 
             return Result<EmployeeDto>.Success(MapToDto(employee));
         }
@@ -107,7 +106,7 @@ public class EmployeeService : IEmployeeService
     {
         try
         {
-            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == id, ct, "Party", "Department");
+            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == id, ct, "Department");
             if (employee == null)
                 return Result<EmployeeDto>.Failure("الموظف غير موجود", ErrorCodes.NotFound);
 
@@ -119,7 +118,14 @@ public class EmployeeService : IEmployeeService
                     return Result<EmployeeDto>.Failure("القسم المحدد غير موجود", ErrorCodes.NotFound);
             }
 
-            employee.Update((short?)request.DepartmentId, request.Salary, request.Notes);
+            employee.Update(
+                name: request.Name,
+                phone: request.Phone,
+                email: request.Email,
+                address: request.Address,
+                departmentId: request.DepartmentId.HasValue ? (short?)request.DepartmentId.Value : null,
+                salary: request.Salary,
+                notes: request.Notes);
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation("Employee updated: #{EmployeeNo} (ID: {Id})", employee.EmployeeNo, id);
@@ -168,7 +174,7 @@ public class EmployeeService : IEmployeeService
     {
         try
         {
-            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == employeeId, ct, "Party");
+            var employee = await _uow.Employees.FirstOrDefaultAsync(e => e.Id == employeeId, ct);
             if (employee == null)
                 return Result<int>.Failure("الموظف غير موجود", ErrorCodes.NotFound);
 
@@ -198,8 +204,8 @@ public class EmployeeService : IEmployeeService
 
             var account = Account.Create(
                 accountCode: nextCode,
-                nameAr: $"عهدة {employee.Party?.Name ?? employeeId.ToString()}",
-                nameEn: $"Custody - {employee.Party?.Name ?? employeeId.ToString()}",
+                nameAr: $"عهدة {employee.Name}",
+                nameEn: $"Custody - {employee.Name}",
                 nature: (byte)AccountType.Asset,
                 isLeaf: true,
                 parentId: parentAccount.Id,
@@ -229,8 +235,10 @@ public class EmployeeService : IEmployeeService
     {
         return new EmployeeDto(
             employee.Id,
-            employee.PartyId,
-            employee.Party?.Name,
+            employee.Name,
+            employee.Phone,
+            employee.Email,
+            employee.Address,
             employee.EmployeeNo,
             employee.HireDate,
             employee.DepartmentId,

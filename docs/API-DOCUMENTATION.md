@@ -36,15 +36,14 @@ Content-Type: application/json
 9. [Backup](#backup)
 10. [Reports](#reports)
 11. [Health Check](#health-check)
-12. [Parties](#parties-v410)
-13. [ProductPrices](#productprices-v410)
-14. [InventoryBatches](#inventorybatches-v410)
-15. [InventoryTransactions](#inventorytransactions-v410)
-16. [WarehouseTransfers](#warehousetransfers-v410)
-17. [CustomerReceipts](#customerreceipts-v410)
-18. [ReceiptVouchers](#receiptvouchers-سندات-قبض)
-19. [PaymentVouchers](#paymentvouchers-سندات-صرف)
-20. [Expenses](#expenses)
+12. [ProductPrices](#productprices-v410)
+13. [InventoryBatches](#inventorybatches-v410)
+14. [InventoryTransactions](#inventorytransactions-v410)
+15. [WarehouseTransfers](#warehousetransfers-v410)
+16. [CustomerReceipts](#customerreceipts-v410)
+17. [ReceiptVouchers](#receiptvouchers-سندات-قبض)
+18. [PaymentVouchers](#paymentvouchers-سندات-صرف)
+19. [Expenses](#expenses)
 
 ---
 
@@ -96,7 +95,6 @@ Content-Type: application/json
 | Payments (customer) | GET, POST | AllStaff |
 | Payments (supplier) | GET, POST | ManagerAndAbove |
 | Inventory | GET /stock, /movements, /warehouse-stocks | ManagerAndAbove |
-| Parties | GET, POST, PUT, DELETE | AllStaff (GET), Manager+ (write) |
 | ProductPrices | GET, POST, PUT, DELETE | ManagerAndAbove |
 | InventoryBatches | GET | ManagerAndAbove |
 | InventoryTransactions | GET | ManagerAndAbove |
@@ -1219,161 +1217,6 @@ Check API health status.
   "Status": "OK",
   "Version": "1.0",
   "Timestamp": "2026-05-07T12:00:00.0000000Z"
-}
-```
-
----
-
-## Parties (v4.10)
-
-**Base URL:** `/api/v1/parties`  
-**Authorization:** All Staff (GET), Manager+ (POST/PUT/DELETE)
-
-### GET /api/v1/parties
-
-List all parties with pagination.
-
-**Query Parameters:**
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| search | string | No | Search by name or phone |
-| page | int | No | Page number (default: 1) |
-| pageSize | int | No | Items per page (default: 10) |
-
-**Response (200):**
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "name": "عميل نقدي",
-      "phone": "0123456789",
-      "email": "cash@example.com",
-      "address": "Cairo",
-      "taxNumber": "123-456-789",
-      "notes": "",
-      "isActive": true
-    }
-  ],
-  "totalCount": 1,
-  "page": 1,
-  "pageSize": 10,
-  "totalPages": 1
-}
-```
-
-### GET /api/v1/parties/{id}
-
-Get party by ID.
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "عميل نقدي",
-  "phone": "0123456789",
-  "email": "cash@example.com",
-  "address": "Cairo",
-  "taxNumber": "123-456-789",
-  "notes": "",
-  "isActive": true
-}
-```
-
-**Response (404):**
-```json
-{
-  "error": "الطرف غير موجود"
-}
-```
-
-### POST /api/v1/parties
-
-Create new party.
-
-**Request Body:**
-```json
-{
-  "name": "New Party",
-  "phone": "0123456789",
-  "email": "party@example.com",
-  "address": "Cairo",
-  "taxNumber": "123-456-789",
-  "notes": ""
-}
-```
-
-**Response (201):**
-```json
-{
-  "id": 2,
-  "name": "New Party",
-  "phone": "0123456789",
-  "email": "party@example.com",
-  "address": "Cairo",
-  "taxNumber": "123-456-789",
-  "notes": "",
-  "isActive": true
-}
-```
-
-**Validation Errors (400):**
-```json
-{
-  "errors": {
-    "Name": ["اسم الطرف مطلوب"]
-  }
-}
-```
-
-### PUT /api/v1/parties/{id}
-
-Update party.
-
-**Request Body:**
-```json
-{
-  "id": 1,
-  "name": "Updated Party",
-  "phone": "0987654321",
-  "email": "updated@example.com",
-  "address": "Giza",
-  "taxNumber": "987-654-321",
-  "notes": "Updated notes",
-  "isActive": true
-}
-```
-
-**Response (200):**
-```json
-{
-  "id": 1,
-  "name": "Updated Party",
-  "phone": "0987654321",
-  "email": "updated@example.com",
-  "address": "Giza",
-  "taxNumber": "987-654-321",
-  "notes": "Updated notes",
-  "isActive": true
-}
-```
-
-### DELETE /api/v1/parties/{id}
-
-Soft delete party (sets `IsActive = false`).
-
-**Response (200):**
-```json
-{
-  "message": "تم الحذف بنجاح",
-  "id": 1
-}
-```
-
-**Response (400):**
-```json
-{
-  "error": "الطرف غير موجود"
 }
 ```
 

@@ -175,4 +175,22 @@ public interface IAccountingIntegrationService
         PurchaseReturn purchaseReturn,
         int reversedByUserId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates journal entry for a posted expense.
+    /// Dr ExpenseAccount (from Expense.ExpenseAccountId) / Cr CashBox.Account (from CashBox linked Account).
+    /// </summary>
+    Task<Result<int>> CreateExpenseEntryAsync(
+        Expense expense,
+        int createdByUserId,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a posted expense journal entry (cancellation of expense).
+    /// Dr CashBox.Account / Cr ExpenseAccount.
+    /// </summary>
+    Task<Result<int>> ReverseExpenseEntryAsync(
+        Expense expense,
+        int reversedByUserId,
+        CancellationToken ct = default);
 }

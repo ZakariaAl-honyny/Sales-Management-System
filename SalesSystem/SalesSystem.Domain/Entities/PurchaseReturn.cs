@@ -56,7 +56,7 @@ public class PurchaseReturnLine : Entity
 /// <summary>
 /// Represents a purchase return (return of goods to a supplier).
 /// Schema 7.3: PurchaseReturns. Status: Draft=1, Posted=2, Cancelled=3.
-/// Columns: ReturnNo (int unique), PurchaseInvoiceId FK (NOT null), SupplierId FK,
+/// Columns: ReturnNo (int unique), PurchaseInvoiceId FK (nullable — standalone mode), SupplierId FK,
 /// WarehouseId FK, CurrencyId FK, TotalAmount, Notes, Status, audit fields.
 /// </summary>
 public class PurchaseReturn : DocumentEntity

@@ -183,12 +183,12 @@ Built on Clean Architecture with WPF Desktop (MVVM) + ASP.NET Core 10 API
 - **Security**: User, Role, Permission management (Admin only)
 - CostingMethod exposed as RadioButton group in SettingsView (WeightedAverage/LastPurchasePrice/SupplierPrice)
 
-### 3.11a Party Management (v4.10)
-- Party entity stores shared contact data (Name, Phone, Email, Address, TaxNumber)
-- Customers and Suppliers each have PartyId FK to share contact data
-- AccountId mandatory on Customer and Supplier â€” auto-created under 1210 (AR) and 2100 (AP) respectively
-- NO OpeningBalance or CurrentBalance on Customer/Supplier â€” balance tracked on linked GL Account
-- NO CurrencyId on Customer/Supplier â€” currency is per-transaction
+### 3.11a Customer & Supplier & Employee Contact Data (Direct)
+- Contact fields (Name, Phone, Email, Address, TaxNumber, Notes) live **directly** on Customer, Supplier, and Employee entities
+- No shared `Parties` table — each entity is self-contained
+- AccountId mandatory on Customer and Supplier — auto-created under 1210 (AR) and 2100 (AP) respectively
+- NO OpeningBalance or CurrentBalance on Customer/Supplier — balance tracked on linked GL Account
+- NO CurrencyId on Customer/Supplier — currency is per-transaction
 - NO CustomerGroup or SupplierType in V1
 - CheckCreditLimit returns bool (soft warning, caller decides to block)
 

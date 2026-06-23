@@ -97,7 +97,7 @@ public class SalesServiceTests : IDisposable
             _mockSequenceService.Object,
             _mockLogger.Object);
 
-        _testCustomer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000");
+        _testCustomer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         _testWarehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
         _testProduct = Product.Create("Test Product", categoryId: 1);
 
@@ -218,7 +218,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] PostAsync_DraftInvoice_PostsSuccessfully");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000");
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
@@ -287,7 +287,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] CancelAsync_PostedInvoice_ReversesStockAndBalance");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000", openingBalance: 1000m);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
@@ -326,7 +326,7 @@ public class SalesServiceTests : IDisposable
         _output.WriteLine("[TEST] CancelAsync_DraftInvoice_NoStockEffect");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000");
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);

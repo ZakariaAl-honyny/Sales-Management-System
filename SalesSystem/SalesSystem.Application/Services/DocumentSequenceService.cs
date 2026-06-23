@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Application.Services;
@@ -101,6 +102,64 @@ public class DocumentSequenceService : IDocumentSequenceService
         {
             _logger.LogError(ex, "Error generating next int for sequence {Key}", sequenceKey);
             return Result<int>.Failure("حدث خطأ أثناء توليد الرقم المتسلسل");
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Gets all document sequences for admin management.
+    /// </summary>
+    public async Task<Result<List<DocumentSequenceDto>>> GetAllAsync(CancellationToken ct)
+    {
+        try
+        {
+            var sequences = await _uow.DocumentSequences.ToListAsync(ct);
+            var dtos = sequences
+                .OrderByDescending(s => s.Id)
+                .Select(s => new DocumentSequenceDto(s.Id, s.DocumentType, s.NextNumber))
+                .ToList();
+            return Result<List<DocumentSequenceDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving document sequences");
+            return Result<List<DocumentSequenceDto>>.Failure("حدث خطأ أثناء استرجاع تسلسل المستندات");
+        }
+    }
+
+    /// <summary>
+    /// Updates the next number for a document sequence (manual reset).
+    /// Thread-safe via SemaphoreSlim.
+    /// </summary>
+    public async Task<Result<DocumentSequenceDto>> UpdateSequenceAsync(int id, int nextNumber, CancellationToken ct)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            var sequence = await _uow.DocumentSequences.GetByIdAsync(id, ct);
+            if (sequence == null)
+                return Result<DocumentSequenceDto>.Failure("تسلسل المستند غير موجود", ErrorCodes.NotFound);
+
+            sequence.SetNextNumber(nextNumber);
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Document sequence {Id} ({Type}) updated. New NextNumber: {Next}",
+                id, sequence.DocumentType, nextNumber);
+
+            return Result<DocumentSequenceDto>.Success(
+                new DocumentSequenceDto(sequence.Id, sequence.DocumentType, sequence.NextNumber));
+        }
+        catch (DomainException ex)
+        {
+            return Result<DocumentSequenceDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating document sequence {Id}", id);
+            return Result<DocumentSequenceDto>.Failure("حدث خطأ أثناء تحديث تسلسل المستند");
         }
         finally
         {

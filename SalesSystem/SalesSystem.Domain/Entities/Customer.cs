@@ -5,22 +5,41 @@ using SalesSystem.Domain.Exceptions;
 namespace SalesSystem.Domain.Entities;
 
 /// <summary>
-/// Customer entity. Contact information (Name, Phone, Email, Address, TaxNumber, Notes)
-/// lives on the referenced <see cref="Party"/> record via PartyId FK.
-/// Customer adds financial fields (CreditLimit) and a CategoryId for classification.
+/// Customer entity with direct contact information.
+/// The customer's balance lives on the linked Chart of Accounts Account (via AccountId FK).
 /// Schema §1.2 — Customers table.
 /// </summary>
 public class Customer : ActivatableEntity
 {
     /// <summary>
-    /// FK to the Party record that holds shared contact data.
+    /// Customer name (required). This field holds the primary display name.
     /// </summary>
-    public int PartyId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Navigation property to the Party record (shared contact data).
+    /// Customer phone number (optional).
     /// </summary>
-    public virtual Party Party { get; private set; } = null!;
+    public string? Phone { get; private set; }
+
+    /// <summary>
+    /// Customer email address (optional).
+    /// </summary>
+    public string? Email { get; private set; }
+
+    /// <summary>
+    /// Customer physical address (optional).
+    /// </summary>
+    public string? Address { get; private set; }
+
+    /// <summary>
+    /// Customer tax number / VAT registration (optional).
+    /// </summary>
+    public string? TaxNumber { get; private set; }
+
+    /// <summary>
+    /// Free-text notes about the customer (optional).
+    /// </summary>
+    public string? Notes { get; private set; }
 
     /// <summary>
     /// FK to the Chart of Accounts Account that holds this customer's balance.
@@ -46,25 +65,34 @@ public class Customer : ActivatableEntity
     private Customer() { } // EF Core
 
     /// <summary>
-    /// Factory method to create a new customer.
-    /// Contact data lives on the Party record referenced by <paramref name="partyId"/>.
+    /// Factory method to create a new customer with direct contact information.
     /// </summary>
-    /// <param name="partyId">FK to the Party record (must be > 0).</param>
-    /// <param name="accountId">FK to the Account record (must be > 0).</param>
+    /// <param name="name">Customer name (required).</param>
+    /// <param name="accountId">FK to the Account record (must be &gt; 0).</param>
+    /// <param name="phone">Optional phone number.</param>
+    /// <param name="email">Optional email address.</param>
+    /// <param name="address">Optional physical address.</param>
+    /// <param name="taxNumber">Optional tax number / VAT registration.</param>
+    /// <param name="notes">Optional free-text notes.</param>
     /// <param name="creditLimit">Credit limit (default 0 = no limit).</param>
     /// <param name="categoryId">Optional FK to AccountCategories.</param>
     /// <param name="createdByUserId">ID of the user creating this customer.</param>
     /// <returns>A new Customer instance.</returns>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public static Customer Create(
-        int partyId,
+        string name,
         int accountId,
+        string? phone = null,
+        string? email = null,
+        string? address = null,
+        string? taxNumber = null,
+        string? notes = null,
         decimal creditLimit = 0,
         int? categoryId = null,
         int? createdByUserId = null)
     {
-        if (partyId <= 0)
-            throw new DomainException("معرّف الطرف غير صالح.");
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم العميل مطلوب.");
         if (accountId <= 0)
             throw new DomainException("معرّف الحساب غير صالح.");
         if (creditLimit < 0)
@@ -72,8 +100,13 @@ public class Customer : ActivatableEntity
 
         var customer = new Customer
         {
-            PartyId = partyId,
+            Name = name.Trim(),
             AccountId = accountId,
+            Phone = phone?.Trim(),
+            Email = email?.Trim(),
+            Address = address?.Trim(),
+            TaxNumber = taxNumber?.Trim(),
+            Notes = notes?.Trim(),
             CreditLimit = creditLimit,
             CategoryId = categoryId,
             IsActive = true,
@@ -101,21 +134,40 @@ public class Customer : ActivatableEntity
     }
 
     /// <summary>
-    /// Updates the customer-specific fields.
-    /// Contact data is updated on the linked <see cref="Party"/> record separately.
+    /// Updates the customer fields including contact information.
     /// </summary>
-    /// <param name="creditLimit">New credit limit (>= 0).</param>
+    /// <param name="name">Customer name (required).</param>
+    /// <param name="phone">Optional phone number.</param>
+    /// <param name="email">Optional email address.</param>
+    /// <param name="address">Optional physical address.</param>
+    /// <param name="taxNumber">Optional tax number / VAT registration.</param>
+    /// <param name="notes">Optional free-text notes.</param>
+    /// <param name="creditLimit">New credit limit (&gt;= 0).</param>
     /// <param name="categoryId">New category id (null = keep current).</param>
     /// <param name="updatedByUserId">ID of the user performing the update.</param>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public void Update(
+        string name,
+        string? phone = null,
+        string? email = null,
+        string? address = null,
+        string? taxNumber = null,
+        string? notes = null,
         decimal creditLimit = 0,
         int? categoryId = null,
         int? updatedByUserId = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم العميل مطلوب.");
         if (creditLimit < 0)
             throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
 
+        Name = name.Trim();
+        Phone = phone?.Trim();
+        Email = email?.Trim();
+        Address = address?.Trim();
+        TaxNumber = taxNumber?.Trim();
+        Notes = notes?.Trim();
         CreditLimit = creditLimit;
         if (categoryId.HasValue)
             CategoryId = categoryId;

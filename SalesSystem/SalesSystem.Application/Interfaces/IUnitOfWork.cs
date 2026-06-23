@@ -47,7 +47,6 @@ public interface IUnitOfWork
     IGenericRepository<UserBranch> UserBranches { get; }
 
     // New entity repositories (v4.7+)
-    IGenericRepository<Party> Parties { get; }
     IGenericRepository<Attachment> Attachments { get; }
     IGenericRepository<Notification> Notifications { get; }
     IGenericRepository<Branch> Branches { get; }
@@ -69,6 +68,10 @@ public interface IUnitOfWork
     // Customer/Supplier Contact repositories
     IGenericRepository<CustomerContact> CustomerContacts { get; }
     IGenericRepository<SupplierContact> SupplierContacts { get; }
+
+    // === Sales Quotation Module ===
+    IGenericRepository<SalesQuotation> SalesQuotations { get; }
+    IGenericRepository<SalesQuotationItem> SalesQuotationItems { get; }
 
     // === New Inventory Module (v4.10+) ===
     IGenericRepository<InventoryTransaction> InventoryTransactions { get; }

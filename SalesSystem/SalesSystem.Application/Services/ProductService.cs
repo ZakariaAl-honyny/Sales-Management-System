@@ -15,27 +15,21 @@ namespace SalesSystem.Application.Services;
 /// Product service aligned to the new 65-table schema.
 /// - Prices via ProductPrices (multi-currency, effective dates)
 /// - Cost via InventoryBatches (FIFO/FEFO, weighted average)
-/// - Barcode on Product entity (primary barcode only)
 /// - ImagePath on Product (single image, no separate ProductImages table)
 /// - Expiry tracked via InventoryBatches, not Product
+/// - Barcode on Product entity (varchar(50), primary barcode for quick lookup)
 /// </summary>
 public class ProductService : IProductService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<ProductService> _logger;
-    private readonly IDocumentSequenceService _documentSequenceService;
-    private readonly IAccountingIntegrationService _accountingService;
 
     public ProductService(
         IUnitOfWork uow,
-        ILogger<ProductService> logger,
-        IDocumentSequenceService documentSequenceService,
-        IAccountingIntegrationService accountingService)
+        ILogger<ProductService> logger)
     {
         _uow = uow;
         _logger = logger;
-        _documentSequenceService = documentSequenceService;
-        _accountingService = accountingService;
     }
 
     public async Task<Result<ProductDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -54,7 +48,9 @@ public class ProductService : IProductService
         bool includeInactive = false, CancellationToken ct = default)
     {
         Expression<Func<Product, bool>> predicate = p =>
-            (string.IsNullOrWhiteSpace(search) || p.Name.Contains(search)) &&
+            (string.IsNullOrWhiteSpace(search) ||
+             p.Name.Contains(search) ||
+             (p.Barcode != null && p.Barcode.Contains(search))) &&
             (!categoryId.HasValue || p.CategoryId == categoryId.Value);
 
         var includes = new[] { "ProductCategory" };
@@ -71,146 +67,21 @@ public class ProductService : IProductService
     {
         try
         {
-            // ─── Guard: validate opening stock prerequisites ──────────────
-            var openingQuantity = request.OpeningQuantity ?? 0m;
-            var openingUnitCost = request.OpeningUnitCost ?? 0m;
-
-            if (openingQuantity > 0 && openingUnitCost <= 0)
-                return Result<ProductDto>.Failure(
-                    "يجب تحديد تكلفة الوحدة للكمية الافتتاحية.");
-
-            if (request.TrackExpiry && openingQuantity > 0 && request.OpeningExpiryDate == null)
-                return Result<ProductDto>.Failure(
-                    "يجب تحديد تاريخ انتهاء الصلاحية للمنتجات التي لها صلاحية.");
-
             // ─── Create product entity ────────────────────────────────────
             var product = Product.Create(
                 name: request.Name,
                 categoryId: request.CategoryId,
                 description: request.Description,
-                barcode: request.Barcode,
-                taxId: request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
-                imagePath: request.ImagePath
+                imagePath: request.ImagePath,
+                barcode: request.Barcode
             );
 
-            // ─── Execute everything inside a transaction ───────────────────
-            await _uow.ExecuteTransactionAsync(async () =>
-            {
-                await _uow.Products.AddAsync(product, ct);
-                await _uow.SaveChangesAsync(ct);
+            await _uow.Products.AddAsync(product, ct);
+            await _uow.SaveChangesAsync(ct);
 
-                _logger.LogInformation("Product created: {ProductName} (ID: {ProductId})", product.Name, product.Id);
-
-                if (openingQuantity > 0)
-                {
-                    // ── Ensure base unit exists ─────────────────────────
-                    var hasBaseUnit = await _uow.ProductUnits.AnyAsync(
-                        pu => pu.ProductId == product.Id && pu.IsBaseUnit, ct);
-                    if (!hasBaseUnit)
-                    {
-                        var defaultUnit = (await _uow.Units.ToListAsync(ct)).FirstOrDefault();
-                        if (defaultUnit == null)
-                            throw new InvalidOperationException(
-                                "لا توجد وحدات قياس في النظام. يرجى إضافة وحدة قياس أولاً.");
-
-                        var baseUnit = ProductUnit.CreateBaseUnit(product.Id, defaultUnit.Id);
-                        await _uow.ProductUnits.AddAsync(baseUnit, ct);
-                        await _uow.SaveChangesAsync(ct);
-                    }
-
-                    // ── Resolve warehouse ──────────────────────────────
-                    var warehouses = await _uow.Warehouses.ToListAsync(ct);
-                    var warehouse = warehouses.FirstOrDefault()
-                        ?? throw new InvalidOperationException(
-                            "لا توجد مستودعات في النظام. يرجى إضافة مستودع أولاً.");
-
-                    // ── Generate batch number ──────────────────────────
-                    var batchSeqResult = await _documentSequenceService.GetNextIntAsync("InventoryBatch", ct);
-                    if (!batchSeqResult.IsSuccess)
-                        throw new InvalidOperationException(
-                            batchSeqResult.Error ?? "فشل في توليد رقم الدفعة.");
-
-                    // ── Create InventoryBatch (OPENING) ────────────────
-                    DateOnly? openingExpiryDateOnly = request.OpeningExpiryDate.HasValue
-                        ? DateOnly.FromDateTime(request.OpeningExpiryDate.Value)
-                        : null;
-                    var batch = InventoryBatch.Create(
-                        batchNo: batchSeqResult.Value.ToString(),
-                        productId: product.Id,
-                        warehouseId: (short)warehouse.Id,
-                        quantityReceived: openingQuantity,
-                        unitCost: openingUnitCost,
-                        expiryDate: openingExpiryDateOnly);
-                    await _uow.InventoryBatches.AddAsync(batch, ct);
-
-                    // ── Update/create WarehouseStock ────────────────────
-                    var existingStock = await _uow.WarehouseStocks.FirstOrDefaultAsync(
-                        ws => ws.ProductId == product.Id && ws.WarehouseId == warehouse.Id, ct);
-
-                    if (existingStock != null)
-                    {
-                        existingStock.IncreaseQuantity(openingQuantity);
-                    }
-                    else
-                    {
-                        var newStock = WarehouseStock.Create(
-                            warehouseId: (short)warehouse.Id,
-                            productId: product.Id,
-                            quantity: openingQuantity);
-                        await _uow.WarehouseStocks.AddAsync(newStock, ct);
-                    }
-
-                    // ── Generate transaction number ────────────────────
-                    var seqResult = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
-                    if (!seqResult.IsSuccess)
-                        throw new InvalidOperationException(
-                            seqResult.Error ?? "فشل في توليد رقم المعاملة.");
-
-                    // ── Create InventoryTransaction ─────────────────────
-                    var invTx = InventoryTransaction.Create(
-                        transactionNo: seqResult.Value.ToString(),
-                        movementType: InventoryTransactionType.OpeningBalance,
-                        warehouseId: (short)warehouse.Id,
-                        referenceType: null,
-                        referenceId: null,
-                        notes: $"الرصيد الافتتاحي للمنتج: {product.Name}");
-                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
-                    await _uow.SaveChangesAsync(ct);
-
-                    // ── Get base unit for the transaction line ──────────
-                    var baseProductUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
-                        pu => pu.ProductId == product.Id && pu.IsBaseUnit, ct);
-                    if (baseProductUnit == null)
-                        throw new InvalidOperationException(
-                            "لم يتم العثور على الوحدة الأساسية للمنتج.");
-
-                    // ── Create InventoryTransactionLine ─────────────────
-                    var txLine = InventoryTransactionLine.Create(
-                        inventoryTransactionId: invTx.Id,
-                        productUnitId: baseProductUnit.Id,
-                        quantity: openingQuantity,
-                        unitCost: openingUnitCost,
-                        batchNo: batch.BatchNo);
-                    invTx.AddLine(txLine);
-
-                    // ── Create journal entry for opening stock ──────────
-                    var totalValue = openingQuantity * openingUnitCost;
-                    var accountingResult = await _accountingService.CreateProductOpeningEntryAsync(
-                        productId: product.Id,
-                        productName: product.Name,
-                        totalOpeningValue: totalValue,
-                        createdByUserId: 0,
-                        transactionDate: DateTime.UtcNow,
-                        ct: ct);
-                    if (!accountingResult.IsSuccess)
-                        throw new InvalidOperationException(
-                            accountingResult.Error ?? "فشل في إنشاء قيد اليومية للرصيد الافتتاحي.");
-
-                    await _uow.SaveChangesAsync(ct);
-                }
-            }, ct);
+            _logger.LogInformation("Product created: {ProductName} (ID: {ProductId})", product.Name, product.Id);
 
             return await GetByIdAsync(product.Id, ct);
         }
@@ -222,11 +93,6 @@ public class ProductService : IProductService
         catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "Invalid argument while creating product");
-            return Result<ProductDto>.Failure(ex.Message);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation while creating product");
             return Result<ProductDto>.Failure(ex.Message);
         }
         catch (Exception ex)
@@ -248,11 +114,10 @@ public class ProductService : IProductService
                 name: request.Name,
                 categoryId: request.CategoryId,
                 description: request.Description,
-                barcode: request.Barcode,
-                taxId: request.TaxId,
                 reorderLevel: request.ReorderLevel,
                 trackExpiry: request.TrackExpiry,
-                imagePath: request.ImagePath
+                imagePath: request.ImagePath,
+                barcode: request.Barcode
             );
 
             if (request.IsActive != product.IsActive)
@@ -329,14 +194,19 @@ public class ProductService : IProductService
     public async Task<Result<ProductDto>> GetByBarcodeAsync(string barcode, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(barcode))
-            return Result<ProductDto>.Failure("الباركود مطلوب");
+            return Result<ProductDto>.Failure("الباركود مطلوب", ErrorCodes.ValidationError);
 
         var product = await _uow.Products.FirstOrDefaultAsync(
-            p => p.Barcode == barcode, ct, "ProductCategory");
+            p => p.Barcode != null && p.Barcode == barcode.Trim(), ct, "ProductCategory");
 
         if (product == null)
-            return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+        {
+            _logger.LogWarning("Product not found by barcode: {Barcode}", barcode);
+            return Result<ProductDto>.Failure("المنتج غير موجود لهذا الباركود", ErrorCodes.NotFound);
+        }
 
+        _logger.LogInformation("Product found by barcode: {Barcode} → {ProductName} (ID: {ProductId})",
+            barcode, product.Name, product.Id);
         return Result<ProductDto>.Success(MapToDto(product));
     }
 
@@ -360,12 +230,12 @@ public class ProductService : IProductService
             p.Name,
             p.CategoryId,
             p.ProductCategory?.Name,
-            p.Barcode,
             p.Description,
             p.ReorderLevel,
             p.TrackExpiry,
             p.ImagePath,
-            p.IsActive
+            p.IsActive,
+            Barcode: p.Barcode
         );
     }
 }

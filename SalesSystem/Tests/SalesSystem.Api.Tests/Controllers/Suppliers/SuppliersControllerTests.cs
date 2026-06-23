@@ -175,7 +175,6 @@ public class SuppliersControllerTests : ControllerTestBase
         TaxNumber: null,
         IsActive: true,
         AccountId: 1,
-        PartyId: id + 100,
         AccountName: null);
 }
 

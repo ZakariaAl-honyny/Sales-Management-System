@@ -78,7 +78,7 @@ public class PrintDataService : IPrintDataService
     public async Task<Result<InvoicePrintDto>> GetSalesReturnPrintDataAsync(int returnId, CancellationToken ct = default)
     {
         var returnEntity = await _uow.SalesReturns.Query()
-            .Include(r => r.Customer).ThenInclude(c => c!.Party)
+            .Include(r => r.Customer)
             .Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == returnId, ct);
 
@@ -95,7 +95,7 @@ public class PrintDataService : IPrintDataService
     public async Task<Result<InvoicePrintDto>> GetPurchaseReturnPrintDataAsync(int returnId, CancellationToken ct = default)
     {
         var returnEntity = await _uow.PurchaseReturns.Query()
-            .Include(r => r.Supplier).ThenInclude(s => s!.Party)
+            .Include(r => r.Supplier)
             .Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == returnId, ct);
 
@@ -104,6 +104,24 @@ public class PrintDataService : IPrintDataService
 
         var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
         var dto = await _builder.BuildFromPurchaseReturnAsync(returnEntity, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
+        if (!string.IsNullOrWhiteSpace(footerNote))
+            dto.FooterNote = footerNote;
+        return Result<InvoicePrintDto>.Success(dto);
+    }
+
+    public async Task<Result<InvoicePrintDto>> GetSalesQuotationPrintDataAsync(int quotationId, CancellationToken ct = default)
+    {
+        var quotation = await _uow.SalesQuotations.Query()
+            .Include(q => q.Customer)
+            .Include(q => q.Items).ThenInclude(i => i.Product)
+            .Include(q => q.Items).ThenInclude(i => i.ProductUnit).ThenInclude(pu => pu.Unit)
+            .FirstOrDefaultAsync(q => q.Id == quotationId, ct);
+
+        if (quotation == null)
+            return Result<InvoicePrintDto>.Failure("عرض السعر غير موجود");
+
+        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote) = await LoadAllStoreInfoAsync(ct);
+        var dto = await _builder.BuildFromSalesQuotationAsync(quotation, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
         if (!string.IsNullOrWhiteSpace(footerNote))
             dto.FooterNote = footerNote;
         return Result<InvoicePrintDto>.Success(dto);

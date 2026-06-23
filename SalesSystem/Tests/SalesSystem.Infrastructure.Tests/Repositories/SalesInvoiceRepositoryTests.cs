@@ -20,14 +20,8 @@ public class SalesInvoiceRepositoryTests
     {
         var warehouse = Warehouse.Create(branchId: 1, name: "Test Warehouse");
         context.Warehouses.Add(warehouse);
-        await context.SaveChangesAsync();
-        
-        var party = Party.Create("Test Customer", createdByUserId: 1);
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        var customer = Customer.Create(party.Id, accountId: 1);
+        var customer = Customer.Create("Test Customer", accountId: 1);
         context.Customers.Add(customer);
-        
         await context.SaveChangesAsync();
     }
 

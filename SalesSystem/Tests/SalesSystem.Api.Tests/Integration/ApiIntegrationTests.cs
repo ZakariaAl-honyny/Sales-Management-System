@@ -99,7 +99,6 @@ public class ApiIntegrationTests : IAsyncLifetime
     public async Task Products_Create_ReturnsCreated()
     {
         var request = new CreateProductRequest(
-            Barcode: "TEST123",
             Name: "Test Product",
             CategoryId: 1,
             ReorderLevel: 10,

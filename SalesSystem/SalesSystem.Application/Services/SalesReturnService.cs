@@ -144,7 +144,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> PostAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines.SalesInvoiceLine.Product", "SalesInvoice", "Customer", "Customer.Party");
+            r => r.Id == id, ct, "Lines.SalesInvoiceLine.Product", "SalesInvoice", "Customer", "Customer");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status != InvoiceStatus.Draft) return Result<SalesReturnDto>.Failure("يمكن فقط ترحيل المرتجعات المسودة");
@@ -238,6 +238,33 @@ public class SalesReturnService : ISalesReturnService
                     }
                 }
 
+                // ─── InventoryTransaction Audit Trail ────────────────────────────
+                var srTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (srTxSeq.IsSuccess)
+                {
+                    var srInvTx = InventoryTransaction.Create(
+                        srTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.SaleReturn,
+                        sr.WarehouseId,
+                        InventoryReferenceType.SalesReturn,
+                        sr.Id,
+                        $"مرتجع مبيعات - رقم {sr.ReturnNo}",
+                        userId);
+                    foreach (var item in sr.Lines)
+                    {
+                        var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                        var productUnitId = item.SalesInvoiceLine?.ProductUnitId ?? 0;
+                        if (productId <= 0 || productUnitId <= 0) continue;
+                        srInvTx.AddLine(InventoryTransactionLine.Create(
+                            srInvTx.Id,
+                            productUnitId,
+                            item.Quantity,
+                            item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
+                            null, null, sr.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(srInvTx, ct);
+                }
+
                 // Compute actual totalCost from product costs (FIX: was sr.TotalAmount)
                 decimal totalCost = 0;
                 foreach (var item in sr.Lines)
@@ -282,7 +309,7 @@ public class SalesReturnService : ISalesReturnService
     public async Task<Result<SalesReturnDto>> CancelAsync(int id, int userId, CancellationToken ct)
     {
         var sr = await _uow.SalesReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Lines", "Customer", "Customer.Party");
+            r => r.Id == id, ct, "Lines.SalesInvoiceLine", "Customer");
 
         if (sr == null) return Result<SalesReturnDto>.Failure("مرتجع المبيعات غير موجود");
         if (sr.Status == InvoiceStatus.Cancelled)
@@ -317,6 +344,58 @@ public class SalesReturnService : ISalesReturnService
                             if (costResult.IsSuccess)
                                 totalCost += item.Quantity * costResult.Value;
                         }
+                    }
+
+                    // ─── FIFO Batch Reversal Warning ────────────────────────────────
+                    // ReturnToBatchAsync creates new immutable batch records during Post.
+                    // These batches are consumed (deducted) here on cancel.
+                    // Batch records are immutable by design — we use DeductFromBatchesAsync
+                    // to consume the return batches that were created during post.
+                    foreach (var item in sr.Lines)
+                    {
+                        var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                        if (productId <= 0 || item.Quantity <= 0) continue;
+
+                        var deductResult = await _fifoAllocationService.DeductFromBatchesAsync(
+                            productId,
+                            sr.WarehouseId,
+                            item.Quantity,
+                            SalesInvoiceLineId: item.SalesInvoiceLineId,
+                            createdByUserId: userId,
+                            ct: ct);
+
+                        if (!deductResult.IsSuccess)
+                        {
+                            _logger.LogWarning("Batch deduction for sales return cancel {Id}, Product {ProductId}: {Error}",
+                                sr.Id, productId, deductResult.Error);
+                        }
+                    }
+
+                    // ─── InventoryTransaction Reversal Audit Trail ────────────────
+                    var srCancelTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (srCancelTxSeq.IsSuccess)
+                    {
+                        var srCancelInvTx = InventoryTransaction.Create(
+                            srCancelTxSeq.Value.ToString("D6"),
+                            InventoryTransactionType.Sale,   // reversing the return
+                            sr.WarehouseId,
+                            InventoryReferenceType.SalesReturn,
+                            sr.Id,
+                            $"إلغاء مرتجع مبيعات - رقم {sr.ReturnNo}",
+                            userId);
+                        foreach (var item in sr.Lines)
+                        {
+                            var productId = item.SalesInvoiceLine?.ProductId ?? 0;
+                            var productUnitId = item.SalesInvoiceLine?.ProductUnitId ?? 0;
+                            if (productId <= 0 || productUnitId <= 0) continue;
+                            srCancelInvTx.AddLine(InventoryTransactionLine.Create(
+                                srCancelInvTx.Id,
+                                productUnitId,
+                                item.Quantity,
+                                item.Amount / (item.Quantity > 0 ? item.Quantity : 1),
+                                null, null, sr.WarehouseId));
+                        }
+                        await _uow.InventoryTransactions.AddAsync(srCancelInvTx, ct);
                     }
 
                     // Reverse the journal entry for the posted sales return
@@ -357,7 +436,7 @@ public class SalesReturnService : ISalesReturnService
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
-            r.Customer?.Party?.Name ?? "غير معروف",
+            r.Customer?.Name ?? "غير معروف",
             r.SalesInvoiceId,
             r.ReturnDate,
             0, // SubTotal removed

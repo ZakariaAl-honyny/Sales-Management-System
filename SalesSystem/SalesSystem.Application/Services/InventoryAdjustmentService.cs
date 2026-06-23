@@ -135,97 +135,213 @@ public class InventoryAdjustmentService : IInventoryAdjustmentService
 
     public async Task<Result> PostAsync(int id, int userId, CancellationToken ct)
     {
-        try
+        var adjustment = await _uow.InventoryAdjustments.FirstOrDefaultAsync(
+            a => a.Id == id, ct, "Lines");
+        if (adjustment == null)
+            return Result.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
+
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
         {
-            var adjustment = await _uow.InventoryAdjustments.FirstOrDefaultAsync(
-                a => a.Id == id, ct, "Lines");
-            if (adjustment == null)
-                return Result.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
-
-            adjustment.Post();
-
-            // Update stock levels based on adjustment type and line differences
-            foreach (var line in adjustment.Lines)
+            try
             {
-                var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
-                if (productUnit == null)
+                adjustment.Post();
+
+                // Update stock levels based on adjustment type and line differences
+                foreach (var line in adjustment.Lines)
                 {
-                    _logger.LogWarning("ProductUnit {ProductUnitId} not found for adjustment line", line.ProductUnitId);
-                    continue;
+                    var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                    if (productUnit == null)
+                    {
+                        _logger.LogWarning("ProductUnit {ProductUnitId} not found for adjustment line", line.ProductUnitId);
+                        continue;
+                    }
+
+                    var productId = productUnit.ProductId;
+                    var diff = line.ActualQuantity - line.ExpectedQuantity;
+
+                    switch (adjustment.AdjustmentType)
+                    {
+                        case InventoryAdjustmentType.Addition:
+                            if (line.ActualQuantity > 0)
+                                await _inventoryService.IncreaseStockAsync(
+                                    productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
+                            break;
+
+                        case InventoryAdjustmentType.Deduction:
+                            if (line.ActualQuantity > 0)
+                                await _inventoryService.DecreaseStockAsync(
+                                    productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
+                            break;
+
+                        case InventoryAdjustmentType.Correction:
+                            if (diff > 0)
+                                await _inventoryService.IncreaseStockAsync(
+                                    productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
+                            else if (diff < 0)
+                                await _inventoryService.DecreaseStockAsync(
+                                    productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
+                            break;
+                    }
                 }
 
-                var productId = productUnit.ProductId;
-                var diff = line.ActualQuantity - line.ExpectedQuantity;
-
-                switch (adjustment.AdjustmentType)
+                // ─── InventoryTransaction Audit Trail ────────────────────────────
+                var adjTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (adjTxSeq.IsSuccess)
                 {
-                    case InventoryAdjustmentType.Addition:
-                        // Increase stock by ActualQuantity (treated as addition from zero)
-                        if (line.ActualQuantity > 0)
-                            await _inventoryService.IncreaseStockAsync(
-                                productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
-                        break;
-
-                    case InventoryAdjustmentType.Deduction:
-                        // Decrease stock by ActualQuantity (treated as removal)
-                        if (line.ActualQuantity > 0)
-                            await _inventoryService.DecreaseStockAsync(
-                                productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, userId, ct);
-                        break;
-
-                    case InventoryAdjustmentType.Correction:
-                        // Adjust stock to match ActualQuantity
-                        if (diff > 0)
-                            await _inventoryService.IncreaseStockAsync(
-                                productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
-                        else if (diff < 0)
-                            await _inventoryService.DecreaseStockAsync(
-                                productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, userId, ct);
-                        break;
+                    var adjInvTx = InventoryTransaction.Create(
+                        adjTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.Adjustment,
+                        adjustment.WarehouseId,
+                        InventoryReferenceType.Adjustment,
+                        adjustment.Id,
+                        $"تسوية مخزون - رقم {adjustment.AdjustmentNo}",
+                        userId);
+                    foreach (var line in adjustment.Lines)
+                    {
+                        var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                        if (productUnit == null) continue;
+                        var qty = adjustment.AdjustmentType switch
+                        {
+                            InventoryAdjustmentType.Addition => line.ActualQuantity,
+                            InventoryAdjustmentType.Deduction => -line.ActualQuantity,
+                            InventoryAdjustmentType.Correction => line.ActualQuantity - line.ExpectedQuantity,
+                            _ => 0
+                        };
+                        if (qty == 0) continue;
+                        adjInvTx.AddLine(InventoryTransactionLine.Create(
+                            adjInvTx.Id,
+                            line.ProductUnitId,
+                            Math.Abs(qty),
+                            line.UnitCost,
+                            null, null, adjustment.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(adjInvTx, ct);
                 }
+
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Inventory adjustment {Id} posted by User {UserId}", id, userId);
+                return Result.Success();
             }
-
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Inventory adjustment {Id} posted by User {UserId}", id, userId);
-            return Result.Success();
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation posting inventory adjustment {Id}: {Message}", id, ex.Message);
-            return Result.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error posting inventory adjustment {Id}", id);
-            return Result.Failure("حدث خطأ أثناء ترحيل التسوية");
-        }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation posting inventory adjustment {Id}: {Message}", id, ex.Message);
+                return Result.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error posting inventory adjustment {Id}", id);
+                return Result.Failure("حدث خطأ أثناء ترحيل التسوية");
+            }
+        }, ct);
     }
 
     public async Task<Result> CancelAsync(int id, CancellationToken ct)
     {
-        try
-        {
-            var adjustment = await _uow.InventoryAdjustments.GetByIdAsync(id, ct);
-            if (adjustment == null)
-                return Result.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
+        var adjustment = await _uow.InventoryAdjustments.FirstOrDefaultAsync(
+            a => a.Id == id, ct, "Lines");
+        if (adjustment == null)
+            return Result.Failure("التسوية غير موجودة", ErrorCodes.NotFound);
 
-            adjustment.Cancel();
-            await _uow.SaveChangesAsync(ct);
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
+        {
+            try
+            {
+                // ─── Reverse Stock Changes (if Posted) ───────────────────────────
+                if (adjustment.Status == InventoryCountStatus.Posted)
+                {
+                    foreach (var line in adjustment.Lines)
+                    {
+                        var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                        if (productUnit == null)
+                        {
+                            _logger.LogWarning("ProductUnit {ProductUnitId} not found for adjustment cancel line", line.ProductUnitId);
+                            continue;
+                        }
 
-            _logger.LogInformation("Inventory adjustment {Id} cancelled", id);
-            return Result.Success();
-        }
-        catch (DomainException ex)
-        {
-            _logger.LogWarning(ex, "Domain rule violation cancelling inventory adjustment {Id}: {Message}", id, ex.Message);
-            return Result.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error cancelling inventory adjustment {Id}", id);
-            return Result.Failure("حدث خطأ أثناء إلغاء التسوية");
-        }
+                        var productId = productUnit.ProductId;
+                        var diff = line.ActualQuantity - line.ExpectedQuantity;
+
+                        switch (adjustment.AdjustmentType)
+                        {
+                            case InventoryAdjustmentType.Addition:
+                                // Reverse: decrease what was added
+                                if (line.ActualQuantity > 0)
+                                    await _inventoryService.DecreaseStockAsync(
+                                        productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, null, ct);
+                                break;
+
+                            case InventoryAdjustmentType.Deduction:
+                                // Reverse: increase what was deducted
+                                if (line.ActualQuantity > 0)
+                                    await _inventoryService.IncreaseStockAsync(
+                                        productId, adjustment.WarehouseId, line.ActualQuantity, line.UnitCost, null, ct);
+                                break;
+
+                            case InventoryAdjustmentType.Correction:
+                                // Reverse: go the opposite direction
+                                if (diff > 0)
+                                    await _inventoryService.DecreaseStockAsync(
+                                        productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, null, ct);
+                                else if (diff < 0)
+                                    await _inventoryService.IncreaseStockAsync(
+                                        productId, adjustment.WarehouseId, Math.Abs(diff), line.UnitCost, null, ct);
+                                break;
+                        }
+                    }
+
+                    // ─── InventoryTransaction Reversal Audit Trail ────────────────
+                    var adjCancelTxSeq = await _sequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                    if (adjCancelTxSeq.IsSuccess)
+                    {
+                        var adjCancelInvTx = InventoryTransaction.Create(
+                            adjCancelTxSeq.Value.ToString("D6"),
+                            InventoryTransactionType.Adjustment,
+                            adjustment.WarehouseId,
+                            InventoryReferenceType.Adjustment,
+                            adjustment.Id,
+                            $"إلغاء تسوية مخزون - رقم {adjustment.AdjustmentNo}",
+                            null);
+                        foreach (var line in adjustment.Lines)
+                        {
+                            var productUnit = await _uow.ProductUnits.GetByIdAsync(line.ProductUnitId, ct);
+                            if (productUnit == null) continue;
+                            var qty = adjustment.AdjustmentType switch
+                            {
+                                InventoryAdjustmentType.Addition => -line.ActualQuantity,
+                                InventoryAdjustmentType.Deduction => line.ActualQuantity,
+                                InventoryAdjustmentType.Correction => -(line.ActualQuantity - line.ExpectedQuantity),
+                                _ => 0
+                            };
+                            if (qty == 0) continue;
+                            adjCancelInvTx.AddLine(InventoryTransactionLine.Create(
+                                adjCancelInvTx.Id,
+                                line.ProductUnitId,
+                                Math.Abs(qty),
+                                line.UnitCost,
+                                null, null, adjustment.WarehouseId));
+                        }
+                        await _uow.InventoryTransactions.AddAsync(adjCancelInvTx, ct);
+                    }
+                }
+
+                adjustment.Cancel();
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Inventory adjustment {Id} cancelled", id);
+                return Result.Success();
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation cancelling inventory adjustment {Id}: {Message}", id, ex.Message);
+                return Result.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error cancelling inventory adjustment {Id}", id);
+                return Result.Failure("حدث خطأ أثناء إلغاء التسوية");
+            }
+        }, ct);
     }
 
     // ─── Private Helpers ─────────────────────────────────

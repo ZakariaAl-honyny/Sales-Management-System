@@ -10,6 +10,7 @@ public interface IBarcodeLookupService
 public record BarcodeSearchResult(
     int ProductId,
     string ProductName,
+    string? Barcode,
     int ProductUnitId,
     string UnitName,
     decimal ConversionFactor,

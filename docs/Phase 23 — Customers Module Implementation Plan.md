@@ -1,13 +1,13 @@
 # Phase 23 — Customers Module: Comprehensive Implementation Plan
 
-> **Version**: 1.0 — Based on 5 analysis files + full codebase audit (Domain, API, Desktop, Infrastructure)
-> **Scope**: Complete Customer CRUD enhancement with Account linking, CustomerType, CustomerGroup, TaxNumber, CreditLimit enforcement, enhanced validation, customer reports, and UI improvements
+> **Version**: 2.0 — Updated per accounts Details.md: ❌ Parties removed, ❌ CustomerGroup removed, ❌ CustomerType removed, ✅ AccountId mandatory auto-created under "1130", ✅ Contact fields direct on Customer, ✅ Balance via JournalEntryLines
+> **Scope**: Complete Customer CRUD enhancement with Account auto-creation (parent code "1130"), CategoryId classification, CreditLimit enforcement, enhanced validation, customer reports, and UI improvements
 
 ---
 
 ## Table of Contents
 
-1. [Customer Module Architecture — 2 Sub-Modules](#1-customer-module-architecture--2-sub-modules)
+1. [Customer Module Architecture — Scope](#1-customer-module-architecture--scope)
 2. [Full Inventory — What Already Exists](#2-full-inventory--what-already-exists)
 3. [BLOCKER Resolution — Critical Issues](#3-blocker-resolution--critical-issues)
 4. [Customer Design Catalog](#4-customer-design-catalog)
@@ -15,20 +15,24 @@
 6. [Architectural Decisions](#6-architectural-decisions)
 7. [Non-V1 Items (Deferred)](#7-non-v1-items-deferred)
 8. [Implementation Tasks](#8-implementation-tasks)
-9. [Compliance Matrix (55+ Rules)](#9-compliance-matrix-55-rules)
+9. [Compliance Matrix](#9-compliance-matrix)
 10. [Risks & Mitigations](#10-risks--mitigations)
 11. [Rollback Plan](#11-rollback-plan)
+12. [FORBIDDEN Patterns](#12-forbidden-patterns)
 
 ---
 
-## 1. Customer Module Architecture — 2 Sub-Modules
+## 1. Customer Module Architecture — Scope
 
-The Customers Module is divided into **2 main sub-modules**:
+The Customers Module is a **single focused scope**: managing customer records with direct contact fields, mandatory Account linking for balance tracking, optional CategoryId classification, and credit limit enforcement.
 
-| # | Sub-Module | Purpose | Existing Status |
-|---|------------|---------|-----------------|
+| # | Aspect | Purpose | Existing Status |
+|---|--------|---------|-----------------|
 | 🧑‍🤝‍🧑 | **Customer CRUD** | Create, Read, Update, Soft-Delete, Permanent-Delete with DeleteStrategy | ✅ Core CRUD exists — needs enhancement |
-| 🔗 | **Customer-Account Link** | Link each Customer to an Account in Chart of Accounts + Customer Type (Cash/Credit) + Customer Group | ❌ Missing entirely — needs full build |
+| 🔗 | **Customer-Account Link** | Auto-create a Level-4 Account under "1130 — العملاء" parent on creation | ✅ Already in code — parent code must be "1130" |
+| 🚫 | **CustomerGroup** | ❌ NOT IN V1 — removed per accounts Details.md | ✅ Already absent from code |
+| 🚫 | **CustomerType** | ❌ NOT IN V1 — payment type is per-invoice (SalesInvoice.PaymentType), not per-customer | ✅ Already absent from code |
+| 🚫 | **Party entity** | ❌ NOT USED — contact fields go DIRECTLY on Customer entity | ✅ Removed from code |
 
 ### 1.1 CRUD Flow (Enhanced)
 
@@ -42,60 +46,99 @@ Desktop CustomerEditorView
                         → CustomerConfiguration (Fluent API, Restrict FKs)
 ```
 
-### 1.2 Customer-Account Link Flow
+### 1.2 Customer-Account Link Flow (Mandatory)
 
 ```text
 Customer.Entity
-    ├── AccountId (int? FK → Account) — Links to Chart of Accounts
-    ├── CustomerType (enum: Cash=1, Credit=2) — Payment classification
-    ├── CustomerGroupId (int? FK → CustomerGroup) — Grouping for reporting
-    └── TaxNumber (string?) — Existing field, already present
+    ├── Name (string)             ← DIRECT on Customer (NOT via Party)
+    ├── Phone (string?)           ← DIRECT on Customer
+    ├── Email (string?)           ← DIRECT on Customer
+    ├── Address (string?)         ← DIRECT on Customer
+    ├── TaxNumber (string?)       ← DIRECT on Customer
+    ├── Notes (string?)           ← DIRECT on Customer
+    ├── AccountId (int FK → Account)  ← MANDATORY, auto-created
+    ├── CategoryId (int? FK → AccountCategories)
+    └── CreditLimit (decimal)     ← Soft warning only (CheckCreditLimit returns bool)
 
-Customer.Entity.AccountId
-    ↓ FK (Restrict)
-Account.Entity (Chart of Accounts — Phase 22)
-    — Enables: balance aging reports, transaction history by account
+Account (Chart of Accounts — Phase 22)
+    — Balance tracked via JournalEntryLines
+    — Enables: balance aging reports, transaction history
     — Enables: automatic journal entries when creating customer payments
+```
+
+### 1.3 Key Architecture Principles (from accounts Details.md)
+
+```text
+✅ حذف Parties → Contact fields directly on Customer entity
+✅ لكل عميل حساب محاسبي تلقائياً تحت 1130
+✅ الرصيد الحقيقي يأتي من JournalEntryLines وليس من جدول العميل
+✅ No CustomerGroup in V1
+✅ No CustomerType in V1 — payment classification per-invoice
+✅ CustomerReceiptApplications لا تستخدم لحساب الرصيد بل لمعرفة ما الفواتير التي تم تسديدها
 ```
 
 ---
 
 ## 2. Full Inventory — What Already Exists
 
-### 2.1 Domain Entity ✅ (Core exists — needs enhancement)
+### 2.1 Domain Entity ⚠️ (Core exists — PartyId must be removed)
 
 **File**: `SalesSystem.Domain.Entities.Customer`
 
-| Field | Type | Required | Status |
-|-------|------|----------|--------|
-| `Id` | `int PK` | ✅ | ✅ Exists — auto-increment |
-| `Name` | `string(150)` | ✅ | ✅ Exists |
-| `Phone` | `string(20)?` | ❌ | ✅ Exists |
-| `Email` | `string(100)?` | ❌ | ✅ Exists |
-| `Address` | `string(250)?` | ❌ | ✅ Exists |
-| `OpeningBalance` | `decimal(18,2)` | ❌ | ✅ Exists |
-| `CurrentBalance` | `decimal(18,2)` | ❌ | ✅ Exists (computed from transactions) |
-| `CreditLimit` | `decimal(18,2)` | ❌ | ✅ Exists |
-| `TaxNumber` | `string(30)?` | ❌ | ✅ Exists |
-| `IsActive` | `bool` | ✅ | ✅ Exists (BaseEntity) |
-| `CreatedAt` | `datetime2` | ✅ | ✅ Exists (BaseEntity) |
-| `AccountId` | `int? FK` | ❌ | ⬜ **NEW — add FK to Accounts table** |
-| `CustomerType` | `byte?` | ❌ | ⬜ **NEW — Cash/Credit enum** |
-| `CustomerGroupId` | `int? FK` | ❌ | ⬜ **NEW — FK to CustomerGroup table** |
+**Current (with PartyId) → Target (direct contact fields)**:
 
-**Domain methods** (all exist):
-- `Customer.Create(name, openingBalance, phone, email, address, taxNumber, creditLimit, createdByUserId)` ✅
-- `Customer.Update(name, phone, email, address, taxNumber, creditLimit, updatedByUserId)` ✅
-- `IncreaseBalance(amount)` ✅
-- `DecreaseBalance(amount)` ✅
+| Field | Type | Required | Target Status |
+|-------|------|----------|---------------|
+| `Id` | `int PK` | ✅ | ✅ Keep |
+| `Name` | `nvarchar(150)` | ✅ | ⬜ **MOVE from Party to Customer directly** |
+| `Phone` | `nvarchar(20)?` | ❌ | ⬜ **MOVE from Party to Customer directly** |
+| `Email` | `nvarchar(100)?` | ❌ | ⬜ **MOVE from Party to Customer directly** |
+| `Address` | `nvarchar(250)?` | ❌ | ⬜ **MOVE from Party to Customer directly** |
+| `TaxNumber` | `nvarchar(30)?` | ❌ | ⬜ **MOVE from Party to Customer directly** |
+| `Notes` | `nvarchar(500)?` | ❌ | ⬜ **MOVE from Party to Customer directly (new)** |
+| `PartyId` | `int FK → Party` | ✅ | ❌ **REMOVE — contact fields now direct** |
+| `AccountId` | `int FK → Account` | ✅ (mandatory) | ✅ **Keep — already non-nullable** |
+| `CategoryId` | `int? FK → AccountCategories` | ❌ | ✅ Keep |
+| `CreditLimit` | `decimal(18,2)` | ❌ | ✅ Keep |
+| `IsActive` | `bit` | ✅ | ✅ Keep (BaseEntity) |
+| `CreatedAt` | `datetime2` | ✅ | ✅ Keep |
+| `UpdatedAt` | `datetime2?` | ❌ | ✅ Keep |
+| `CreatedByUserId` | `int? FK` | ❌ | ✅ Keep |
+| `UpdatedByUserId` | `int? FK` | ❌ | ✅ Keep |
 
-**Missing domain methods:**
-- `SetCustomerType(CustomerType type)` — ⬜ NEW
-- `LinkToAccount(int accountId)` — ⬜ NEW
-- `SetCustomerGroup(int? customerGroupId)` — ⬜ NEW
-- `CheckCreditLimit(decimal additionalAmount)` — ⬜ NEW (returns bool, not DomainException)
+**REMOVED fields (confirmed absent from codebase):**
+- ❌ `CustomerGroupId` — NOT in V1
+- ❌ `CustomerType` — NOT in V1
+- ❌ `OpeningBalance` — handled via Journal Entry (Dr AR / Cr OpeningBalanceEquity)
+- ❌ `CurrentBalance` — balance lives on linked Account, queried from JournalEntryLines
 
-### 2.2 Infrastructure Layer ⚠️ (Partially exists)
+**Domain methods (current):**
+- `Customer.Create(partyId, accountId, creditLimit, categoryId, createdByUserId)` ✅ → ⬜ Change to direct contact fields
+- `Customer.Update(creditLimit, categoryId, updatedByUserId)` ✅ → ⬜ Add contact field parameters
+- `CheckCreditLimit(decimal additionalAmount)` ✅ — returns bool, non-throwing
+
+**Domain methods (target after Party removal):**
+- `Customer.Create(name, phone, email, address, taxNumber, notes, accountId, creditLimit, categoryId, createdByUserId)` ⬜ **NEW signature with direct contact fields**
+- `Customer.Update(name, phone, email, address, taxNumber, notes, creditLimit, categoryId, updatedByUserId)` ⬜ **NEW signature with direct contact fields**
+- `Customer.CheckCreditLimit(decimal additionalAmount)` ✅ Keep as-is
+
+### 2.2 Party Entity ❌ — Must Be Removed
+
+**File**: `SalesSystem.Domain.Entities.Party`
+
+| Field | Type | Action |
+|-------|------|--------|
+| `Id` | `int PK` | ❌ Remove entire entity |
+| `Name` | `nvarchar(150)` | ➡️ Move to Customer directly |
+| `Phone` | `nvarchar(20)?` | ➡️ Move to Customer directly |
+| `Email` | `nvarchar(100)?` | ➡️ Move to Customer directly |
+| `Address` | `nvarchar(250)?` | ➡️ Move to Customer directly |
+| `TaxNumber` | `nvarchar(30)?` | ➡️ Move to Customer directly |
+| `Notes` | `nvarchar(500)?` | ➡️ Move to Customer directly |
+
+**Impact**: Removing Party affects Supplier and Employee too — this plan covers ONLY Customer. Follow-up phases will handle Supplier and Employee Party removal.
+
+### 2.3 Infrastructure Layer ⚠️ (Needs Party→Direct migration)
 
 **File**: `Infrastructure/Data/Configurations/CustomerConfiguration.cs`
 
@@ -103,53 +146,49 @@ Account.Entity (Chart of Accounts — Phase 22)
 |---------|--------|
 | `ToTable("Customers")` | ✅ Exists |
 | `HasKey(c => c.Id)` | ✅ Exists |
-| `Name — HasMaxLength(150)` | ✅ Exists |
-| `Phone — HasMaxLength(20)` | ✅ Exists |
-| `Email — HasMaxLength(100)` | ✅ Exists |
-| `Address — HasMaxLength(250)` | ✅ Exists |
-| `OpeningBalance — HasPrecision(18, 2)` | ✅ Exists |
-| `CurrentBalance — HasPrecision(18, 2)` | ✅ Exists |
-| `CreditLimit — HasPrecision(18, 2)` | ✅ Exists |
-| `TaxNumber — HasMaxLength(30)` | ✅ Exists |
+| PartyId FK config (restrict) | ✅ Exists — to be removed |
+| AccountId FK config (restrict) | ✅ Exists |
+| `HasIndex(c => c.AccountId)` | ✅ Exists |
 | `HasQueryFilter(c => c.IsActive)` | ✅ Exists |
 
-**Missing configuration:**
-- `AccountId` FK configuration with `DeleteBehavior.Restrict` — ⬜ NEW
-- `CustomerType` property config — ⬜ NEW
-- `CustomerGroupId` FK configuration with `DeleteBehavior.Restrict` — ⬜ NEW
-- `CustomerGroupConfiguration` — ⬜ NEW (entirely new entity)
-- Index on `AccountId` for faster joins — ⬜ NEW
-- Index on `CustomerGroupId` for faster filtering — ⬜ NEW
+**Changes needed:**
+- ❌ Remove `PartyId` FK configuration entirely
+- ✅ Add direct contact field configs: `Name` (HasMaxLength 150, IsRequired), `Phone` (HasMaxLength 20), `Email` (HasMaxLength 100), `Address` (HasMaxLength 250), `TaxNumber` (HasMaxLength 30), `Notes` (HasMaxLength 500, optional)
+- ✅ Add `HasIndex(c => c.TaxNumber).IsUnique().HasFilter("[TaxNumber] IS NOT NULL")` — optional unique tax number
+- ⬜ New migration: DROP FK to Parties, DROP PartyId column, ADD direct contact columns, DROP Parties table (after all references removed)
 
-### 2.3 DbSeeder ⚠️ (Needs update)
+**File**: `Infrastructure/Data/Configurations/PartyConfiguration.cs`
 
-**File**: `Infrastructure/Data/DbSeeder.cs` — Lines 120-126
+| Setting | Action |
+|---------|--------|
+| Entire file | ❌ **DELETE** — Party entity removed |
 
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and see DbSeeder.cs for seed data patterns.
+**File**: `Infrastructure/Data/DbSeeder.cs`
 
-Also needs to seed:
-- Default CustomerGroup (e.g., "عام") — ⬜ NEW
-- AccountId link for the default customer — ⬜ NEW
+| Seed Data | Status | Action |
+|-----------|--------|--------|
+| Default customer "عميل نقدي" | ✅ Exists | Keep — but seed with direct fields, not via Party |
+| Default customer Account linking | ✅ Exists | Keep — link to auto-created Account under "1130" |
+| CustomerGroup seeds | ❌ Already absent | ✅ Nothing to do |
+| CustomerType references | ❌ Already absent | ✅ Nothing to do |
 
-### 2.4 Application Layer ✅ (Core exists)
+### 2.4 Application Layer ✅ (Core exists — Party methods to refactor)
 
 **File**: `Application/Interfaces/Services/ICustomerService.cs`
 
-| Method | Return Type | Status |
-|--------|-------------|--------|
-| `GetByIdAsync(id, ct)` | `Result<CustomerDto>` | ✅ Exists |
-| `GetAllAsync(search, page, pageSize, includeInactive, ct)` | `Result<PagedResult<CustomerDto>>` | ✅ Exists |
-| `CreateAsync(request, ct)` | `Result<CustomerDto>` | ✅ Exists |
-| `UpdateAsync(id, request, ct)` | `Result<CustomerDto>` | ✅ Exists |
-| `DeleteAsync(id, ct)` | `Result` | ✅ Exists (soft delete) |
-| `PermanentDeleteAsync(id, ct)` | `Result` | ✅ Exists (with DbUpdateException catch) |
+| Method | Return Type | Status | Action |
+|--------|-------------|--------|--------|
+| `GetByIdAsync(id, ct)` | `Result<CustomerDto>` | ✅ Exists | Fix mapping (Contact fields from Customer directly) |
+| `GetAllAsync(search, page, pageSize, includeInactive, ct)` | `Result<PagedResult<CustomerDto>>` | ✅ Exists | Fix mapping, fix sort order (Id desc — RULE-220) |
+| `CreateAsync(request, ct)` | `Result<CustomerDto>` | ✅ Exists | Auto-create Party replaced by direct fields + auto-create Account |
+| `UpdateAsync(id, request, ct)` | `Result<CustomerDto>` | ✅ Exists | Fix mapping (no Party update) |
+| `DeleteAsync(id, ct)` | `Result` | ✅ Exists | Soft delete — keep as-is |
+| `PermanentDeleteAsync(id, ct)` | `Result` | ✅ Exists | Will change: no Party to cascade delete |
 
-**Missing methods:**
-- `GetByGroupAsync(int customerGroupId, ct)` — ⬜ NEW
-- `GetCreditLimitSummaryAsync(int id, ct)` — ⬜ NEW
-- `CheckCreditLimitAsync(int customerId, decimal amount, ct)` — ⬜ NEW (called from SalesService)
-- `GetCustomerBalanceReportAsync(int id, DateTime from, DateTime to, ct)` — ⬜ NEW
-- `GetCustomerAgingReportAsync(ct)` — ⬜ NEW
+**Key service behavior changes:**
+- `CreateAsync()`: No longer creates a Party record. Creates Customer directly with Name, Phone, Email, Address, TaxNumber, Notes. Auto-creates Account under parent "1130" if AccountId not provided.
+- `UpdateAsync()`: No longer calls Party.Update(). Updates fields directly on Customer entity.
+- `PermanentDeleteAsync()`: No Party FK to check — simpler cleanup. Still catches FK exceptions from SalesInvoice/Payment references.
 
 **File**: `Application/Services/CustomerService.cs`
 
@@ -158,41 +197,56 @@ Observations:
 - ✅ Returns `Result<T>` (RULE-006)
 - ✅ Has proper logging (RULE-035)
 - ✅ `PermanentDeleteAsync` catches FK exceptions (RULE-200)
-- ❌ `GetAllAsync` sorts by Name ascending — should sort by Id descending (RULE-220) — needs fix
-- ❌ Missing `try-catch` in `LoadCustomersAsync` uses manual try/finally instead of `ExecuteAsync()` wrapper (RULE-141)
+- ❌ `GetAllAsync` sorts by Name ascending — should sort by Id descending (RULE-220)
+- ⬜ Currently creates Party record before Customer — must change to direct Customer creation
 
-### 2.5 Contracts Layer ⚠️ (Needs enhancement)
+### 2.5 Contracts Layer ⚠️ (Needs enhancement — CustomerDto)
 
-**File**: `Contracts/DTOs/AllDtos.cs` — Line 51
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
+**File**: `Contracts/DTOs/AllDtos.cs`
 
-**Missing fields in CustomerDto:**
-- `int? AccountId` — ⬜ NEW
-- `string? AccountName` — ⬜ NEW
-- `byte? CustomerType` — ⬜ NEW
-- `int? CustomerGroupId` — ⬜ NEW
-- `string? CustomerGroupName` — ⬜ NEW
+**CustomerDto — Current vs Target**:
+
+| Field | Current Status | Target | Action |
+|-------|---------------|--------|--------|
+| `Id` | ✅ Exists | Keep | ✅ |
+| `Name` | ✅ From Party (via navigation) | **DIRECT on CustomerDto** | ⬜ Fix mapping |
+| `Phone` | ✅ From Party (via navigation) | **DIRECT on CustomerDto** | ⬜ Fix mapping |
+| `Email` | ✅ From Party (via navigation) | **DIRECT on CustomerDto** | ⬜ Fix mapping |
+| `Address` | ✅ From Party (via navigation) | **DIRECT on CustomerDto** | ⬜ Fix mapping |
+| `TaxNumber` | ✅ From Party (via navigation) | **DIRECT on CustomerDto** | ⬜ Fix mapping |
+| `Notes` | ❌ Missing | **ADD** — string? | ⬜ NEW |
+| `AccountId` | ✅ Exists (mandatory int) | Keep | ✅ |
+| `AccountName` | ✅ Exists | Keep | ✅ |
+| `CategoryId` | ✅ Exists | Keep | ✅ |
+| `CreditLimit` | ✅ Exists | Keep | ✅ |
+| `CreatedAt` | ✅ Exists | Keep | ✅ |
+| `IsActive` | ✅ Exists | Keep | ✅ |
+| ~~PartyId~~ | ❌ Should NOT be exposed | **REMOVE** | ⬜ NEW |
+| ~~CustomerType~~ | ❌ Already absent | NOT IN V1 | ✅ |
+| ~~CustomerGroupId~~ | ❌ Already absent | NOT IN V1 | ✅ |
+| ~~CustomerGroupName~~ | ❌ Already absent | NOT IN V1 | ✅ |
 
 **File**: `Contracts/Requests/CustomerRequests.cs`
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
 
-**Missing fields in requests:**
-- `int? AccountId` — ⬜ NEW
-- `byte? CustomerType` — ⬜ NEW
-- `int? CustomerGroupId` — ⬜ NEW
+| Field | Status | Action |
+|-------|--------|--------|
+| `Name` | ✅ Exists | Keep — required |
+| `Phone` | ✅ Exists | Keep |
+| `Email` | ✅ Exists | Keep |
+| `Address` | ✅ Exists | Keep |
+| `TaxNumber` | ✅ Exists | Keep |
+| `CreditLimit` | ✅ Exists | Keep |
+| `CategoryId` | ✅ Exists | Keep |
+| `AccountId` | NOT in request | ❌ **NOT added** — auto-created by service |
+| ~~PartyId~~ | ❌ Not in request already | ✅ Nothing to do |
+| ~~CustomerGroupId~~ | ❌ Already absent | ✅ |
+| ~~CustomerType~~ | ❌ Already absent | ✅ |
 
-**File**: `Contracts/Responses/CustomerResponse.cs`
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
+**Key insight**: Since AccountId is auto-created (mandatory, non-nullable, system-generated), it MUST NOT be in Create/Update requests. The service always generates it.
+- `CreateCustomerRequest`: No AccountId field — service creates Account under "1130"
+- `UpdateCustomerRequest`: No AccountId field — cannot change the linked account
 
-**Missing:**
-- `string? TaxNumber` — ⬜ NEW (needed for invoice printing)
-- `decimal OpeningBalance` — ⬜ NEW
-- `int? AccountId` — ⬜ NEW
-- `string? AccountName` — ⬜ NEW
-- `byte? CustomerType` — ⬜ NEW
-- `string? CustomerGroupName` — ⬜ NEW
-
-### 2.6 API Layer ✅ (Core exists — needs enhancement)
+### 2.6 API Layer ✅ (Core exists — minor enhancements)
 
 **File**: `Api/Controllers/CustomersController.cs`
 
@@ -204,26 +258,26 @@ Observations:
 | PUT | `/api/v1/customers/{id}` | `ManagerAndAbove` | ✅ Exists |
 | DELETE | `/api/v1/customers/{id}` | `ManagerAndAbove` | ✅ Exists (soft) |
 | DELETE | `/api/v1/customers/permanent/{id}` | `ManagerAndAbove` | ✅ Exists (permanent) |
+| GET | `/api/v1/customers/{id}/balance-report` | `AllStaff` | ⬜ NEW (report endpoint) |
+| GET | `/api/v1/customers/aging` | `AllStaff` | ⬜ NEW (report endpoint) |
 
-**Missing endpoints:**
-- `GET /api/v1/customers/groups` — List customer groups — ⬜ NEW
-- `GET /api/v1/customers/{id}/balance-report` — Balance report — ⬜ NEW
-- `GET /api/v1/customers/aging` — Aging report — ⬜ NEW
-- `POST /api/v1/customers/groups` — Create group — ⬜ NEW
-- `PUT /api/v1/customers/groups/{id}` — Update group — ⬜ NEW
-- `DELETE /api/v1/customers/groups/{id}` — Delete group — ⬜ NEW
+**REMOVED from scope (NOT in V1):**
+- ❌ No `/api/v1/customers/groups` endpoints (CustomerGroup not in V1)
+- ❌ No `CustomerGroupsController`
 
 **File**: `Api/Validators/CustomerRequestValidators.cs`
 
 | Validator | Status |
 |-----------|--------|
-| `CreateCustomerRequestValidator` | ✅ Exists — Name required, Phone/Email length, OpeningBalance ≥ 0, CreditLimit ≥ 0 |
-| `UpdateCustomerRequestValidator` | ✅ Exists — Same rules |
+| `CreateCustomerRequestValidator` | ✅ Exists — update contact fields, add Notes + Phone regex |
+| `UpdateCustomerRequestValidator` | ✅ Exists — same updates |
 
-**Missing validation:**
-- Phone regex pattern validation (e.g., Saudi/Yemeni mobile format) — ⬜ NEW
-- Email format enhancement — ⬜ NEW
-- New fields (AccountId, CustomerType, CustomerGroupId) — ⬜ NEW
+**Missing validation to add:**
+- ✅ Phone regex `^05\d{8}$` with Arabic error message "رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام"
+- ✅ Email format enhancement via `.EmailAddress()`
+- ✅ Notes max length 500
+- ✅ Name max length 150 with Arabic message "اسم العميل مطلوب"
+- ✅ Remove any Party-related validation (none should exist currently)
 
 ### 2.7 Desktop Layer ⚠️ (Core exists — needs enhancement)
 
@@ -242,9 +296,13 @@ Observations:
 - ❌ `EditCommand` has `CanExecute` predicate `() => SelectedCustomer != null` — should always be enabled (RULE-059)
 - ❌ `DeleteCommand` has `CanExecute` predicate — should always be enabled (RULE-059)
 - ❌ `RestoreCommand` has `CanExecute` predicate — should always be enabled (RULE-059)
+- ❌ Party.Name reference in display — change to direct Customer.Name
 - ✅ Sort by Id descending (RULE-220)
 - ✅ EventBus subscription + cleanup
 - ✅ DeleteStrategy dialog with 3 options
+- ✅ IncludeInactive property for soft-deleted entities
+- ⬜ Add AccountId, AccountName display columns
+- ⬜ ErrorMessage bar (RULE-540)
 
 **Customer Editor**:
 
@@ -255,12 +313,14 @@ Observations:
 | `Views/Customers/CustomerEditorView.xaml.cs` | ✅ Exists (code-behind) |
 
 **Issues in CustomerEditorViewModel:**
-- ❌ Missing `AccountId`, `CustomerType`, `CustomerGroupId` properties — ⬜ NEW
-- ❌ `SaveCommand` uses `ExecuteAsync` correctly ✅
-- ❌ Missing `CustomerGroup` related properties for dropdown — ⬜ NEW
 - ✅ Uses `SetDialogService()` ✅
 - ✅ Uses `INotifyDataErrorInfo` (RULE-228)
 - ✅ ValidateAsync calls ClearAllErrors + AddError + ValidateAllAsync (RULE-229)
+- ❌ Currently loads Party data via separate API call — change to direct fields
+- ❌ Missing `Notes` property binding
+- ❌ SaveAsync creates Party before Customer — change to create Customer directly
+- ⬜ Add loading overlay (RULE-548)
+- ⬜ Success/failure feedback (RULE-536-539)
 
 **Customer Selection**:
 
@@ -274,6 +334,7 @@ Observations:
 - ❌ `LoadCustomersAsync()` uses manual `try/catch/finally` — should use `ExecuteAsync()` wrapper (RULE-141)
 - ❌ `SelectCommand` has `CanExecute` predicate — should always be enabled (RULE-059)
 - ❌ Empty `catch` block — should log via `LogSystemError()` (RULE-199)
+- ❌ Party.Name reference — change to direct Customer.Name
 
 **Customer API Service**:
 
@@ -283,12 +344,14 @@ Observations:
 | `Services/Api/IApiService.cs` (ICustomerApiService) | ✅ Exists |
 
 **Missing API methods:**
-- `GetGroupsAsync()` — ⬜ NEW
-- `CreateGroupAsync(request)` — ⬜ NEW
-- `UpdateGroupAsync(id, request)` — ⬜ NEW
-- `DeleteGroupAsync(id)` — ⬜ NEW
-- `GetBalanceReportAsync(id, from, to)` — ⬜ NEW
-- `GetAgingReportAsync()` — ⬜ NEW
+- ⬜ `GetBalanceReportAsync(id, from, to)` — NEW
+- ⬜ `GetAgingReportAsync()` — NEW (from JournalEntryLines)
+
+**REMOVED API methods (CustomerGroup gone):**
+- ❌ No GetGroupsAsync — NOT needed
+- ❌ No CreateGroupAsync — NOT needed
+- ❌ No UpdateGroupAsync — NOT needed
+- ❌ No DeleteGroupAsync — NOT needed
 
 **Customer XAML Views — UI Compact Compliance (RULE-262-274):**
 
@@ -301,114 +364,174 @@ Observations:
 | Section margins ≤ 8px | ✅ StandardSectionMargin | ✅ Uses Border Height="12" (excessive — should be 8) |
 | Dialog title FontSize ≤ 16 | N/A (list view) | ❌ Line 28: FontSize="20" — **MUST FIX** |
 | Empty-state button Width=140 | ✅ Width="140" | N/A |
-| Dialog icons 44×44 max | N/A | ❌ Line 26-27: IconUser 24×24 ✅ (but icon is Path not emoji) |
+| Dialog icons 44×44 max | N/A | ✅ 24×24 |
 
 ---
 
 ## 3. BLOCKER Resolution — Critical Issues
 
-### 3.1 Blocker 1: Default Customer Name — Must Rename to "عميل نقدي"
+### 3.1 Blocker 1: Party Entity Removal — Contact Fields Must Move to Customer
 
-**Problem**: The seed default customer is named "العميل الافتراضي في النظام" which is not a user-friendly name. The analysis explicitly states the name should be "عميل نقدي" (Cash Customer) — this is the standard name used in comparable systems (محاسب سوفت) and is what the codebase already references in 6+ places as a fallback string.
+**Problem**: The current Customer entity stores all contact data (Name, Phone, Email, Address, TaxNumber) on a **Party** record linked via `PartyId` FK. The accounts Details.md analysis explicitly mandates:
+```
+✅ حذف Parties
+✅ جعل Customers, Suppliers, Employees جداول مستقلة
+```
 
-**Evidence from codebase** (all reference "عميل نقدي" as the default display name):
-- `SalesService.cs` line 470: `i.Customer?.Name ?? "عميل نقدي"`
-- `PrintDtoExtensions.cs` line 29: `invoice.CustomerName ?? "عميل نقدي"`
-- `ReportRepository.cs` line 33: `i.Customer.Name ?? "عميل نقدي"`
-- `SalesInvoiceEditorViewModel.cs` line 589: filter includes `"عميل نقدي"`
-- `DashboardViewModel.cs` line 249: `inv.CustomerName ?? "عميل نقدي"`
+**Solution**: Remove `PartyId` from Customer. Add all contact fields directly to Customer entity:
+- `Name` (nvarchar(150), required) — moved from Party
+- `Phone` (nvarchar(20)?) — moved from Party
+- `Email` (nvarchar(100)?) — moved from Party
+- `Address` (nvarchar(250)?) — moved from Party
+- `TaxNumber` (nvarchar(30)?) — moved from Party
+- `Notes` (nvarchar(500)?) — moved from Party
 
-> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
+**Impact**:
+- Requires data migration: `INSERT INTO Customers (Name, Phone, Email, Address, TaxNumber) SELECT p.Name, p.Phone, p.Email, p.Address, p.TaxNumber FROM Parties p JOIN Customers c ON p.Id = c.PartyId`
+- Requires EF migration: DROP FK, DROP PartyId, ADD direct columns
+- CustomerService.CreateAsync() no longer creates Party first
+- CustomerService.UpdateAsync() no longer calls Party.Update()
+- Parties table can be dropped after ALL references (Supplier, Employee) are migrated
 
-**Additionally**, the default supplier must also be renamed from "المورد الافتراضي في النظام" to "مورد نقدي" (though this is the Supplier module scope — include here for cross-reference).
+**⚠️ Multi-module dependency**: Supplier and Employee also reference Party. This plan covers ONLY Customer. The Party entity and Parties table will remain until Supplier and Employee are migrated in their respective phases. The Customer migration simply removes its PartyId FK and adds direct contact fields.
 
-**Impact**: Low — name change only, no data migration needed if the DB hasn't been deployed to production. If production data exists, an UPDATE script is needed.
+**Files changed**:
+- `Domain/Entities/Customer.cs` — Remove PartyId, add direct fields
+- `Domain/Entities/Party.cs` — No change (still used by Supplier/Employee)
+- `Infrastructure/Data/Configurations/CustomerConfiguration.cs` — Remove PartyId FK, add direct field configs
+- `Infrastructure/Data/Migrations/` — NEW migration
 
-**Files changed**: `DbSeeder.cs` only.
+### 3.2 Blocker 2: AccountId Mandatory — Auto-Creation Under Parent "1130"
 
-### 3.2 Blocker 2: AccountId FK — New Migration Required
+**Problem**: AccountId is already mandatory (non-nullable `int` FK) on Customer entity. The service must auto-create a Level-4 detail account under parent code "1130" (Accounts Receivable/العملاء) when creating a customer.
 
-**Problem**: The Customer entity needs to link to the Chart of Accounts (Account entity from Phase 22). Currently there is no `AccountId` FK. Adding it requires:
-1. Add `int? AccountId` to Customer entity
-2. Add FK configuration with `DeleteBehavior.Restrict`
-3. Create a new migration
-4. Update seed data to link the default customer to the correct account
+> ⚠️ **CRITICAL**: The parent account code is "1130" — NOT "1210" as previously documented. RULE-504 stipulates: "CustomerService.AutoCreateCustomerAccountAsync() MUST look up parent account by code '1130' (Accounts Receivable/العملاء) — NOT '1210' (Fixed Assets)."
 
-**Decision**: Make `AccountId` nullable (optional). If no account is linked, the customer still works functionally but won't appear in account-based reports.
+**Solution**: Auto-create Account in `CustomerService.CreateAsync()`:
+1. Look up parent account by code `"1130"` (seeded in Phase 22)
+2. Generate next child code: max existing code under 1130 + 1 (e.g., 1131, 1132, 1133...)
+3. Create Level-4 Account with `allowTransactions: true` (RULE-506)
+4. Link Customer to the new Account via `AccountId`
+5. Wrap in `ExecuteTransactionAsync()` — if customer creation fails, account creation rolls back
 
-> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
+**Auto-creation logic**:
+```csharp
+// Inside CustomerService.CreateAsync()
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
+var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+var newCode = (int.Parse(maxCode ?? "1130") + 1).ToString();
+var account = Account.Create(
+    accountCode: newCode,
+    nameAr: customer.Name,
+    nameEn: customer.Name,
+    nature: AccountNature.Debit,   // AR is a debit-nature asset account
+    isLeaf: true,                  // Level 4 detail account
+    parentId: parentAccount.Id,
+    isSystem: false,               // Not a system account
+    categoryId: null,
+    level: 4,                      // Detail/leaf level
+    description: $"حساب العميل: {customer.Name}",
+    colorCode: "#2196F3",          // Asset blue
+    notes: null,
+    allowTransactions: true,       // REQUIRED for Level 4 (RULE-506)
+    createdByUserId: userId
+);
+await _uow.Accounts.AddAsync(account, ct);
+```
 
-### 3.3 Blocker 3: CustomerType & CustomerGroup — New Entities
+**Validation**: AccountId is NEVER accepted from the user in Create/Update requests. The service generates it.
+- `CreateCustomerRequest`: No `AccountId` field
+- `UpdateCustomerRequest`: No `AccountId` field (cannot change linked account)
+- `CustomerDto`: Exposes `AccountId` and `AccountName` as read-only outputs
 
-**Problem**: The current Customer entity has no `CustomerType` or `CustomerGroupId`. The analysis explicitly mentions:
-- "نوع العميل: نقدي / آجل" (Customer Type: Cash / Credit)
-- "مجموعة العملاء" (Customer Group) — for categorizing customers (e.g., Wholesale, Retail, VIP)
+**Migration**: No migration needed for this — AccountId FK already exists. Only the auto-creation logic needs implementation.
 
-> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
+### 3.3 Blocker 3: OpeningBalance/CurrentBalance — ALREADY REMOVED
 
-**CustomerGroup Entity** (new standalone entity):
+**Problem**: None — the Customer entity already has NO OpeningBalance or CurrentBalance fields. The code already matches the target architecture.
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| `Id` | `int PK` | ✅ | Auto-increment |
-| `Name` | `nvarchar(100)` | ✅ | **UNIQUE Index** — e.g., "جملة", "قطاعي", "VIP" |
-| `Description` | `nvarchar(250)?` | ❌ | Optional description |
-| `IsActive` | `bit` | ✅ | Global query filter |
-
-**Seed data for CustomerGroup**:
-| Name | Description |
-|------|-------------|
-| عام | المجموعة الافتراضية — لجميع العملاء غير المصنفين |
-| جملة | عملاء الجملة |
-| قطاعي | عملاء القطاعي |
-| VIP | عملاء مميزون |
+**Verification**: Customer.cs confirms:
+- ❌ No `OpeningBalance` property
+- ❌ No `CurrentBalance` property
+- ✅ Balance tracked via JournalEntryLines on linked Account
 
 ---
 
 ## 4. Customer Design Catalog
 
-### 4.1 Customer Entity (Enhanced)
+### 4.1 Customer Entity (Target — After Party Removal)
 
-| # | Field | Type | Required | Default | Constraints | Status |
+| # | Field | Type | Required | Default | Constraints | Source |
 |---|-------|------|----------|---------|-------------|--------|
-| 1 | `Id` | `int PK` | ✅ | Auto | — | ✅ Exists |
-| 2 | `Name` | `nvarchar(150)` | ✅ | — | **UNIQUE Index** (optional — discuss) | ✅ Exists |
-| 3 | `Phone` | `nvarchar(20)?` | ❌ | `null` | — | ✅ Exists |
-| 4 | `Email` | `nvarchar(100)?` | ❌ | `null` | — | ✅ Exists |
-| 5 | `Address` | `nvarchar(250)?` | ❌ | `null` | — | ✅ Exists |
-| 6 | `OpeningBalance` | `decimal(18,2)` | ❌ | `0` | `CHECK >= 0` | ✅ Exists |
-| 7 | `CurrentBalance` | `decimal(18,2)` | ❌ | `0` | — (computed) | ✅ Exists |
-| 8 | `CreditLimit` | `decimal(18,2)` | ❌ | `0` | `CHECK >= 0` | ✅ Exists |
-| 9 | `TaxNumber` | `nvarchar(30)?` | ❌ | `null` | **UNIQUE Index** (optional) | ✅ Exists |
-| 10 | `AccountId` | `int? FK` | ❌ | `null` | FK → Accounts, Restrict | ⬜ **NEW** |
-| 11 | `CustomerType` | `byte?` | ❌ | `null` | 1=Cash, 2=Credit | ⬜ **NEW** |
-| 12 | `CustomerGroupId` | `int? FK` | ❌ | `null` | FK → CustomerGroups, Restrict | ⬜ **NEW** |
-| 13 | `IsActive` | `bit` | ✅ | `true` | Global query filter | ✅ Exists (BaseEntity) |
-| 14 | `CreatedAt` | `datetime2` | ✅ | `GETUTCDATE()` | — | ✅ Exists (BaseEntity) |
-| 15 | `UpdatedAt` | `datetime2?` | ❌ | `null` | — | ✅ Exists (BaseEntity) |
-| 16 | `CreatedByUserId` | `int? FK` | ❌ | `null` | FK → Users, Restrict | ✅ Exists (BaseEntity) |
-| 17 | `UpdatedByUserId` | `int? FK` | ❌ | `null` | FK → Users, Restrict | ✅ Exists (BaseEntity) |
+| 1 | `Id` | `int PK` | ✅ | Auto | — | Existing |
+| 2 | `Name` | `nvarchar(150)` | ✅ | — | — | ⬜ Moved from Party |
+| 3 | `Phone` | `nvarchar(20)?` | ❌ | `null` | Regex: `^05\d{8}$` | ⬜ Moved from Party |
+| 4 | `Email` | `nvarchar(100)?` | ❌ | `null` | Email format | ⬜ Moved from Party |
+| 5 | `Address` | `nvarchar(250)?` | ❌ | `null` | — | ⬜ Moved from Party |
+| 6 | `TaxNumber` | `nvarchar(30)?` | ❌ | `null` | UNIQUE INDEX (optional) | ⬜ Moved from Party |
+| 7 | `Notes` | `nvarchar(500)?` | ❌ | `null` | — | ⬜ Moved from Party |
+| 8 | `AccountId` | `int FK` | ✅ | Auto | FK → Accounts, Restrict | ✅ Exists (non-nullable) |
+| 9 | `CategoryId` | `int? FK` | ❌ | `null` | FK → AccountCategories, Restrict | ✅ Exists |
+| 10 | `CreditLimit` | `decimal(18,2)` | ❌ | `0` | `CHECK >= 0` (0 = no limit) | ✅ Exists |
+| 11 | `IsActive` | `bit` | ✅ | `true` | Global query filter | ✅ Existing (BaseEntity) |
+| 12 | `CreatedAt` | `datetime2` | ✅ | `GETUTCDATE()` | — | ✅ Existing (BaseEntity) |
+| 13 | `UpdatedAt` | `datetime2?` | ❌ | `null` | — | ✅ Existing (BaseEntity) |
+| 14 | `CreatedByUserId` | `int? FK` | ❌ | `null` | FK → Users, Restrict | ✅ Existing (BaseEntity) |
+| 15 | `UpdatedByUserId` | `int? FK` | ❌ | `null` | FK → Users, Restrict | ✅ Existing (BaseEntity) |
 
-### 4.2 CustomerGroup Entity (New)
+**REMOVED (NOT IN V1):**
+- ~~`CustomerGroupId`~~ ❌ NOT IN V1
+- ~~`CustomerType`~~ ❌ NOT IN V1 (payment type per-invoice)
+- ~~`PartyId`~~ ❌ Replaced by direct contact fields
+- ~~`OpeningBalance`~~ ❌ Handled via Journal Entry
+- ~~`CurrentBalance`~~ ❌ Balance on linked Account
 
-| # | Field | Type | Required | Default | Constraints |
-|---|-------|------|----------|---------|-------------|
-| 1 | `Id` | `int PK` | ✅ | Auto | — |
-| 2 | `Name` | `nvarchar(100)` | ✅ | — | **UNIQUE Index** |
-| 3 | `Description` | `nvarchar(250)?` | ❌ | `null` | — |
-| 4 | `IsActive` | `bit` | ✅ | `true` | Global query filter |
+### 4.2 CustomerDto (Target)
 
-### 4.3 CustomerType Enum (New)
+| # | Field | Type | Notes |
+|---|-------|------|-------|
+| 1 | `Id` | `int` | Auto-increment PK |
+| 2 | `Name` | `string` | Direct from Customer (not Party) |
+| 3 | `Phone` | `string?` | Direct from Customer |
+| 4 | `Email` | `string?` | Direct from Customer |
+| 5 | `Address` | `string?` | Direct from Customer |
+| 6 | `TaxNumber` | `string?` | Direct from Customer |
+| 7 | `Notes` | `string?` | Direct from Customer |
+| 8 | `AccountId` | `int` | Mandatory FK to Account |
+| 9 | `AccountName` | `string?` | Read from Account.NameAr |
+| 10 | `CategoryId` | `int?` | FK to AccountCategories |
+| 11 | `CategoryName` | `string?` | Read from Category NameAr |
+| 12 | `CreditLimit` | `decimal` | 0 = no limit |
+| 13 | `IsActive` | `bool` | Soft-delete flag |
+| 14 | `CreatedAt` | `DateTime` | BaseEntity |
 
-> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
+### 4.3 CustomerBalanceReportDto (New — for Reports)
 
-### 4.4 CustomerBalanceReportDto (New — for reports)
+| # | Field | Type | Source |
+|---|-------|------|--------|
+| 1 | `CustomerId` | `int` | Customer.Id |
+| 2 | `CustomerName` | `string` | Customer.Name |
+| 3 | `AccountId` | `int` | Customer.AccountId |
+| 4 | `AccountCode` | `string` | Account.AccountCode |
+| 5 | `CurrentBalance` | `decimal` | Sum of JournalEntryLines (Debit - Credit) |
+| 6 | `CreditLimit` | `decimal` | Customer.CreditLimit |
+| 7 | `AvailableCredit` | `decimal` | CreditLimit - CurrentBalance (floored to 0) |
+| 8 | `TotalSales` | `decimal` | Sum of posted SalesInvoice TotalAmount |
+| 9 | `TotalPayments` | `decimal` | Sum of CustomerPayment amounts |
+| 10 | `LastTransactionDate` | `DateTime?` | Max of JournalEntry.CreatedAt |
 
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
+### 4.4 CustomerAgingReportDto (New — for Reports)
 
-### 4.5 CustomerAgingReportDto (New — for aging reports)
-
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
+| # | Field | Type | Source |
+|---|-------|------|--------|
+| 1 | `CustomerId` | `int` | Customer.Id |
+| 2 | `CustomerName` | `string` | Customer.Name |
+| 3 | `CurrentBalance` | `decimal` | From Account balance |
+| 4 | `Current0_30` | `decimal` | Unpaid invoices 0-30 days |
+| 5 | `Current31_60` | `decimal` | Unpaid invoices 31-60 days |
+| 6 | `Current61_90` | `decimal` | Unpaid invoices 61-90 days |
+| 7 | `Current91Plus` | `decimal` | Unpaid invoices 91+ days |
+| 8 | `TotalDue` | `decimal` | Sum of all aging buckets |
 
 ---
 
@@ -418,147 +541,215 @@ Observations:
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| Customer entity with Name, Phone, Email, Address | ✅ Exists | Nothing |
-| OpeningBalance, CurrentBalance, CreditLimit, TaxNumber | ✅ Exists | Nothing |
-| AccountId FK (link to Chart of Accounts) | ❌ Missing | Add FK + config + migration |
-| CustomerType (Cash/Credit enum) | ❌ Missing | Add enum + property + migration |
-| CustomerGroupId FK + CustomerGroup entity | ❌ Missing | Create from scratch |
-| Customer.CheckCreditLimit() domain method | ❌ Missing | Add domain method |
-| CreditLimit validation in SalesService | ❌ Missing | Add pre-transaction check |
+| Customer entity with PartyId | ✅ Exists | ❌ Remove PartyId |
+| Customer with direct Name, Phone, Email, Address | ❌ On Party entity | ⬜ Move fields to Customer |
+| Customer with direct TaxNumber, Notes | ❌ On Party entity | ⬜ Move fields to Customer |
+| AccountId FK (mandatory, non-nullable) | ✅ Already exists | Keep — auto-creation under "1130" |
+| CategoryId FK (optional) | ✅ Already exists | Keep |
+| CreditLimit field | ✅ Already exists | Keep |
+| CheckCreditLimit() domain method | ✅ Already exists | Keep — returns bool (non-throwing) |
+| CustomerGroup entity | ❌ Already absent | NOT IN V1 |
+| CustomerType enum | ❌ Already absent | NOT IN V1 |
+| Party entity (for Customer) | ✅ Exists | ❌ Remove Customer's dependency on Party (keep entity for Supplier/Employee) |
 
 ### 5.2 Infrastructure
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| CustomerConfiguration (Fluent API) | ✅ Exists | Add new FK configurations |
-| CustomerGroupConfiguration | ❌ Missing | Create from scratch |
-| DbSeeder — default customer name | ❌ Wrong | Rename to "عميل نقدي" |
-| DbSeeder — CustomerGroup seed data | ❌ Missing | Add 4 groups |
-| Migration — new columns | ❌ Missing | Create migration |
+| CustomerConfiguration (Fluent API) | ✅ Exists | Remove PartyId FK, add direct field configs |
+| PartyConfiguration | ✅ Exists | No change (Supplier/Employee still use Party) |
+| DbSeeder — default customer name | ✅ "عميل نقدي" | Keep as-is |
+| DbSeeder — CustomerGroup seeds | ❌ Already absent | NOT IN V1 |
+| DbSeeder — CustomerType seeds | ❌ Already absent | NOT IN V1 |
+| Migration — PartyId removal + direct fields | ❌ Missing | ⬜ NEW migration |
 
 ### 5.3 Application Services
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| ICustomerService — 6 CRUD methods | ✅ Exists | Add new methods |
-| CustomerService — CRUD implementation | ✅ Exists | Add new methods + mapping |
-| Customer group service (ICustomerGroupService) | ❌ Missing | Create from scratch |
-| Credit limit validation in CRM | ❌ Missing | Add CheckCreditLimitAsync |
-| Customer reports (balance, aging) | ❌ Missing | Add report services |
-| CustomerService — fix GetAllAsync sort order | ❌ Sorted A-Z | Change to Id desc (RULE-220) |
+| ICustomerService — 6 CRUD methods | ✅ Exists | Update signatures |
+| CustomerService — CRUD implementation | ✅ Exists | Remove Party creation, add Account auto-creation, fix mapping |
+| CustomerService — Account auto-creation | ❌ Missing | ⬜ Add auto-creation under parent "1130" |
+| Credit limit check in SalesService | ❌ Missing | ⬜ Add CheckCreditLimitAsync |
+| Customer reports (balance, aging) | ❌ Missing | ⬜ Add report services |
+| CustomerService — fix GetAllAsync sort order | ❌ Sorted A-Z | ⬜ Change to Id desc (RULE-220) |
 
 ### 5.4 API Layer
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| CustomersController — 6 endpoints | ✅ Exists | Add new endpoints |
-| CustomerGroupsController | ❌ Missing | Create |
-| CustomerReportsController | ❌ Missing | Create (or add to CustomersController) |
-| FluentValidators — current fields | ✅ Exists | Add new field validation |
-| FluentValidators — CustomerGroup | ❌ Missing | Create |
+| CustomersController — 6 endpoints | ✅ Exists | Minor updates only |
+| Customer reports endpoints | ❌ Missing | ⬜ Add balance + aging endpoints |
+| CustomerGroupsController | ❌ Already absent | NOT IN V1 |
+| FluentValidators — current fields | ✅ Exists | Add Phone regex, Notes validation |
+| FluentValidators — CustomerGroup | ❌ Already absent | NOT IN V1 |
 
 ### 5.5 Desktop Layer
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| CustomerListViewModel (371 lines) | ✅ Exists | Fix async patterns + add group filter |
-| CustomerEditorViewModel (244 lines) | ✅ Exists | Add AccountId, CustomerType, CustomerGroupId |
+| CustomerListViewModel (371 lines) | ✅ Exists | Fix async patterns, remove Party references |
+| CustomerEditorViewModel (244 lines) | ✅ Exists | Remove PartyId, add direct fields + Notes |
 | CustomerSelectionViewModel (133 lines) | ✅ Exists | Fix async patterns + empty catch |
-| CustomersListView.xaml (270 lines) | ✅ Exists | Add group filter combo + balance indicator |
-| CustomerEditorView.xaml (185 lines) | ✅ Exists | Add new fields + fix FontSize=20 |
-| CustomerGroup list/editor VMs | ❌ Missing | Create |
-| CustomerGroup XAML views | ❌ Missing | Create |
-| CustomerApiService (60 lines) | ✅ Exists | Add group + report methods |
-| ICustomerApiService (in IApiService.cs) | ✅ Exists | Add new method signatures |
+| CustomersListView.xaml (270 lines) | ✅ Exists | Remove Party references, add Notes column |
+| CustomerEditorView.xaml (185 lines) | ✅ Exists | Remove PartyId, add Notes field, fix FontSize=20 |
+| CustomerApiService (60 lines) | ✅ Exists | Add report methods |
+| ICustomerApiService (in IApiService.cs) | ✅ Exists | Add report method signatures |
+| CustomerGroup VMs/Views | ❌ Already absent | NOT IN V1 |
 
 ### 5.6 Validation & Business Rules
 
 | Rule | Status | Action |
 |------|--------|--------|
-| Customer.Name required | ✅ Exists | Nothing |
-| Phone max length 20 | ✅ Exists | Add regex pattern validation |
-| Email format validation | ✅ Exists | Nothing |
-| OpeningBalance ≥ 0 | ✅ Exists | Nothing |
-| CreditLimit ≥ 0 | ✅ Exists | Nothing |
-| CreditLimit enforcement during sales | ❌ Missing | Add in SalesService post-transaction |
-| CustomerType required for credit customers | ❌ Missing | Add validation |
-| CustomerGroupId must exist | ❌ Missing | Add FK validator |
+| Customer.Name required | ✅ Exists | Arabic message: "اسم العميل مطلوب" |
+| Phone regex pattern `^05\d{8}$` | ❌ Missing | ⬜ ADD |
+| Email format validation | ✅ Exists | Keep `.EmailAddress()` |
+| Notes max length 500 | ❌ Missing | ⬜ ADD |
+| CreditLimit ≥ 0 | ❌ Missing in validator | ⬜ ADD (exists in domain guard) |
+| CreditLimit enforcement during sales | ❌ Missing | ⬜ ADD pre-transaction check in SalesService |
+| TaxNumber uniqueness | ❌ Missing | ⬜ ADD unique index (optional) |
+| Account auto-creation on create | ❌ Missing | ⬜ ADD in CustomerService |
+| No AccountId in requests (auto-created) | ✅ Already absent | Keep |
 
 ---
 
 ## 6. Architectural Decisions
 
-### 6.1 CustomerType: Enum (NOT Bool)
+### 6.1 Direct Contact Fields (NOT Party Entity)
 
-Although CustomerType could be represented as a `bool IsCreditCustomer`, an enum is preferred because:
-- **Extensibility**: Future types may include `COD` (Cash on Delivery), `Prepaid`, `Installment`
-- **Clarity**: `CustomerType.Cash` is more readable than `IsCreditCustomer = false`
-- **Consistency**: Matches AGENTS.md convention of byte enums (UserRole, InvoiceStatus, PaymentType)
+**Decision**: Customer contact fields (Name, Phone, Email, Address, TaxNumber, Notes) are stored **directly on the Customer entity** — NOT on a shared Party table.
 
-**Decision**: Add `CustomerType` as `byte?` (nullable — defaults to null which means "not specified") with values 1=Cash, 2=Credit.
-
-### 6.2 CustomerGroup: Standalone Entity (NOT String)
-
-Several options were considered:
+**Rationale** (from accounts Details.md):
+```
+✅ حذف Parties → Contact fields directly on Customer entity
+✅ جعل Customers, Suppliers, Employees جداول مستقلة
+```
 
 | Option | Pros | Cons |
 |--------|------|------|
-| **String column** `GroupName` | Simple, no new table | No reporting, no consistency, typos |
-| **Standalone Entity** with CRUD | Full control, reporting, dropdown UI | More files, more code |
-| **Enum** | Simple, type-safe | Not user-extensible |
+| **Direct fields on Customer** ✅ | Simple queries, no joins, direct API mapping | Duplication if fields shared with Supplier |
+| Shared Party entity (current) | Shared contact data model | Complex queries, extra FK, unnecessary abstraction |
+| Separate shared base class | Code reuse without FK | Over-engineering for this scope |
 
-**Decision**: **Standalone Entity** (`CustomerGroup`) with full CRUD. Rationale:
-- Users need to create custom groups dynamically (Wholesale, Retail, VIP, Agent, etc.)
-- Reporting requires filtering by group
-- Dropdown in UI requires a reliable options source
-- 4 seed groups will be provided (عام, جملة, قطاعي, VIP)
+**Why not keep Party**: The Party entity adds unnecessary complexity (extra FK, extra join, extra CRUD) with minimal benefit. Customer and Supplier don't actually share contact data at runtime — they just have similar field shapes. Direct fields are simpler, faster, and match the accounts Details.md analysis.
 
-### 6.3 AccountId: Nullable FK (NOT Required)
+**⚠️ Impact on Supplier/Employee**: The Party entity will remain for Supplier and Employee until their respective phases migrate to direct fields. This plan only covers Customer.
 
-The customer may be created without an Account link if the Chart of Accounts module isn't fully set up yet.
+### 6.2 AccountId: MANDATORY, Auto-Created, NOT User-Supplied
 
-**Decision**: `int? AccountId` — nullable FK. When null:
-- Customer works normally for cash sales
-- Customer won't appear in account-based reports
-- A warning icon shows on the customer editor if Account is not linked
-- The SalesInvoice and CustomerPayment modules handle the null case gracefully
+**Decision**: `AccountId` is a mandatory non-nullable `int` FK to Account. The service auto-creates a Level-4 detail account under parent code "1130" (Accounts Receivable/العملاء) when creating a customer. AccountId is NEVER accepted from the user in Create/Update requests.
 
-### 6.4 CreditLimit Enforcement Strategy
+**Key design points**:
+- Parent account code: **"1130"** (NOT "1210" — RULE-504)
+- Account level: 4 (detail/leaf — allowTransactions: true)
+- Account code: auto-generated hierarchically (1131, 1132, 1133...)
+- Account name: matches Customer.Name in both Arabic and English
+- Nature: **Debit** (Asset — Accounts Receivable)
+- Color: `#2196F3` (Asset blue)
+- Wrapped in `ExecuteTransactionAsync()` — atomic with customer creation
+- If parent "1130" doesn't exist (Phase 22 not deployed), return clear error message
 
-**Decision**: Credit limit is checked **during sales invoice posting**, not during draft save.
+**Why mandatory (not nullable)**:
+- Every customer needs a balance tracking mechanism
+- Account-based reports (aging, balance, transaction history) require the link
+- Journal entries for payments and invoices reference the account
+- Without an Account, customer credit limit enforcement is impossible
+
+**Why not user-supplied**:
+- Account code numbering must be system-controlled for integrity
+- Users should not choose which AR sub-account to use
+- Prevents accidental linking to wrong account types (e.g., expense accounts)
+
+### 6.3 NO CustomerType (Payment Per-Invoice)
+
+**Decision**: CustomerType is **NOT in V1**. The payment classification (Cash/Credit) is determined per-invoice via `SalesInvoice.PaymentType`.
+
+**Rationale**:
+- A customer may pay cash for one invoice and credit for another
+- Per-customer type is a false constraint — it's a business flow choice, not a customer attribute
+- Per-invoice PaymentType already exists on SalesInvoice entity
+- AGENTS.md §3 already defines `PaymentType : byte { Cash = 1, Credit = 2, Mixed = 3 }` on SalesInvoice
+
+**What this means for the module**:
+- No CustomerType enum
+- No CustomerType field on Customer entity
+- No CustomerType in DTOs, requests, or responses
+- No CustomerType in validators
+- No CustomerType in UI (no radio buttons, no dropdown)
+
+### 6.4 NO CustomerGroup in V1
+
+**Decision**: CustomerGroup is **NOT in V1**. No grouping entity, service, controller, DTO, or UI.
+
+**Rationale** (from accounts Details.md):
+- CustomerGroup was originally planned but determined to be out of V1 scope
+- No existing CustomerGroup code in the codebase
+- Deferred to a future phase if needed for reporting
+
+**What this means for the module**:
+- No CustomerGroup entity
+- No CustomerGroupDto
+- No CustomerGroupService / ICustomerGroupService
+- No CustomerGroupsController
+- No CustomerGroup API endpoints
+- No CustomerGroup VMs or Views
+- No CustomerGroup seed data
+- No CustomerGroupId FK on Customer
+
+### 6.5 Balance: Via JournalEntryLines (NOT on Customer)
+
+**Decision**: Customer balance is computed from the linked Account's JournalEntryLines — NOT stored on Customer entity.
+
+**Rationale** (from accounts Details.md):
+```
+✅ الرصيد الحقيقي يأتي من JournalEntryLines وليس من جدول العميل
+```
+
+- No `OpeningBalance` or `CurrentBalance` on Customer entity (already correct)
+- Balance = `SUM(Debit) - SUM(Credit)` from `JournalEntryLine` where `AccountId = Customer.AccountId`
+- Balance is computed when needed for reports (not cached on entity)
+- CustomerPayment and SalesInvoice create journal entries that affect this balance
+
+### 6.6 CreditLimit Enforcement (Soft Warning Only)
+
+**Decision**: Credit limit is a **soft warning** — `CheckCreditLimit()` returns `bool` (never throws). The caller decides whether to block.
 
 **Flow**:
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
+1. `SalesService.PostAsync()` calls `CheckCreditLimitAsync(customerId, invoice.TotalAmount)`
+2. Inside: loads customer, computes projected balance via Account, calls `customer.CheckCreditLimit(projectedBalance)`
+3. If exceeds limit → log warning (RULE-183), return `Result.Failure` with Arabic message
+4. Admin users can override in future phases ("Force Post" permission)
 
-**Note**: This is a soft check — admin users can override (phase 24 feature — "Force Post" permission). In V1, the check blocks the post with a clear Arabic message.
+### 6.7 CategoryId: Optional Classification (Keep)
 
-### 6.5 Customer Balance: Computed (NOT Stored Manually)
+**Decision**: `CategoryId` (int?, FK → AccountCategories) is kept for customer classification — already exists in code.
 
-**Decision**: `CurrentBalance` is updated only through domain methods `IncreaseBalance()` and `DecreaseBalance()`:
-- Called from `SalesService.PostAsync()` (increases balance by DueAmount)
-- Called from `SalesService.CancelAsync()` (decreases balance by DueAmount)
-- Called from `CustomerPaymentService.PostAsync()` (decreases balance by payment amount)
-- Called from `SalesReturnService.PostAsync()` (decreases balance)
-- NEVER updated directly by the user
+- Optional field for grouping customers by type (e.g., Retail, Wholesale, VIP)
+- Distinguishable from CustomerGroup (which is removed) — CategoryId links to AccountCategories which is a general classification system
+- Not required for V1 core functionality
+- Displayed in CustomerDto and CustomerEditorView if populated
 
-The `OpeningBalance` field is set once during customer creation and never changes.
+### 6.8 Why Not A Combined "Customers + Suppliers" Module
 
-### 6.6 Why Not A Combined "Customers + Suppliers" Module
+**Decision**: Customers and Suppliers remain fully separate modules (no shared "Parties" approach).
 
-Some systems combine Customers and Suppliers into a single "Parties" module. We keep them separate because:
-- **Different behavior**: Customers have credit limits (due to us), suppliers have credit limits (we owe them)
-- **Different permissions**: Cashiers can view customers but not suppliers (AGENTS.md §6)
-- **Different reports**: Customer aging vs. Supplier aging
-- **Existing codebase**: Both modules already exist and are well-separated
+**Rationale** (from accounts Details.md):
+- Different behavior: Customers have credit limits (due to us), suppliers have credit limits (we owe them)
+- Different permissions: Cashiers can view customers but not suppliers (AGENTS.md §6)
+- Different reports: Customer aging vs. Supplier aging
+- Different COA parents: Customers under "1130" (AR), Suppliers under "1320" (AP)
+- Existing codebase: Both modules already exist and are well-separated
 
 ---
 
 ## 7. Non-V1 Items (Deferred)
 
-These customer features are explicitly **deferred** to future phases:
+These customer features are explicitly **deferred** to future phases or **excluded** from V1:
 
 | Feature | Reason | Proposed Phase |
 |---------|--------|----------------|
+| CustomerGroup | Removed from V1 per accounts Details.md | 🚫 Not planned |
+| CustomerType | Payment type is per-invoice (SalesInvoice.PaymentType) | 🚫 Not planned |
 | Customer Loyalty Points / Rewards Program | Requires new entity + business logic + UI | Phase 30+ |
 | Customer Statements (monthly PDF statements) | Requires background job + email integration | Phase 28+ |
 | Bulk SMS / Email to customer groups | Requires external API integration (Twilio, etc.) | Phase 29+ |
@@ -569,7 +760,7 @@ These customer features are explicitly **deferred** to future phases:
 | Customer Import from Excel/CSV | File parsing + validation + batch processing | Phase 28+ |
 | Duplicate Customer Detection (AI/ML) | Complex matching algorithm — not V1 | Phase 33+ |
 | Customer Barcode / QR on statements | Print design detail — low priority | Phase 26+ |
-| Default Cash Customer setting in SystemSettings (`DefaultCashCustomerId`) | Already exists as key-value setting — just needs UI toggle | ✅ Already exists |
+| Default Cash Customer setting (`DefaultCashCustomerId`) | Already exists as key-value setting | ✅ Already exists |
 
 ---
 
@@ -579,509 +770,856 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 ---
 
-### Task 1 — Rename Default Customer Seed to "عميل نقدي"
+### Task 1 — Remove PartyId from Customer Entity, Add Direct Contact Fields
+
+**Description**: Remove the `PartyId` FK from Customer entity. Add all contact fields (Name, Phone, Email, Address, TaxNumber, Notes) **directly** on Customer. Update the `Create()` and `Update()` factory methods to accept direct contact fields instead of a PartyId.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Infrastructure/Data/DbSeeder.cs` (line 122) | Change `"العميل الافتراضي في النظام"` → `"عميل نقدي"` |
-| `Infrastructure/Data/DbSeeder.cs` (line 130) | Change `"المورد الافتراضي في النظام"` → `"مورد نقدي"` (cross-reference for Supplier module) |
+| `Domain/Entities/Customer.cs` | Remove `PartyId`, `Party` nav property. Add `Name`, `Phone`, `Email`, `Address`, `TaxNumber`, `Notes` direct fields. Update `Create()` signature. Update `Update()` signature. |
+| `Infrastructure/Data/Configurations/CustomerConfiguration.cs` | Remove PartyId FK config. Add direct field configs: `Name` (HasMaxLength 150, IsRequired), `Phone` (HasMaxLength 20), `Email` (HasMaxLength 100), `Address` (HasMaxLength 250), `TaxNumber` (HasMaxLength 30), `Notes` (HasMaxLength 500). Add `HasIndex(c => c.TaxNumber).IsUnique().HasFilter("[TaxNumber] IS NOT NULL")` |
+| `Infrastructure/Data/Migrations/` | NEW migration: `DROP FK_Customers_Parties_PartyId`, `DROP COLUMN PartyId`, `ADD Name nvarchar(150) NOT NULL`, `ADD Phone nvarchar(20) NULL`, `ADD Email nvarchar(100) NULL`, `ADD Address nvarchar(250) NULL`, `ADD TaxNumber nvarchar(30) NULL`, `ADD Notes nvarchar(500) NULL`. If production data exists, include data migration: `UPDATE Customers SET Name = p.Name, Phone = p.Phone, ... FROM Parties p WHERE Customers.PartyId = p.Id` |
 
-**Code change**:
-> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
+**Domain entity changes**:
 
-**Logging**: `Log.Information("Default customer seeded: عميل نقدي (ID: {CustomerId})")`
+```csharp
+// REMOVED:
+// public int PartyId { get; private set; }
+// public virtual Party Party { get; private set; } = null!;
 
-**Validation**: None — name change only
+// ADDED:
+public string Name { get; private set; } = string.Empty;
+public string? Phone { get; private set; }
+public string? Email { get; private set; }
+public string? Address { get; private set; }
+public string? TaxNumber { get; private set; }
+public string? Notes { get; private set; }
 
-**Estimate**: ~5 minutes
+// Updated Create() — NO more partyId parameter:
+public static Customer Create(
+    string name,                    // NEW — direct
+    string? phone,                  // NEW — direct
+    string? email,                  // NEW — direct
+    string? address,                // NEW — direct
+    string? taxNumber,              // NEW — direct
+    string? notes,                  // NEW — direct
+    int accountId,                  // Mandatory
+    decimal creditLimit = 0,
+    int? categoryId = null,
+    int? createdByUserId = null)
+{
+    if (string.IsNullOrWhiteSpace(name))
+        throw new DomainException("اسم العميل مطلوب.");
+    // ... guard clauses for other fields ...
 
----
+    return new Customer
+    {
+        Name = name.Trim(),
+        Phone = phone?.Trim(),
+        Email = email?.Trim(),
+        Address = address?.Trim(),
+        TaxNumber = taxNumber?.Trim(),
+        Notes = notes?.Trim(),
+        AccountId = accountId,
+        CreditLimit = creditLimit,
+        CategoryId = categoryId,
+        IsActive = true,
+        CreatedAt = DateTime.UtcNow
+    };
+}
 
-### Task 2 — Add AccountId FK to Customer + Migration
+// Updated Update() — now accepts contact fields:
+public void Update(
+    string name,
+    string? phone = null,
+    string? email = null,
+    string? address = null,
+    string? taxNumber = null,
+    string? notes = null,
+    decimal creditLimit = 0,
+    int? categoryId = null,
+    int? updatedByUserId = null)
+{
+    if (string.IsNullOrWhiteSpace(name))
+        throw new DomainException("اسم العميل مطلوب.");
+    if (creditLimit < 0)
+        throw new DomainException("حد الائتمان لا يمكن أن يكون سالباً.");
 
-**Files**:
+    Name = name.Trim();
+    Phone = phone?.Trim();
+    Email = email?.Trim();
+    Address = address?.Trim();
+    TaxNumber = taxNumber?.Trim();
+    Notes = notes?.Trim();
+    CreditLimit = creditLimit;
+    if (categoryId.HasValue)
+        CategoryId = categoryId;
+    SetUpdatedBy(updatedByUserId);
+    UpdateTimestamp();
+}
+```
 
-| File | Change |
-|------|--------|
-| `Domain/Entities/Customer.cs` | Add `public int? AccountId { get; private set; }` + `Account? Account` nav property + `LinkToAccount(int accountId)` method |
-| `Infrastructure/Data/Configurations/CustomerConfiguration.cs` | Add FK config: `.Property(c => c.AccountId)`, `.HasIndex(c => c.AccountId)`, `.HasForeignKey(c => c.AccountId).OnDelete(DeleteBehavior.Restrict)` |
-| `Infrastructure/Data/Migrations/` | New migration: ADD column + FK + INDEX |
-| `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Add `int? AccountId`, `string? AccountName` |
-| `Contracts/Requests/CustomerRequests.cs` | Add `int? AccountId` to Create/Update |
-| `Contracts/Responses/CustomerResponse.cs` | Add `int? AccountId`, `string? AccountName` |
-| `Application/Services/CustomerService.cs` | Map `AccountId` + `AccountName` in `MapToDto()` — eager load `Account` nav property |
-| `Api/Validators/CustomerRequestValidators.cs` | Add `AccountId must exist if provided` rule |
+**Logging**: `Log.Information("Customer {CustomerId} contact fields updated: Name={Name}, Phone={Phone}", id, name, maskedPhone)`
 
-**Domain method**:
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
-
-**SQL migration**:
-> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
-
-**Logging**: `Log.Information("Customer {CustomerId} linked to Account {AccountId}", customerId, accountId)`
-
-**Validation**: `RuleFor(x => x.AccountId).GreaterThan(0).When(x => x.AccountId.HasValue)`
-
-**Estimate**: ~1 hour
-
----
-
-### Task 3 — Add CustomerType Enum + CustomerGroup Entity + Migration
-
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Domain/Enums/CustomerType.cs` | **NEW** — `public enum CustomerType : byte { Cash = 1, Credit = 2 }` |
-| `Domain/Entities/CustomerGroup.cs` | **NEW** — entity with Name, Description, IsActive |
-| `Domain/Entities/Customer.cs` | Add `public byte? CustomerType { get; private set; }` + `public int? CustomerGroupId { get; private set; }` + nav properties + `SetCustomerType()`, `SetCustomerGroup()` methods |
-| `Infrastructure/Data/Configurations/CustomerConfiguration.cs` | Add `.Property(c => c.CustomerType)`, `.HasIndex(c => c.CustomerGroupId)`, `.HasForeignKey(c => c.CustomerGroupId).OnDelete(DeleteBehavior.Restrict)` |
-| `Infrastructure/Data/Configurations/CustomerGroupConfiguration.cs` | **NEW** — Fluent API config |
-| `Infrastructure/Data/DbSeeder.cs` | Add seed data for 4 CustomerGroups + link default customer to "عام" group + set CustomerType = Cash |
-| `Infrastructure/Data/Migrations/` | New migration: ADD columns + FK + tables |
-| `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Add `byte? CustomerType`, `int? CustomerGroupId`, `string? CustomerGroupName` |
-| `Contracts/DTOs/AllDtos.cs` — `CustomerGroupDto` | **NEW** — record |
-| `Contracts/Requests/CustomerRequests.cs` | Add `byte? CustomerType`, `int? CustomerGroupId` to Create/Update |
-| `Contracts/Requests/CustomerGroupRequests.cs` | **NEW** — CreateCustomerGroupRequest, UpdateCustomerGroupRequest |
-| `Contracts/Responses/CustomerResponse.cs` | Add `byte? CustomerType`, `string? CustomerGroupName` |
-| `Application/Services/CustomerService.cs` | Map new fields in `MapToDto()` + eager load CustomerGroup nav property |
-
-**CustomerGroup entity**:
-
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for table definitions.
-
-**Customer configuration additions**:
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
-
-> See `Infrastructure/Data/DbSeeder.cs` for seed data patterns.
-
-**SQL migration**:
-> See `docs/database-schema.md` for the canonical table definitions and migration patterns.
-
-**Logging**: `Log.Information("Customer {Id} type set to {CustomerType}", id, customerType)`
-
-**Validation**: `RuleFor(x => x.CustomerType).InclusiveBetween(1, 2).When(x => x.CustomerType.HasValue)`
+**Validation**: All field guards in domain entity with Arabic messages:
+- `"اسم العميل مطلوب"`
+- `"رقم الجوال يجب أن يتكون من 10 أرقام ويبدأ بـ 05"`
+- `"البريد الإلكتروني غير صالح"`
+- `"الحد الائتماني لا يمكن أن يكون سالباً"`
 
 **Estimate**: ~2 hours
 
 ---
 
-### Task 3.1 — Auto-Create Sub-Account When CustomerType = Credit
+### Task 2 — Add Account Auto-Creation Under Parent "1130" in CustomerService
 
-**Problem**: Analysis Part 2 (lines 740-821) requires that when creating a customer with `CustomerType = Credit`, the system must automatically create a sub-account in the Chart of Accounts under the `العملاء` parent account (Account Code 1210, seeded in Phase 22).
+**Description**: When `CustomerService.CreateAsync()` is called, auto-create a Level-4 detail account under parent account code "1130" (Accounts Receivable/العملاء). The AccountId is NEVER supplied by the user — it is always system-generated.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Application/Services/CustomerService.cs` | Add `CreateCustomerAccountAsync()` method as part of `CreateAsync()` flow |
-| `Application/Interfaces/Services/ICustomerService.cs` | Add `CreateCustomerAccountAsync` signature |
-| `Application/Services/CustomerService.cs` | Update `CreateAsync()` to call account creation when CustomerType is Credit |
-| `Infrastructure/Data/Migrations/` | Ensure Account sequence exists for auto-code generation |
-| `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Ensure `AccountId`, `AccountName` returned after creation |
+| `Application/Interfaces/Services/ICustomerService.cs` | Add `AutoCreateCustomerAccountAsync(int customerId, int userId, CancellationToken ct)` — returns `Result<int>` (AccountId) |
+| `Application/Services/CustomerService.cs` | Add `AutoCreateCustomerAccountAsync()` implementation. Update `CreateAsync()` to call account creation as part of the transactional flow. |
+| `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Ensure `AccountId` and `AccountName` are included in response after creation |
+| `Contracts/Requests/CustomerRequests.cs` | Ensure NO `AccountId` field in Create/Update — it is system-generated |
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
+**Auto-creation logic** (in CustomerService.CreateAsync):
+```csharp
+// Step 1: Create Customer entity (no AccountId yet)
+var customer = Customer.Create(
+    name: request.Name,
+    phone: request.Phone,
+    email: request.Email,
+    address: request.Address,
+    taxNumber: request.TaxNumber,
+    notes: request.Notes,
+    accountId: 0,  // Placeholder — will update after account creation
+    creditLimit: request.CreditLimit,
+    categoryId: request.CategoryId,
+    createdByUserId: userId
+);
+await _uow.Customers.AddAsync(customer, ct);
+await _uow.SaveChangesAsync(ct);  // Get customer.Id
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer + transaction patterns.
+// Step 2: Auto-create Account under parent "1130"
+var result = await AutoCreateCustomerAccountAsync(customer.Id, userId, ct);
 
-**⚠️ Dependency**: Phase 22 must be complete — the parent account `1210 — العملاء` must exist in the seeded Chart of Accounts. If Phase 22 is not yet deployed, this feature will skip account creation and return a clear error message.
+// Step 3: Update Customer with AccountId
+customer.SetAccountId(result.Value);
+await _uow.SaveChangesAsync(ct);
+```
+
+**AutoCreateCustomerAccountAsync**:
+```csharp
+public async Task<Result<int>> AutoCreateCustomerAccountAsync(
+    int customerId, int userId, CancellationToken ct)
+{
+    var customer = await _uow.Customers.GetByIdAsync(customerId, ct);
+    if (customer == null)
+        return Result<int>.Failure("العميل غير موجود", ErrorCodes.NotFound);
+    if (customer.AccountId > 0)
+        return Result<int>.Failure("العميل لديه حساب محاسبي بالفعل");
+
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
+    if (parentAccount == null)
+        return Result<int>.Failure(
+            "الحساب الرئيسي 1130 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات.");
+
+    var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
+    var newCode = (int.Parse(maxCode ?? "1130") + 1).ToString();
+    
+    var account = Account.Create(
+        accountCode: newCode,
+        nameAr: customer.Name,
+        nameEn: customer.Name,
+        nature: AccountNature.Debit,
+        isLeaf: true,
+        parentId: parentAccount.Id,
+        isSystem: false,
+        categoryId: null,
+        level: 4,
+        description: $"حساب العميل: {customer.Name}",
+        colorCode: "#2196F3",
+        notes: null,
+        allowTransactions: true,
+        createdByUserId: userId
+    );
+    await _uow.Accounts.AddAsync(account, ct);
+    await _uow.SaveChangesAsync(ct);
+
+    return Result<int>.Success(account.Id);
+}
+```
+
+**⚠️ Dependency**: Phase 22 (Chart of Accounts) must be complete — account "1130" must exist. If Phase 22 is not deployed, return clear error message.
 
 **Logging**:
-- `Log.Information("Sub-account created for Customer {CustomerId}: AccountCode={Code}, AccountId={Id}", ...)`
-- `Log.Warning("Could not auto-create account for credit customer {Id}: parent account 1210 not found", ...)`
+- `Log.Information("Account auto-created for Customer {CustomerId}: AccountCode={Code}, AccountId={Id}", customerId, newCode, account.Id)`
+- `Log.Warning("Cannot auto-create account for customer {Id}: parent account 1130 not found", customerId)`
 
 **Estimate**: ~1.5 hours
 
 ---
 
-### Task 4 — Add CreditLimit Validation Domain Method + Service Check
+### Task 3 — Add CreditLimit Validation + SalesService Enforcement
+
+**Description**: Add `CheckCreditLimit()` domain method (already exists in simplified form) and wire it into `SalesService.PostAsync()` as a pre-transaction check. Add `CheckCreditLimitAsync()` to `CustomerService`.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Domain/Entities/Customer.cs` | Add `CheckCreditLimit(decimal additionalAmount)` method + `IsCreditLimitExceeded(decimal projectedBalance)` method |
-| `Application/Services/CustomerService.cs` | Add `CheckCreditLimitAsync(int customerId, decimal amount, CancellationToken ct)` method |
-| `Application/Services/SalesService.cs` | Add credit limit check before BeginTransactionAsync in PostAsync |
+| `Domain/Entities/Customer.cs` | `CheckCreditLimit(decimal additionalAmount)` — Already exists. Enhance to accept `decimal currentBalance` for proper comparison. |
+| `Application/Services/CustomerService.cs` | Add `CheckCreditLimitAsync(int customerId, decimal amount, CancellationToken ct)` |
 | `Application/Interfaces/Services/ICustomerService.cs` | Add `CheckCreditLimitAsync` signature |
+| `Application/Services/SalesService.cs` | Add credit limit check BEFORE `BeginTransactionAsync` in `PostAsync()` |
 | `Contracts/DTOs/AllDtos.cs` | Add `CreditLimitCheckResultDto` record |
 
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods).
+**Domain method (enhanced)**:
+```csharp
+/// <summary>
+/// Checks whether adding an additional amount would exceed the credit limit.
+/// Non-throwing — the caller decides whether to block.
+/// </summary>
+public bool CheckCreditLimit(decimal currentBalance, decimal additionalAmount)
+{
+    if (CreditLimit <= 0)
+        return true; // No limit set — always allowed
+    return (currentBalance + additionalAmount) <= CreditLimit;
+}
+```
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
+**SalesService integration**:
+```csharp
+// Inside SalesService.PostAsync(), BEFORE transaction:
+if (invoice.PaymentType != PaymentType.Cash && invoice.CustomerId.HasValue)
+{
+    var creditCheck = await _customerService.CheckCreditLimitAsync(
+        invoice.CustomerId.Value, invoice.TotalAmount, ct);
+    if (!creditCheck.IsSuccess)
+        return Result<SalesInvoiceDto>.Failure(
+            $"تجاوز الحد الائتماني للعميل: {creditCheck.Error}", 
+            ErrorCodes.CreditLimitExceeded);
+}
+```
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
-
-**Logging**: 
-- `Log.Warning("Credit limit exceeded for Customer {Id}: Current={Current}, Limit={Limit}", ...)` (RULE-183 — user mistake)
-- `Log.Information("Credit limit check passed for Customer {Id}", ...)`
-
-**Validation**: N/A — this is business logic validation, not request validation
+**Logging**:
+- `Log.Warning("Credit limit exceeded for Customer {Id}: Current={Current}, Additional={Additional}, Limit={Limit}", ...)` — RULE-183 (user mistake)
+- `Log.Information("Credit limit check passed for Customer {Id}: Projected={Projected}, Limit={Limit}", ...)`
 
 **Estimate**: ~1 hour
 
 ---
 
-### Task 5 — Enhance CustomerEditorViewModel with New Fields + INotifyDataErrorInfo
+### Task 4 — Update CustomerService CreateAsync/UpdateAsync (Remove Party Logic)
+
+**Description**: Refactor `CustomerService.CreateAsync()` and `UpdateAsync()` to work with direct contact fields instead of Party records. Remove all Party creation/update logic.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `ViewModels/Customers/CustomerEditorViewModel.cs` | Add AccountId, CustomerType, CustomerGroupId properties + load groups + validation |
+| `Application/Services/CustomerService.cs` | `CreateAsync()` — No longer creates Party. Creates Customer directly with contact fields + auto-creates Account. `UpdateAsync()` — Updates Customer directly, no Party.Update(). |
+| `Application/Services/CustomerService.cs` | `MapToDto()` — Map contact fields from Customer directly (not from Customer.Party) |
+| `Application/Services/CustomerService.cs` | `PermanentDeleteAsync()` — No Party FK to check |
 
-> See `docs/AGENTS.md` for ViewModel patterns (INotifyDataErrorInfo, ExecuteAsync wrapper). See existing editor ViewModels for property binding conventions.
+**Mapping changes**:
+```csharp
+// BEFORE (with Party):
+private static CustomerDto MapToDto(Customer customer) => new()
+{
+    Id = customer.Id,
+    Name = customer.Party?.Name ?? string.Empty,
+    Phone = customer.Party?.Phone,
+    Email = customer.Party?.Email,
+    // ...
+};
 
-> See `docs/AGENTS.md` §2.23 for INotifyDataErrorInfo validation patterns.
+// AFTER (direct fields):
+private static CustomerDto MapToDto(Customer customer) => new()
+{
+    Id = customer.Id,
+    Name = customer.Name,
+    Phone = customer.Phone,
+    Email = customer.Email,
+    Address = customer.Address,
+    TaxNumber = customer.TaxNumber,
+    Notes = customer.Notes,
+    AccountId = customer.AccountId,
+    AccountName = customer.Account?.NameAr,
+    CategoryId = customer.CategoryId,
+    CreditLimit = customer.CreditLimit,
+    IsActive = customer.IsActive,
+    CreatedAt = customer.CreatedAt
+};
+```
 
-> See existing ViewModel constructors in `DesktopPWF/ViewModels/` for initialization patterns.
-
-**Logging**: `LogSystemError("Failed to load customer groups", "CustomerEditorViewModel.LoadCustomerGroupsAsync", ex)`
+**Logging**: `Log.Information("Customer {Id} created with direct contact fields: Name={Name}, AccountId={AccountId}", customer.Id, customer.Name, customer.AccountId)`
 
 **Estimate**: ~1.5 hours
 
 ---
 
-### Task 6 — Update CustomerEditorView.xaml with New Fields + Arabic ToolTips + Compact Styles
+### Task 5 — Update Contracts Layer (DTOs, Requests, Responses)
+
+**Description**: Update DTOs to reflect direct contact fields. Remove any Party-related fields. Add Notes. Remove CustomerGroup/CustomerType fields (already absent).
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Views/Customers/CustomerEditorView.xaml` | Add CustomerType radio/dropdown, CustomerGroup combo, AccountId search/combo, fix FontSize=20 violation |
+| `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Remove `PartyId`. Add `Notes` (string?). Keep `Name`, `Phone`, `Email`, `Address`, `TaxNumber` as direct fields (not via Party). Remove `PartyName`/`PartyPhone` aliases if any. |
+| `Contracts/DTOs/AllDtos.cs` — `CustomerBalanceReportDto` | NEW record |
+| `Contracts/DTOs/AllDtos.cs` — `CustomerAgingReportDto` | NEW record |
+| `Contracts/DTOs/AllDtos.cs` — `CreditLimitCheckResultDto` | NEW record |
+| `Contracts/Requests/CustomerRequests.cs` — `CreateCustomerRequest` | Remove `AccountId` (auto-created). Add `Notes`. Keep existing fields. |
+| `Contracts/Requests/CustomerRequests.cs` — `UpdateCustomerRequest` | Remove `AccountId` (cannot change). Add `Notes`. Keep existing fields. |
+| `Contracts/Responses/CustomerResponse.cs` | Remove `PartyId`. Add `Notes` (string?). Keep contact fields direct. |
 
-**New XAML sections (in order)**:
+**CustomerDto target**:
+```csharp
+public record CustomerDto(
+    int Id,
+    string Name,
+    string? Phone,
+    string? Email,
+    string? Address,
+    string? TaxNumber,
+    string? Notes,
+    int AccountId,
+    string? AccountName,
+    int? CategoryId,
+    decimal CreditLimit,
+    bool IsActive,
+    DateTime CreatedAt
+);
+```
 
-> See XAML patterns in existing views at `DesktopPWF/Views/` and `DesktopPWF/Styles/Styles.xaml` for control styling conventions.
+**Estimate**: ~1 hour
 
-> See `docs/AGENTS.md` §2.64 for UI compact style rules (RULE-262–274).
+---
 
-> See `docs/AGENTS.md` §2.64 for UI compact style rules (RULE-262–274).
+### Task 6 — Update FluentValidation for Customer Requests
 
-**Arabic ToolTips (RULE-185-190)**:
-- CustomerType combo: `"اختيار نوع العميل — نقدي (الدفع عند الاستلام) أو آجل (فاتورة على الحساب)"`
-- CustomerGroup combo: `"تصنيف العميل ضمن مجموعة — يساعد في التقارير والتصفية"`
-- Account combo: `"ربط العميل بحساب في دليل الحسابات — ضروري للتقارير المحاسبية"`
-- Save button: `"حفظ بيانات العميل — سيتم تحديث جميع المعلومات"`
-- Cancel button: `"إلغاء وإغلاق نافذة العميل"`
+**Description**: Update validators to add Phone regex, Notes maxlength, and remove any Party-related validation. Remove CustomerGroup/CustomerType validation (none existed, but ensure none added).
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `Api/Validators/CustomerRequestValidators.cs` | Add Phone regex, Notes maxlength, Name required Arabic message, CreditLimit range |
+
+**Validator additions**:
+```csharp
+public class CreateCustomerRequestValidator : AbstractValidator<CreateCustomerRequest>
+{
+    public CreateCustomerRequestValidator()
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty().WithMessage("اسم العميل مطلوب")
+            .MaximumLength(150).WithMessage("اسم العميل يجب أن لا يتجاوز 150 حرفاً");
+
+        RuleFor(x => x.Phone)
+            .Matches("^05\\d{8}$").WithMessage("رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام")
+            .When(x => !string.IsNullOrEmpty(x.Phone));
+
+        RuleFor(x => x.Email)
+            .EmailAddress().WithMessage("البريد الإلكتروني غير صالح")
+            .When(x => !string.IsNullOrEmpty(x.Email));
+
+        RuleFor(x => x.Address)
+            .MaximumLength(250).WithMessage("العنوان يجب أن لا يتجاوز 250 حرفاً");
+
+        RuleFor(x => x.TaxNumber)
+            .MaximumLength(30).WithMessage("الرقم الضريبي يجب أن لا يتجاوز 30 حرفاً");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(500).WithMessage("الملاحظات يجب أن لا تتجاوز 500 حرف");
+
+        RuleFor(x => x.CreditLimit)
+            .GreaterThanOrEqualTo(0).WithMessage("الحد الائتماني لا يمكن أن يكون سالباً");
+    }
+}
+
+public class UpdateCustomerRequestValidator : AbstractValidator<UpdateCustomerRequest>
+{
+    // Same rules as Create
+}
+```
+
+**Estimate**: ~30 minutes
+
+---
+
+### Task 7 — Update CustomerEditorViewModel (Remove Party Logic, Add Direct Fields + Notes)
+
+**Description**: Refactor CustomerEditorViewModel to work with direct contact fields instead of Party. Add Notes property. Remove any CustomerGroup/CustomerType-related properties.
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `ViewModels/Customers/CustomerEditorViewModel.cs` | Replace Party-based loading/saving with direct field operations. Add `Notes` property. Remove `PartyId`. Remove `CustomerGroupId`/`CustomerType` stubs if any. |
+
+**Property changes**:
+- Keep: `Name`, `Phone`, `Email`, `Address`, `TaxNumber`, `CreditLimit`, `CategoryId`, `SelectedCategory`
+- Add: `Notes` (string?, with INotifyDataErrorInfo validation)
+- Remove: `PartyId` (was kept in VM)
+- Remove: Any `CustomerGroupId`, `CustomerGroupList`, `SelectedCustomerGroup` if referenced
+- Remove: Any `CustomerType`, `SelectedCustomerType` if referenced
+
+**SaveAsync flow change**:
+```csharp
+// BEFORE: Create Party → Create Customer with PartyId
+// AFTER: Create Customer directly with contact fields + auto-create Account
+
+private async Task SaveAsync()
+{
+    if (!Validate()) return;
+    await ExecuteAsync(async () =>
+    {
+        var request = new CreateCustomerRequest
+        {
+            Name = Name,
+            Phone = Phone,
+            Email = Email,
+            Address = Address,
+            TaxNumber = TaxNumber,
+            Notes = Notes,
+            CreditLimit = CreditLimit,
+            CategoryId = SelectedCategory?.Key
+            // NO AccountId — auto-created by service
+        };
+        var result = await _customerApiService.CreateAsync(request);
+        // ...
+    });
+}
+```
+
+**Logging**: `LogSystemError("فشل حفظ العميل", "CustomerEditorViewModel.SaveAsync", ex)`
+
+**Arabic ToolTips (new)**:
+- Name: `"اسم العميل — إلزامي"`
+- Phone: `"رقم الجوال — يجب أن يبدأ بـ 05 ويتكون من 10 أرقام"`
+- Email: `"البريد الإلكتروني — اختياري"`
+- Address: `"العنوان — اختياري"`
+- TaxNumber: `"الرقم الضريبي — اختياري وفريد"`
+- Notes: `"ملاحظات إضافية عن العميل"`
+- Save button: `"حفظ بيانات العميل — سيتم إنشاء حساب محاسبي تلقائياً"`
 
 **Estimate**: ~1.5 hours
 
 ---
 
-### Task 7 — Update CustomersListView.xaml with Group Filter + Balance Indicator
+### Task 8 — Update CustomerEditorView.xaml (Remove Party Fields, Add Notes + Account Display)
+
+**Description**: Update editor XAML to show direct contact fields, remove Party-related controls, add Notes multiline input, fix FontSize=20 violation, add loading overlay.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `ViewModels/Customers/CustomerListViewModel.cs` | Add Group filter combo + fix async patterns (RULE-141) + fix CanExecute violations (RULE-059) |
-| `Views/Customers/CustomersListView.xaml` | Add group filter UI + balance indicator column + fix ToolTips |
+| `Views/Customers/CustomerEditorView.xaml` | Replace any Party-related template with direct fields. Add Notes TextBox (multiline). Add AccountName display (read-only). Fix FontSize="20" → "16". Add loading overlay. |
 
-**ViewModel changes**:
+**XAML layout (target)**:
 
-**a) Add group filter property**:
-> See existing ViewModel patterns in `DesktopPWF/ViewModels/` for ObservableCollection and filter property conventions.
+```xml
+<!-- Account Info (Read-Only Display) -->
+<Border Style="{StaticResource SectionBorder}">
+    <Grid>
+        <TextBlock Text="معلومات الحساب المحاسبي" Style="{StaticResource SectionHeaderStyle}"/>
+        <StackPanel Grid.Row="1" Margin="0,6,0,0">
+            <TextBlock Text="رقم الحساب: يتم إنشاؤه تلقائياً" 
+                       Style="{StaticResource ReadOnlyFieldStyle}"
+                       ToolTip="الحساب المحاسبي للعميل — يتم إنشاؤه تلقائياً تحت 1130"/>
+            <TextBlock Text="{Binding AccountName, StringFormat='اسم الحساب: {0}'}"
+                       Visibility="{Binding AccountName, Converter={StaticResource StringNotEmptyToVisibility}}"
+                       Style="{StaticResource ReadOnlyFieldStyle}"/>
+        </StackPanel>
+    </Grid>
+</Border>
 
-> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
+<!-- Contact Information (Direct Fields) -->
+<Border Style="{StaticResource SectionBorder}">
+    <Grid>
+        <TextBlock Text="معلومات الاتصال" Style="{StaticResource SectionHeaderStyle}"/>
+        <StackPanel Grid.Row="1" Margin="0,6,0,0">
+            <!-- Name -->
+            <TextBlock Text="اسم العميل *" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="اسم العميل — إلزامي"/>
+            
+            <!-- Phone -->
+            <TextBlock Text="رقم الجوال" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="رقم الجوال — يجب أن يبدأ بـ 05 ويتكون من 10 أرقام"/>
 
-> See `docs/AGENTS.md` §2.23 for interactive validation patterns (RULE-059 — buttons always enabled).
+            <!-- Email -->
+            <TextBlock Text="البريد الإلكتروني" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="البريد الإلكتروني — اختياري"/>
 
-> See `docs/AGENTS.md` §2.23 — CanExecute predicates are never used (buttons always enabled).
+            <!-- Address -->
+            <TextBlock Text="العنوان" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="العنوان — اختياري"/>
 
-> See XAML patterns in existing views at `DesktopPWF/Views/Customers/` for DataGrid/ToolBar conventions.
+            <!-- TaxNumber -->
+            <TextBlock Text="الرقم الضريبي" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <TextBox Text="{Binding TaxNumber, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="الرقم الضريبي — اختياري وفريد لكل عميل"/>
 
-**Fix XAML ToolTips**:
-- Edit button: `"تعديل بيانات العميل المحدد"` (not `"تعديل العنصر المحدد"`)
-- Delete button: `"حذف أو إلغاء تنشيط العميل المحدد"` (not `"حذف أو إلغاء تنشيط العنصر المحدد"`)
-- Restore button: `"استعادة العميل المحذوف"` (not `"استعادة العنصر المحذوف"`)
-- Refresh button: `"تحديث قائمة العملاء"` (not `"تحديث قائمة البيانات"`)
+            <!-- Notes -->
+            <TextBlock Text="ملاحظات" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                     AcceptsReturn="True" TextWrapping="Wrap" MaxHeight="100"
+                     ToolTip="ملاحظات إضافية — اختيارية"/>
+        </StackPanel>
+    </Grid>
+</Border>
 
-**Logging**: `LogSystemError("Failed to load customer groups", "CustomerListViewModel.LoadGroupsAsync", ex)`
+<!-- Financial Info -->
+<Border Style="{StaticResource SectionBorder}">
+    <Grid>
+        <TextBlock Text="المعلومات المالية" Style="{StaticResource SectionHeaderStyle}"/>
+        <StackPanel Grid.Row="1" Margin="0,6,0,0">
+            <!-- CreditLimit -->
+            <TextBlock Text="الحد الائتماني" Style="{StaticResource LabelStyle}"/>
+            <TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged}"
+                     ToolTip="الحد الائتماني — صفر يعني لا يوجد حد"/>
+            
+            <!-- Category -->
+            <TextBlock Text="التصنيف" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+            <ComboBox ItemsSource="{Binding CategoryOptions}"
+                      SelectedValuePath="Key" DisplayMemberPath="Value"
+                      SelectedValue="{Binding SelectedCategoryId}"
+                      Style="{StaticResource ModernComboBox}"
+                      ToolTip="تصنيف العميل — اختياري"/>
+        </StackPanel>
+    </Grid>
+</Border>
+
+<!-- Loading Overlay -->
+<Border Grid.RowSpan="10" 
+        Background="#80FFFFFF"
+        Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+        Panel.ZIndex="1000">
+    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+        <ProgressBar IsIndeterminate="True" Width="200"/>
+        <TextBlock Text="جاري المعالجة..." Margin="0,8,0,0" 
+                   HorizontalAlignment="Center"/>
+    </StackPanel>
+</Border>
+```
+
+**FontSize fix**: `FontSize="20"` on line 28 → change to `FontSize="16"`
+
+**Estimate**: ~1.5 hours
+
+---
+
+### Task 9 — Update CustomerListViewModel + SelectionViewModel (Remove Party + Fix Async Patterns)
+
+**Description**: Fix async pattern violations (RULE-141), remove CanExecute predicates (RULE-059), remove Party references. Add ErrorMessage bar.
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `ViewModels/Customers/CustomerListViewModel.cs` | Refactor 3 methods to `ExecuteAsync()` wrapper: `LoadCustomersAsync`, `DeleteCustomerAsync`, `RestoreCustomerAsync`. Remove CanExecute predicates. Remove Party.Name references. Add ErrorMessage property + display. |
+| `ViewModels/Customers/CustomerSelectionViewModel.cs` | Refactor `LoadCustomersAsync` to `ExecuteAsync()` wrapper. Fix empty catch block. Remove CanExecute predicates. Remove Party.Name references. |
+
+**Key changes in CustomerListViewModel**:
+```csharp
+// BEFORE (with Party):
+private async Task LoadCustomersAsync()
+{
+    IsBusy = true;
+    try
+    {
+        var result = await _customerApiService.GetAllAsync(SearchText, IncludeInactive);
+        if (result.IsSuccess)
+            Customers = new ObservableCollection<CustomerDto>(result.Value!.Items);
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Error loading customers");
+    }
+    finally
+    {
+        IsBusy = false;
+    }
+}
+
+// AFTER (clean operation method):
+private async Task LoadCustomersOperationAsync()
+{
+    ErrorMessage = null;
+    var result = await _customerApiService.GetAllAsync(SearchText, IncludeInactive);
+    if (result.IsSuccess && result.Value != null)
+        Customers = new ObservableCollection<CustomerDto>(result.Value.Items);
+    else
+        ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل العملاء", "LoadCustomers");
+}
+
+// Commands use ExecuteAsync():
+RefreshCommand = new AsyncRelayCommand(
+    async () => await ExecuteAsync(LoadCustomersOperationAsync));
+```
+
+**Remove CanExecute predicates**:
+```csharp
+// BEFORE:
+EditCommand = new AsyncRelayCommand(EditCustomerAsync, () => SelectedCustomer != null);
+DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync, () => SelectedCustomer != null);
+
+// AFTER (always enabled — RULE-059):
+EditCommand = new AsyncRelayCommand(EditCustomerAsync);
+DeleteCommand = new AsyncRelayCommand(DeleteCustomerAsync);
+```
+
+**Add ErrorMessage bar to XAML** (between header and DataGrid):
+```xml
+<Border Grid.Row="2" Background="{StaticResource ErrorBackground}"
+        Visibility="{Binding ErrorMessage, Converter={StaticResource StringNotEmptyToVisibility}}"
+        Padding="8,4">
+    <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource ErrorBrush}"/>
+</Border>
+```
 
 **Estimate**: ~2 hours
 
 ---
 
-### Task 8 — Customer Group Module (Full Build — New)
+### Task 10 — Update CustomersListView.xaml (Remove Party Columns)
 
-**Files**:
-
-| File | Content |
-|------|---------|
-| `Domain/Entities/CustomerGroup.cs` | ✅ Already created in Task 3 |
-| `Infrastructure/Data/Configurations/CustomerGroupConfiguration.cs` | ✅ Already created in Task 3 |
-| `Contracts/DTOs/AllDtos.cs` — `CustomerGroupDto` | **NEW** record |
-| `Contracts/Requests/CustomerGroupRequests.cs` | **NEW** — CreateCustomerGroupRequest, UpdateCustomerGroupRequest |
-| `Application/Interfaces/Services/ICustomerGroupService.cs` | **NEW** — interface with CRUD |
-| `Application/Services/CustomerGroupService.cs` | **NEW** — implementation with Result<T>, IUnitOfWork |
-| `Api/Controllers/CustomerGroupsController.cs` | **NEW** — 6 endpoints |
-| `Api/Validators/CustomerGroupRequestValidators.cs` | **NEW** — FluentValidation |
-| `Desktop/Services/Api/IApiService.cs` — `ICustomerGroupApiService` | **NEW** — add to existing interface file |
-| `Desktop/Services/Api/CustomerGroupApiService.cs` | **NEW** — HTTP client |
-| `Desktop/ViewModels/Customers/CustomerGroupListViewModel.cs` | **NEW** — list with ExecuteAsync |
-| `Desktop/Views/Customers/CustomerGroupListView.xaml` + `.cs` | **NEW** — DataGrid + ToolTips |
-| `Desktop/ViewModels/Customers/CustomerGroupEditorViewModel.cs` | **NEW** — INotifyDataErrorInfo |
-| `Desktop/Views/Customers/CustomerGroupEditorView.xaml` + `.cs` | **NEW** — editor form |
-| `Desktop/Messaging/Messages/AppMessages.cs` | **NEW** — `CustomerGroupChangedMessage` |
-| `Desktop/App.xaml.cs` | DI registrations + navigation |
-
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
-
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
-
-**API Endpoints** (CustomerGroupsController):
-
-| Method | Endpoint | Policy |
-|--------|----------|--------|
-| GET | `/api/v1/customers/groups` | `AllStaff` |
-| GET | `/api/v1/customers/groups/{id}` | `AllStaff` |
-| POST | `/api/v1/customers/groups` | `ManagerAndAbove` |
-| PUT | `/api/v1/customers/groups/{id}` | `ManagerAndAbove` |
-| DELETE | `/api/v1/customers/groups/{id}` | `ManagerAndAbove` (soft) |
-| DELETE | `/api/v1/customers/groups/permanent/{id}` | `AdminOnly` (permanent) |
-
-**FluentValidation**:
-- `CreateCustomerGroupRequestValidator`: Name required (max 100), Description max 250
-- `UpdateCustomerGroupRequestValidator`: Same
-
-**ViewModel patterns** (RULE-141):
-- All async commands wrapped in `ExecuteAsync()`
-- Error messages via `LogSystemError()` (RULE-199)
-- Dialog titles: `"خطأ في حفظ مجموعة العملاء"` (RULE-173)
-- All via `IDialogService` — NO `MessageBox.Show` (RULE-174)
-- Async suffix: `ShowErrorAsync`, `ShowSuccessAsync` (RULE-175)
-
-**UI Compact** (RULE-262-274):
-- Button/TextBox: 28px via styles
-- Header: Padding="12,6", Footer: Padding="12,8"
-- Section margins: 6px between fields
-- Dialog title: FontSize="16", Section headers: FontSize="14"
-- Empty-state: Margin="0,12,0,0", Width="140"
-- Dialog icons: 44×44 max
-
-**Arabic ToolTips** (RULE-185-190):
-- Add group: `"إضافة مجموعة عملاء جديدة"`
-- Edit group: `"تعديل بيانات المجموعة"`
-- Delete group: `"حذف المجموعة — لن يتم حذف العملاء المرتبطين بها"`
-- Save group: `"حفظ بيانات مجموعة العملاء"`
-- Cancel: `"إلغاء والعودة"`
-
-**Estimate**: ~3 hours
-
----
-
-### Task 9 — Fix CustomerListViewModel Async Pattern Violations (RULE-141)
+**Description**: Update the list view XAML to remove any Party-related columns. Keep direct contact fields. Add ErrorMessage bar. Fix ToolTips.
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `ViewModels/Customers/CustomerListViewModel.cs` | Refactor 3 methods to use ExecuteAsync wrapper: `LoadCustomersAsync`, `DeleteCustomerAsync`, `RestoreCustomerAsync` |
-| `ViewModels/Customers/CustomerSelectionViewModel.cs` | Refactor `LoadCustomersAsync` to use ExecuteAsync wrapper + fix empty catch block |
+| `Views/Customers/CustomersListView.xaml` | Remove Party references. Add ErrorMessage bar. Verify ToolTips use customer-specific Arabic text. |
 
-**Changes in CustomerListViewModel**:
+**DataGrid column updates**:
+- Remove: Any `Party.Name` bound columns (should be `Name` direct)
+- Keep: `Name`, `Phone`, `Email`, `Address`, `CreditLimit`, `AccountName` columns
+- Add: `Notes` column (truncated) if helpful
+- Ensure: `AccountName` column shows "حساب: {AccountName}" format
 
-> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
-
-**Changes in CustomerSelectionViewModel**:
-
-> See `docs/AGENTS.md` §2.46 for the LogSystemError pattern (RULE-199).
-
-**Remove manual IsBusy assignments** (no longer needed — managed by ExecuteAsync):
-- Remove all `IsBusy = true` / `IsBusy = false` from the 3 operation methods
-- Remove all `try/catch/finally` blocks — replace with clean operation methods
+**ToolTip fixes**:
+- Search box: `"البحث في العملاء بالاسم أو رقم الجوال"`
+- IncludeInactive checkbox: `"عرض العملاء غير النشطين — الذين تم حذفهم سابقاً"`
+- Edit button: `"تعديل بيانات العميل المحدد"`
+- Delete button: `"حذف أو إلغاء تنشيط العميل المحدد"`
+- Restore button: `"استعادة العميل المحذوف"`
+- Refresh button: `"تحديث قائمة العملاء"`
 
 **Estimate**: ~1 hour
 
 ---
 
-### Task 10 — Customer Reports Endpoints + FluentValidation Enhancement
+### Task 11 — Customer Reports Endpoints (Balance + Aging)
+
+**Description**: Create balance report and aging report endpoints using JournalEntryLines for balance computation (not stored Customer balance).
 
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Application/Interfaces/Services/ICustomerReportService.cs` | **NEW** — Balance report + Aging report |
-| `Application/Services/CustomerReportService.cs` | **NEW** — Implementation using IUnitOfWork + raw SQL via ReportRepository |
+| `Application/Interfaces/Services/ICustomerReportService.cs` | NEW — interface with `GetBalanceReportAsync`, `GetAgingReportAsync` |
+| `Application/Services/CustomerReportService.cs` | NEW — implementation queries JournalEntryLines sum per AccountId |
 | `Contracts/DTOs/AllDtos.cs` | Add `CustomerBalanceReportDto`, `CustomerAgingReportDto` |
-| `Api/Controllers/CustomersController.cs` | Add 3 new endpoints (or new CustomerReportsController) |
-| `Api/Validators/CustomerRequestValidators.cs` | Add Phone regex pattern, new field validators |
-| `Desktop/Services/Api/CustomerApiService.cs` | Add GetBalanceReportAsync, GetAgingReportAsync |
-| `Desktop/Services/Api/IApiService.cs` | Add balance report + aging report method signatures |
+| `Api/Controllers/CustomersController.cs` | Add 2 new report endpoints |
+| `Desktop/Services/Api/CustomerApiService.cs` | Add `GetBalanceReportAsync`, `GetAgingReportAsync` |
 
-> See `SalesSystem.Contracts/` for canonical DTO definitions.
+**Balance report query pattern**:
+```csharp
+// Balance = SUM(Debit) - SUM(Credit) for the account
+var balance = await _uow.JournalEntryLines
+    .Where(jel => jel.AccountId == customer.AccountId && jel.JournalEntry.Status == JournalEntryStatus.Posted)
+    .GroupBy(jel => jel.AccountId)
+    .Select(g => new { Balance = g.Sum(jel => jel.Debit - jel.Credit) })
+    .FirstOrDefaultAsync(ct);
+```
 
-> See `docs/AGENTS.md` for controller patterns (RULE-022, RULE-025) and `docs/CONSTITUTION.md` for the Result<T> pattern.
+**Aging report query**: Group unpaid SalesInvoice amounts by DueDate range for posted invoices with DueAmount > 0.
 
-> See `SalesSystem.Api/Validators/` for FluentValidation patterns and `docs/AGENTS.md` §2.13 for validation layers.
-
-**Logging**: 
-- `Log.Information("Customer balance report generated for {CustomerId}", id)`
-- `Log.Warning("Aging report requested with no customers matching criteria")` (RULE-183)
+**Logging**: `Log.Information("Customer balance report generated for {CustomerId}", id)`
 
 **Estimate**: ~2 hours
-
----
-
-### Task 11 — Update CustomerSelectionViewModel for CustomerType Filter + Cleanup
-
-**Files**:
-
-| File | Change |
-|------|--------|
-| `ViewModels/Customers/CustomerSelectionViewModel.cs` | Add CustomerType filter + fix async patterns + fix empty catch block |
-| `Views/Customers/CustomerSelectionView.xaml` | Add CustomerType filter dropdown + ToolTips |
-
-> See existing selection ViewModel patterns in `DesktopPWF/ViewModels/` for filter properties.
-
-> See `docs/AGENTS.md` §2.36 for the ExecuteAsync pattern (RULE-141–146).
-
-**Fix empty catch block**:
-
-> See `docs/AGENTS.md` §2.46 for the LogSystemError pattern (RULE-199).
-
-> See XAML patterns in existing views at `DesktopPWF/Views/` for control styling conventions.
-
-**Estimate**: ~45 minutes
 
 ---
 
 ### Task 12 — End-to-End Integration + Desktop Navigation
 
+**Description**: Wire up all changes. Update DI registrations for new/removed services.
+
 **Files**:
 
 | File | Change |
 |------|--------|
-| `Desktop/App.xaml.cs` | Register `CustomerGroupListViewModel`, `CustomerGroupEditorViewModel`, `CustomerGroupApiService`, `ICustomerGroupService` (via API client), `CustomerReportService` |
-| `Desktop/App.xaml.cs` | Add navigation menu item for Customer Groups under Customers section |
-| `Desktop/MainWindow.xaml` | Add "مجموعات العملاء" MenuItem in Customers navigation section |
+| `Desktop/App.xaml.cs` | NO CustomerGroup registrations (removed from V1). Ensure `CustomerApiService`, `CustomerReportService` are registered. |
+| `Desktop/MainWindow.xaml` | NO "مجموعات العملاء" menu item. Keep existing Customers navigation entry. Add Customer Reports menu if needed. |
 
-> See `DesktopPWF/App.xaml.cs` for DI registration patterns.
+**DI registration changes**:
+```csharp
+// REMOVE (CustomerGroup NOT in V1):
+// services.AddTransient<ICustomerGroupApiService, CustomerGroupApiService>();
+// services.AddTransient<CustomerGroupListViewModel>();
+// services.AddTransient<CustomerGroupEditorViewModel>();
 
-> See `DesktopPWF/MainWindow.xaml` for navigation entry patterns.
+// KEEP (Customer core):
+services.AddTransient<ICustomerApiService, CustomerApiService>();
+services.AddTransient<CustomerListViewModel>();
+services.AddTransient<CustomerEditorViewModel>();
+services.AddTransient<CustomerSelectionViewModel>();
+```
 
 **Estimate**: ~30 minutes
 
+---
+
 ### Task 13 — Unit Tests
 
-**Files**: NEW test files in `SalesSystem.Domain.Tests`, `SalesSystem.Application.Tests`, `SalesSystem.Api.Tests`, `SalesSystem.Infrastructure.Tests`
+**Files**: Updated test files in `SalesSystem.Domain.Tests`, `SalesSystem.Application.Tests`, `SalesSystem.Api.Tests`
 
 #### 1. Domain Entity Tests
 
-**Customer.Create()** — Test with valid inputs creates entity. Test with empty `name` → `DomainException("اسم العميل مطلوب")`. Test with `CreditLimit < 0` → `DomainException`. Test `IncreaseBalance(amount)` and `DecreaseBalance(amount)` update `CurrentBalance` correctly. Test `DecreaseBalance` with amount > CurrentBalance → `DomainException("المبلغ المدفوع أكبر من الإجمالي")`.
+**Customer.Create()** (new signature with direct fields):
+- Valid inputs → creates entity with all fields set correctly
+- Empty `name` → `DomainException("اسم العميل مطلوب")`
+- `name` with whitespace → trimmed correctly
+- `CreditLimit < 0` → `DomainException("الحد الائتماني لا يمكن أن يكون سالباً")`
+- `Phone` with valid Saudi format (05xxxxxxxx) → accepted
+- `Phone` with invalid format → accepted at domain level (validated at FluentValidation layer)
+- `Email` with invalid format → accepted at domain level
+- Null optional fields → stored as null
+- `AccountId <= 0` → DomainException
 
-**Customer.Create() with CustomerType** — Validate new fields: `CustomerType = CustomerType.Credit` sets `CustomerType = 2`; `CustomerType = CustomerType.Cash` sets `CustomerType = 1`.
+**Customer.Update()** (new signature with direct fields):
+- Valid update modifies all fields
+- Empty name → DomainException
+- `CreditLimit < 0` → DomainException
+- `Notes` updated correctly
+- `UpdateTimestamp()` called after update
+- Partial update (null phone) keeps existing phone
 
-**Customer.LinkToAccount()** — Valid accountId links correctly. `accountId <= 0` → `DomainException("رقم الحساب المحاسبي غير صحيح")`.
-
-**Customer.CheckCreditLimit()** — Projected balance > CreditLimit → returns `true`. Within limit → returns `false`. CreditLimit = 0 (no limit) → always `false`.
-
-**Customer.SetCustomerType()** — Valid type values (1, 2) set correctly. Invalid values → `DomainException`.
-
-**Customer.SetCustomerGroup()** — Valid groupId sets correctly.
-
-**CustomerGroup.Create()** — Valid name creates group. Empty name → `DomainException("اسم المجموعة مطلوب")`. Valid description saved.
-
-**CustomerGroup.Update()** — Valid update modifies fields. Empty name → `DomainException`.
+**Customer.CheckCreditLimit()**:
+- `CreditLimit = 0` (no limit) → always returns `true`
+- `CreditLimit > 0` with projected balance <= limit → returns `true`
+- `CreditLimit > 0` with projected balance > limit → returns `false`
+- Negative additional amount → still handles gracefully
 
 #### 2. Service Tests (using Mock<IUnitOfWork>)
 
 **CustomerService.CreateAsync()**:
-- Valid request with CustomerType = Credit → `Result<CustomerDto>.Success`; auto-creates sub-account under 1210
-- Valid request with CustomerType = Cash → `Result<CustomerDto>.Success`; NO account created
-- Duplicate TaxNumber → `Result<CustomerDto>.Failure`
-- Transaction rollback on failure (account created but customer save fails)
-- `GetAllAsync()` sorts by `Id` descending (RULE-220)
+- Valid request with all fields → `Result<CustomerDto>.Success`; Account auto-created under "1130"
+- Valid request with minimal fields → `Result<CustomerDto>.Success`
+- Duplicate TaxNumber (unique index violation caught) → `Result<CustomerDto>.Failure`
+- Parent account "1130" not found → `Result.Failure` with Arabic message
+- Transaction rollback if account creation succeeds but customer save fails
+
+**CustomerService.UpdateAsync()**:
+- Valid update → `Result<CustomerDto>.Success` with updated fields
+- Non-existent customer → `Result.Failure` with `ErrorCodes.NotFound`
+- Update with same TaxNumber as another customer → `Result.Failure`
 
 **CustomerService.CheckCreditLimitAsync()**:
-- CustomerType = Credit with projected balance <= limit → `Result.Success`
-- CustomerType = Credit with projected balance > limit → `Result.Failure` with `ErrorCodes.CreditLimitExceeded` and Arabic message
-- CustomerType = Cash → always `Result.Success` (no credit limit)
-
-**CustomerService.GetByIdAsync()**:
-- Existing customer → DTO with AccountId, AccountName, CustomerGroupName included
-- Non-existent → `Result<CustomerDto>.Failure` with `ErrorCodes.NotFound`
+- Within limit → `Result.Success`
+- Exceeds limit → `Result.Failure` with Arabic message
+- Customer not found → `Result.Failure` with NotFound
+- `CreditLimit = 0` (no limit) → `Result.Success`
 
 **CustomerService.DeleteAsync()** / **PermanentDeleteAsync()**:
-- Soft delete → `Result.Success()`
-- Hard delete with FK violation → `Result.Failure` with FK error caught (RULE-200)
+- Soft delete → `Result.Success`
+- Hard delete with FK violation (has sales invoices) → `Result.Failure` with FK error caught (RULE-200)
+
+**CustomerService.GetAllAsync()**:
+- Returns items sorted by Id descending (RULE-220)
+- `includeInactive = true` → returns active + inactive
+- `includeInactive = false` → returns active only
 
 #### 3. FluentValidation Tests
 
 **CreateCustomerRequestValidator**:
 - Valid request passes (all fields correct)
 - Empty Name → fails with "اسم العميل مطلوب"
+- Name > 150 chars → fails
+- Phone invalid format (not starting with 05) → fails
 - Phone > 20 chars → fails
-- Phone invalid format (regex) → fails
-- Invalid CustomerType (not 1 or 2) → fails when provided
-- CustomerGroupId <= 0 → fails when provided
-- AccountId <= 0 → fails when provided
-- OpeningBalance < 0 → fails
+- Invalid Email format → fails
+- Address > 250 chars → fails
+- TaxNumber > 30 chars → fails
+- Notes > 500 chars → fails
 - CreditLimit < 0 → fails
-
-**CustomerGroupRequestValidator**:
-- Valid request passes
-- Empty Name → fails
-- Name > 100 chars → fails
-- Description > 250 chars → fails
+- NO CustomerGroup validation (not in V1)
+- NO CustomerType validation (not in V1)
+- NO AccountId validation (auto-created)
 
 #### 4. Database Configuration Tests
 
-**CustomerConfiguration**: Verify `HasQueryFilter(c => c.IsActive)`. Verify FK for `AccountId` uses `DeleteBehavior.Restrict`. Verify FK for `CustomerGroupId` uses `DeleteBehavior.Restrict`. Verify `HasIndex(c => c.AccountId)`. Verify `HasIndex(c => c.CustomerGroupId)`. Verify `TaxNumber` has unique index. Verify `CustomerType` property configuration.
-
-**CustomerGroupConfiguration**: Verify `HasQueryFilter(g => g.IsActive)`. Verify unique index on `Name`. Verify `HasMaxLength(100)` on `Name`, `HasMaxLength(250)` on `Description`.
+**CustomerConfiguration**:
+- Verify `HasQueryFilter(c => c.IsActive)`
+- Verify `Name` has `HasMaxLength(150)` and `IsRequired()`
+- Verify `Phone` has `HasMaxLength(20)`
+- Verify `Email` has `HasMaxLength(100)`
+- Verify `Address` has `HasMaxLength(250)`
+- Verify `TaxNumber` has `HasMaxLength(30)` and `HasIndex().IsUnique().HasFilter()`
+- Verify `Notes` has `HasMaxLength(500)`
+- Verify `AccountId` FK uses `DeleteBehavior.Restrict`
+- Verify `HasIndex(c => c.AccountId)`
+- Verify `CategoryId` FK uses `DeleteBehavior.Restrict`
+- Verify NO PartyId configuration (removed)
+- Verify NO CustomerGroupId configuration (never existed)
 
 #### 5. Phase-specific Tests
 
-- Customer.Create() with `CustomerType = Credit` auto-creates sub-account under parent Account Code `1210` (العملاء)
-- `CreateCustomerAccountAsync()` generates correct account code sequence: `1211`, `1212`, `1213`... (max existing code + 1 under 1210)
-- TaxNumber UNIQUE INDEX enforced — duplicate TaxNumber on create/update raises DB exception
-- CustomerType enum: Cash=`1`, Credit=`2` with different validation rules per type
-- CreditLimit validation: must be `> 0` when `CustomerType = Credit`; can be `0` when `CustomerType = Cash`
-- AccountId FK: links customer to Chart of Accounts correctly; FK with `DeleteBehavior.Restrict` — cannot delete Account if customer references it
-- Auto-account creation is transactional with customer creation — if account creation fails, customer creation rolls back
-- Default customer "عميل نقدي" seeded correctly with `CustomerType = Cash`, linked to "عام" group
-- `CustomerGroup` seed data: 4 groups seeded (عام, جملة, قطاعي, VIP) with unique names
-- Balance computation: SalesService.PostAsync() calls `IncreaseBalance(DueAmount)`; SalesService.CancelAsync() calls `DecreaseBalance(DueAmount)`
-- `AvailableCredit = CreditLimit - CurrentBalance` computed correctly (never negative — floored to 0)
+- Customer.Create() with valid direct fields → no Party created
+- Account auto-creation generates hierarchical code: "1131", "1132", "1133"...
+- Account name matches Customer.Name in Arabic
+- Account nature is Debit (Asset — AR)
+- Account allowTransactions = true (Level 4 detail)
+- Parent account lookup by code "1130" (NOT "1210")
+- Auto-creation is transactional — if customer fails, account rolls back
+- Balance computed as SUM(Debit - Credit) from JournalEntryLines
+- Default customer "عميل نقدي" seeded with direct fields (no Party)
+- CheckCreditLimit returns bool (never throws DomainException)
 
 **Estimate**: ~4 hours
 
 ---
 
-## 9. Compliance Matrix (55+ Rules)
+## 9. Compliance Matrix
 
 | Rule | Directive | Where Applied | Verdict |
 |------|-----------|---------------|---------|
-| **RULE-001** | `decimal(18,2)` for ALL money | CreditLimit, CurrentBalance, OpeningBalance — `HasPrecision(18,2)` | ✅ |
+| **RULE-001** | `decimal(18,2)` for ALL money | CreditLimit — `HasPrecision(18,2)` | ✅ |
 | **RULE-002** | `decimal(18,3)` for ALL quantities | No quantity fields in this phase | ✅ N/A |
-| **RULE-003** | Multi-table ops in transaction | SalesService PostAsync — credit limit check INSIDE transaction | ✅ |
-| **RULE-006** | ALL services return `Result<T>` | CustomerService, CustomerGroupService, CustomerReportService | ✅ |
-| **RULE-008** | ALL text columns `nvarchar` | Customer.Name, Phone, Email, Address, TaxNumber — all nvarchar | ✅ |
-| **RULE-016** | BaseEntity audit fields | Customer, CustomerGroup inherit BaseEntity | ✅ |
-| **RULE-024** | Services inject `IUnitOfWork` | CustomerService, CustomerGroupService | ✅ |
+| **RULE-003** | Multi-table ops in transaction | Customer Create: Party removal + Account creation + Customer save in one transaction | ✅ |
+| **RULE-006** | ALL services return `Result<T>` | CustomerService, CustomerReportService | ✅ |
+| **RULE-008** | ALL text columns `nvarchar` | Name, Phone, Email, Address, TaxNumber, Notes — all nvarchar | ✅ |
+| **RULE-016** | BaseEntity audit fields | Customer inherits BaseEntity | ✅ |
+| **RULE-024** | Services inject `IUnitOfWork` | CustomerService | ✅ |
 | **RULE-035** | Serilog for logging | All services: Log.Information on CRUD + CreditLimit warnings | ✅ |
-| **RULE-036** | Log critical operations | Customer create/update/delete, CreditLimit enforcement, default customer rename | ✅ |
+| **RULE-036** | Log critical operations | Customer create/update/delete, Account auto-creation, CreditLimit enforcement | ✅ |
 | **RULE-037** | NEVER log passwords/conn strings | Verified — no secrets logged | ✅ |
-| **RULE-038** | ALL endpoints `[Authorize]` | CustomersController, CustomerGroupsController | ✅ |
-| **RULE-042** | Rich Domain — `private set` + domain methods | Customer.Create, Update, IncreaseBalance, DecreaseBalance, CheckCreditLimit, LinkToAccount | ✅ |
-| **RULE-044** | FluentValidation for EVERY Command | CreateCustomerRequestValidator, UpdateCustomerRequestValidator, Create/Update CustomerGroup validators | ✅ |
+| **RULE-038** | ALL endpoints `[Authorize]` | CustomersController | ✅ |
+| **RULE-042** | Rich Domain — `private set` + domain methods | Customer.Create, Update, CheckCreditLimit | ✅ |
+| **RULE-044** | FluentValidation for EVERY Command | CreateCustomerRequestValidator, UpdateCustomerRequestValidator | ✅ |
 | **RULE-050** | DeleteStrategy for ALL deletes | Customer delete dialog: Cancel/Deactivate/Permanent | ✅ |
-| **RULE-052** | Guard Clauses on all entities | Customer.Create/Update, CustomerGroup.Create/Update | ✅ |
-| **RULE-053** | DomainException in Arabic | All messages in Arabic: "اسم العميل مطلوب", "المبلغ يجب أن يكون أكبر من الصفر" | ✅ |
+| **RULE-052** | Guard Clauses on all entities | Customer.Create/Update with all field guards | ✅ |
+| **RULE-053** | DomainException in Arabic | All messages in Arabic | ✅ |
 | **RULE-054** | IDialogService — no MessageBox | All ViewModels use IDialogService | ✅ |
 | **RULE-055** | NEVER raw MessageBox.Show | Verified across all ViewModels | ✅ |
-| **RULE-058** | INotifyDataErrorInfo | CustomerEditorViewModel, CustomerGroupEditorViewModel | ✅ |
-| **RULE-059** | Save always enabled, validate on click | CustomerEditorViewModel — no CanExecute blocking (Task 6 fix) | ✅ |
-| **RULE-141** | ExecuteAsync() wrapper for all VMs | CustomerListViewModel (FIX — Task 9), CustomerEditorViewModel ✅, CustomerSelectionViewModel (FIX — Task 11) | ✅ |
+| **RULE-058** | INotifyDataErrorInfo | CustomerEditorViewModel | ✅ |
+| **RULE-059** | Save always enabled, validate on click | CustomerEditorViewModel — no CanExecute blocking (Task 9 fix) | ✅ |
+| **RULE-141** | ExecuteAsync() wrapper for all VMs | CustomerListViewModel (FIX — Task 9), CustomerEditorViewModel ✅, CustomerSelectionViewModel (FIX — Task 9) | ✅ |
 | **RULE-147** | NO MediatR / CQRS | Service Layer pattern everywhere | ✅ |
-| **RULE-160** | ScreenWindowService for non-modal windows | Customer editor opens via OpenScreen (already correct) | ✅ |
+| **RULE-160** | ScreenWindowService for non-modal windows | Customer editor opens via OpenScreen | ✅ |
 | **RULE-171** | NO ex.Message in user dialogs | All catch blocks use LogSystemError() | ✅ |
 | **RULE-172** | HandleFailure() transforms errors | ViewModelBase pattern in all VMs | ✅ |
 | **RULE-173** | Screen-specific dialog titles | `"خطأ في حفظ العميل"`, `"خطأ في تحميل العملاء"` | ✅ |
@@ -1090,28 +1628,27 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | **RULE-182** | Log.Error for system errors only | DB failures, API unreachable | ✅ |
 | **RULE-183** | Log.Warning for user mistakes | Credit limit exceeded, validation errors, empty results | ✅ |
 | **RULE-184** | HandleResponseAsync checks ContentType | CustomerApiService inherits from ApiServiceBase with guard | ✅ |
-| **RULE-185** | Arabic ToolTips on ALL interactive controls | All buttons, combos, inputs across CustomersListView, CustomerEditorView, CustomerGroup views | ✅ |
+| **RULE-185** | Arabic ToolTips on ALL interactive controls | All buttons, combos, inputs across CustomersListView, CustomerEditorView | ✅ |
 | **RULE-186** | ToolTips describe action (not repeat text) | "فتح شاشة إضافة عميل جديد" ✅, not "عميل جديد" ❌ | ✅ |
-| **RULE-187** | Action buttons explain consequences | Post: "ترحيل العملية نهائياً — سيتم تحديث رصيد العميل" | ✅ |
-| **RULE-188** | Navigation MenuItems describe destination | "إدارة مجموعات العملاء — إنشاء وتعديل المجموعات" | ✅ |
+| **RULE-187** | Action buttons explain consequences | Save: "حفظ بيانات العميل — سيتم إنشاء حساب محاسبي تلقائياً" | ✅ |
+| **RULE-188** | Navigation MenuItems describe destination | "إدارة العملاء — إنشاء وتعديل بيانات العملاء" | ✅ |
 | **RULE-189** | Empty-state buttons have ToolTips | "➕ إضافة أول عميل — ابدأ بتسجيل بيانات العملاء" | ✅ |
 | **RULE-190** | Error dismiss buttons have ToolTips | "إخفاء رسالة الخطأ" | ✅ |
-| **RULE-191** | Product/Customer/Supplier — NO Code column | Customer entity already has no Code column ✅ | ✅ |
-| **RULE-199** | LogSystemError() is ONLY method for system error logging | All ViewModels use LogSystemError() — never direct Serilog.Log.Error | ✅ |
+| **RULE-191** | Customer — NO Code column | Customer entity has no Code column ✅ | ✅ |
+| **RULE-199** | LogSystemError() is ONLY method for system error logging | All ViewModels use LogSystemError() | ✅ |
 | **RULE-200** | ALL hard-delete catch DbUpdateException → Result.Failure | CustomerService.PermanentDeleteAsync catches FK violation | ✅ |
 | **RULE-201** | All catch blocks use LogSystemError() | All ViewModel catch blocks | ✅ |
-| **RULE-202** | ALL Service methods return Result<T> | CustomerService, CustomerGroupService, CustomerReportService | ✅ |
-| **RULE-203** | Controllers NO DbContext/IUnitOfWork | CustomersController — service only (already correct) | ✅ |
-| **RULE-210** | CHECK constraints at DB level | CreditLimit ≥ 0, OpeningBalance ≥ 0 (add to configuration) | ⬜ Add |
-| **RULE-214** | ALL FKs DeleteBehavior.Restrict | AccountId FK, CustomerGroupId FK — both Restrict | ✅ |
+| **RULE-202** | ALL Service methods return Result<T> | CustomerService, CustomerReportService | ✅ |
+| **RULE-203** | Controllers NO DbContext/IUnitOfWork | CustomersController — service only | ✅ |
+| **RULE-210** | CHECK constraints at DB level | CreditLimit ≥ 0 (add to configuration) | ⬜ Add |
+| **RULE-214** | ALL FKs DeleteBehavior.Restrict | AccountId FK, CategoryId FK — both Restrict | ✅ |
 | **RULE-220** | Newest-first sorting on lists | CustomerListViewModel: OrderByDescending(Id) ✅, fix CustomerService GetAllAsync sort | ⬜ Fix |
-| **RULE-227** | SetDialogService() in EVERY Editor VM | CustomerEditorViewModel ✅, CustomerGroupEditorViewModel | ✅ |
-| **RULE-228** | INotifyDataErrorInfo (NO HasXxxError booleans) | CustomerEditorViewModel ✅, CustomerGroupEditorViewModel | ✅ |
+| **RULE-227** | SetDialogService() in EVERY Editor VM | CustomerEditorViewModel ✅ | ✅ |
+| **RULE-228** | INotifyDataErrorInfo (NO HasXxxError booleans) | CustomerEditorViewModel ✅ | ✅ |
 | **RULE-229** | ClearAllErrors() + AddError() + ValidateAllAsync() | Pre-save validation in CustomerEditorViewModel ✅ | ✅ |
 | **RULE-246** | Users soft-deleted only | Not affected by this phase | ✅ N/A |
 | **RULE-249** | Arabic strings UTF-8 encoded | All Arabic strings in new/modified files verified UTF-8 | ✅ |
 | **RULE-250** | Files saved with UTF-8 encoding | All modified .cs and .xaml files | ✅ |
-| **RULE-254** | InvoiceNo as int, NOT string | Not affected — credit limit uses CurrentBalance | ✅ N/A |
 | **RULE-262** | No hardcoded Height="36" on buttons/inputs | All new/modified XAML: compact 28px via styles | ✅ |
 | **RULE-263** | No hardcoded Padding="16+" on buttons | All new/modified XAML: 10,4 via styles | ✅ |
 | **RULE-264** | Header padding 12,6 / Footer 12,8 max | All new/modified XAML views | ✅ |
@@ -1122,8 +1659,26 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 | **RULE-269** | MainWindow sidebar Width=200 | Already set | ✅ N/A |
 | **RULE-270** | Dialog icons: 44×44 max | CustomerEditorView 24×24 ✅ | ✅ |
 | **RULE-271** | ScreenWindow MinWidth=500, MinHeight=350 | Already set in ScreenWindow.xaml | ✅ N/A |
-| **RULE-272** | Dialog buttons: MinWidth (80-100), not fixed width | CustomerEditorView buttons use Width="140" (Save) and Width="100" (Cancel) — acceptable for primary action | ✅ |
+| **RULE-272** | Dialog buttons: MinWidth (80-100), not fixed width | CustomerEditorView buttons acceptable | ✅ |
 | **RULE-273** | Remove hardcoded Height/Padding duplicates | All new/modified XAML uses styles only | ✅ |
+| **RULE-504** | Customer parent account code = "1130" (NOT "1210") | CustomerService.AutoCreateCustomerAccountAsync | ✅ |
+| **RULE-506** | Level 4 accounts must have allowTransactions=true | Account.Create in auto-creation | ✅ |
+| **RULE-426** | AccountId mandatory (non-nullable int FK) | Customer entity | ✅ |
+| **RULE-427** | CustomerGroup NOT in V1 | NO CustomerGroup entity/service/controller/UI | ✅ |
+| **RULE-428** | CustomerType REMOVED | Payment type per-invoice via SalesInvoice.PaymentType | ✅ |
+| **RULE-429** | Customer.Create() accepts accountId | Domain factory method | ✅ |
+| **RULE-430** | Customer.Update() accepts accountId | Domain update method (AccountId is read-only after creation) | ✅ |
+| **RULE-431** | NO OpeningBalance/CurrentBalance on Customer | Balance on linked Account via JournalEntryLines | ✅ |
+| **RULE-432** | NO CurrencyId on Customer | Currency per-transaction (invoice/payment) | ✅ |
+| **RULE-433** | CheckCreditLimit returns bool (non-throwing) | Domain method returns bool | ✅ |
+| **RULE-434** | CustomerDto includes AccountId, AccountName | DTO has both | ✅ |
+| **RULE-435** | Create/Update requests NO AccountId | Auto-created by service | ✅ |
+| **RULE-436** | Desktop editor NO CustomerGroup/AccountId/Type UI | No such controls | ✅ |
+| **RULE-437** | Account auto-created under parent "1130" | Service creates Level-4 under AR | ✅ |
+| **RULE-438** | Seeder NO CustomerGroup seeds | Only "عميل نقدي" with auto-account | ✅ |
+| **RULE-439** | Phone regex `^05\d{8}$` with Arabic error | FluentValidation | ✅ |
+| **RULE-440** | ModernComboBox (NOT ModernTextBox) on ComboBox | Style guide | ✅ |
+| **RULE-504** | Parent code is "1130" NOT "1210" | Auto-creation logic | ✅ |
 
 ---
 
@@ -1131,14 +1686,14 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| **AccountId FK references non-existent Account** | **MEDIUM** — migration may fail if Account FK references a table that hasn't been migrated yet | Ensure Phase 22 (Chart of Accounts) migration runs BEFORE Phase 23 migration. If Phases run out of order, make AccountId nullable and add FK only after Accounts exist. |
-| **CustomerGroup rename conflict** | **LOW** — "عام" group name may conflict with existing seed data from other modules | Use `AnyAsync()` guard before seeding. Name has UNIQUE index enforced at DB level. |
-| **CreditLimit enforcement breaks existing sales** | **MEDIUM** — existing credit customers may have CurrentBalance > CreditLimit after adding enforcement | Add enforcement gently: first warning (not blocking), then blocking in next phase. Or add a grace period setting. |
-| **CustomerListViewModel refactor (async patterns) breaks existing tests** | **MEDIUM** — changing method signatures from `async Task` to `ExecuteAsync` wrappers changes how tests invoke commands | Update 3 test files (CustomerListViewModelTests.cs, CustomerEditorViewModelTests.cs) to use new command execution pattern. Run all tests before merging. |
-| **CanExecute removal changes UX behavior** | **LOW** — Edit/Delete buttons now always enabled, validation moves to click handler | This is intentional per RULE-059. Users get a warning dialog if they click without selecting. |
-| **New migration conflicts with production DB** | **LOW** — additive columns (nullable) are safe. Only risk is FK to Accounts table. | Always test migration against a copy of production DB first. |
-| **CustomerGroup CRUD duplicates effort (SupplierGroup in Phase 24)** | **LOW** — CustomerGroup and SupplierGroup could share a base class or interface | Keep separate for now. If they converge, refactor in Phase 25 (Consolidation phase). |
-| **TaxNumber uniqueness not enforced** | **LOW** — two customers could have the same TaxNumber | Add unique index on TaxNumber at DB level. Handle gracefully in FluentValidation. |
+| **Party removal breaks Supplier/Employee** | **HIGH** — Customer migration removes PartyId FK but Supplier and Employee still reference Parties table | Keep Parties table and Party entity. Only remove Customer's FK. Do NOT DROP Parties table until all modules migrate. |
+| **AccountId FK references non-existent Account** | **MEDIUM** — migration may fail if Account FK references a table that hasn't been migrated yet | Ensure Phase 22 (Chart of Accounts) migration runs BEFORE Phase 23 migration. AccountId is mandatory — FK must exist. |
+| **Account auto-creation fails if parent "1130" missing** | **MEDIUM** — customer creation blocked if Phase 22 not complete | Return clear Arabic error: "الحساب الرئيسي 1130 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات." |
+| **Existing production data with Party references** | **MEDIUM** — data migration needed to move contact fields from Parties to Customers | Write UPDATE SQL in migration: `UPDATE Customers SET Name = p.Name, ... FROM Parties p WHERE ...` |
+| **CreditLimit enforcement breaks existing sales** | **MEDIUM** — existing credit customers may have high balances | Add enforcement gently: warning first (not blocking), then blocking in next phase. Or check soft — RULE-506 states warning-only for below-cost, similar approach here. |
+| **CustomerListViewModel refactor breaks existing tests** | **MEDIUM** — changing async patterns changes test invocation | Update test files to use new command execution pattern. Run all tests before merging. |
+| **CanExecute removal changes UX behavior** | **LOW** — Edit/Delete buttons now always enabled | This is intentional per RULE-059. Users get a warning dialog if they click without selecting. |
+| **TaxNumber unique index conflicts with existing data** | **LOW** — two customers may have null or same TaxNumber | Make unique index filtered (`WHERE TaxNumber IS NOT NULL`). Handle gracefully in UI. |
 
 ---
 
@@ -1146,11 +1701,31 @@ All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), Ara
 
 | Scenario | Action |
 |----------|--------|
-| Default customer rename causes issues | `UPDATE Customers SET Name = N'العميل الافتراضي في النظام' WHERE Id = 1 AND Name = N'عميل نقدي'` |
+| Party removal migration fails | Keep PartyId column. Revert Customer.cs to use PartyId. Don't drop FK until Supplier/Employee ready. |
+| Account auto-creation causes issues | Set AccountId nullable temporarily, fall back to manual Account linking. |
 | AccountId FK migration fails | `ALTER TABLE Customers DROP CONSTRAINT FK_Customers_Accounts_AccountId; ALTER TABLE Customers DROP COLUMN AccountId;` |
-| CustomerType columns cause issues | `ALTER TABLE Customers DROP COLUMN CustomerType; ALTER TABLE Customers DROP COLUMN CustomerGroupId;` |
-| CustomerGroup table not needed | `DROP TABLE CustomerGroups;` (check FK first) |
-| CustomerGroup module desktop not needed | Remove DI registrations + navigation entries — no data impact |
-| CreditLimit enforcement blocks too many sales | Comment out the `CheckCreditLimitAsync()` call in SalesService — business logic only, no schema change |
-| CustomerListViewModel async refactor breaks | Revert CustomerListViewModel.cs to previous version — all data access is via API (no schema impact) |
-| `FontSize="16"` change disliked by user | Revert to `FontSize="20"` — cosmetic only, no data impact |
+| CreditLimit enforcement blocks too many sales | Comment out the `CheckCreditLimitAsync()` call in SalesService — business logic only, no schema change. |
+| CustomerEditorViewModel refactor breaks | Revert CustomerEditorViewModel.cs to previous version — no schema impact. |
+| CustomerListViewModel async refactor breaks | Revert CustomerListViewModel.cs to previous version — all data access is via API (no schema impact). |
+| `FontSize="16"` change disliked by user | Revert to `FontSize="20"` — cosmetic only, no data impact. |
+| Data migration (Party→Customer fields) corrupts data | Restore from backup. Run migration script in transaction with validation step. |
+
+---
+
+## 12. FORBIDDEN Patterns
+
+**These patterns are explicitly forbidden in V1 of the Customers Module:**
+
+| Pattern | Why Forbidden |
+|---------|---------------|
+| ❌ **CustomerGroup** — No entity, DTO, service, controller, validator, Desktop VM/View, seed data, FK on Customer | Removed per accounts Details.md — not in V1 |
+| ❌ **CustomerType** — No enum, no field on Customer, no DTO field, no radio button UI | Payment type is per-invoice via SalesInvoice.PaymentType — not per-customer |
+| ❌ **Parties entity for Customer** — No PartyId FK, no Party navigation property on Customer | Contact fields (Name, Phone, Email, Address, TaxNumber, Notes) are DIRECT fields on Customer entity |
+| ❌ **OpeningBalance on Customer** — No OpeningBalance field | Handled via Journal Entry (Dr AR / Cr OpeningBalanceEquity) |
+| ❌ **CurrentBalance on Customer** — No CurrentBalance field | Balance tracked on linked Account via JournalEntryLines |
+| ❌ **CurrencyId on Customer** — No per-customer currency | Currency is per-transaction (invoice/payment), not per-customer |
+| ❌ **User-supplied AccountId** — AccountId is NEVER in Create/Update requests | Always auto-created by service under parent "1130" |
+| ❌ **AccountId nullable** — AccountId is mandatory (non-nullable int FK) | Every customer needs an Account for balance tracking |
+| ❌ **CustomerGroup in Desktop navigation** — No "مجموعات العملاء" menu item | CustomerGroup is NOT in V1 |
+| ❌ **CustomerType in Desktop editor** — No radio buttons or dropdowns | Payment type is per-invoice, not per-customer |
+| ❌ **Hardcoded parent code 1210** — Parent account code is "1130" | RULE-504 explicitly mandates "1130" (Accounts Receivable/العملاء) |

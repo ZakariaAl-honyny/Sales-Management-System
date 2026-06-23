@@ -25,7 +25,7 @@ public class SupplierContactService : ISupplierContactService
         try
         {
             var contacts = await _uow.SupplierContacts
-                .ToListAsync(c => c.SupplierId == supplierId, null, ct, false, "Supplier", "Supplier.Party");
+                .ToListAsync(c => c.SupplierId == supplierId, null, ct, false, "Supplier");
             var dtos = contacts.Select(MapToDto).ToList();
             return Result<List<SupplierContactDto>>.Success(dtos);
         }
@@ -154,7 +154,7 @@ public class SupplierContactService : ISupplierContactService
         return new SupplierContactDto(
             contact.Id,
             contact.SupplierId,
-            contact.Supplier?.Party?.Name,
+            contact.Supplier?.Name,
             contact.Name,
             contact.Phone,
             contact.Email,

@@ -194,7 +194,6 @@ builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationS
 builder.Services.AddScoped<IFiscalYearService, FiscalYearService>();
 
 // ─── New Entity Services (v4.7+) ──────────────────────────────
-builder.Services.AddScoped<IPartyService, PartyService>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
@@ -218,6 +217,8 @@ builder.Services.AddScoped<IReceiptVoucherService, ReceiptVoucherService>();
 builder.Services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
 builder.Services.AddScoped<IWarehouseTransferService, WarehouseTransferService>();
 
+// ─── Sales Quotation Service ────────────────────────────
+builder.Services.AddScoped<ISalesQuotationService, SalesQuotationService>();
 
 builder.Services.AddSingleton(jwtSettings);
 

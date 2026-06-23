@@ -1325,4 +1325,103 @@ public class AccountingIntegrationService : IAccountingIntegrationService
             return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس سند الدفع");
         }
     }
+
+    // ────────────────────────────────────────────────────────────────
+    //  J. Create Expense Entry
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> CreateExpenseEntryAsync(
+        Expense expense,
+        int createdByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            // Load the CashBox to get its linked AccountId
+            var cashBox = await _uow.CashBoxes.FirstOrDefaultAsync(
+                cb => cb.Id == expense.CashBoxId, ct);
+            if (cashBox == null)
+                return Result<int>.Failure("الصندوق غير موجود");
+
+            var cashAccountId = cashBox.AccountId;
+
+            // Dr ExpenseAccount / Cr CashBox.Account (cash outflow)
+            var request = new CreateJournalEntryRequest(
+                EntryDate: expense.ExpenseDate,
+                Description: $"مصروف: {expense.Notes ?? $"رقم {expense.ExpenseNo}"}",
+                EntryType: JournalEntryType.Manual,
+                ReferenceType: "Expense",
+                ReferenceId: expense.Id,
+                ReferenceNumber: expense.ExpenseNo.ToString(),
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(expense.ExpenseAccountId, expense.Amount, 0, "مصروف"),
+                    new(cashAccountId, 0, expense.Amount, "خروج نقدي من الصندوق")
+                }
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, createdByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, createdByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            _logger.LogInformation("Expense journal entry created: ExpenseId={ExpenseId}, JE={JeId}",
+                expense.Id, createResult.Value);
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating expense entry for expense {ExpenseId}", expense.Id);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد المصروف");
+        }
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  K. Reverse Expense Entry
+    // ────────────────────────────────────────────────────────────────
+    public async Task<Result<int>> ReverseExpenseEntryAsync(
+        Expense expense,
+        int reversedByUserId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var cashBox = await _uow.CashBoxes.FirstOrDefaultAsync(
+                cb => cb.Id == expense.CashBoxId, ct);
+            if (cashBox == null)
+                return Result<int>.Failure("الصندوق غير موجود");
+
+            var cashAccountId = cashBox.AccountId;
+
+            // Reverse: Dr CashBox.Account / Cr ExpenseAccount (cash returned)
+            var request = new CreateJournalEntryRequest(
+                EntryDate: DateTime.UtcNow,
+                Description: $"قيد عكس مصروف: {expense.Notes ?? $"رقم {expense.ExpenseNo}"}",
+                EntryType: JournalEntryType.Manual,
+                ReferenceType: "Expense",
+                ReferenceId: expense.Id,
+                ReferenceNumber: $"{expense.ExpenseNo}-REV",
+                Lines: new List<JournalEntryLineRequest>
+                {
+                    new(cashAccountId, expense.Amount, 0, "إعادة نقدي للصندوق"),
+                    new(expense.ExpenseAccountId, 0, expense.Amount, "عكس مصروف")
+                }
+            );
+
+            var createResult = await _journalEntryService.CreateJournalEntryAsync(request, reversedByUserId, ct);
+            if (!createResult.IsSuccess) return createResult;
+
+            var postResult = await _journalEntryService.PostJournalEntryAsync(createResult.Value, reversedByUserId, ct);
+            if (!postResult.IsSuccess) return Result<int>.Failure(postResult.Error!);
+
+            _logger.LogInformation("Expense reversal journal entry created: ExpenseId={ExpenseId}, JE={JeId}",
+                expense.Id, createResult.Value);
+            return Result<int>.Success(createResult.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reversing expense entry for expense {ExpenseId}", expense.Id);
+            return Result<int>.Failure("حدث خطأ أثناء إنشاء قيد عكس المصروف");
+        }
+    }
 }

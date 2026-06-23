@@ -1,0 +1,193 @@
+<UserControl x:Class="SalesSystem.DesktopPWF.Views.Sales.SalesQuotationsListView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+      xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+      xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+      mc:Ignorable="d"
+      
+      FlowDirection="RightToLeft"
+      Background="{StaticResource BackgroundBrush}">
+
+    <i:Interaction.Triggers>
+        <i:EventTrigger EventName="Loaded">
+            <i:InvokeCommandAction Command="{Binding RefreshCommand}" />
+        </i:EventTrigger>
+    </i:Interaction.Triggers>
+
+    <Grid Margin="16,16,16,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <TextBlock Grid.Row="0" Text="📋  عروض السعر" Style="{StaticResource HeaderStyle}" Margin="0,0,0,12"/>
+
+        <!-- Error Message Bar -->
+        <Border Grid.Row="1" 
+                Background="{StaticResource ErrorLightBrush}" 
+                BorderBrush="{StaticResource ErrorBrush}"
+                BorderThickness="1"
+                Padding="10,6"
+                Margin="0,0,0,16"
+                CornerRadius="8"
+                Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="⚠️" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding ErrorMessage}" 
+                           Foreground="{StaticResource ErrorTextBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="2" Style="{StaticResource ToolbarStyle}">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Search Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <TextBlock Text="البحث" VerticalAlignment="Center" Margin="0,0,16,0" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBox Width="200"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="رقم العرض أو العميل..."
+                             TabIndex="1"
+                             AutomationProperties.AutomationId="TxtSearchSalesQuotations"
+                             helpers:FocusHelper.AdvanceOnEnter="True"
+                             ToolTip="أدخل رقم عرض السعر أو اسم العميل للبحث">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding RefreshCommand}"/>
+                        </TextBox.InputBindings>
+                    </TextBox>
+                    <Button Command="{Binding RefreshCommand}" 
+                            Style="{StaticResource PrimaryButton}"
+                            Margin="8,0,0,0"
+                            AutomationProperties.AutomationId="BtnSearchSalesQuotations"
+                            ToolTip="اضغط هنا للبحث عن عروض السعر حسب البيانات التي أدخلتها">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔍" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="بحث" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <!-- Status Filter Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,20,5">
+                    <ComboBox ItemsSource="{Binding StatusOptions}"
+                              SelectedValuePath="Value"
+                              DisplayMemberPath="Display"
+                              SelectedValue="{Binding StatusFilter}"
+                              Width="140"
+                              Style="{StaticResource ModernComboBox}"
+                              ToolTip="تصفية عروض السعر حسب الحالة"/>
+                </StackPanel>
+
+                <!-- Actions Group -->
+                <StackPanel Orientation="Horizontal" Margin="0,5,0,5">
+                    <Button Command="{Binding NewCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnNewSalesQuotation"
+                            ToolTip="اضغط هنا لفتح شاشة إنشاء عرض سعر جديد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="➕" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض سعر جديد" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ViewCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnViewSalesQuotation"
+                            ToolTip="عرض تفاصيل عرض السعر المحدد">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="👁" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="عرض" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding EditCommand}" Style="{StaticResource SecondaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnEditSalesQuotation"
+                            ToolTip="تعديل عرض السعر المحدد (للمسودات فقط)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="✏️" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تعديل" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Command="{Binding ConvertCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BtnConvertSalesQuotation"
+                            ToolTip="تحويل عرض السعر المقبول إلى فاتورة بيع">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="🔄" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="تحويل لفاتورة" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Loading Overlay -->
+        <Border Grid.Row="3" Background="#80FFFFFF" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
+                Panel.ZIndex="1000">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressBar IsIndeterminate="True" Width="200" Height="4"/>
+                <TextBlock Text="جاري التحميل..." FontSize="14" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="3" ItemsSource="{Binding Quotations}" 
+                  SelectedItem="{Binding SelectedQuotation}"
+                  AutoGenerateColumns="False" 
+                  IsReadOnly="True"
+                  RowDetailsVisibilityMode="Collapsed"
+                  Style="{StaticResource CompactDataGrid}"
+                  Margin="0,4,0,0"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling">
+            <DataGrid.InputBindings>
+                <KeyBinding Key="Enter" Command="{Binding ViewCommand}"/>
+                <KeyBinding Key="F2" Command="{Binding EditCommand}"/>
+            </DataGrid.InputBindings>
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="عرض التفاصيل" Command="{Binding ViewCommand}" 
+                              ToolTip="عرض تفاصيل عرض السعر المحدد"/>
+                    <MenuItem Header="تعديل" Command="{Binding EditCommand}" 
+                              ToolTip="تعديل عرض السعر المحدد (للمسودات فقط)"/>
+                    <Separator/>
+                    <MenuItem Header="إرسال للعميل" Command="{Binding SendCommand}" 
+                              ToolTip="تحديث حالة عرض السعر إلى مرسل"/>
+                    <MenuItem Header="قبول" Command="{Binding AcceptCommand}" 
+                              ToolTip="تحديث حالة عرض السعر إلى مقبول"/>
+                    <MenuItem Header="رفض" Command="{Binding RejectCommand}" 
+                              ToolTip="تحديث حالة عرض السعر إلى مرفوض"/>
+                    <Separator/>
+                    <MenuItem Header="تحويل لفاتورة بيع" Command="{Binding ConvertCommand}" 
+                              ToolTip="تحويل عرض السعر المقبول إلى فاتورة بيع"/>
+                    <Separator/>
+                    <MenuItem Header="إلغاء عرض السعر" Command="{Binding CancelCommand}" 
+                              ToolTip="إلغاء عرض السعر المحدد"/>
+                </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="رقم العرض" Binding="{Binding QuotationNo}" Width="80"/>
+                <DataGridTextColumn Header="العميل" Binding="{Binding CustomerName}" Width="150"/>
+                <DataGridTextColumn Header="التاريخ" Binding="{Binding QuotationDate, StringFormat='{}{0:yyyy/MM/dd}'}" Width="90"/>
+                <DataGridTextColumn Header="صالح حتى" Binding="{Binding ValidUntil, StringFormat='{}{0:yyyy/MM/dd}'}" Width="90"/>
+                <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalAmount, StringFormat='N2'}" Width="100"/>
+                <DataGridTextColumn Header="الحالة" Binding="{Binding StatusDisplay}" Width="100"/>
+                <DataGridTextColumn Header="ملاحظات" Binding="{Binding Notes}" Width="*" MinWidth="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>

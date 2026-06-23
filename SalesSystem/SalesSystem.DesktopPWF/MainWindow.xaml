@@ -7,6 +7,7 @@
         xmlns:viewmodels="clr-namespace:SalesSystem.DesktopPWF.ViewModels"
         xmlns:views="clr-namespace:SalesSystem.DesktopPWF.Views"
         xmlns:viewsSales="clr-namespace:SalesSystem.DesktopPWF.Views.Sales"
+        xmlns:viewsSalesQuotations="clr-namespace:SalesSystem.DesktopPWF.Views.Sales"
         xmlns:viewsReturns="clr-namespace:SalesSystem.DesktopPWF.Views.Returns"
         xmlns:viewsPurchases="clr-namespace:SalesSystem.DesktopPWF.Views.Purchases"
         xmlns:viewsPayments="clr-namespace:SalesSystem.DesktopPWF.Views.Payments"
@@ -54,7 +55,6 @@
              xmlns:viewsDepartment="clr-namespace:SalesSystem.DesktopPWF.Views.Department"
              xmlns:viewsEmployee="clr-namespace:SalesSystem.DesktopPWF.Views.Employee"
              xmlns:viewsBank="clr-namespace:SalesSystem.DesktopPWF.Views.Bank"
-             xmlns:viewsParty="clr-namespace:SalesSystem.DesktopPWF.Views.Party"
              xmlns:viewsExpense="clr-namespace:SalesSystem.DesktopPWF.Views.Expense"
              xmlns:viewsCustomerReceipt="clr-namespace:SalesSystem.DesktopPWF.Views.CustomerReceipt"
              xmlns:viewsInventoryCount="clr-namespace:SalesSystem.DesktopPWF.Views.InventoryCount"
@@ -65,7 +65,6 @@
              xmlns:vmDepartment="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Department"
              xmlns:vmEmployee="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Employee"
              xmlns:vmBank="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Bank"
-             xmlns:vmParty="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Party"
              xmlns:vmExpense="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Expense"
              xmlns:vmCustomerReceipt="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CustomerReceipt"
              xmlns:vmInventoryCount="clr-namespace:SalesSystem.DesktopPWF.ViewModels.InventoryCount"
@@ -112,6 +111,9 @@
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmSales:SalesInvoiceListViewModel}">
                 <viewsSales:SalesInvoicesListView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type vmSales:SalesQuotationListViewModel}">
+                <viewsSales:SalesQuotationsListView />
             </DataTemplate>
             <DataTemplate DataType="{x:Type vmReturns:SalesReturnListViewModel}">
                 <viewsReturns:SalesReturnsListView />
@@ -251,9 +253,6 @@
             <DataTemplate DataType="{x:Type vmBank:BankListViewModel}">
                 <viewsBank:BankListView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type vmParty:PartyListViewModel}">
-                <viewsParty:PartyListView />
-            </DataTemplate>
             <DataTemplate DataType="{x:Type vmExpense:ExpenseListViewModel}">
                 <viewsExpense:ExpenseListView />
             </DataTemplate>
@@ -387,6 +386,7 @@
             </MenuItem>
             <MenuItem Header="المبيعات" ToolTip="قائمة المبيعات">
                 <MenuItem Header="فواتير البيع" ToolTip="عرض وإدارة فواتير البيع" Click="SalesInvoicesMenuItem_Click"/>
+                <MenuItem Header="عروض السعر" ToolTip="عرض وإدارة عروض الأسعار للعملاء" Click="SalesQuotationsMenuItem_Click"/>
                 <MenuItem Header="إرجاع المبيعات" ToolTip="إدارة مرتجعات المبيعات" Click="SalesReturnsMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="فتح نافذة مبيعات جديدة" ToolTip="فتح نافذة مبيعات مستقلة في نافذة منفصلة" Click="OpenNewSalesWindow_Click"/>
@@ -553,6 +553,11 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavSalesInvoices"
                                             ToolTip="عرض وإدارة فواتير البيع بجميع حالاتها"/>
+                                    <Button Content="عروض السعر" 
+                                            Command="{Binding NavigateToSalesQuotationsCommand}" 
+                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
+                                            AutomationProperties.AutomationId="NavSalesQuotations"
+                                            ToolTip="عرض وإدارة عروض الأسعار للعملاء"/>
                                     <Button Content="مرتجعات المبيعات" 
                                             Command="{Binding NavigateToSalesReturnsCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"

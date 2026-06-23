@@ -48,8 +48,8 @@ public class ProductSelectionItemViewModel : INotifyPropertyChanged
     // Delegated properties for XAML column bindings
     public int Id => Product.Id;
     public string Name => Product.Name;
-    public string? Barcode => Product.Barcode;
     public string? CategoryName => Product.CategoryName;
+    public string? Barcode => Product.Barcode;
     public decimal Cost => 0m;
 
     public ProductSelectionItemViewModel(ProductDto product, decimal stock = 0)
@@ -373,8 +373,8 @@ public class ProductSelectionViewModel : ViewModelBase
 
         var search = SearchText.Trim().ToLower();
         return item.Name.ToLower().Contains(search)
-            || (item.Barcode?.ToLower().Contains(search) ?? false)
-            || (item.CategoryName?.ToLower().Contains(search) ?? false);
+            || (item.CategoryName?.ToLower().Contains(search) ?? false)
+            || (item.Barcode?.ToLower().Contains(search) ?? false);
     }
 
     private void Search() => ProductsView?.Refresh();
@@ -385,7 +385,8 @@ public class ProductSelectionViewModel : ViewModelBase
 
         var search = SearchText.Trim().ToLower();
         var match = Products.FirstOrDefault(p =>
-            (p.Barcode != null && p.Barcode.ToLower() == search));
+            p.Name.ToLower().Contains(search) ||
+            (p.Barcode != null && p.Barcode.ToLower().Contains(search)));
 
         if (match != null)
         {

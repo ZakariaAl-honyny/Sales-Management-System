@@ -302,7 +302,6 @@ public async Task DeleteProductAsync()
 
         var request = new UpdateProductRequest(
             Name: SelectedProduct!.Name,
-            Barcode: SelectedProduct.Barcode,
             CategoryId: SelectedProduct.CategoryId,
             Description: SelectedProduct.Description,
             ReorderLevel: SelectedProduct.ReorderLevel,

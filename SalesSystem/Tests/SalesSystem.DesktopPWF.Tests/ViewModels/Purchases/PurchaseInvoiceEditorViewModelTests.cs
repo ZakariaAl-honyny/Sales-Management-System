@@ -55,8 +55,8 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
         var suppliers = new List<SupplierDto>
         {
-            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, PartyId: 1, AccountId: 1),
-            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, PartyId: 1, AccountId: 1)
+            new SupplierDto(Id: 1, Name: "مورد 1", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1),
+            new SupplierDto(Id: 2, Name: "مورد 2", Phone: null, Email: null, Address: null, TaxNumber: null, IsActive: true, AccountId: 1)
         };
 
         var warehouses = new List<WarehouseDto>
@@ -197,7 +197,7 @@ public class PurchaseInvoiceEditorViewModelTests : IDisposable
 
     private static ProductDto CreateProductDto(int id, string name, decimal salePrice, decimal purchasePrice)
     {
-        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Barcode: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, IsActive: true);
+        return new ProductDto(Id: id, Name: name, CategoryId: 1, CategoryName: null, Description: null, ReorderLevel: 0m, TrackExpiry: false, ImagePath: null, IsActive: true);
     }
 }
 

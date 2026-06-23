@@ -80,11 +80,7 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="نوع المستند" Binding="{Binding DocumentType}" Width="*"
                                             CellStyle="{StaticResource DataGridCellStyle}"/>
-                        <DataGridTextColumn Header="البادئة" Binding="{Binding Prefix}" Width="100"
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        <DataGridTextColumn Header="السنة" Binding="{Binding Year}" Width="80"
-                                            CellStyle="{StaticResource DataGridCellCenterStyle}"/>
-                        <DataGridTextColumn Header="الرقم التالي" Binding="{Binding LastNumber}" Width="120"
+                        <DataGridTextColumn Header="الرقم التالي" Binding="{Binding NextNumber}" Width="120"
                                             CellStyle="{StaticResource DataGridCellCenterStyle}"/>
                     </DataGrid.Columns>
 

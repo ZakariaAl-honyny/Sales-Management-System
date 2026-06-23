@@ -6,5 +6,6 @@ public record BarcodeResolutionDto(
     int ProductUnitId,
     int UnitId,
     string? UnitName,
-    decimal ConversionFactor
+    decimal ConversionFactor,
+    string? Barcode = null
 );

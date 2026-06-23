@@ -175,33 +175,37 @@ public class ProductUnitService : IProductUnitService
         if (string.IsNullOrWhiteSpace(barcode))
             return Result<BarcodeResolutionDto>.Failure("الباركود مطلوب");
 
-        try
+        // Look up by Product.Barcode (primary barcode on the product entity)
+        var product = await _uow.Products.FirstOrDefaultAsync(
+            p => p.Barcode != null && p.Barcode == barcode.Trim(), ct);
+
+        if (product == null)
         {
-            // Include Units and Unit navigation to get unit name
-            var product = await _uow.Products.FirstOrDefaultAsync(
-                p => p.Barcode == barcode, ct, "Category", "Units", "Units.Unit");
-            if (product == null)
-                return Result<BarcodeResolutionDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
-
-            var baseUnit = product.Units.FirstOrDefault(u => u.IsBaseUnit);
-            if (baseUnit == null)
-                return Result<BarcodeResolutionDto>.Failure("المنتج لا يحتوي على وحدة أساسية", ErrorCodes.NotFound);
-
-            var dto = new BarcodeResolutionDto(
-                product.Id,
-                product.Name,
-                baseUnit.Id,
-                baseUnit.UnitId,
-                baseUnit.Unit?.Name ?? "",
-                baseUnit.Factor);
-
-            return Result<BarcodeResolutionDto>.Success(dto);
+            _logger.LogWarning("Barcode not found: {Barcode}", barcode);
+            return Result<BarcodeResolutionDto>.Failure("الباركود غير موجود", ErrorCodes.NotFound);
         }
-        catch (Exception ex)
+
+        // Get the base unit for this product
+        var baseUnit = await _uow.ProductUnits.FirstOrDefaultAsync(
+            pu => pu.ProductId == product.Id && pu.IsBaseUnit, ct);
+
+        if (baseUnit == null)
         {
-            _logger.LogError(ex, "Failed to resolve barcode {Barcode}", barcode);
-            return Result<BarcodeResolutionDto>.Failure("حدث خطأ أثناء البحث عن الباركود.");
+            _logger.LogError("Product {ProductId} ({ProductName}) has no base unit configured", product.Id, product.Name);
+            return Result<BarcodeResolutionDto>.Failure("المنتج لا يحتوي على وحدة أساسية");
         }
+
+        _logger.LogInformation("Barcode resolved: {Barcode} → {ProductName} (ID: {ProductId}, UnitId: {UnitId})",
+            barcode, product.Name, product.Id, baseUnit.Id);
+
+        return Result<BarcodeResolutionDto>.Success(new BarcodeResolutionDto(
+            ProductId: product.Id,
+            ProductName: product.Name,
+            ProductUnitId: baseUnit.Id,
+            UnitId: baseUnit.UnitId,
+            UnitName: baseUnit.Unit?.Name ?? "",
+            ConversionFactor: baseUnit.Factor,
+            Barcode: product.Barcode));
     }
 
     private static ProductUnitDto MapToDto(ProductUnit unit)

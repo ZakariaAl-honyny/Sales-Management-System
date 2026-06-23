@@ -28,7 +28,6 @@ public class ProductEditorViewModel : ViewModelBase
     private readonly IToastNotificationService? _toastService;
 
     private int _productId;
-    private string _barcode = string.Empty;
     private string _name = string.Empty;
     private int? _categoryId;
     private decimal _reorderLevel;
@@ -36,9 +35,7 @@ public class ProductEditorViewModel : ViewModelBase
     private bool _isActive = true;
     private bool _isEditMode;
     private bool _trackExpiry;
-    private decimal? _openingQuantity;
-    private decimal? _openingUnitCost;
-    private DateTime? _openingExpiryDate;
+    private string? _barcode;
     private string? _errorMessage;
 
     private ProductCategoryDto? _selectedCategory;
@@ -104,7 +101,6 @@ public class ProductEditorViewModel : ViewModelBase
             toastService: App.GetService<IToastNotificationService>())
     {
         _productId = product.Id;
-        _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
         _reorderLevel = product.ReorderLevel;
@@ -112,6 +108,7 @@ public class ProductEditorViewModel : ViewModelBase
         _isActive = product.IsActive;
         _isEditMode = true;
         _trackExpiry = product.TrackExpiry;
+        _barcode = product.Barcode;
     }
 
     public ProductEditorViewModel(
@@ -128,7 +125,6 @@ public class ProductEditorViewModel : ViewModelBase
               priceService, batchService, screenWindowService, toastService)
     {
         _productId = product.Id;
-        _barcode = product.Barcode ?? string.Empty;
         _name = product.Name;
         _categoryId = product.CategoryId;
         _reorderLevel = product.ReorderLevel;
@@ -136,6 +132,7 @@ public class ProductEditorViewModel : ViewModelBase
         _isActive = product.IsActive;
         _isEditMode = true;
         _trackExpiry = product.TrackExpiry;
+        _barcode = product.Barcode;
     }
 
     #region Properties
@@ -145,12 +142,6 @@ public class ProductEditorViewModel : ViewModelBase
     {
         get => _isEditMode;
         set => SetProperty(ref _isEditMode, value);
-    }
-
-    public string Barcode
-    {
-        get => _barcode;
-        set => SetProperty(ref _barcode, value);
     }
 
     public string Name
@@ -221,6 +212,26 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
+    // ── Barcode ──
+
+    /// <summary>
+    /// Primary barcode for quick lookup — varchar(50), visible on invoices and reports.
+    /// </summary>
+    public string? Barcode
+    {
+        get => _barcode;
+        set
+        {
+            if (SetProperty(ref _barcode, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value) && value.Length > 50)
+                    AddError(nameof(Barcode), "الباركود لا يمكن أن يتجاوز 50 حرف");
+                else
+                    ClearErrors(nameof(Barcode));
+            }
+        }
+    }
+
     // ── Opening Stock Fields ──
 
     /// <summary>
@@ -231,39 +242,6 @@ public class ProductEditorViewModel : ViewModelBase
         get => _trackExpiry;
         set => SetProperty(ref _trackExpiry, value);
     }
-
-    /// <summary>
-    /// Optional opening quantity when creating a new product.
-    /// </summary>
-    public decimal? OpeningQuantity
-    {
-        get => _openingQuantity;
-        set => SetProperty(ref _openingQuantity, value);
-    }
-
-    /// <summary>
-    /// Optional unit cost for the opening stock.
-    /// </summary>
-    public decimal? OpeningUnitCost
-    {
-        get => _openingUnitCost;
-        set => SetProperty(ref _openingUnitCost, value);
-    }
-
-    /// <summary>
-    /// Optional expiry date for the opening stock batch.
-    /// Required if TrackExpiry is true and OpeningQuantity > 0.
-    /// </summary>
-    public DateTime? OpeningExpiryDate
-    {
-        get => _openingExpiryDate;
-        set => SetProperty(ref _openingExpiryDate, value);
-    }
-
-    /// <summary>
-    /// True when opening stock fields should be visible (create mode only).
-    /// </summary>
-    public bool ShowOpeningFields => !IsEditMode;
 
     // ── Tab-specific Properties ──
 
@@ -388,17 +366,6 @@ public class ProductEditorViewModel : ViewModelBase
         if (!CategoryId.HasValue || CategoryId.Value <= 0)
             AddError(nameof(CategoryId), "يجب اختيار فئة");
 
-        // Opening stock validation (create mode only)
-        if (ShowOpeningFields)
-        {
-            if (OpeningQuantity.HasValue && OpeningQuantity.Value <= 0)
-                AddError(nameof(OpeningQuantity), "الكمية الافتتاحية يجب أن تكون أكبر من صفر");
-            if (OpeningUnitCost.HasValue && OpeningUnitCost.Value < 0)
-                AddError(nameof(OpeningUnitCost), "تكلفة الوحدة لا يمكن أن تكون سالبة");
-            if (TrackExpiry && OpeningQuantity.HasValue && OpeningQuantity.Value > 0 && !OpeningExpiryDate.HasValue)
-                AddError(nameof(OpeningExpiryDate), "تاريخ الانتهاء مطلوب عند تفعيل تتبع الصلاحية وإدخال كمية افتتاحية");
-        }
-
         return await ValidateAllAsync();
     }
 
@@ -417,11 +384,11 @@ public class ProductEditorViewModel : ViewModelBase
         {
             var updateRequest = new UpdateProductRequest(
                 Name: Name,
-                Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode,
                 CategoryId: CategoryId ?? 0,
                 Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
                 ReorderLevel: ReorderLevel,
                 TrackExpiry: TrackExpiry,
+                Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode,
                 IsActive: IsActive);
 
             result = await _productService.UpdateAsync(_productId, updateRequest);
@@ -430,14 +397,11 @@ public class ProductEditorViewModel : ViewModelBase
         {
             var createRequest = new CreateProductRequest(
                 Name: Name,
-                Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode,
                 CategoryId: CategoryId ?? 0,
                 Description: string.IsNullOrWhiteSpace(Description) ? null : Description,
                 ReorderLevel: ReorderLevel,
                 TrackExpiry: TrackExpiry,
-                OpeningQuantity: OpeningQuantity,
-                OpeningUnitCost: OpeningUnitCost,
-                OpeningExpiryDate: OpeningExpiryDate);
+                Barcode: string.IsNullOrWhiteSpace(Barcode) ? null : Barcode);
 
             result = await _productService.CreateAsync(createRequest);
         }

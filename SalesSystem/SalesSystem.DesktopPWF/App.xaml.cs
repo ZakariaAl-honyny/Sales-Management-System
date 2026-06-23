@@ -38,7 +38,6 @@ using SalesSystem.DesktopPWF.ViewModels.Branch;
 using SalesSystem.DesktopPWF.ViewModels.Department;
 using SalesSystem.DesktopPWF.ViewModels.Employee;
 using SalesSystem.DesktopPWF.ViewModels.Bank;
-using SalesSystem.DesktopPWF.ViewModels.Party;
 using SalesSystem.DesktopPWF.ViewModels.Expense;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
@@ -211,6 +210,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IPurchaseInvoiceApiService, PurchaseInvoiceApiService>();
         services.AddSingleton<ISalesReturnApiService, SalesReturnApiService>();
         services.AddSingleton<IPurchaseReturnApiService, PurchaseReturnApiService>();
+        services.AddSingleton<ISalesQuotationApiService, SalesQuotationApiService>();
         services.AddSingleton<IWarehouseTransferApiService, WarehouseTransferApiService>();
         services.AddSingleton<ISupplierPaymentApiService, SupplierPaymentApiService>();
         services.AddSingleton<IUserApiService, UserApiService>();
@@ -232,7 +232,6 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IBranchApiService, BranchApiService>();
         services.AddSingleton<IDepartmentApiService, DepartmentApiService>();
         services.AddSingleton<IBankApiService, BankApiService>();
-        services.AddSingleton<IPartyApiService, PartyApiService>();
         services.AddSingleton<IProductCategoryApiService, ProductCategoryApiService>();
         services.AddSingleton<INotificationApiService, NotificationApiService>();
         services.AddSingleton<IInventoryCountApiService, InventoryCountApiService>();
@@ -335,6 +334,8 @@ public partial class App : System.Windows.Application
         services.AddTransient<SupplierPaymentEditorViewModel>();
         services.AddTransient<SalesReturnListViewModel>();
         services.AddTransient<SalesReturnEditorViewModel>();
+        services.AddTransient<SalesQuotationListViewModel>();
+        services.AddTransient<SalesQuotationEditorViewModel>();
         services.AddTransient<PurchaseReturnListViewModel>();
         services.AddTransient<PurchaseReturnEditorViewModel>();
         services.AddTransient<WarehouseTransfersListViewModel>();
@@ -461,7 +462,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<ProductCategoriesListView>();
         services.AddTransient<ProductCategoryEditorView>();
 
-        // New Module ViewModels (Branch, Department, Employee, Bank, Party, Expense)
+        // New Module ViewModels (Branch, Department, Employee, Bank, Expense)
         services.AddTransient<BranchListViewModel>();
         services.AddTransient<BranchEditorViewModel>();
         services.AddTransient<DepartmentListViewModel>();
@@ -470,8 +471,6 @@ public partial class App : System.Windows.Application
         services.AddTransient<EmployeeEditorViewModel>();
         services.AddTransient<BankListViewModel>();
         services.AddTransient<BankEditorViewModel>();
-        services.AddTransient<PartyListViewModel>();
-        services.AddTransient<PartyEditorViewModel>();
         services.AddTransient<ExpenseListViewModel>();
         services.AddTransient<ExpenseEditorViewModel>();
 

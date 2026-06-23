@@ -127,7 +127,6 @@ public class CreateProductRequestValidatorTests
         Name: "Valid Product",
         CategoryId: 1,
         Description: "Test description",
-        Barcode: "123456789",
         ReorderLevel: 10
     );
 }

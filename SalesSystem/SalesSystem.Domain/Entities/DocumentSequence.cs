@@ -47,6 +47,7 @@ public class DocumentSequence : AuditableEntity
     {
         var current = NextNumber;
         NextNumber++;
+        UpdateTimestamp();
         return current;
     }
 

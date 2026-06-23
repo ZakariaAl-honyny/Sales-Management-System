@@ -57,15 +57,7 @@ public class ProductImportService : IProductImportService
                     seenProductNames.Add(productName);
             }
 
-            // Barcode uniqueness check against existing products
-            if (!string.IsNullOrWhiteSpace(row.Barcode))
-            {
-                var existing = await _uow.Products.FirstOrDefaultAsync(
-                    p => p.Barcode == row.Barcode, ct);
-                if (existing != null)
-                    rowErrors.Add($"الباركود '{row.Barcode}' مستخدم بالفعل للمنتج '{existing.Name}'");
-            }
-
+            // Barcode uniqueness check is handled via UnitBarcode entity (not Product.Barcode)
             // MinStockLevel validation
             if (row.MinStockLevel.HasValue && row.MinStockLevel.Value < 0)
                 rowErrors.Add("الحد الأدنى للمخزون لا يمكن أن يكون سالباً");
@@ -148,9 +140,9 @@ public class ProductImportService : IProductImportService
                         name: row.ProductName!.Trim(),
                         categoryId: categoryId ?? 0,
                         description: row.Description?.Trim(),
-                        barcode: row.Barcode?.Trim(),
                         reorderLevel: row.MinStockLevel ?? 0,
                         trackExpiry: false,
+                        barcode: row.Barcode?.Trim(),
                         createdByUserId: userId
                     );
                     await _uow.Products.AddAsync(product, ct);

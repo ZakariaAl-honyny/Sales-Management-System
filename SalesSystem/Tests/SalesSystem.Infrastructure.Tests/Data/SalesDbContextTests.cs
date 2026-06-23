@@ -32,11 +32,7 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Test Customer", phone: "0123456789");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("Test Customer", accountId: 1, phone: "0123456789");
 
         context.Customers.Add(customer);
         
@@ -45,11 +41,10 @@ public class SalesDbContextTests
 
         // Assert
         var savedCustomer = await context.Customers
-            .Include(c => c.Party)
             .FirstOrDefaultAsync(c => c.Id == customer.Id);
         savedCustomer.Should().NotBeNull();
-        savedCustomer!.Party.Name.Should().Be("Test Customer");
-        savedCustomer.Party.Phone.Should().Be("0123456789");
+        savedCustomer!.Name.Should().Be("Test Customer");
+        savedCustomer.Phone.Should().Be("0123456789");
     }
 
     [Fact]
@@ -62,29 +57,20 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Original Name", phone: "1234567890");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("Original Name", accountId: 1, phone: "1234567890");
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
         // Act - update Customer fields
-        customer.Update(creditLimit: 5000m, updatedByUserId: null);
-        await context.SaveChangesAsync();
-
-        // Also update Party name/phone
-        party.Update("Updated Name", phone: "9876543210", updatedByUserId: null);
+        customer.Update("Updated Name", phone: "9876543210", creditLimit: 5000m, updatedByUserId: null);
         await context.SaveChangesAsync();
 
         // Assert
         var updatedCustomer = await context.Customers
-            .Include(c => c.Party)
             .FirstOrDefaultAsync(c => c.Id == customer.Id);
         updatedCustomer.Should().NotBeNull();
-        updatedCustomer!.Party.Name.Should().Be("Updated Name");
-        /* AccountId removed from Customer — lives on Party only */
+        updatedCustomer!.Name.Should().Be("Updated Name");
+        updatedCustomer.Phone.Should().Be("9876543210");
         updatedCustomer.CreditLimit.Should().Be(5000m);
     }
 
@@ -98,11 +84,7 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("To Delete");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("To Delete", accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
@@ -153,11 +135,7 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Customer 1");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("Customer 1", accountId: 1);
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", address: "Test Location");
         warehouse.SetCreatedBy(1);
 
@@ -185,14 +163,8 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party1 = Party.Create("Customer One");
-        var party2 = Party.Create("Customer Two");
-        context.Parties.Add(party1);
-        context.Parties.Add(party2);
-        await context.SaveChangesAsync();
-
-        var customer1 = Customer.Create(partyId: party1.Id, accountId: 1);
-        var customer2 = Customer.Create(partyId: party2.Id, accountId: 1);
+        var customer1 = Customer.Create("Customer One", accountId: 1);
+        var customer2 = Customer.Create("Customer Two", accountId: 1);
         
         context.Customers.Add(customer1);
         context.Customers.Add(customer2);
@@ -200,12 +172,11 @@ public class SalesDbContextTests
 
         // Act
         var result = await context.Customers
-            .Include(c => c.Party)
-            .FirstOrDefaultAsync(c => c.Party.Name == "Customer One");
+            .FirstOrDefaultAsync(c => c.Name == "Customer One");
 
         // Assert
         result.Should().NotBeNull();
-        result!.Party.Name.Should().Be("Customer One");
+        result!.Name.Should().Be("Customer One");
     }
 
     [Fact]
@@ -221,11 +192,7 @@ public class SalesDbContextTests
         var warehouse = Warehouse.Create(branchId: 1, name: "Warehouse 1", address: "Location 1");
         warehouse.SetCreatedBy(1);
         
-        var party = Party.Create("Customer 1");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("Customer 1", accountId: 1);
         
         context.Warehouses.Add(warehouse);
         context.Customers.Add(customer);
@@ -243,7 +210,6 @@ public class SalesDbContextTests
         // Assert
         var savedInvoice = await context.SalesInvoices
             .Include(i => i.Customer!)
-            .ThenInclude(c => c!.Party)
             .Include(i => i.Warehouse)
             .FirstOrDefaultAsync(i => i.Id == invoice.Id);
 
@@ -269,11 +235,8 @@ public class SalesDbContextTests
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        // Create a party and customer for the invoice
-        var party = Party.Create("Test Customer");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        // Create a customer for the invoice
+        var customer = Customer.Create("Test Customer", accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
@@ -301,11 +264,7 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party = Party.Create("Precision Test Customer");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create("Precision Test Customer", accountId: 1);
         /* IncreaseBalance removed — balance lives on linked Account */
 
         context.Customers.Add(customer);
@@ -331,11 +290,8 @@ public class SalesDbContextTests
         context.Warehouses.Add(warehouse);
         await context.SaveChangesAsync();
 
-        // Create a party and customer for the invoice
-        var party = Party.Create("Test Customer");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        // Create a customer for the invoice
+        var customer = Customer.Create("Test Customer", accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
 
@@ -367,14 +323,8 @@ public class SalesDbContextTests
 
         await using var context = new SalesDbContext(options);
 
-        var party1 = Party.Create("Active Customer");
-        var party2 = Party.Create("Deleted Customer");
-        context.Parties.Add(party1);
-        context.Parties.Add(party2);
-        await context.SaveChangesAsync();
-
-        var customer1 = Customer.Create(partyId: party1.Id, accountId: 1);
-        var customer2 = Customer.Create(partyId: party2.Id, accountId: 1);
+        var customer1 = Customer.Create("Active Customer", accountId: 1);
+        var customer2 = Customer.Create("Deleted Customer", accountId: 1);
         context.Customers.Add(customer1);
         context.Customers.Add(customer2);
         await context.SaveChangesAsync();
@@ -385,9 +335,8 @@ public class SalesDbContextTests
 
         // Assert - Global query filter excludes soft-deleted
         var activeCustomers = await context.Customers
-            .Include(c => c.Party)
             .ToListAsync();
         activeCustomers.Should().HaveCount(1);
-        activeCustomers.First().Party.Name.Should().Be("Active Customer");
+        activeCustomers.First().Name.Should().Be("Active Customer");
     }
 }

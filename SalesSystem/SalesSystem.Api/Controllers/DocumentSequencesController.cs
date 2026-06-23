@@ -1,11 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -14,13 +12,11 @@ namespace SalesSystem.Api.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public class DocumentSequencesController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
     private readonly IDocumentSequenceService _sequenceService;
 
-    public DocumentSequencesController(IUnitOfWork uow, IDocumentSequenceService sequenceService)
+    public DocumentSequencesController(IDocumentSequenceService sequenceService)
     {
-        _uow = uow;
-        _sequenceService = sequenceService;
+        _sequenceService = sequenceService ?? throw new ArgumentNullException(nameof(sequenceService));
     }
 
     /// <summary>
@@ -29,46 +25,26 @@ public class DocumentSequencesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)
     {
-        try
-        {
-            var sequences = await _uow.DocumentSequences.ToListAsync(ct);
-            var dtos = sequences.Select(s => new DocumentSequenceDto(
-                s.Id, s.DocumentType, s.NextNumber)).ToList();
-            return Ok(dtos);
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "Error retrieving document sequences");
-            return BadRequest(new { error = "حدث خطأ أثناء استرجاع تسلسل المستندات" });
-        }
+        var result = await _sequenceService.GetAllAsync(ct);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
-    /// Updates a document sequence's last number (reset).
+    /// Updates a document sequence's next number (reset).
     /// </summary>
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateDocumentSequenceRequest request, CancellationToken ct)
     {
-        try
-        {
-            var sequence = await _uow.DocumentSequences.GetByIdAsync(id, ct);
-            if (sequence == null)
-                return NotFound(new { error = "تسلسل المستند غير موجود" });
+        var result = await _sequenceService.UpdateSequenceAsync(id, request.NextNumber, ct);
 
-            sequence.SetNextNumber(request.NextNumber);
+        if (result.IsSuccess)
+            return Ok(result.Value);
 
-            await _uow.SaveChangesAsync(ct);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
 
-            Serilog.Log.Information("Document sequence {Id} ({Type}) updated. New NextNumber: {Number}",
-                id, sequence.DocumentType, request.NextNumber);
-
-            return Ok(new DocumentSequenceDto(
-                sequence.Id, sequence.DocumentType, sequence.NextNumber));
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Error(ex, "Error updating document sequence {Id}", id);
-            return BadRequest(new { error = "حدث خطأ أثناء تحديث تسلسل المستند" });
-        }
+        return BadRequest(new { error = result.Error });
     }
 }

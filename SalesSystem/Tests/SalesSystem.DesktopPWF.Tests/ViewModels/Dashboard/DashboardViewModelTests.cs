@@ -419,7 +419,6 @@ public class DashboardViewModelTests : IDisposable
             TaxNumber: null,
             CreditLimit: 0,
             IsActive: isActive,
-            PartyId: 1,
             AccountId: 1);
     }
 
@@ -433,7 +432,6 @@ public class DashboardViewModelTests : IDisposable
             Address: null,
             TaxNumber: null,
             IsActive: isActive,
-            PartyId: 1,
             AccountId: 1);
     }
 
@@ -444,7 +442,6 @@ public class DashboardViewModelTests : IDisposable
             Name: name,
             CategoryId: 1,
             CategoryName: "Category",
-            Barcode: null,
             Description: null,
             ReorderLevel: minStock,
             TrackExpiry: false,

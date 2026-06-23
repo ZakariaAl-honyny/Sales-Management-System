@@ -71,7 +71,7 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetByIdAsync_ExistingSupplier_ReturnsDto");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -124,7 +124,7 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] UpdateAsync_ValidRequest_UpdatesSupplier");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -163,7 +163,7 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] DeleteAsync_ExistingSupplier_SoftDeletes");
 
-        var supplier = Supplier.Create(partyId: 1, accountId: 1, openingBalance: 0m);
+        var supplier = Supplier.Create(name: "Test Supplier", accountId: 1);
         _dbContext.Suppliers.Add(supplier);
         await _dbContext.SaveChangesAsync();
 
@@ -198,8 +198,8 @@ public class SupplierServiceTests : IDisposable
     {
         _output.WriteLine("[TEST] GetAllAsync_WithSearch_FiltersResults");
 
-        var supplier1 = Supplier.Create(partyId: 1, accountId: 1);
-        var supplier2 = Supplier.Create(partyId: 2, accountId: 1);
+        var supplier1 = Supplier.Create(name: "Test Supplier", accountId: 1);
+        var supplier2 = Supplier.Create(name: "Test Supplier 2", accountId: 1);
         _dbContext.Suppliers.Add(supplier1);
         _dbContext.Suppliers.Add(supplier2);
         await _dbContext.SaveChangesAsync();

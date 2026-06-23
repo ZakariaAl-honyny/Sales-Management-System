@@ -19,11 +19,6 @@ public class Product : ActivatableEntity
     public string Name { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Primary barcode for quick lookup. varchar(50) in DB — ASCII-only barcodes.
-    /// </summary>
-    public string? Barcode { get; private set; }
-
-    /// <summary>
     /// Product description / notes.
     /// </summary>
     public string? Description { get; private set; }
@@ -32,11 +27,6 @@ public class Product : ActivatableEntity
     /// FK to ProductCategory — every product must belong to a category.
     /// </summary>
     public int CategoryId { get; private set; }
-
-    /// <summary>
-    /// FK to Tax (smallint). Optional tax rate override for this product.
-    /// </summary>
-    public short? TaxId { get; private set; }
 
     /// <summary>
     /// Quantity threshold that triggers a reorder alert.
@@ -55,17 +45,19 @@ public class Product : ActivatableEntity
     /// </summary>
     public string? ImagePath { get; private set; }
 
+    /// <summary>
+    /// Primary barcode for quick lookup — varchar(50), ASCII-only.
+    /// Each product has exactly one barcode; additional barcodes per unit stored in UnitBarcode table.
+    /// Not a unique identifier (nullable), but indexed for fast search.
+    /// </summary>
+    public string? Barcode { get; private set; }
+
     // ─── Navigation Properties ────────────────────────────
 
     /// <summary>
     /// The category this product belongs to.
     /// </summary>
     public virtual ProductCategory? ProductCategory { get; private set; }
-
-    /// <summary>
-    /// The tax rate override for this product.
-    /// </summary>
-    public virtual Tax? Tax { get; private set; }
 
     /// <summary>
     /// Stock records per warehouse.
@@ -106,10 +98,17 @@ public class Product : ActivatableEntity
     }
 
     /// <summary>
-    /// Validates product has exactly ONE base unit before saving.
+    /// Validates product has exactly ONE base unit + at least one additional unit before saving.
+    /// RULE-067: Product MUST have at least one base unit + one additional unit.
     /// </summary>
     public void ValidateUnits()
     {
+        if (_units.Count < 2)
+            throw new DomainException(
+                "يجب أن يحتوي المنتج على وحدتين على الأقل:\n" +
+                "وحدة صغرى (حبة) + وحدة إضافية (كرتون / كيلو / لتر).\n" +
+                "أضف وحدة ثانية قبل الحفظ.");
+
         var baseUnits = _units.Where(u => u.IsBaseUnit).ToList();
 
         if (baseUnits.Count == 0)
@@ -133,12 +132,15 @@ public class Product : ActivatableEntity
     }
 
     /// <summary>
-    /// Removes a unit from the product. Guards against removing the last active unit.
+    /// Removes a unit from the product. Guards against removing below minimum 2 units.
+    /// RULE-067: Product MUST have at least one base unit + one additional unit.
     /// </summary>
     public void RemoveUnit(ProductUnit unit)
     {
-        if (_units.Count <= 1)
-            throw new DomainException("يجب أن يكون للمنتج وحدة قياس واحدة على الأقل");
+        if (_units.Count <= 2)
+            throw new DomainException(
+                "لا يمكن حذف الوحدة — يجب أن يحتوي المنتج على وحدتين على الأقل.\n" +
+                "يجب إضافة وحدة بديلة قبل حذف هذه الوحدة.");
         _units.Remove(unit);
     }
 
@@ -168,22 +170,20 @@ public class Product : ActivatableEntity
     /// <param name="name">Product display name (required).</param>
     /// <param name="categoryId">FK to ProductCategory (required).</param>
     /// <param name="description">Optional product description.</param>
-    /// <param name="barcode">Optional primary barcode for quick lookup.</param>
-    /// <param name="taxId">Optional FK to Tax.</param>
     /// <param name="reorderLevel">Quantity threshold for reorder alert (default 0).</param>
     /// <param name="trackExpiry">Whether this product can expire (default false).</param>
     /// <param name="imagePath">Optional primary image path.</param>
+    /// <param name="barcode">Optional primary barcode for quick lookup.</param>
     /// <param name="createdByUserId">User who created this record.</param>
     /// <returns>The newly created Product entity.</returns>
     public static Product Create(
         string name,
         int categoryId,
         string? description = null,
-        string? barcode = null,
-        short? taxId = null,
         decimal reorderLevel = 0,
         bool trackExpiry = false,
         string? imagePath = null,
+        string? barcode = null,
         int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -197,12 +197,11 @@ public class Product : ActivatableEntity
         {
             Name = name,
             Description = description?.Trim(),
-            Barcode = barcode?.Trim(),
             CategoryId = categoryId,
-            TaxId = taxId,
             ReorderLevel = reorderLevel,
             TrackExpiry = trackExpiry,
             ImagePath = imagePath?.Trim(),
+            Barcode = barcode?.Trim(),
             IsActive = true
         };
         product.SetCreatedBy(createdByUserId);
@@ -216,11 +215,10 @@ public class Product : ActivatableEntity
         string name,
         int categoryId,
         string? description = null,
-        string? barcode = null,
-        short? taxId = null,
         decimal reorderLevel = 0,
         bool trackExpiry = false,
         string? imagePath = null,
+        string? barcode = null,
         int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -232,12 +230,11 @@ public class Product : ActivatableEntity
 
         Name = name;
         Description = description?.Trim();
-        Barcode = barcode?.Trim();
         CategoryId = categoryId;
-        TaxId = taxId;
         ReorderLevel = reorderLevel;
         TrackExpiry = trackExpiry;
         ImagePath = imagePath?.Trim();
+        Barcode = barcode?.Trim();
 
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

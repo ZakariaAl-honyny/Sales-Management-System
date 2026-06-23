@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>A comprehensive sales management platform for small-to-medium retail businesses</strong><br/>
-  <em>v4.10.5 — UX Complete: Success/Failure Messages on ALL CRUD + IncludeInactive Checkboxes ✅</em>
+  <em>v4.10.7 — Transaction Atomicity & Inventory Audit Trail: All 22 Operations Audited, ExpenseService Journal Entries, SaveChangesAsync Bug Fixes ✅</em>
 </p>
 
 <p align="center">
@@ -11,14 +11,14 @@
   <img src="https://img.shields.io/badge/SQL%20Server-2019+-CC2927?style=for-the-badge&logo=microsoftsqlserver&logoColor=white" alt="SQL Server"/>
   <img src="https://img.shields.io/badge/Architecture-Clean-2ECC71?style=for-the-badge" alt="Clean Architecture"/>
   <img src="https://img.shields.io/badge/API-ASP.NET%20Core%2010-512BD4?style=for-the-badge" alt="ASP.NET Core"/>
-  <img src="https://img.shields.io/badge/Status-v4.10.5%20%7C%20UX%20Messages%20%2B%20IncludeInactive-2ECC71?style=for-the-badge" 
+  <img src="https://img.shields.io/badge/Status-v4.10.7%20%7C%20Transaction%20Atomicity-2ECC71?style=for-the-badge" 
 alt="Status"/>
 
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-v4.10.5%20%7C%20CRUD%20Messages-blue.svg?style=flat-square" alt="Version"/>
+  <img src="https://img.shields.io/badge/Version-v4.10.7%20%7C%20Transaction%20Atomicity-blue.svg?style=flat-square" alt="Version"/>
   <img src="https://img.shields.io/badge/Language-Arabic%20%2B%20English-orange.svg?style=flat-square" alt="Language"/>
 </p>
 
@@ -75,6 +75,7 @@ The API-first architecture is designed to support **future web and mobile client
 - ✅ **Comprehensive XAML UI Quality Audit (v4.10.4)**: Systematic review of ALL 157 View XAML files across 48 modules — fixed 50+ files across 8 categories. ContextMenu MenuItems (15 files) now have Arabic ToolTips explaining actions. CheckBox controls (9 files) have Arabic ToolTips for "عرض غير النشطة"/"عرض الملغاة" filters. Form controls (34 controls across Purchase/Sales/Return/Transfer editors) got Arabic ToolTips explaining validation rules. ErrorMessage bars added to 19 list views that were missing them. Loading overlays (IsBusy ProgressBar) added to 6 editor views. Functional bugs fixed: ExpenseEditorView 3 ComboBoxes missing ItemsSource (non-functional), DailyClosureView duplicate Grid.Row layout collision. Hardcoded size violations fixed across 5 files (LoginView Height=40 removed, Purchase/Sales editor button Padding=16,0 removed, CashTransferView ComboBoxStyle→ModernComboBox). Success/failure user feedback audit across ALL ViewModels — 7 more ViewModels fixed with proper toasts and error dialogs. **Build: 0 errors, 0 warnings across all 6 production projects.**
 - 💬 **Complete CRUD Success/Failure Feedback (v4.10.5)**: EVERY CRUD operation (Add, Edit, Delete, Restore, Post, Cancel) across ALL 43 List ViewModels and 38 Editor ViewModels now shows user feedback — success toast for minor operations (delete/restore/post/cancel), success dialog for major operations (save/create/update), and error dialog for ALL failures after `HandleFailure()`. Garbled Arabic strings fixed in UserListViewModel. **Build: 0 errors, 0 warnings across all projects.**  
 - ✅ **IncludeInactive Checkboxes Complete (v4.10.5)**: 6 new "عرض غير النشطة" checkboxes added to CashBoxes, CustomerContacts, SupplierContacts, ProductUnits, ProductPrices, and CurrencyRates views — all with Arabic ToolTips and client-side IsActive filtering. Full ViewModel `IncludeInactive` property with auto-reload on toggle. **No silent data hiding.**  
+- 🏗️ **Products Module Aligned to Analysis (v4.10.6)**: TaxId removed from Product entity (tax is invoice-level only: `SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`). Barcode restored on Product entity (Products.Barcode varchar(50) unique filtered). Opening stock removed from Product creation — now a separate inventory transaction. Product creation = 3 tables atomic via `ExecuteTransactionAsync` (Products + ProductUnits + ProductPrices). Minimum 2 units enforced per product (RULE-067) — `ValidateUnits()` throws DomainException if < 2 units, `RemoveUnit()` guards at 2. Parties entity removed entirely — contact fields live directly on Customer, Supplier, Employee. All 4 multi-table creation services (`CustomerService`, `SupplierService`, `CashBoxService`, `BankService`) wrapped in `ExecuteTransactionAsync` to prevent orphaned accounts. **Build: 0 errors across all projects.**  
 - 👤 **Users & Permissions (Phase 21)**: 9 DB-driven roles (System Admin, Manager, Accountant, Treasurer, Cashier, Warehouse Supervisor, Sales Employee, Observer, Branch Manager), 45 granular permissions across 12 categories, UserRole enum removed, lockout at 5 attempts, AuditLog (bigint PK), PermissionManagementView
 - 📦 **FIFO/FEFO Batch Tracking (Phases 25/27/28)**: PurchaseLot entity with FIFO cost allocation, expiry-based FEFO deduction
 - 🎯 **Touch POS (Phase 15)**: Dual-mode toggle (Cart/QuickSale) with tile grid, category filtering, numeric keypad, integrated barcode scanner, Cash/Card/Draft payment flow, auto-suggestion search
@@ -1490,6 +1491,50 @@ Phase 21 added RULE-305 through RULE-320 covering:
 - RULE-321: User has IsActive (soft-delete) + IsLocked (lockout) — NOT UserStatus enum
 - RULE-322: Desktop PermissionManagementView shows 9 role tabs with 45 permission flags
 - RULE-323: All 9 roles seeded with appropriate permissions matching AGENTS.md §6 matrix
+
+---
+
+## 🔒 What's New in v4.10.7 — Transaction Atomicity & Inventory Audit Trail
+
+### 22-Operation Audit Complete
+Every transaction operation that affects stock, cash, or accounting has been audited and wrapped in `ExecuteTransactionAsync`:
+
+| Category | Services Audited | Key Fix |
+|----------|-----------------|---------|
+| **Sales** | SalesService.Post/Cancel | Added `InventoryTransaction` audit trail in both Post and Cancel |
+| **Purchases** | PurchaseService.Post/Cancel | Added `InventoryTransaction` audit trail in both Post and Cancel |
+| **Returns** | SalesReturn/PurchaseReturn | Already correct — verified journal entries + FIFO |
+| **Payments** | CustomerReceipt, SupplierPayment | Wrapped Cancel/Delete in `ExecuteTransactionAsync`; fixed missing `SaveChangesAsync` |
+| **Vouchers** | ReceiptVoucher, PaymentVoucher | Wrapped Post/Cancel in `ExecuteTransactionAsync` |
+| **Expenses** | ExpenseService | **NEW**: Added `IAccountingIntegrationService` + journal entries (`Dr ExpenseAccount / Cr CashBox.Account`) + `DocumentSequenceService` for thread-safe sequence |
+| **Inventory** | Adjustment, Count | Already correct — verified `IncreaseStockAsync`/`DecreaseStockAsync` |
+| **Transfers** | WarehouseTransfer, InventoryService | Wrapped Create/Post/Cancel in `ExecuteTransactionAsync` |
+
+### Bug Fixes Applied
+1. **ExpenseService**: ZERO journal entries for expenses → Now creates balanced double-entry on Post + reversal on Cancel
+2. **CustomerReceiptService.DeleteAsync**: Missing `SaveChangesAsync` → Deletes were never persisted (silent rollback)
+3. **SupplierPaymentService.DeleteAsync**: Same missing `SaveChangesAsync` → Fixed
+4. **WarehouseTransferService.CreateAsync**: Two SaveChanges without transaction → Orphan transfer risk eliminated
+5. **ExpenseService sequence**: `ToListIgnoreFiltersAsync().Max() + 1` → Replaced with `DocumentSequenceService` (thread-safe)
+
+### New Rules
+- RULE-560: All 22 transaction operations MUST use `ExecuteTransactionAsync`
+- RULE-561: `InventoryTransaction` audit trail for EVERY stock-affecting operation
+- RULE-562: `ExpenseService` journal entries + `DocumentSequenceService` for sequence
+- RULE-563: `InventoryService` bulk stock methods wrapped in `ExecuteTransactionAsync`
+- RULE-564: `DeleteAsync`/`CancelAsync` MUST call `SaveChangesAsync` before returning
+- RULE-565: `InventoryTransaction` created in service wrappers, NOT in `IncreaseStockAsync`/`DecreaseStockAsync`
+- RULE-566: FIFO batch restoration deferred (known gap)
+
+### Files Modified (22 files across 5 layers)
+- **Domain**: `Expense.cs` — Post/Cancel domain methods with timestamps
+- **Application**: 8 service files (SalesService, PurchaseService, ExpenseService, CustomerReceiptService, SupplierPaymentService, ReceiptVoucherService, PaymentVoucherService, InventoryService, WarehouseTransferService)
+- **Application Interfaces**: `IAccountingIntegrationService.cs` — Added `CreateExpenseEntryAsync` + `ReverseExpenseEntryAsync`
+- **Application Implementation**: `AccountingIntegrationService.cs` — Implemented both methods
+- **Contracts**: `ExpenseDto.cs` — Updated DTO
+- **Infrastructure**: EF configurations
+- **DesktopPWF**: ViewModels
+- **Api**: Controllers
 
 ---
 

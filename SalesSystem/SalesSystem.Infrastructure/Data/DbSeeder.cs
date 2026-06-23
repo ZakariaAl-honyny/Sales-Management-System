@@ -35,14 +35,8 @@ public static class DbSeeder
         {
             var cashCustomerAccount = await db.Set<Account>()
                 .FirstAsync(a => a.AccountCode == "11030001");
-            var cashCustomerParty = Party.Create(
-                name: "عميل نقدي",
-                createdByUserId: null
-            );
-            db.Set<Party>().Add(cashCustomerParty);
-            await db.SaveChangesAsync();
             db.Customers.Add(Customer.Create(
-                partyId: cashCustomerParty.Id,
+                name: "عميل نقدي",
                 accountId: cashCustomerAccount.Id,
                 createdByUserId: null
             ));
@@ -54,14 +48,8 @@ public static class DbSeeder
         {
             var cashSupplierAccount = await db.Set<Account>()
                 .FirstAsync(a => a.AccountCode == "21010001");
-            var cashSupplierParty = Party.Create(
-                name: "المورد الافتراضي في النظام",
-                createdByUserId: null
-            );
-            db.Set<Party>().Add(cashSupplierParty);
-            await db.SaveChangesAsync();
             db.Suppliers.Add(Supplier.Create(
-                partyId: cashSupplierParty.Id,
+                name: "المورد الافتراضي في النظام",
                 accountId: cashSupplierAccount.Id,
                 createdByUserId: null
             ));

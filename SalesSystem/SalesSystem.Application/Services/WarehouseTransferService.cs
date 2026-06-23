@@ -45,26 +45,29 @@ public class WarehouseTransferService : IWarehouseTransferService
                 request.Notes,
                 userId);
 
-            await _uow.WarehouseTransfers.AddAsync(transfer, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            // Now transfer has an ID — add lines
-            foreach (var lineReq in request.Lines)
+            return await _uow.ExecuteTransactionAsync<Result<WarehouseTransferDto>>(async () =>
             {
-                var line = WarehouseTransferLine.Create(
-                    transfer.Id,
-                    lineReq.ProductUnitId,
-                    lineReq.Quantity,
-                    lineReq.BatchNo);
-                transfer.AddLine(line);
-            }
-            await _uow.SaveChangesAsync(ct);
+                await _uow.WarehouseTransfers.AddAsync(transfer, ct);
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("WarehouseTransfer created (No: {TransferNo}, ID: {Id}) by User {UserId}",
-                transfer.TransferNo, transfer.Id, userId);
+                // Now transfer has an ID — add lines
+                foreach (var lineReq in request.Lines)
+                {
+                    var line = WarehouseTransferLine.Create(
+                        transfer.Id,
+                        lineReq.ProductUnitId,
+                        lineReq.Quantity,
+                        lineReq.BatchNo);
+                    transfer.AddLine(line);
+                }
+                await _uow.SaveChangesAsync(ct);
 
-            var created = await LoadTransferWithIncludesAsync(transfer.Id, ct);
-            return Result<WarehouseTransferDto>.Success(MapToDto(created!));
+                _logger.LogInformation("WarehouseTransfer created (No: {TransferNo}, ID: {Id}) by User {UserId}",
+                    transfer.TransferNo, transfer.Id, userId);
+
+                var created = await LoadTransferWithIncludesAsync(transfer.Id, ct);
+                return Result<WarehouseTransferDto>.Success(MapToDto(created!));
+            }, ct);
         }
         catch (DomainException ex)
         {

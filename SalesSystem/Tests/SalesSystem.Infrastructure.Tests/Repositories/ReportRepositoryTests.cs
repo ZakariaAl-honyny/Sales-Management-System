@@ -48,10 +48,7 @@ public class ReportRepositoryTests
     private async Task<int> SeedCustomer(SalesDbContext context, string name)
     {
         await SeedAccount(context, $"حساب {name}");
-        var party = Party.Create(name);
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        var customer = Customer.Create(partyId: party.Id, accountId: 1);
+        var customer = Customer.Create(name, accountId: 1);
         context.Customers.Add(customer);
         await context.SaveChangesAsync();
         return customer.Id;
@@ -60,10 +57,7 @@ public class ReportRepositoryTests
     private async Task<int> SeedSupplier(SalesDbContext context, string name)
     {
         await SeedAccount(context, $"حساب {name}");
-        var party = Party.Create(name);
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
+        var supplier = Supplier.Create(name, accountId: 1);
         context.Suppliers.Add(supplier);
         await context.SaveChangesAsync();
         return supplier.Id;

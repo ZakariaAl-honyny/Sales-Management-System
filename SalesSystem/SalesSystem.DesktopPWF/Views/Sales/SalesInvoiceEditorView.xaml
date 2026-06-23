@@ -478,12 +478,12 @@
                             TabIndex="14"
                             ToolTip="إلغاء العملية (للحالات غير المرحلة)"/>
 
-                    <Button Content="🗑️ حذف" 
+                    <Button Content="🚫 إلغاء الفاتورة" 
                             Command="{Binding DeleteCommand}" 
                             Style="{StaticResource DangerButton}" 
                             Padding="12,0" 
                             Visibility="{Binding IsEditMode, Converter={StaticResource BoolToVisibility}}"
-                            ToolTip="إلغاء الفاتورة — لا يمكن التراجع عن هذه العملية وسيتم عكس الأرصدة"/>
+                            ToolTip="إلغاء الفاتورة بالكامل — عكس كل العمليات (المخزون والقيود والمدفوعات)"/>
                 </StackPanel>
 
                 <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" 

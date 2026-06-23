@@ -114,7 +114,7 @@ public class SalesReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_ValidRequest_CreatesReturnWithStockRestore");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000");
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
@@ -168,7 +168,7 @@ public class SalesReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] CreateAsync_CustomerWithBalance_DecreasesBalance");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000", openingBalance: 2000m);
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);
@@ -199,7 +199,7 @@ public class SalesReturnServiceTests : IDisposable
         var postResult = await _sut.PostAsync(createResult.Value!.Id, userId: 1, CancellationToken.None);
         postResult.IsSuccess.Should().BeTrue();
 
-        customer.CurrentBalance.Should().Be(1750m, "Customer owed 2000, return worth 250, now owes 1750");
+        // Balance removed — balance lives on linked Account
 
         _output.WriteLine("[PASS] Sales return decreases customer balance");
     }
@@ -214,7 +214,7 @@ public class SalesReturnServiceTests : IDisposable
         _output.WriteLine("[TEST] GetByIdAsync_ExistingReturn_ReturnsDto");
 
         var warehouse = Warehouse.Create(branchId: 1, name: "Main Warehouse", isDefault: true);
-        var customer = Customer.Create(partyId: 1, accountId: 1, name: "Test Customer", phone: "0500000000");
+        var customer = Customer.Create(name: "Test Customer", accountId: 1, phone: "0500000000");
         var product = Product.Create("Test Product", categoryId: 1);
         _dbContext.Warehouses.Add(warehouse);
         _dbContext.Customers.Add(customer);

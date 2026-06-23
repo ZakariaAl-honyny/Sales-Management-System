@@ -1,4 +1,4 @@
-# AGENTS.md — Sales Management System (v4.10.4+ — Phase 21-22 Complete: 9 DB-driven Roles, 45 Permissions, Schema-Aligned, Chart of Accounts, XAML Quality Audit)
+# AGENTS.md — Sales Management System (v4.10.7 — Transaction Atomicity & Inventory Audit Trail: All 22 Operations Audited, ExpenseService Journal Entries, SaveChangesAsync Bug Fixes)
 # READ THIS FILE FIRST — BEFORE WRITING ANY CODE
 # Platform: .NET 10 LTS | Clean Architecture
 # WPF Desktop + ASP.NET Core 10 API + SQL Server
@@ -38,6 +38,16 @@ Desktop → (HttpClient) → Api → Application → Infrastructure → SQL Serv
 ## 2. CONSTITUTION — Non-Negotiable Rules
 
 **These rules are LAW. They override ALL other instructions.**
+
+### 2.98 Products Module — TaxId, Barcode, Units, ExecuteTransactionAsync (v4.10.6)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-543 | `Product` entity MUST NOT have `TaxId` — Tax is invoice-level only (`SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`). Tax entity determines tax rate applied at sale/purchase time, NOT on the product catalog. |
+| RULE-544 | Product creation MUST be atomic across 3 tables: `Products` + `ProductUnits` + `ProductPrices` — wrapped in `_uow.ExecuteTransactionAsync<Result<ProductDto>>()`. Prevents orphaned ProductUnit/Price records on partial failure. |
+| RULE-545 | Opening stock is a SEPARATE inventory transaction (via `InventoryAdjustments` Type=Opening or `InventoryBatches`) — NEVER stored on `Product` entity fields like `OpeningQuantity`/`OpeningUnitCost`. |
+| RULE-546 | Services that create BOTH an Account AND an entity (Customer, Supplier, CashBox, Bank) MUST wrap both writes in `_uow.ExecuteTransactionAsync<Result<T>>()` — prevents orphaned accounts when entity creation fails. |
+| RULE-547 | `CustomerService.CreateAsync`, `SupplierService.CreateAsync`, `CashBoxService.CreateAsync`, and `BankService.CreateAsync` MUST use `ExecuteTransactionAsync` wrapping account creation + entity creation + SaveChanges in a single transaction. |
 
 ### 2.1 Money and Quantity Types
 
@@ -1832,6 +1842,18 @@ Phase 26: Code Review Remediations (C-1 through C-8) → Fix COGS, netRevenue, C
 | RULE-558 | Entities with status-based lifecycles (Draft/Posted/Cancelled like invoices, journal entries) should use `IncludeCancelled` instead of `IncludeInactive` where appropriate. |
 | RULE-559 | Views for log/transaction/appended-only entities (audit logs, inventory transactions, notifications) do NOT need IncludeInactive since they don't support soft-delete. |
 
+### 2.100 Transaction Atomicity & Inventory Audit Trail (v4.10.7)
+
+| RULE | DIRECTIVE |
+|------|-----------|
+| RULE-560 | ALL 22 transaction operations that affect stock, cash, or accounting MUST be wrapped in `ExecuteTransactionAsync` — NO exceptions. This includes: SalesService.PostAsync/CancelAsync, PurchaseService.PostAsync/CancelAsync, SalesReturnService.PostAsync/CancelAsync, PurchaseReturnService.PostAsync/CancelAsync, CustomerReceiptService.CreateAsync/PostAsync/CancelAsync/DeleteAsync, SupplierPaymentService.CreateAsync/PostAsync/CancelAsync/DeleteAsync, ExpenseService.CreateAsync/PostAsync/CancelAsync, InventoryAdjustmentService.PostAsync/CancelAsync, InventoryCountService.PostAsync/CancelAsync, WarehouseTransferService.CreateAsync/PostAsync/CancelAsync, ReceiptVoucherService.PostAsync/CancelAsync, PaymentVoucherService.PostAsync/CancelAsync, InventoryService.CreateTransferAsync/PostTransferAsync/CancelTransferAsync. |
+| RULE-561 | `InventoryTransaction` records MUST be created for EVERY stock-affecting operation — SalesService.PostAsync (type=Sale), SalesService.CancelAsync (type=SaleReturn), PurchaseService.PostAsync (type=Purchase), PurchaseService.CancelAsync (type=PurchaseReturn), SalesReturnService.PostAsync (type=SaleReturn), SalesReturnService.CancelAsync (type=SaleReturn), PurchaseReturnService.PostAsync (type=PurchaseReturn), PurchaseReturnService.CancelAsync (type=PurchaseReturn), InventoryAdjustmentService.PostAsync (type=Adjustment), InventoryCountService.PostAsync (type=Count), WarehouseTransferService.PostTransferAsync (type=TransferOut/TransferIn). Each InventoryTransaction MUST have at least one `InventoryTransactionLine` per product. |
+| RULE-562 | `ExpenseService` MUST inject `IAccountingIntegrationService` and create journal entries: PostAsync creates `Dr ExpenseAccount / Cr CashBox.Account`; CancelAsync creates reversal `Dr CashBox.Account / Cr ExpenseAccount`. Expense sequence MUST use `IDocumentSequenceService.GetNextIntAsync("Expense", ct)` — NEVER `ToListIgnoreFiltersAsync().Max() + 1` (not thread-safe). |
+| RULE-563 | `InventoryService` methods that modify stock in bulk (IncreaseStockAsync, DecreaseStockAsync, CreateTransferAsync, PostTransferAsync, CancelTransferAsync) MUST be wrapped in `ExecuteTransactionAsync` — stock updates are financial operations requiring atomic commits. |
+| RULE-564 | `DeleteAsync` and `CancelAsync` methods MUST call `SaveChangesAsync` before returning — missing `SaveChangesAsync` means deletes are silently rolled back. This applies to CustomerReceiptService.DeleteAsync, SupplierPaymentService.DeleteAsync, and any other soft-delete operation. |
+| RULE-565 | When creating `InventoryTransaction` records inside a service's `ExecuteTransactionAsync` wrapper, use `InventoryTransaction.Create()` + `AddLine()` — NEVER create `InventoryTransaction` inside `IncreaseStockAsync`/`DecreaseStockAsync` (would cause duplicate records when those methods are called from multiple callers). |
+| RULE-566 | FIFO batch restoration in SalesService.CancelAsync/PurchaseService.CancelAsync is NOT yet implemented — stock is restored via `IncreaseStockAsync()` but batch `QuantityRemaining` is not decremented back. This is a known gap to be addressed when batch allocation tracking is added. |
+
 ## 3. Enums (Use These EXACT Values)
 
 ```csharp
@@ -1998,6 +2020,182 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ Health check injecting raw `IConfiguration` instead of `SecureDbContextFactory`
 ❌ `CheckCreditLimit()` throwing exceptions (return bool instead)
 ❌ CustomerGroup in V1 (deferred to V2 — no CustomerGroup entity, service, controller, or Desktop UI in V1)
+❌ CustomerType/SupplierType in V1 (deferred to V2 — payment type is per-invoice)
+❌ User-supplied AccountId in Customer/Supplier requests (auto-created by service)
+❌ OpeningBalance input field in Customer/Supplier Desktop forms (journal entry is source of truth)
+❌ `ModernTextBox` style on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"`, causes `XamlParseException`
+❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox` — WPF throws `InvalidOperationException`
+❌ client-supplied CreatedBy in journal entry requests (always extract from JWT)
+❌ Hardcoded userId (createdByUserId: 1) in Customer/Supplier services
+❌ lastId + 1 for InvoiceNo generation (use DocumentSequenceService)
+❌ PurchaseCost for COGS calculation (use AverageCost)
+❌ Clamping negative netRevenue to 0 (return validation error instead)
+❌ SupplierPayment CashTransactionType on purchase cancel (use RefundOut)
+❌ String-based ReferenceNumber lookup alone (use ReferenceId with fallback)
+❌ Missing composite index on JournalEntry(ReferenceType, ReferenceId)
+❌ Payment update/delete without reversal journal entries
+❌ PurchasePrice/SalePrice on Product entity (use ProductPrices table instead)
+❌ Single-currency pricing (must support multi-currency via ProductPrices)
+❌ No batch tracking for inventory (must use InventoryBatches for FIFO/FEFO)
+❌ Purchase invoice without landed cost distribution (must use AdditionalCharge entity)
+❌ Sales quotation without expiry date (quotations must expire)
+❌ Payment without allocation tracking (must use PaymentAllocation entity)
+❌ CashBox without AccountId FK (must link to Chart of Accounts)
+❌ OpeningBalance/CurrentBalance on CashBox entity (balance lives on linked Account only)
+❌ BalanceBefore/BalanceAfter on CashTransaction (use RunningBalance instead)
+❌ Deposit()/Withdraw() methods on CashBox (removed — service creates CashTransaction records directly)
+❌ Client-side balance validation for CashBox transfers (server validates via Account)
+❌ CashTransaction.Create() being internal (must be public — callable from service layer)
+❌ Fixed AccountsReceivableAccountId/AccountsPayableAccountId in AccountingIntegrationService (use per-entity Customer.AccountId/Supplier.AccountId instead)
+❌ Split Cash Sales (1521) and Credit Sales (1522) revenue accounts (use single 1520 instead)
+❌ Crediting InventoryAssetAccountId for purchase return reversals (use PurchaseReturnAccountId instead)
+❌ Missing PurchaseReturnAccountId in SystemAccountMappings (Purchase Returns account required for financial reporting)
+❌ Hardcoding system mapping account IDs in customer/supplier opening entries or payment reversals (accept per-entity accountId parameters)
+❌ Journal entry without multi-currency support (must store CurrencyId + ExchangeRate)
+❌ Report without Excel export (ALL report DTOs must support ClosedXML)
+❌ Hard-coded price levels (use PriceLevel enum + ProductPrices table)
+❌ Optional/nullable AccountId on Customer/Supplier (must be mandatory non-nullable int, auto-created by service)
+❌ Deleting fiscal year (must use open/close lifecycle, not delete)
+❌ Physical count in V1 (deferred to V2 — use opening stock instead)
+❌ OpeningBalance/CurrentBalance on Customer/Supplier entity (balance lives on linked Account only)
+❌ CurrencyId on Customer/Supplier entity (currency is per-transaction, not per-entity)
+❌ Changing IsBaseCurrency after system creation (immutable — locked at setup)
+❌ Products without a second unit (must have at least base unit + one additional unit)
+❌ ProductPrices without EffectiveFrom/EffectiveTo date ranges (pricing must have date tracking)
+❌ InventoryMovement without ProductUnitId (use ProductUnitId instead of raw ProductId)
+❌ PurchaseInvoice without `OtherCharges` property (must match SalesInvoice for landed cost consistency)
+❌ `AllocateAdditionalCharges()` missing from `PurchaseService.PostAsync()` — landed cost MUST be distributed proportionally
+❌ `OtherCharges` missing from `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`
+❌ `OtherCharges` missing from Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`
+❌ Sales Price Enforcement NOT wired — `SalesService.PostAsync()` MUST check `PreventBelowRetailPrice` and `AllowBelowCostSale`
+❌ `IProductPriceService` NOT injected into `SalesService` (price enforcement requires it)
+❌ `GetDefaultPrice()` returning `0m` stub in Editor VM (breaks `IsPriceOverridden` detection)
+❌ `CostInBaseCurrency` hardcoded to `0m` on load (must use actual cost from invoice DTO)
+❌ DeliveryCharges NOT in separate revenue account (OtherCharges credited to SalesRevenue instead of `DeliveryChargesRevenue`)
+❌ `DeliveryChargesRevenueAccountId` missing from `SystemAccountKey` enum and `AccountingSeeder`
+❌ Purchase Return VALIDATION requiring invoice (standalone mode must be allowed)
+❌ Purchase Return without journal entries (`AccountingIntegrationService` MUST have `CreatePurchaseReturnEntryAsync`/`ReversePurchaseReturnEntryAsync`)
+❌ `ProductUnitId` hardcoded to `1` in Purchase Return editor
+❌ `PostedAt`/`CancelledAt` NOT set in `PurchaseReturn.Post()`/`Cancel()` methods
+❌ Flexible Input missing — LineTotal column MUST be editable (not `IsReadOnly`)
+❌ `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` NOT implemented in line ViewModels
+❌ `FlexibleInputCalculator` helper class missing
+❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
+❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
+❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
+❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
+❌ Service interface without concrete implementation class (DI resolution crash)
+❌ Report API URL mismatch between Desktop ViewModel and Controller (404 errors)
+❌ Payment UpdateAsync without journal entry reversal for posted amounts
+❌ Standalone sales return without `CreateSalesReturnEntryAsync()` (missing journal entries)
+❌ Report service returning hardcoded stub `"تحت التطوير"` instead of real data
+❌ Report ViewModel with PDF export but NO Excel export (incomplete)
+❌ `CashBoxReportService` missing implementation (3 API endpoints crash at runtime)
+❌ `FinancialReportService.GetCashFlowReportAsync()` returning stub instead of computing from ReceiptVoucher/PaymentVoucher data
+❌ `AllowBelowCostSale` BLOCKING instead of WARNING-only (per analysis: "ولا نمنع البيع" — must warn but never block below-cost sales)
+❌ `AllowBelowCostSale` defaulting to `"false"` (must default to `true` per analysis spec: "السماح مع تنبيه")
+❌ `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo (service MUST auto-generate via DocumentSequenceService when `<= 0`)
+❌ `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` (MUST use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` for atomic + audit trail)
+❌ `InventoryCountService.PostAsync()` creating one Adjustment per line (MUST create ONE adjustment per Post with `ReferenceType = "InventoryCount"`)
+❌ `AdjustmentType` validator with range `(1,2)` excluding Correction=3 (MUST use `InclusiveBetween(1, 3)`)
+❌ `ReportsController` with `CancellationToken` AFTER optional parameters (MUST precede optional params)
+❌ Inventory Operations ViewModels NOT implementing `IDisposable` (EventBus subscriptions MUST be disposed)
+❌ `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator MUST only be called when `_lastModifiedField == Total`)
+❌ `SalesReturn.Post()` without `PostedAt = DateTime.UtcNow` (missing audit trail timestamp — same issue as RULE-489 for PurchaseReturn)
+❌ `SalesReturn.Cancel()` without `CancelledAt = DateTime.UtcNow` (missing audit trail timestamp)
+❌ `SalesReturnService` NOT creating journal entries on Post/Cancel (general ledger out of sync — MUST inject IAccountingIntegrationService)
+❌ `ProductUnitId` hardcoded to `1` in ANY ViewModel (breaks inventory tracking — use DefaultPurchaseUnitId/DefaultSalesUnitId instead)
+❌ `AllocateAdditionalCharges()` logic inline in `PurchaseService.PostAsync()` (MUST extract to standalone `AdditionalChargeAllocator` helper)
+❌ CustomerType/SupplierType in V1 (deferred to V2 — payment type is per-invoice)
+❌ User-supplied AccountId in Customer/Supplier requests (auto-created by service)
+❌ OpeningBalance input field in Customer/Supplier Desktop forms (journal entry is source of truth)
+❌ `ModernTextBox` style on `ComboBox` elements — `ModernTextBox` has `TargetType="TextBox"`, causes `XamlParseException`
+❌ `DisplayMemberPath` and `ItemTemplate` on same `ComboBox` — WPF throws `InvalidOperationException`
+❌ client-supplied CreatedBy in journal entry requests (always extract from JWT)
+❌ Hardcoded userId (createdByUserId: 1) in Customer/Supplier services
+❌ lastId + 1 for InvoiceNo generation (use DocumentSequenceService)
+❌ PurchaseCost for COGS calculation (use AverageCost)
+❌ Clamping negative netRevenue to 0 (return validation error instead)
+❌ SupplierPayment CashTransactionType on purchase cancel (use RefundOut)
+❌ String-based ReferenceNumber lookup alone (use ReferenceId with fallback)
+❌ Missing composite index on JournalEntry(ReferenceType, ReferenceId)
+❌ Payment update/delete without reversal journal entries
+❌ PurchasePrice/SalePrice on Product entity (use ProductPrices table instead)
+❌ Single-currency pricing (must support multi-currency via ProductPrices)
+❌ No batch tracking for inventory (must use InventoryBatches for FIFO/FEFO)
+❌ Purchase invoice without landed cost distribution (must use AdditionalCharge entity)
+❌ Sales quotation without expiry date (quotations must expire)
+❌ Payment without allocation tracking (must use PaymentAllocation entity)
+❌ CashBox without AccountId FK (must link to Chart of Accounts)
+❌ OpeningBalance/CurrentBalance on CashBox entity (balance lives on linked Account only)
+❌ BalanceBefore/BalanceAfter on CashTransaction (use RunningBalance instead)
+❌ Deposit()/Withdraw() methods on CashBox (removed — service creates CashTransaction records directly)
+❌ Client-side balance validation for CashBox transfers (server validates via Account)
+❌ CashTransaction.Create() being internal (must be public — callable from service layer)
+❌ Fixed AccountsReceivableAccountId/AccountsPayableAccountId in AccountingIntegrationService (use per-entity Customer.AccountId/Supplier.AccountId instead)
+❌ Split Cash Sales (1521) and Credit Sales (1522) revenue accounts (use single 1520 instead)
+❌ Crediting InventoryAssetAccountId for purchase return reversals (use PurchaseReturnAccountId instead)
+❌ Missing PurchaseReturnAccountId in SystemAccountMappings (Purchase Returns account required for financial reporting)
+❌ Hardcoding system mapping account IDs in customer/supplier opening entries or payment reversals (accept per-entity accountId parameters)
+❌ Journal entry without multi-currency support (must store CurrencyId + ExchangeRate)
+❌ Report without Excel export (ALL report DTOs must support ClosedXML)
+❌ Hard-coded price levels (use PriceLevel enum + ProductPrices table)
+❌ Optional/nullable AccountId on Customer/Supplier (must be mandatory non-nullable int, auto-created by service)
+❌ Deleting fiscal year (must use open/close lifecycle, not delete)
+❌ Physical count in V1 (deferred to V2 — use opening stock instead)
+❌ OpeningBalance/CurrentBalance on Customer/Supplier entity (balance lives on linked Account only)
+❌ CurrencyId on Customer/Supplier entity (currency is per-transaction, not per-entity)
+❌ Changing IsBaseCurrency after system creation (immutable — locked at setup)
+❌ Products without a second unit (must have at least base unit + one additional unit)
+❌ ProductPrices without EffectiveFrom/EffectiveTo date ranges (pricing must have date tracking)
+❌ InventoryMovement without ProductUnitId (use ProductUnitId instead of raw ProductId)
+❌ PurchaseInvoice without `OtherCharges` property (must match SalesInvoice for landed cost consistency)
+❌ `AllocateAdditionalCharges()` missing from `PurchaseService.PostAsync()` — landed cost MUST be distributed proportionally
+❌ `OtherCharges` missing from `CreatePurchaseInvoiceRequest`/`UpdatePurchaseInvoiceRequest`/`PurchaseInvoiceDto`
+❌ `OtherCharges` missing from Desktop VM `RecalculateTotals()`/`BuildRequest()`/`LoadInvoiceAsync()`
+❌ Sales Price Enforcement NOT wired — `SalesService.PostAsync()` MUST check `PreventBelowRetailPrice` and `AllowBelowCostSale`
+❌ `IProductPriceService` NOT injected into `SalesService` (price enforcement requires it)
+❌ `GetDefaultPrice()` returning `0m` stub in Editor VM (breaks `IsPriceOverridden` detection)
+❌ `CostInBaseCurrency` hardcoded to `0m` on load (must use actual cost from invoice DTO)
+❌ DeliveryCharges NOT in separate revenue account (OtherCharges credited to SalesRevenue instead of `DeliveryChargesRevenue`)
+❌ `DeliveryChargesRevenueAccountId` missing from `SystemAccountKey` enum and `AccountingSeeder`
+❌ Purchase Return VALIDATION requiring invoice (standalone mode must be allowed)
+❌ Purchase Return without journal entries (`AccountingIntegrationService` MUST have `CreatePurchaseReturnEntryAsync`/`ReversePurchaseReturnEntryAsync`)
+❌ `ProductUnitId` hardcoded to `1` in Purchase Return editor
+❌ `PostedAt`/`CancelledAt` NOT set in `PurchaseReturn.Post()`/`Cancel()` methods
+❌ Flexible Input missing — LineTotal column MUST be editable (not `IsReadOnly`)
+❌ `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` NOT implemented in line ViewModels
+❌ `FlexibleInputCalculator` helper class missing
+❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
+❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
+❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
+❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
+❌ Service interface without concrete implementation class (DI resolution crash)
+❌ Report API URL mismatch between Desktop ViewModel and Controller (404 errors)
+❌ Payment UpdateAsync without journal entry reversal for posted amounts
+❌ Standalone sales return without `CreateSalesReturnEntryAsync()` (missing journal entries)
+❌ Report service returning hardcoded stub `"تحت التطوير"` instead of real data
+❌ Report ViewModel with PDF export but NO Excel export (incomplete)
+❌ `CashBoxReportService` missing implementation (3 API endpoints crash at runtime)
+❌ `FinancialReportService.GetCashFlowReportAsync()` returning stub instead of computing from ReceiptVoucher/PaymentVoucher data
+❌ `AllowBelowCostSale` BLOCKING instead of WARNING-only (per analysis: "ولا نمنع البيع" — must warn but never block below-cost sales)
+❌ `AllowBelowCostSale` defaulting to `"false"` (must default to `true` per analysis spec: "السماح مع تنبيه")
+❌ `InventoryService.CreateTransactionAsync()` requiring Desktop to provide TransactionNo (service MUST auto-generate via DocumentSequenceService when `<= 0`)
+❌ `InventoryAdjustmentService.PostAsync()` directly setting `WarehouseStock.Quantity` (MUST use `IInventoryService.IncreaseStockAsync`/`DecreaseStockAsync` for atomic + audit trail)
+❌ `InventoryCountService.PostAsync()` creating one Adjustment per line (MUST create ONE adjustment per Post with `ReferenceType = "InventoryCount"`)
+❌ `AdjustmentType` validator with range `(1,2)` excluding Correction=3 (MUST use `InclusiveBetween(1, 3)`)
+❌ `ReportsController` with `CancellationToken` AFTER optional parameters (MUST precede optional params)
+❌ Inventory Operations ViewModels NOT implementing `IDisposable` (EventBus subscriptions MUST be disposed)
+❌ `InvoiceLineViewModel`/`PurchaseInvoiceLineViewModel` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator MUST only be called when `_lastModifiedField == Total`)
+❌ `SalesReturn.Post()` without `PostedAt = DateTime.UtcNow` (missing audit trail timestamp — same issue as RULE-489 for PurchaseReturn)
+❌ `SalesReturn.Cancel()` without `CancelledAt = DateTime.UtcNow` (missing audit trail timestamp)
+❌ `SalesReturnService` NOT creating journal entries on Post/Cancel (general ledger out of sync — MUST inject IAccountingIntegrationService)
+❌ `ProductUnitId` hardcoded to `1` in ANY ViewModel (breaks inventory tracking — use DefaultPurchaseUnitId/DefaultSalesUnitId instead)
+❌ `AllocateAdditionalCharges()` logic inline in `PurchaseService.PostAsync()` (MUST extract to standalone `AdditionalChargeAllocator` helper)
 ❌ CustomerType/SupplierType in V1 (deferred to V2 — payment type is per-invoice)
 ❌ User-supplied AccountId in Customer/Supplier requests (auto-created by service)
 ❌ OpeningBalance input field in Customer/Supplier Desktop forms (journal entry is source of truth)
@@ -2566,3 +2764,25 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] All list XAML views for soft-deletable entities have "عرض غير النشطة" CheckBox with ToolTip?
 - [ ] Client-side filtering implemented for IncludeInactive toggle (CollectionView filter or API param)?
 - [ ] Entities with status-based lifecycles use IncludeCancelled instead of IncludeInactive where appropriate?
+- [ ] Product entity has NO TaxId — TaxId is on SalesInvoice/PurchaseInvoice only?
+- [ ] Product entity has Barcode property (Products.Barcode varchar(50) null unique filtered)?
+- [ ] Product.ValidateUnits() enforces minimum 2 units (base + one additional)?
+- [ ] Product.RemoveUnit() guards at 2 units (cannot remove below minimum)?
+- [ ] Product creation = 3 tables atomic via ExecuteTransactionAsync (Products + ProductUnits + ProductPrices)?
+- [ ] CustomerService.CreateAsync wrapped in ExecuteTransactionAsync<Result<CustomerDto>>?
+- [ ] SupplierService.CreateAsync wrapped in ExecuteTransactionAsync<Result<SupplierDto>>?
+- [ ] CashBoxService.CreateAsync wrapped in ExecuteTransactionAsync<Result<CashBoxDto>>?
+- [ ] BankService.CreateAsync wrapped in ExecuteTransactionAsync<Result<BankDto>>?
+- [ ] SalesService.CreateAsync uses ExecuteTransactionAsync (not raw BeginTransactionAsync)?
+- [ ] Opening stock on Product creation is a SEPARATE inventory transaction (not on Product entity)?
+- [ ] No TaxId in CreateProductRequest, ProductDto, or Product editor XAML?
+- [ ] Product editor XAML has no TaxId binding (Tax is invoice-level only)?
+- [ ] Service creating Account + Entity wraps BOTH in single ExecuteTransactionAsync (prevents orphaned accounts)?
+- [ ] Product unit validation shows Arabic message explaining minimum 2 units requirement?
+- [ ] ALL 22 transaction operations wrapped in `ExecuteTransactionAsync`? (SalesService.Post/Cancel, PurchaseService.Post/Cancel, SalesReturnService.Post/Cancel, PurchaseReturnService.Post/Cancel, CustomerReceiptService.Create/Post/Cancel/Delete, SupplierPaymentService.Create/Post/Cancel/Delete, ExpenseService.Create/Post/Cancel, InventoryAdjustmentService.Post/Cancel, InventoryCountService.Post/Cancel, WarehouseTransferService.Create/Post/Cancel, ReceiptVoucherService.Post/Cancel, PaymentVoucherService.Post/Cancel, InventoryService.CreateTransfer/PostTransfer/CancelTransfer)
+- [ ] `InventoryTransaction` + `InventoryTransactionLine` created for EVERY stock-affecting operation? (Sale, Purchase, SaleReturn, PurchaseReturn, Adjustment, Count, Transfer)
+- [ ] `ExpenseService` creates journal entries on Post (`Dr ExpenseAccount / Cr CashBox.Account`) and reversal on Cancel?
+- [ ] `ExpenseService` uses `IDocumentSequenceService.GetNextIntAsync("Expense", ct)` — NOT `ToListIgnoreFiltersAsync().Max() + 1`?
+- [ ] `DeleteAsync`/`CancelAsync` methods call `SaveChangesAsync` before returning? (CustomerReceiptService, SupplierPaymentService)
+- [ ] `InventoryTransaction` created via `InventoryTransaction.Create()` + `AddLine()` inside service wrappers — NOT inside `IncreaseStockAsync`/`DecreaseStockAsync`?
+- [ ] No `BeginTransactionAsync` used directly — all wrapped via `ExecuteTransactionAsync` (RULE-275)?

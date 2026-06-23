@@ -168,7 +168,6 @@ public class ProductsControllerTests : ControllerTestBase
         Name: $"منتج {id}",
         CategoryId: 1,
         CategoryName: "تصنيف",
-        Barcode: null,
         Description: null,
         ReorderLevel: 10.00m,
         TrackExpiry: false,
@@ -179,14 +178,12 @@ public class ProductsControllerTests : ControllerTestBase
         Name: "منتج جديد",
         CategoryId: 1,
         Description: null,
-        Barcode: null!,
         ReorderLevel: 10.00m);
 
     private static UpdateProductRequest UpdateValidRequest() => new(
         Name: "منتج محدث",
         CategoryId: 1,
         Description: "وصف محدث",
-        Barcode: null!,
         ReorderLevel: 15.00m,
         IsActive: true);
 }

@@ -107,7 +107,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Arrange
         var product = new ProductDto(
             Id: 1,
-            Barcode: null,
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
@@ -132,7 +131,6 @@ public class ProductEditorViewModelTests : IDisposable
 
         // Assert
         viewModel.Name.Should().BeEmpty();
-        viewModel.Barcode.Should().BeEmpty();
         viewModel.ReorderLevel.Should().Be(0);
         viewModel.IsActive.Should().BeTrue();
         viewModel.IsBusy.Should().BeFalse();
@@ -155,7 +153,6 @@ public class ProductEditorViewModelTests : IDisposable
         // Arrange
         var product = new ProductDto(
             Id: 1,
-            Barcode: null,
             Name: "منتج تجريبي",
             CategoryId: 1,
             CategoryName: "تصنيف 1",
@@ -331,7 +328,6 @@ public class ProductEditorViewModelTests : IDisposable
     {
         return new ProductDto(
             Id: id,
-            Barcode: null,
             Name: name,
             CategoryId: 1,
             CategoryName: "فئة تجريبية",

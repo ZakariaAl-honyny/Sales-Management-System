@@ -147,7 +147,7 @@
 | Rule | Description |
 |------|-------------|
 | BR-160 | ALL `Account.Create()` calls for Level 4+ MUST pass `allowTransactions: true`. The default is `false` and `Account.Create()` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")` when `level >= 4 && !allowTransactions`. |
-| BR-161 | Check ALL callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService — every auto-creation path MUST set `allowTransactions: true`. |
+| BR-161 | Check ALL callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService — every auto-creation path MUST set `allowTransactions: true`. (PartyService removed — Parties table deleted.) |
 
 ## 17. Service Implementation Completeness
 

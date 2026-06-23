@@ -377,6 +377,23 @@ public interface IPurchaseReturnApiService
     Task<Result<Dictionary<int, decimal>>> GetReturnedQuantitiesByInvoiceAsync(int invoiceId, CancellationToken ct = default);
 }
 
+public interface ISalesQuotationApiService
+{
+    Task<Result<List<SalesQuotationDto>>> GetAllAsync(
+        string? search = null, DateTime? from = null, DateTime? to = null,
+        byte? status = null, int? customerId = null,
+        bool includeInactive = false, int page = 1, int pageSize = 100,
+        CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> GetByIdAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> CreateAsync(CreateSalesQuotationRequest request, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> UpdateAsync(int id, UpdateSalesQuotationRequest request, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> SendAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> AcceptAsync(int id, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> RejectAsync(int id, string? reason, CancellationToken ct = default);
+    Task<Result<SalesQuotationDto>> ConvertToInvoiceAsync(int id, CancellationToken ct = default);
+    Task<Result> CancelAsync(int id, CancellationToken ct = default);
+}
+
 public interface IWarehouseTransferApiService
 {
     Task<Result<List<WarehouseTransferDto>>> GetAllAsync(string? search = null, DateTime? from = null, DateTime? to = null, byte? status = null, bool includeInactive = false, int page = 1, int pageSize = 100, CancellationToken ct = default);
@@ -422,6 +439,14 @@ public interface IPrintApiService
     /// Returns the temp file path on success.
     /// </summary>
     Task<Result<string>> GetPurchaseA4PdfAsync(int invoiceId, CancellationToken ct = default);
+
+    // Return print methods
+    Task<Result> PrintSalesReturnA4Async(int returnId, CancellationToken ct = default);
+    Task<Result> PrintSalesReturnThermalAsync(int returnId, CancellationToken ct = default);
+    Task<Result> PrintPurchaseReturnA4Async(int returnId, CancellationToken ct = default);
+    Task<Result> PrintPurchaseReturnThermalAsync(int returnId, CancellationToken ct = default);
+    Task<Result<string>> GetSalesReturnA4PdfAsync(int returnId, CancellationToken ct = default);
+    Task<Result<string>> GetPurchaseReturnA4PdfAsync(int returnId, CancellationToken ct = default);
 }
 
 public interface IDatabaseHealthCheckService
@@ -520,15 +545,6 @@ public interface IBankApiService
     Task<Result<BankDto>> GetByIdAsync(int id);
     Task<Result<BankDto>> CreateAsync(CreateBankRequest request);
     Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request);
-    Task<Result> DeactivateAsync(int id);
-}
-
-public interface IPartyApiService
-{
-    Task<Result<List<PartyDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<PartyDto>> GetByIdAsync(int id);
-    Task<Result<PartyDto>> CreateAsync(CreatePartyRequest request);
-    Task<Result<PartyDto>> UpdateAsync(int id, UpdatePartyRequest request);
     Task<Result> DeactivateAsync(int id);
 }
 

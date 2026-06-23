@@ -1,6 +1,7 @@
 ---
 name: "Database Engineer"
 reasoningEffect: high
+model: opencode/deepseek-v4-flash-free
 role: "EF Core + SQL Server specialist"
 activation: "When working on entities, configurations, migrations, seed data"
 mode: subagent
@@ -95,6 +96,14 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
 - `CashTransaction.Create()` is PUBLIC (not internal) — callable from service layer
 - CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية" when AccountId is null
   - AccountCode auto-increments: 1111, 1112, 1113...
+
+### Products Entity — No TaxId, Barcode Present (v4.10.6)
+- **RULE-543**: `Product` entity MUST NOT have `TaxId` — Tax is invoice-level only (`SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`)
+- **RULE-545**: Opening stock is a SEPARATE inventory transaction — NEVER stored on `Product` entity (no `OpeningQuantity`/`OpeningUnitCost` fields)
+- `Products` table has `Barcode` column: `varchar(50) null unique filtered` (per database-schema.md line 437)
+- `ProductConfiguration` MUST configure Barcode: `builder.Property(x => x.Barcode).HasMaxLength(50).IsRequired(false);` + `builder.HasIndex(x => x.Barcode).IsUnique().HasFilter("[Barcode] IS NOT NULL AND [IsActive] = 1");`
+- **No TaxId column** in Products table — confirmed by database-schema.md (lines 432-447)
+- Product creation = 3 tables atomic via ExecuteTransactionAsync (Products + ProductUnits + ProductPrices)
 
 ### 65-Table Schema Changes (Refactored from ~82 tables)
 

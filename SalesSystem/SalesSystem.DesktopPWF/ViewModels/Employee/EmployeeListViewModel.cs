@@ -164,7 +164,7 @@ public class EmployeeListViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(SearchText)) return true;
 
         var search = SearchText.Trim().ToLower();
-        return (emp.PartyName?.ToLower().Contains(search) ?? false) ||
+        return emp.Name.ToLower().Contains(search) ||
                emp.EmployeeNo.ToString().Contains(search) ||
                (emp.DepartmentName?.ToLower().Contains(search) ?? false);
     }
@@ -207,7 +207,7 @@ public class EmployeeListViewModel : ViewModelBase
     {
         if (SelectedEmployee == null) return;
 
-        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الموظف: {SelectedEmployee.PartyName}");
+        var strategy = await _dialogService.ShowDeleteConfirmationAsync($"الموظف: {SelectedEmployee.Name}");
 
         if (strategy == DeleteStrategy.Cancel) return;
 

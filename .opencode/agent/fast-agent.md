@@ -1,6 +1,7 @@
 ---
 name: "Fast Agent"
-reasoningEffect: high
+reasoningEffect: max
+model: opencode/deepseek-v4-flash-free
 role: "Code cleaner and fixer for simple tasks"
 activation: "When there are simple code issues that can be fixed without changing business logic or adding features."
 mode: subagent
@@ -541,3 +542,81 @@ else
 
 **Check if ViewModel already has the API parameter:**
 Some API service methods already accept `bool? includeInactive`. In that case, simply pass `IncludeInactive` to the API call instead of hardcoding `false`.
+
+## Transaction Atomicity Fix Patterns (v4.10.7)
+
+### Fix: Missing `ExecuteTransactionAsync` Wrapper
+**Symptom**: Service method has multiple `SaveChangesAsync` calls without transaction wrapping.
+**Fix**: Wrap the entire operation in `_uow.ExecuteTransactionAsync(async () => { ... }, ct)`.
+
+```csharp
+// WRONG — two SaveChanges without transaction (orphan risk)
+await _uow.SomeEntity.AddAsync(entity, ct);
+await _uow.SaveChangesAsync(ct);
+await _uow.AnotherEntity.UpdateAsync(another, ct);
+await _uow.SaveChangesAsync(ct);
+
+// CORRECT — atomic transaction
+await _uow.ExecuteTransactionAsync(async () =>
+{
+    await _uow.SomeEntity.AddAsync(entity, ct);
+    await _uow.AnotherEntity.UpdateAsync(another, ct);
+    await _uow.SaveChangesAsync(ct);
+}, ct);
+```
+
+### Fix: Missing `InventoryTransaction` Audit Trail
+**Symptom**: Stock-affecting operation (Post/Cancel) doesn't create `InventoryTransaction` record.
+**Fix**: Add `InventoryTransaction.Create()` + `AddLine()` inside the service's transaction wrapper.
+
+```csharp
+// Inside PostAsync (after stock change):
+var inventoryTx = InventoryTransaction.Create(
+    referenceType: InventoryReferenceType.SalesInvoice,
+    referenceId: invoice.Id,
+    warehouseId: warehouseId,
+    transactionDate: DateTime.UtcNow,
+    notes: $"بيع فاتورة #{invoice.InvoiceNo}");
+inventoryTx.AddLine(productId, productUnitId, quantity, unitCost, batchNo, expiryDate);
+await _uow.InventoryTransactions.AddAsync(inventoryTx, ct);
+```
+
+### Fix: Missing `SaveChangesAsync` in DeleteAsync/CancelAsync
+**Symptom**: Soft-delete operation doesn't persist — record still appears in queries.
+**Fix**: Add `await _uow.SaveChangesAsync(ct)` before returning.
+
+```csharp
+// WRONG — delete silently rolled back
+entity.IsActive = false;
+return Result.Success();
+
+// CORRECT — delete persisted
+entity.IsActive = false;
+await _uow.SaveChangesAsync(ct);
+return Result.Success();
+```
+
+### Fix: ExpenseService Without Journal Entries
+**Symptom**: `ExpenseService.PostAsync()` doesn't create GL entries — expenses missing from reports.
+**Fix**: Inject `IAccountingIntegrationService`, call `CreateExpenseEntryAsync()` on Post, `ReverseExpenseEntryAsync()` on Cancel.
+
+```csharp
+// In PostAsync (inside transaction):
+var journalResult = await _accountingService.CreateExpenseEntryAsync(
+    expenseId, expense.AccountId, expense.CashBoxId, expense.Amount, ct);
+if (!journalResult.IsSuccess)
+    return Result.Failure("فشل في إنشاء القيد المحاسبي: " + journalResult.Error);
+```
+
+### Fix: Non-Thread-Safe Sequence Generation
+**Symptom**: `ToListIgnoreFiltersAsync().Max() + 1` for sequence numbers — duplicates under concurrency.
+**Fix**: Replace with `IDocumentSequenceService.GetNextIntAsync("Expense", ct)`.
+
+```csharp
+// WRONG — not thread-safe
+var expenses = await _uow.Expenses.ToListIgnoreFiltersAsync(ct);
+var nextNo = expenses.Any() ? expenses.Max(e => e.ExpenseNo) + 1 : 1;
+
+// CORRECT — thread-safe with SemaphoreSlim
+var nextNo = await _sequenceService.GetNextIntAsync("Expense", ct);
+```

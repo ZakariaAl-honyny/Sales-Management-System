@@ -283,11 +283,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb1");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Test Supplier");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
+        var supplier = Supplier.Create("Test Supplier", accountId: 1);
 
         // Act
         await repository.AddAsync(supplier);
@@ -295,8 +291,7 @@ public class GenericRepositoryTests
 
         // Assert
         var saved = await context.Suppliers
-            .Include(s => s.Party)
-            .FirstOrDefaultAsync(s => s.Party.Name == "Test Supplier");
+            .FirstOrDefaultAsync(s => s.Name == "Test Supplier");
         saved.Should().NotBeNull();
         /* CurrentBalance removed — balance lives on linked Account */
     }
@@ -308,11 +303,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb2");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Supplier to Find");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
+        var supplier = Supplier.Create("Supplier to Find", accountId: 1);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 
@@ -321,7 +312,7 @@ public class GenericRepositoryTests
 
         // Assert
         result.Should().NotBeNull();
-        result!.Party.Name.Should().Be("Supplier to Find");
+        result!.Name.Should().Be("Supplier to Find");
     }
 
     [Fact]
@@ -331,11 +322,7 @@ public class GenericRepositoryTests
         await using var context = CreateContext("SupplierDb3");
         var repository = new GenericRepository<Supplier>(context);
 
-        var party = Party.Create("Test Supplier");
-        context.Parties.Add(party);
-        await context.SaveChangesAsync();
-
-        var supplier = Supplier.Create(partyId: party.Id, accountId: 1);
+        var supplier = Supplier.Create("Test Supplier", accountId: 1);
         await repository.AddAsync(supplier);
         await context.SaveChangesAsync();
 

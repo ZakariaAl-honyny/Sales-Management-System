@@ -6,21 +6,31 @@ namespace SalesSystem.Domain.Entities;
 
 /// <summary>
 /// Represents an employee who works for the organisation.
-/// Each employee is linked to a Party record for contact/personal details
-/// and may optionally be linked to a Department and a Chart of Accounts Account
+/// Contact information (Name, Phone, Email, Address) is stored directly on this entity.
+/// Each employee may optionally be linked to a Department and a Chart of Accounts Account
 /// (for custody / advance tracking purposes).
 /// </summary>
 public class Employee : ActivatableEntity
 {
     /// <summary>
-    /// FK to the Party record holding the employee's personal / contact details.
+    /// Employee name (required). This field holds the primary display name.
     /// </summary>
-    public int PartyId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Navigation property to the linked Party.
+    /// Employee phone number (optional).
     /// </summary>
-    public virtual Party Party { get; private set; } = null!;
+    public string? Phone { get; private set; }
+
+    /// <summary>
+    /// Employee email address (optional).
+    /// </summary>
+    public string? Email { get; private set; }
+
+    /// <summary>
+    /// Employee physical address (optional).
+    /// </summary>
+    public string? Address { get; private set; }
 
     /// <summary>
     /// FK to the Department the employee belongs to (optional).
@@ -66,28 +76,34 @@ public class Employee : ActivatableEntity
     private Employee() { } // EF Core
 
     /// <summary>
-    /// Factory method to create a new Employee.
+    /// Factory method to create a new Employee with direct contact information.
     /// </summary>
-    /// <param name="partyId">FK to the Party record (required, must be &gt; 0).</param>
+    /// <param name="name">Employee name (required).</param>
     /// <param name="employeeNo">Unique employee number (required, must be &gt; 0).</param>
     /// <param name="hireDate">Date of hire (required).</param>
+    /// <param name="phone">Optional phone number.</param>
+    /// <param name="email">Optional email address.</param>
+    /// <param name="address">Optional physical address.</param>
+    /// <param name="notes">Free-text notes (optional).</param>
     /// <param name="departmentId">FK to Department (optional).</param>
     /// <param name="salary">Monthly salary amount (default 0).</param>
-    /// <param name="notes">Free-text notes (optional).</param>
     /// <param name="createdByUserId">ID of the user creating this record.</param>
     /// <returns>A new Employee instance.</returns>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public static Employee Create(
-        int partyId,
+        string name,
         int employeeNo,
         DateTime hireDate,
+        string? phone = null,
+        string? email = null,
+        string? address = null,
+        string? notes = null,
         short? departmentId = null,
         decimal salary = 0,
-        string? notes = null,
         int? createdByUserId = null)
     {
-        if (partyId <= 0)
-            throw new DomainException("معرّف الطرف غير صالح.");
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم الموظف مطلوب.");
         if (employeeNo <= 0)
             throw new DomainException("رقم الموظف يجب أن يكون أكبر من صفر.");
         if (hireDate == default)
@@ -97,12 +113,15 @@ public class Employee : ActivatableEntity
 
         var employee = new Employee
         {
-            PartyId = partyId,
+            Name = name.Trim(),
             EmployeeNo = employeeNo,
             HireDate = hireDate,
+            Phone = phone?.Trim(),
+            Email = email?.Trim(),
+            Address = address?.Trim(),
+            Notes = notes?.Trim(),
             DepartmentId = departmentId,
             Salary = salary,
-            Notes = notes?.Trim(),
             IsActive = true
         };
         employee.SetCreatedBy(createdByUserId);
@@ -110,25 +129,39 @@ public class Employee : ActivatableEntity
     }
 
     /// <summary>
-    /// Updates mutable fields of the employee.
+    /// Updates mutable fields of the employee including contact information.
     /// Only non-null values are applied — null means "keep current value".
     /// </summary>
+    /// <param name="name">Employee name (required).</param>
+    /// <param name="phone">New phone number (null = keep current).</param>
+    /// <param name="email">New email address (null = keep current).</param>
+    /// <param name="address">New physical address (null = keep current).</param>
     /// <param name="departmentId">New department ID (pass 0 or negative to keep current).</param>
     /// <param name="salary">New salary (pass null to keep current).</param>
     /// <param name="notes">New notes (pass null to keep current).</param>
     /// <param name="updatedByUserId">ID of the user performing the update.</param>
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public void Update(
+        string name,
+        string? phone = null,
+        string? email = null,
+        string? address = null,
         short? departmentId = null,
         decimal? salary = null,
         string? notes = null,
         int? updatedByUserId = null)
     {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new DomainException("اسم الموظف مطلوب.");
         if (departmentId.HasValue && departmentId.Value <= 0)
             throw new DomainException("معرّف القسم غير صالح.");
         if (salary.HasValue && salary.Value < 0)
             throw new DomainException("الراتب لا يمكن أن يكون سالباً.");
 
+        Name = name.Trim();
+        Phone = phone?.Trim() ?? Phone;
+        Email = email?.Trim() ?? Email;
+        Address = address?.Trim() ?? Address;
         DepartmentId = departmentId ?? DepartmentId;
         if (salary.HasValue)
             Salary = salary.Value;

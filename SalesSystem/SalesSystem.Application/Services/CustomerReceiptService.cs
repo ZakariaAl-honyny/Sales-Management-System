@@ -33,7 +33,7 @@ public class CustomerReceiptService : ICustomerReceiptService
     {
         try
         {
-            var receipts = await _uow.CustomerReceipts.ToListAsync(ct, "Customer", "Customer.Party", "CashBox", "Currency", "Applications");
+            var receipts = await _uow.CustomerReceipts.ToListAsync(ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
             var dtos = receipts.Select(MapToDto).ToList();
             return Result<List<CustomerReceiptDto>>.Success(dtos);
         }
@@ -49,7 +49,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer.Party", "CashBox", "Currency", "Applications");
+                r => r.Id == id, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
             if (receipt == null)
                 return Result<CustomerReceiptDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -105,7 +105,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer.Party", "CashBox", "Currency", "Applications");
+                r => r.Id == id, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
             if (receipt == null)
                 return Result<CustomerReceiptDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -149,7 +149,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Applications", "Customer", "Customer.Party");
+                r => r.Id == id, ct, "Applications", "Customer", "Customer");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -158,7 +158,7 @@ public class CustomerReceiptService : ICustomerReceiptService
                 receipt.Post();
 
                 // Create journal entry: Dr Cash / Cr AR
-                var customerName = receipt.Customer?.Party?.Name ?? "";
+                var customerName = receipt.Customer?.Name ?? "";
                 var entryResult = await _accountingService.CreateCustomerPaymentEntryAsync(
                     receipt, customerName, userId, ct);
                 if (!entryResult.IsSuccess)
@@ -187,26 +187,29 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer.Party");
+                r => r.Id == id, ct, "Customer", "Customer");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
-            // If already posted, reverse the journal entry first
-            if (receipt.Status == InvoiceStatus.Posted)
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
             {
-                var customerAccountId = receipt.Customer?.AccountId ?? 0;
-                var customerName = receipt.Customer?.Party?.Name ?? "";
-                var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
-                    receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
-                if (!reverseResult.IsSuccess)
-                    return Result.Failure(reverseResult.Error!);
-            }
+                // If already posted, reverse the journal entry first
+                if (receipt.Status == InvoiceStatus.Posted)
+                {
+                    var customerAccountId = receipt.Customer?.AccountId ?? 0;
+                    var customerName = receipt.Customer?.Name ?? "";
+                    var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
+                        receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
+                    if (!reverseResult.IsSuccess)
+                        return Result.Failure(reverseResult.Error!);
+                }
 
-            receipt.Cancel();
-            await _uow.SaveChangesAsync(ct);
+                receipt.Cancel();
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Customer receipt {Id} cancelled by User {UserId}", id, userId);
-            return Result.Success();
+                _logger.LogInformation("Customer receipt {Id} cancelled by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (DomainException ex)
         {
@@ -249,7 +252,7 @@ public class CustomerReceiptService : ICustomerReceiptService
 
             // Reload with full includes for the response
             var updatedReceipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == receiptId, ct, "Customer", "Customer.Party", "CashBox", "Currency", "Applications");
+                r => r.Id == receiptId, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
             return Result<CustomerReceiptDto>.Success(MapToDto(updatedReceipt!));
         }
         catch (DomainException ex)
@@ -269,29 +272,33 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer.Party");
+                r => r.Id == id, ct, "Customer", "Customer");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
             if (receipt.Status == InvoiceStatus.Cancelled)
                 return Result.Failure("سند القبض ملغي بالفعل", ErrorCodes.InvalidOperation);
 
-            // If already posted, reverse the journal entry first
-            if (receipt.Status == InvoiceStatus.Posted)
+            return await _uow.ExecuteTransactionAsync<Result>(async () =>
             {
-                var customerAccountId = receipt.Customer?.AccountId ?? 0;
-                var customerName = receipt.Customer?.Party?.Name ?? "";
-                var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
-                    receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
-                if (!reverseResult.IsSuccess)
-                    return Result.Failure(reverseResult.Error!);
-            }
+                // If already posted, reverse the journal entry first
+                if (receipt.Status == InvoiceStatus.Posted)
+                {
+                    var customerAccountId = receipt.Customer?.AccountId ?? 0;
+                    var customerName = receipt.Customer?.Name ?? "";
+                    var reverseResult = await _accountingService.ReverseCustomerPaymentEntryAsync(
+                        receipt.Id, receipt.Amount, customerName, customerAccountId, userId, ct);
+                    if (!reverseResult.IsSuccess)
+                        return Result.Failure(reverseResult.Error!);
+                }
 
-            receipt.UpdateTimestamp();
-            _uow.CustomerReceipts.DeleteRange(new[] { receipt });
+                receipt.UpdateTimestamp();
+                _uow.CustomerReceipts.DeleteRange(new[] { receipt });
+                await _uow.SaveChangesAsync(ct);
 
-            _logger.LogInformation("Customer receipt {Id} deleted by User {UserId}", id, userId);
-            return Result.Success();
+                _logger.LogInformation("Customer receipt {Id} deleted by User {UserId}", id, userId);
+                return Result.Success();
+            }, ct);
         }
         catch (DomainException ex)
         {
@@ -314,7 +321,7 @@ public class CustomerReceiptService : ICustomerReceiptService
             receipt.ReceiptNo,
             receipt.ReceiptDate,
             receipt.CustomerId,
-            receipt.Customer?.Party?.Name,
+            receipt.Customer?.Name,
             receipt.CashBoxId,
             receipt.CashBox?.Name,
             receipt.CurrencyId,

@@ -2,6 +2,78 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.10.7 — Transaction Atomicity & Inventory Audit Trail (2026-06-23)
+
+### 🔒 Transaction Atomicity: All 22 Operations Audited
+Complete audit of every transaction operation that affects stock, cash, or accounting — all now wrapped in `ExecuteTransactionAsync` per RULE-275/276/281.
+
+### ✅ P0 — Critical Fixes (Accounting + Audit Trail)
+- **ExpenseService**: Injected `IAccountingIntegrationService` + `IDocumentSequenceService`; `PostAsync`/`CancelAsync` wrapped in `ExecuteTransactionAsync`; Post creates `Dr ExpenseAccount / Cr CashBox.Account`; Cancel reverses; sequence uses `DocumentSequenceService` (was `ToListIgnoreFiltersAsync().Max() + 1` — not thread-safe)
+- **IAccountingIntegrationService**: Added `CreateExpenseEntryAsync()` + `ReverseExpenseEntryAsync()` interface methods
+- **AccountingIntegrationService**: Implemented both methods — loads CashBox.AccountId, creates balanced double-entry
+- **SalesService**: Added `InventoryTransaction` creation in `PostAsync` (type=Sale) and `CancelAsync` (type=SaleReturn) with `InventoryTransactionLine` per item
+- **PurchaseService**: Added `InventoryTransaction` creation in `PostAsync` (type=Purchase) and `CancelAsync` (type=PurchaseReturn)
+
+### ✅ P2 — Medium Priority (Transaction Wrapping)
+- **ReceiptVoucherService**: `PostAsync`/`CancelAsync` wrapped in `ExecuteTransactionAsync`
+- **PaymentVoucherService**: `PostAsync`/`CancelAsync` wrapped in `ExecuteTransactionAsync`
+- **CustomerReceiptService**: `CancelAsync`/`DeleteAsync` wrapped in `ExecuteTransactionAsync`; **fixed missing `SaveChangesAsync`** in `DeleteAsync` (deletes were silently rolled back)
+- **SupplierPaymentService**: `CancelAsync`/`DeleteAsync` wrapped in `ExecuteTransactionAsync`; **fixed missing `SaveChangesAsync`** in `DeleteAsync`
+- **WarehouseTransferService**: `CreateAsync` wrapped in `ExecuteTransactionAsync` (fixed orphan transfer bug — 2 SaveChanges without transaction)
+- **InventoryService**: `CreateTransferAsync`/`PostTransferAsync`/`CancelTransferAsync` all wrapped in `ExecuteTransactionAsync`
+
+### 🐛 Bugs Found & Fixed
+1. **ExpenseService**: ZERO journal entries for expenses — accounting permanently out of sync → Fixed
+2. **CustomerReceiptService.DeleteAsync**: Missing `SaveChangesAsync` — deletes were never persisted → Fixed
+3. **SupplierPaymentService.DeleteAsync**: Same missing `SaveChangesAsync` → Fixed
+4. **WarehouseTransferService.CreateAsync**: Two SaveChanges without transaction — orphan transfer risk → Fixed
+5. **ExpenseService sequence**: `ToListIgnoreFiltersAsync().Max() + 1` not thread-safe → Replaced with `DocumentSequenceService`
+
+### ✅ Verified Already-Correct Services
+- InventoryAdjustmentService: ExecuteTransactionAsync + InventoryTransaction + stock reversal on Cancel ✅
+- InventoryCountService: ExecuteTransactionAsync + InventoryTransaction + stock reversal on Cancel ✅
+- PurchaseReturnService: ExecuteTransactionAsync + journal entries + FIFO handling ✅
+- SalesReturnService: ExecuteTransactionAsync + journal entries + FIFO handling ✅
+
+### 📚 Documentation & Subagent Updates
+- **AGENTS.md**: Version bumped to v4.10.7; new §2.100 (RULE-560→566) for Transaction Atomicity; 8 new checklist items; 8 new FORBIDDEN patterns
+- **README.md**: Version bumped to v4.10.7; new "Transaction Atomicity" feature section
+- **CHANGELOG.md**: This entry
+- **implement-agent.md**: New auto-fix rules for transaction wrapping and InventoryTransaction audit trail
+- **backend-architect.md**: Updated bug prevention checklist with transaction atomicity checks
+- **code-reviewer.md**: New review items for ExecuteTransactionAsync, InventoryTransaction, SaveChangesAsync
+
+### ✅ Build Status
+- **Build: 0 errors, 0 warnings** across all 6 production projects
+- Tests: 63/78 pass (7 pre-existing AuthService/UserService failures — unrelated)
+
+---
+
+## v4.10.5 — Parties Removal: Direct Contact Fields on Customer/Supplier/Employee (2026-06-23)
+
+### ❌ Removed: Parties Entity & Parties Table
+- **Party entity** (`Domain/Entities/Party.cs`) deleted — no more shared contact data table
+- **Parties table** removed from database schema (6 tables, 8 columns) — 1 fewer entity in the system
+- Contact fields (Name, Phone, Email, Address, TaxNumber) now live **directly** on Customer, Supplier, and Employee entities
+- `PartyId` FK columns removed from Customers, Suppliers, and Employees tables
+- NO change to `Customer.AccountId` or `Supplier.AccountId` — accounting links remain via Chart of Accounts
+
+### 📚 Documentation Updates (8 files)
+- **CONSTITUTION.md**: Removed §2.5c (Party Entity Pattern), updated Schema Reference table for Module 3
+- **API-DOCUMENTATION.md**: Removed Parties API section (6 endpoints, TOC entry, summary table row)
+- **PRD-MVP.md**: Rewrote §3.11a from "Party Management" to "Customer/Supplier/Employee Contact Data (Direct)"
+- **Phase-Implementation-Status.md**: Updated Phase 23/32 descriptions, removed Parties row from Added Tables
+- **BUSINESS-RULES.md**: Updated BR-161 — removed PartyService from caller list
+- **Db sc.md**: Removed §1.1 Parties table definition, added direct contact fields to Customers/Suppliers/Employees, updated Module 1 name to "Core & Security", renumbered subsections 1.1→1.13, updated module count (65→64)
+- **ui-screens.md**: Removed "Party Selector" section
+- **CHANGELOG.md**: This entry
+
+### ✅ Impact
+- **Zero code changes** in this release — documentation-only cleanup after the Parties table removal decision
+- Total table count: **65 → 64** (one removed)
+
+---
+
 ## v4.10.5 — Complete CRUD Feedback + IncludeInactive Checkboxes (2026-06-22)
 
 ### ✨ Feature: Success/Failure Messages for ALL CRUD Operations
