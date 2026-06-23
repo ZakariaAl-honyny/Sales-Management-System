@@ -140,7 +140,7 @@
                   AutoGenerateColumns="False" 
                   IsReadOnly="True"
                   RowDetailsVisibilityMode="Collapsed"
-                  Style="{StaticResource CompactDataGrid}"
+                  Style="{StaticResource ModernDataGrid}"
                   Margin="0,4,0,0"
                   VirtualizingPanel.IsVirtualizing="True"
                   VirtualizingPanel.VirtualizationMode="Recycling">

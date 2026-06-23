@@ -175,7 +175,6 @@
                                               IsChecked="{Binding IsStandaloneMode}"
                                               Command="{Binding ToggleStandaloneModeCommand}"
                                               Content="تبديل"
-                                              Style="{StaticResource SecondaryButton}"
                                               FontSize="12" Padding="8,4"/>
                             </Grid>
                         </StackPanel>

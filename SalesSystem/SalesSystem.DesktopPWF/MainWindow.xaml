@@ -486,7 +486,6 @@
                 <MenuItem Header="الأقسام" Command="{Binding NavigateToDepartmentsCommand}" ToolTip="إدارة الأقسام — إضافة وتعديل وعرض الأقسام"/>
                 <MenuItem Header="الموظفين" Command="{Binding NavigateToEmployeesCommand}" ToolTip="إدارة الموظفين — إضافة وتعديل وعرض الموظفين"/>
                 <MenuItem Header="البنوك" Command="{Binding NavigateToBanksCommand}" ToolTip="إدارة البنوك — إضافة وتعديل بيانات البنوك والحسابات"/>
-                <MenuItem Header="الجهات" Command="{Binding NavigateToPartiesCommand}" ToolTip="إدارة الجهات الخارجية — إضافة وتعديل وعرض الجهات"/>
                 <MenuItem Header="المصروفات" Command="{Binding NavigateToExpensesCommand}" ToolTip="إدارة المصروفات — إضافة وتعديل وعرض المصروفات"/>
                 <Separator/>
                 <MenuItem Header="جرد المخزون" Command="{Binding NavigateToInventoryCountsCommand}" ToolTip="إدارة وإجراء جرد المخزون الدوري"/>
@@ -992,11 +991,6 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavBanks"
                                             ToolTip="إدارة البنوك — إضافة وتعديل بيانات البنوك والحسابات"/>
-                                    <Button Content="الجهات" 
-                                            Command="{Binding NavigateToPartiesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavParties"
-                                            ToolTip="إدارة الجهات الخارجية — إضافة وتعديل وعرض الجهات"/>
                                     <Button Content="المصروفات" 
                                             Command="{Binding NavigateToExpensesCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
