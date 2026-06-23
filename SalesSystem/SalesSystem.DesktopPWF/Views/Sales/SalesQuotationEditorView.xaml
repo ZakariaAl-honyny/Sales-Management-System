@@ -180,7 +180,7 @@
                 <!-- Items DataGrid -->
                 <DataGrid ItemsSource="{Binding Items}" 
                           AutoGenerateColumns="False"
-                          Style="{StaticResource CompactDataGrid}"
+                          Style="{StaticResource ModernDataGrid}"
                           Height="200"
                           Margin="0,0,0,8">
                     <DataGrid.Columns>
