@@ -16,7 +16,6 @@ public record PurchaseInvoiceResponse(
     bool IsTaxInclusive,
     decimal NetTotal, decimal PaidAmount, decimal RemainingAmount,
     DateTime InvoiceDate,
-    int? CurrencyId, string? CurrencyCode, decimal? ExchangeRate,
     string? AttachmentPath,
     string? Notes,
     List<PurchaseInvoiceLineResponse> Items

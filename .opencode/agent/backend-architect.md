@@ -177,9 +177,9 @@ public async Task<IActionResult> GetById(int id, CancellationToken ct)
 ### Auto-Account Creation
 When `CashBoxService.CreateAsync()` receives `AccountId = null`, auto-create a Level-4 account:
 ```csharp
-var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct); // Cash & Cash Equivalents
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1101", ct); // Cash & Cash Equivalents
 var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var newCode = (int.Parse(maxCode ?? "1101") + 1).ToString();
 var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
     AccountType.Asset, 4, parentAccount!.Id, false);
 await _uow.Accounts.AddAsync(account, ct);
@@ -515,7 +515,7 @@ When writing or reviewing code in ANY layer, check these:
 
 When you encounter any code related to these areas, apply fixes automatically:
 
-1. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
+1. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1101 — النقدية صناديق"
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 3. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record (shared contact data)
 4. Missing `CurrencyId` on financial entities → Add multi-currency support (not on Customer/Supplier)

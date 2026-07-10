@@ -490,7 +490,6 @@ public class SalesReturnEditorViewModel : ViewModelBase
                 CustomerId: SelectedInvoice?.CustomerId,
                 WarehouseId: (short)SelectedWarehouseId,
                 ReturnDate: ReturnDate,
-                CurrencyId: (short?)1,
                 Notes: Notes,
                 Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new ReturnItemRequest(
                     SalesInvoiceLineId: i.SalesInvoiceLineId,

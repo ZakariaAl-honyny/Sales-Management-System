@@ -317,6 +317,27 @@ public class ByteToIndexConverter : IValueConverter
 }
 
 /// <summary>
+/// Compares a byte value to a converter parameter and returns true if equal.
+/// Used for RadioButton IsChecked bindings with enum/byte values.
+/// </summary>
+public class ByteEqualityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is byte b && parameter is string s && byte.TryParse(s, out var target))
+            return b == target;
+        return false;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is bool isChecked && isChecked && parameter is string s && byte.TryParse(s, out var target))
+            return target;
+        return Binding.DoNothing;
+    }
+}
+
+/// <summary>
 /// Converts SaleMode byte to Arabic string
 /// </summary>
 public class SaleModeToStringConverter : IValueConverter

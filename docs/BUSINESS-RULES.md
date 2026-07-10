@@ -17,13 +17,13 @@
 
 | Rule | Description |
 |------|-------------|
-| BR-010 | **CashBox** without `AccountId` → auto-create Level-4 sub-account under parent `"1110 — النقدية"` (Cash & Cash Equivalents). Code auto-increments (1111, 1112, ...). |
-| BR-011 | **Bank** without `AccountId` → auto-create Level-4 sub-account under parent `"1120 — البنوك"` (Bank Accounts). Code auto-increments (1121, 1122, ...). |
-| BR-012 | **Customer** without `AccountId` → auto-create Level-4 sub-account under parent `"1130 — العملاء"` (Accounts Receivable). Code auto-increments (1131, 1132, ...). |
+| BR-010 | **CashBox** without `AccountId` → auto-create Level-4 sub-account under parent `"1101 — النقدية صناديق"` (Cash & Cash Equivalents). Code auto-increments (1111, 1112, ...). |
+| BR-011 | **Bank** without `AccountId` → auto-create Level-4 sub-account under parent `"1102 — البنوك"` (Bank Accounts). Code auto-increments (1121, 1122, ...). |
+| BR-012 | **Customer** without `AccountId` → auto-create Level-4 sub-account under parent `"1103 — العملاء"` (Accounts Receivable). Code auto-increments (1131, 1132, ...). |
 | BR-013 | **Supplier** without `AccountId` → auto-create Level-4 sub-account under parent `"1320 — الموردون"` (Accounts Payable). Code auto-increments (1321, 1322, ...). |
 | BR-014 | **Employee** via `POST /api/v1/employees/{id}/auto-create-account` → auto-create Level-4 sub-account under parent `"1170 — عهد الموظفين"` (Employee Custody). |
 | BR-015 | All auto-created accounts are Level 4 (detail), `AccountType.Asset` or `AccountType.Liability`, `AllowTransactions = true`, `IsSystemAccount = false`. |
-| BR-016 | Parent accounts for auto-creation are looked up by **hardcoded code string** — NEVER by name. Correct codes: CashBox→1110, Bank→1120, Customer→1130, Supplier→1320, Employee→1170. |
+| BR-016 | Parent accounts for auto-creation are looked up by **hardcoded code string** — NEVER by name. Correct codes: CashBox→1101, Bank→1102, Customer→1103, Supplier→2101, Employee→1107. |
 
 ## 3. Flexible Input (Sales & Purchase Lines)
 

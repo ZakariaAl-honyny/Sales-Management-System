@@ -1,10 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SalesSystem.Application.Interfaces;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.Common;
-using SalesSystem.Contracts.DTOs;
-using SalesSystem.Domain.Entities;
 
 namespace SalesSystem.Api.Controllers;
 
@@ -17,47 +13,25 @@ namespace SalesSystem.Api.Controllers;
 [Authorize(Policy = "AdminOnly")]
 public class SessionsController : ControllerBase
 {
-    private readonly IUnitOfWork _uow;
-    private readonly ILogger<SessionsController> _logger;
+    private readonly ISessionManagementService _sessionService;
 
-    public SessionsController(IUnitOfWork uow, ILogger<SessionsController> logger)
+    public SessionsController(ISessionManagementService sessionService)
     {
-        _uow = uow;
-        _logger = logger;
+        _sessionService = sessionService;
     }
 
     /// <summary>
     /// Gets all user sessions, optionally filtered by user and revoked status.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<UserSessionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IReadOnlyList<Contracts.DTOs.UserSessionDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? userId = null,
         [FromQuery] bool includeRevoked = false,
         CancellationToken ct = default)
     {
-        List<UserSession> sessions;
-
-        if (userId.HasValue)
-        {
-            if (includeRevoked)
-                sessions = await _uow.UserSessions.ToListAsync(
-                    s => s.UserId == userId.Value, null, ct, ignoreQueryFilters: true);
-            else
-                sessions = await _uow.UserSessions.ToListAsync(
-                    s => s.UserId == userId.Value, ct: ct);
-        }
-        else
-        {
-            if (includeRevoked)
-                sessions = await _uow.UserSessions.ToListIgnoreFiltersAsync(ct: ct);
-            else
-                sessions = await _uow.UserSessions.ToListAsync(
-                    s => !s.IsRevoked, ct: ct);
-        }
-
-        var dtos = sessions.Select(MapToDto).OrderByDescending(x => x.CreatedAt).ToList();
-        return Ok(dtos);
+        var result = await _sessionService.GetAllAsync(userId, includeRevoked, ct);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -68,29 +42,11 @@ public class SessionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revoke(long id, CancellationToken ct)
     {
-        var session = await _uow.UserSessions.GetByIdAsync((int)id, ct);
-        if (session == null)
-            return NotFound(new { error = "الجلسة غير موجودة" });
-
-        session.Revoke();
-        await _uow.UserSessions.UpdateAsync(session, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        _logger.LogInformation("Session {SessionId} revoked by admin", id);
-        return Ok(new { message = "تم إلغاء الجلسة بنجاح" });
-    }
-
-    private static UserSessionDto MapToDto(UserSession s)
-    {
-        return new UserSessionDto(
-            Id: s.Id,
-            UserId: s.UserId,
-            UserName: s.User?.UserName,
-            DeviceName: s.DeviceName,
-            IpAddress: s.IpAddress,
-            CreatedAt: s.CreatedAt,
-            LastActivityAt: s.LastActivityAt,
-            ExpiresAt: s.ExpiresAt,
-            IsRevoked: s.IsRevoked);
+        var result = await _sessionService.RevokeAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم إلغاء الجلسة بنجاح" });
+        if (result.ErrorCode == Contracts.Common.ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 }

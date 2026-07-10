@@ -11,11 +11,13 @@ namespace SalesSystem.DesktopPWF.ViewModels.Permissions;
 public class PermissionManagementViewModel : AdminOnlyViewModel
 {
     private readonly IPermissionApiService _permissionService;
+    private readonly IRoleApiService _roleService;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
 
     private ObservableCollection<PermissionCategoryGroup> _categories = new();
-    private byte _selectedRole = 1; // Admin default
+    private ObservableCollection<RoleItem> _roles = new();
+    private RoleItem? _selectedRoleItem;
     private string? _errorMessage;
 
     public PermissionManagementViewModel()
@@ -27,12 +29,13 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
         : base(sessionService)
     {
         _permissionService = App.GetService<IPermissionApiService>();
+        _roleService = App.GetService<IRoleApiService>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
-        _ = LoadPermissionsAsync();
+        _ = LoadRolesAsync();
     }
 
     private void InitializeCommands()
@@ -50,37 +53,22 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
         set => SetProperty(ref _categories, value);
     }
 
-    public byte SelectedRole
+    public ObservableCollection<RoleItem> Roles
     {
-        get => _selectedRole;
+        get => _roles;
+        set => SetProperty(ref _roles, value);
+    }
+
+    public RoleItem? SelectedRoleItem
+    {
+        get => _selectedRoleItem;
         set
         {
-            if (SetProperty(ref _selectedRole, value))
+            if (SetProperty(ref _selectedRoleItem, value) && value != null)
             {
-                OnPropertyChanged(nameof(IsAdminSelected));
-                OnPropertyChanged(nameof(IsManagerSelected));
-                OnPropertyChanged(nameof(IsCashierSelected));
                 _ = LoadPermissionsAsync();
             }
         }
-    }
-
-    public bool IsAdminSelected
-    {
-        get => _selectedRole == 1;
-        set { if (value) SelectedRole = 1; }
-    }
-
-    public bool IsManagerSelected
-    {
-        get => _selectedRole == 2;
-        set { if (value) SelectedRole = 2; }
-    }
-
-    public bool IsCashierSelected
-    {
-        get => _selectedRole == 3;
-        set { if (value) SelectedRole = 3; }
     }
 
     public string? ErrorMessage
@@ -101,6 +89,33 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
 
     #region Methods
 
+    public async Task LoadRolesAsync()
+    {
+        await ExecuteAsync(LoadRolesOperationAsync);
+    }
+
+    private async Task LoadRolesOperationAsync()
+    {
+        var result = await _roleService.GetAllAsync();
+        if (result.IsSuccess && result.Value != null)
+        {
+            await InvokeOnUIThreadAsync(() =>
+            {
+                Roles.Clear();
+                foreach (var role in result.Value.Where(r => r.IsActive).OrderBy(r => r.Id))
+                {
+                    Roles.Add(new RoleItem { Id = role.Id, Name = role.Name });
+                }
+                SelectedRoleItem = Roles.FirstOrDefault();
+                return System.Threading.Tasks.Task.CompletedTask;
+            });
+        }
+        else
+        {
+            ErrorMessage = HandleFailure(result.Error ?? "فشل في تحميل الأدوار", "PermissionManagementViewModel.LoadRolesOperationAsync");
+        }
+    }
+
     public async Task LoadPermissionsAsync()
     {
         await ExecuteAsync(LoadPermissionsOperationAsync);
@@ -109,6 +124,8 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
     private async Task LoadPermissionsOperationAsync()
     {
         ErrorMessage = null;
+
+        if (SelectedRoleItem == null) return;
 
         var permissionsResult = await _permissionService.GetAllAsync();
         var rolePermsResult = await _permissionService.GetRolePermissionsAsync();
@@ -120,7 +137,7 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
         }
 
         var rolePermissions = rolePermsResult.IsSuccess ? rolePermsResult.Value! : new Dictionary<byte, List<int>>();
-        var selectedIds = rolePermissions.TryGetValue(SelectedRole, out var ids) && ids != null ? ids : new List<int>();
+        var selectedIds = rolePermissions.TryGetValue((byte)SelectedRoleItem.Id, out var ids) && ids != null ? ids : new List<int>();
 
         await InvokeOnUIThreadAsync(() =>
         {
@@ -137,13 +154,13 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
                     CategoryName = group.Key,
                     Permissions = new ObservableCollection<PermissionCheckItem>()
                 };
-                foreach (var perm in group.OrderBy(p => p.DisplayNameAr))
+                foreach (var perm in group.OrderBy(p => p.DisplayName))
                 {
                     category.Permissions.Add(new PermissionCheckItem
                     {
                         Id = perm.Id,
-                        Name = perm.Name,
-                        DisplayNameAr = perm.DisplayNameAr,
+                        Name = perm.Code,
+                        DisplayNameAr = perm.DisplayName,
                         IsChecked = selectedIds.Contains(perm.Id)
                     });
                 }
@@ -180,13 +197,15 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
 
     private async Task SaveOperationAsync()
     {
+        if (SelectedRoleItem == null) return;
+
         var selectedIds = Categories
             .SelectMany(c => c.Permissions)
             .Where(p => p.IsChecked)
             .Select(p => p.Id)
             .ToList();
 
-        var result = await _permissionService.UpdateRolePermissionsAsync(SelectedRole, selectedIds);
+        var result = await _permissionService.UpdateRolePermissionsAsync((byte)SelectedRoleItem.Id, selectedIds);
 
         if (result.IsSuccess)
         {
@@ -205,6 +224,13 @@ public class PermissionManagementViewModel : AdminOnlyViewModel
     }
 
     #endregion
+}
+
+public class RoleItem
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public override string ToString() => Name;
 }
 
 public class PermissionCategoryGroup : ViewModelBase

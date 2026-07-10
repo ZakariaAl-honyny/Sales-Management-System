@@ -1,3 +1,5 @@
+using SalesSystem.Contracts.Enums;
+
 namespace SalesSystem.Contracts.Requests;
 
 public record CreateSalesReturnRequest(
@@ -5,21 +7,21 @@ public record CreateSalesReturnRequest(
     int? CustomerId,
     short WarehouseId,
     DateTime? ReturnDate,
-    short? CurrencyId,
-    string? Notes,
-    List<ReturnItemRequest> Items
+    string? ReturnReason = null,
+    string? Notes = null,
+    List<ReturnItemRequest>? Items = null
 );
 
 /// <summary>
-/// طلب إنشاء مرتجع شراء — مع دعم الربط بالفاتورة والعملات.
+/// طلب إنشاء مرتجع شراء — مع دعم الربط بالفاتورة والعملات ونوع الخصم.
 /// </summary>
 public record CreatePurchaseReturnRequest(
     int? PurchaseInvoiceId,
     int SupplierId,
     int WarehouseId,
     DateTime? ReturnDate,
-    int? CurrencyId,
-    decimal? ExchangeRate,
+    DiscountType? DiscountType,
+    decimal? DiscountRate,
     string? Notes,
     List<CreatePurchaseReturnItemRequest> Items);
 

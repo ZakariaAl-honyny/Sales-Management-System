@@ -18,8 +18,6 @@ public class SalesQuotationConfiguration : IEntityTypeConfiguration<SalesQuotati
         builder.Property(q => q.QuotationDate).IsRequired().HasColumnType("date");
         builder.Property(q => q.ValidUntil).HasColumnType("date").IsRequired(false);
 
-        builder.Property(q => q.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
-
         builder.Property(q => q.PaymentType).HasConversion<byte>();
         builder.Property(q => q.Status).HasConversion<byte>();
 
@@ -41,11 +39,6 @@ public class SalesQuotationConfiguration : IEntityTypeConfiguration<SalesQuotati
         builder.HasOne(q => q.Warehouse)
             .WithMany()
             .HasForeignKey(q => q.WarehouseId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(q => q.Currency)
-            .WithMany()
-            .HasForeignKey(q => q.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Items collection

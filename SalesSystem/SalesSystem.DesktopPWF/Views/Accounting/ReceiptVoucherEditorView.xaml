@@ -3,8 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounting"
-      mc:Ignorable="d"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounting"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
       d:DataContext="{d:DesignInstance vm:ReceiptVoucherEditorViewModel, IsDesignTimeCreatable=False}"
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
@@ -109,9 +110,10 @@
                         <!-- Total Amount -->
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding TotalAmount, UpdateSourceTrigger=PropertyChanged, StringFormat='N2'}"
+                            <TextBox Text="{Binding TotalAmount, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
                                      IsEnabled="{Binding IsReadOnly, Converter={StaticResource InverseBool}}"
+                                     helpers:InputHelper.NumericOnly="True"
                                      AutomationProperties.AutomationId="TxtTotalAmount"
                                      ToolTip="مبلغ سند القبض — يجب أن يكون أكبر من صفر"/>
                         </StackPanel>

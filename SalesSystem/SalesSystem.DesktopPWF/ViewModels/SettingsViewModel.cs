@@ -25,8 +25,6 @@ public class SettingsViewModel : ViewModelBase
     // DEPRECATED: backing fields for DefaultTaxRate and InvoicePrefix removed — keep properties as stubs
     private bool _enableStockAlerts = true;
     private bool _allowNegativeStock;
-    private bool _autoUpdatePrices;
-    private int _costingMethod = 1; // Default WeightedAverage
     private string _thermalPrinterName = string.Empty;
     private string _a4PrinterName = string.Empty;
     private string _logoPath = string.Empty;
@@ -124,38 +122,6 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _allowNegativeStock, value);
     }
 
-    public bool AutoUpdatePrices
-    {
-        get => _autoUpdatePrices;
-        set => SetProperty(ref _autoUpdatePrices, value);
-    }
-
-    #endregion
-
-    #region Costing Method Properties
-    public int CostingMethod
-    {
-        get => _costingMethod;
-        set => SetProperty(ref _costingMethod, value);
-    }
-
-    public bool IsWeightedAverageSelected
-    {
-        get => _costingMethod == 1;
-        set { if (value) CostingMethod = 1; }
-    }
-
-    public bool IsLastPriceSelected
-    {
-        get => _costingMethod == 2;
-        set { if (value) CostingMethod = 2; }
-    }
-
-    public bool IsSupplierPriceSelected
-    {
-        get => _costingMethod == 3;
-        set { if (value) CostingMethod = 3; }
-    }
     #endregion
 
     #region Print Properties
@@ -356,9 +322,7 @@ public class SettingsViewModel : ViewModelBase
             DefaultTaxRate = s.DefaultTaxRate;
             EnableStockAlerts = s.EnableStockAlerts;
             AllowNegativeStock = s.AllowNegativeStock;
-            AutoUpdatePrices = s.AutoUpdatePrices;
             InvoicePrefix = s.InvoicePrefix;
-            CostingMethod = s.CostingMethod;
             SignaturePath = s.SignaturePath ?? string.Empty;
         }
 
@@ -414,15 +378,12 @@ public class SettingsViewModel : ViewModelBase
             Phone,
             Email,
             null,
-            "SAR",
             0m,            // DefaultTaxRate — deprecated, always send 0
             true,          // IsTaxEnabled — deprecated, always send true
             TaxNumber,
             EnableStockAlerts,
             AllowNegativeStock,
-            AutoUpdatePrices,
             string.Empty,  // InvoicePrefix — deprecated, always send empty
-            CostingMethod,
             BackupPath: null,
             BackupScheduleTime: null,
             BackupRetentionDays: 30,

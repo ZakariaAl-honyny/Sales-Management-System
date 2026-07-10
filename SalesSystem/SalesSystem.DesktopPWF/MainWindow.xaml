@@ -38,8 +38,6 @@
         xmlns:vmUsers="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Users"
         xmlns:vmTaxes="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Taxes"
         xmlns:viewsTaxes="clr-namespace:SalesSystem.DesktopPWF.Views.Taxes"
-             xmlns:vmCurrencies="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Currencies"
-             xmlns:viewsCurrencies="clr-namespace:SalesSystem.DesktopPWF.Views.Currencies"
              xmlns:vmAccounts="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Accounts"
              xmlns:vmJournalEntries="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
              xmlns:viewsJournalEntries="clr-namespace:SalesSystem.DesktopPWF.Views.JournalEntries"
@@ -51,20 +49,14 @@
            xmlns:viewsPerms="clr-namespace:SalesSystem.DesktopPWF.Views.Permissions"
            xmlns:viewsWarehouses="clr-namespace:SalesSystem.DesktopPWF.Views.Warehouses"
              xmlns:vmWarehouses="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Warehouses"
-             xmlns:viewsBranch="clr-namespace:SalesSystem.DesktopPWF.Views.Branch"
-             xmlns:viewsDepartment="clr-namespace:SalesSystem.DesktopPWF.Views.Department"
-             xmlns:viewsEmployee="clr-namespace:SalesSystem.DesktopPWF.Views.Employee"
-             xmlns:viewsBank="clr-namespace:SalesSystem.DesktopPWF.Views.Bank"
+              xmlns:viewsBank="clr-namespace:SalesSystem.DesktopPWF.Views.Bank"
              xmlns:viewsExpense="clr-namespace:SalesSystem.DesktopPWF.Views.Expense"
              xmlns:viewsCustomerReceipt="clr-namespace:SalesSystem.DesktopPWF.Views.CustomerReceipt"
              xmlns:viewsInventoryCount="clr-namespace:SalesSystem.DesktopPWF.Views.InventoryCount"
              xmlns:viewsInventoryAdjustment="clr-namespace:SalesSystem.DesktopPWF.Views.InventoryAdjustment"
              xmlns:viewsNotifications="clr-namespace:SalesSystem.DesktopPWF.Views.Notifications"
              xmlns:viewsAttachments="clr-namespace:SalesSystem.DesktopPWF.Views.Attachments"
-             xmlns:vmBranch="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Branch"
-             xmlns:vmDepartment="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Department"
-             xmlns:vmEmployee="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Employee"
-             xmlns:vmBank="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Bank"
+              xmlns:vmBank="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Bank"
              xmlns:vmExpense="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Expense"
              xmlns:vmCustomerReceipt="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CustomerReceipt"
              xmlns:vmInventoryCount="clr-namespace:SalesSystem.DesktopPWF.ViewModels.InventoryCount"
@@ -209,15 +201,6 @@
             <DataTemplate DataType="{x:Type vmTaxes:TaxesListViewModel}">
                 <viewsTaxes:TaxesListView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type vmCurrencies:CurrenciesListViewModel}">
-                <viewsCurrencies:CurrenciesListView />
-            </DataTemplate>
-            <DataTemplate DataType="{x:Type vmCurrencies:CurrencyEditorViewModel}">
-                <viewsCurrencies:CurrencyEditorView />
-            </DataTemplate>
-            <DataTemplate DataType="{x:Type vmCurrencies:CurrencyRatesViewModel}">
-                <viewsCurrencies:CurrencyRatesView />
-            </DataTemplate>
             <DataTemplate DataType="{x:Type vmAccounts:AccountsListViewModel}">
                 <viewsAccounts:AccountsListView />
             </DataTemplate>
@@ -240,16 +223,6 @@
                 <viewsSessions:UserSessionListView />
             </DataTemplate>
 
-            <!-- Organization Management DataTemplates -->
-            <DataTemplate DataType="{x:Type vmBranch:BranchListViewModel}">
-                <viewsBranch:BranchListView />
-            </DataTemplate>
-            <DataTemplate DataType="{x:Type vmDepartment:DepartmentListViewModel}">
-                <viewsDepartment:DepartmentListView />
-            </DataTemplate>
-            <DataTemplate DataType="{x:Type vmEmployee:EmployeeListViewModel}">
-                <viewsEmployee:EmployeeListView />
-            </DataTemplate>
             <DataTemplate DataType="{x:Type vmBank:BankListViewModel}">
                 <viewsBank:BankListView />
             </DataTemplate>
@@ -471,7 +444,6 @@
                 <MenuItem Header="إدارة المستخدمين" ToolTip="إدارة حسابات المستخدمين والصلاحيات" Click="UsersMenuItem_Click"/>
                 <Separator/>
                 <MenuItem Header="الضرائب" ToolTip="إدارة الضرائب — إضافة وتعديل نسب الضريبة" Click="TaxesMenuItem_Click"/>
-                <MenuItem Header="العملات" Command="{Binding NavigateToCurrenciesCommand}" ToolTip="إدارة العملات وأسعار الصرف"/>
                 <MenuItem Header="دليل الحسابات" Command="{Binding NavigateToChartOfAccountsCommand}" ToolTip="إدارة دليل الحسابات — عرض وتعديل الحسابات المحاسبية"
                           Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}"/>
                 <MenuItem Header="القيود اليومية" Command="{Binding NavigateToJournalEntriesCommand}" ToolTip="عرض القيود اليومية المحاسبية — جميع حركات الحسابات المدينة والدائنة"
@@ -482,9 +454,6 @@
                           Command="{Binding NavigateToBackupCommand}"
                           ToolTip="إنشاء واستعادة النسخ الاحتياطية لقاعدة البيانات"/>
                 <Separator/>
-                <MenuItem Header="الفروع" Command="{Binding NavigateToBranchesCommand}" ToolTip="إدارة الفروع — إضافة وتعديل وعرض الفروع"/>
-                <MenuItem Header="الأقسام" Command="{Binding NavigateToDepartmentsCommand}" ToolTip="إدارة الأقسام — إضافة وتعديل وعرض الأقسام"/>
-                <MenuItem Header="الموظفين" Command="{Binding NavigateToEmployeesCommand}" ToolTip="إدارة الموظفين — إضافة وتعديل وعرض الموظفين"/>
                 <MenuItem Header="البنوك" Command="{Binding NavigateToBanksCommand}" ToolTip="إدارة البنوك — إضافة وتعديل بيانات البنوك والحسابات"/>
                 <MenuItem Header="المصروفات" Command="{Binding NavigateToExpensesCommand}" ToolTip="إدارة المصروفات — إضافة وتعديل وعرض المصروفات"/>
                 <Separator/>
@@ -971,21 +940,6 @@
                                       AutomationProperties.AutomationId="SidebarExpanderOrgMgmt"
                                       Visibility="{Binding IsAdvancedMode, Converter={StaticResource BoolToVisibility}}">
                                 <StackPanel>
-                                    <Button Content="الفروع" 
-                                            Command="{Binding NavigateToBranchesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavBranches"
-                                            ToolTip="إدارة الفروع — إضافة وتعديل وعرض الفروع"/>
-                                    <Button Content="الأقسام" 
-                                            Command="{Binding NavigateToDepartmentsCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavDepartments"
-                                            ToolTip="إدارة الأقسام — إضافة وتعديل وعرض الأقسام"/>
-                                    <Button Content="الموظفين" 
-                                            Command="{Binding NavigateToEmployeesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavEmployees"
-                                            ToolTip="إدارة الموظفين — إضافة وتعديل وعرض الموظفين"/>
                                     <Button Content="البنوك" 
                                             Command="{Binding NavigateToBanksCommand}" 
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
@@ -996,24 +950,6 @@
                                             Style="{StaticResource SidebarSubMenuButtonStyle}"
                                             AutomationProperties.AutomationId="NavExpenses"
                                             ToolTip="إدارة المصروفات — إضافة وتعديل وعرض المصروفات"/>
-                                </StackPanel>
-                            </Expander>
-
-                            <!-- Currencies Expander -->
-                            <Expander Header="العملات" Style="{StaticResource SidebarExpanderStyle}"
-                                      AutomationProperties.AutomationId="SidebarExpanderCurrencies"
-                                      Visibility="{Binding HasCurrenciesAccess, Converter={StaticResource BoolToVisibility}}">
-                                <StackPanel>
-                                    <Button Content="العملات" 
-                                            Command="{Binding NavigateToCurrenciesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavCurrencies"
-                                            ToolTip="إدارة العملات — إضافة وتعديل العملات وتعيين العملة الأساسية"/>
-                                    <Button Content="أسعار العملات" 
-                                            Command="{Binding NavigateToCurrencyRatesCommand}" 
-                                            Style="{StaticResource SidebarSubMenuButtonStyle}"
-                                            AutomationProperties.AutomationId="NavCurrencyRates"
-                                            ToolTip="إدارة أسعار صرف العملات — عرض وتحديث أسعار الصرف اليومية"/>
                                 </StackPanel>
                             </Expander>
 
@@ -1073,20 +1009,7 @@
                     </Border>
                 </StackPanel>
             </StatusBarItem>
-            <Separator/>
-            <StatusBarItem>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="الفرع:" VerticalAlignment="Center" Margin="0,0,4,0" FontSize="12"
-                               Foreground="{StaticResource TextSecondaryBrush}"/>
-                    <ComboBox ItemsSource="{Binding UserBranches}"
-                              SelectedItem="{Binding SelectedUserBranch}"
-                              DisplayMemberPath="Name"
-                              Style="{StaticResource ModernComboBox}"
-                              MinWidth="120"
-                              ToolTip="اختيار الفرع النشط"/>
-                </StackPanel>
-            </StatusBarItem>
-            <Separator/>
+
             <StatusBarItem>
                 <Button x:Name="BtnChangePassword"
                         Content="🔑"

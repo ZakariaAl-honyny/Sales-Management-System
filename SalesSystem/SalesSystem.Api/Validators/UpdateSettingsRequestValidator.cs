@@ -24,10 +24,6 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
             .EmailAddress().WithMessage("البريد الإلكتروني غير صالح")
             .When(x => !string.IsNullOrEmpty(x.Email));
 
-        RuleFor(x => x.Currency)
-            .NotEmpty().WithMessage("العملة مطلوبة")
-            .MaximumLength(10).WithMessage("العملة يجب ألا تتجاوز 10 أحرف");
-
         // DEPRECATED: DefaultTaxRate — use Tax entity instead. Remove in Phase 20.
         RuleFor(x => x.DefaultTaxRate)
             .InclusiveBetween(0m, 100m).WithMessage("نسبة الضريبة يجب أن تكون بين 0 و 100")
@@ -42,7 +38,5 @@ public class UpdateSettingsRequestValidator : AbstractValidator<UpdateSettingsRe
             .MaximumLength(10).WithMessage("بادئة الفاتورة يجب ألا تتجاوز 10 أحرف")
             .When(x => !string.IsNullOrEmpty(x.InvoicePrefix));
 
-        RuleFor(x => x.CostingMethod)
-            .InclusiveBetween(1, 3).WithMessage("طريقة التكلفة غير صالحة — يجب أن تكون 1 (متوسط مرجح)، 2 (آخر سعر شراء)، أو 3 (سعر المورد)");
     }
 }

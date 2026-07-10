@@ -53,6 +53,7 @@
             <converters:ImagePathConverter x:Key="ImagePathConverter"/>
             <converters:BytesToKbConverter x:Key="BytesToKbConverter"/>
             <converters:ByteToIndexConverter x:Key="ByteToIndexConverter"/>
+            <converters:ByteEqualityConverter x:Key="ByteEqualityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

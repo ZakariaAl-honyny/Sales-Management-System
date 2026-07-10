@@ -12,16 +12,6 @@ public static class DbSeeder
 {
     public static async Task SeedAsync(SalesDbContext db, ILogger? logger = null)
     {
-        if (!await db.Set<Currency>().AnyAsync())
-        {
-            db.Set<Currency>().AddRange(
-                Currency.Create("ريال يمني", "YER", "﷼", isBaseCurrency: true, fractionName: "فلس"),
-                Currency.Create("دولار أمريكي", "USD", "$", fractionName: "سنت"),
-                Currency.Create("ريال سعودي", "SAR", "﷼", fractionName: "هللة")
-            );
-            logger?.LogInformation("Seeded {Count} currencies.", 3);
-        }
-
         if (!await db.Set<ProductCategory>().AnyAsync())
         {
             var generalCategory = ProductCategory.Create("عام", description: "التصنيف الافتراضي لجميع المنتجات", createdByUserId: 1);
@@ -61,7 +51,6 @@ public static class DbSeeder
         {
             var settings = new List<SystemSetting>
             {
-                SystemSetting.Create("CostingMethod", "1", settingType: 2, category: "Inventory", displayName: "طريقة تقييم المخزون", description: "1=WeightedAverage, 2=LastPurchasePrice, 3=SupplierPrice"),
                 SystemSetting.Create("AllowNegativeStock", "false", settingType: 4, category: "Inventory", displayName: "السماح بالمخزون السالب", description: "السماح بجعل كمية المخزون أقل من صفر"),
                 SystemSetting.Create("EnableFefo", "false", settingType: 4, category: "Inventory", displayName: "استخدام FEFO", description: "استخدام طريقة الصادر أولاً حسب تاريخ الانتهاء"),
                 SystemSetting.Create("StockAlertDays", "5", settingType: 2, category: "Inventory", displayName: "تحذير المخزون (أيام)", description: "عدد الأيام للتحذير قبل نفاد المخزون"),
@@ -73,13 +62,10 @@ public static class DbSeeder
                 SystemSetting.Create("DefaultCashCustomerId", "1", settingType: 2, category: "Sales", displayName: "العميل النقدي", description: "العميل الافتراضي لمبيعات النقد"),
                 SystemSetting.Create("PurchaseAutoPost", "true", settingType: 4, category: "Purchases", displayName: "ترحيل المشتريات تلقائياً", description: "ترحيل فاتورة الشراء مباشرة عند الحفظ"),
                 SystemSetting.Create("DefaultCashSupplierId", "1", settingType: 2, category: "Purchases", displayName: "المورد النقدي", description: "المورد الافتراضي لمشتريات النقد"),
-                SystemSetting.Create("EnableBarcode", "true", settingType: 4, category: "Barcode", displayName: "تفعيل الباركود", description: "تفعيل الباركود في النظام بالكامل"),
-                SystemSetting.Create("BarcodeInputType", "Scanner", settingType: 1, category: "Barcode", displayName: "نوع إدخال الباركود", description: "Scanner أو Camera"),
+
                 SystemSetting.Create("AutoGenerateBarcode", "true", settingType: 4, category: "Barcode", displayName: "توليد باركود تلقائي", description: "توليد باركود تلقائي للمنتجات الجديدة"),
                 SystemSetting.Create("AutoCreateJournalEntry", "true", settingType: 4, category: "Accounting", displayName: "إنشاء قيود محاسبية", description: "إنشاء قيد محاسبي عند ترحيل كل فاتورة"),
-                SystemSetting.Create("DecimalPlaces", "2", settingType: 2, category: "General", displayName: "الكسور العشرية", description: "عدد الخانات العشرية للأسعار والمبالغ"),
-                SystemSetting.Create("Language", "ar", settingType: 1, category: "General", displayName: "لغة النظام", description: "اللغة الافتراضية للنظام"),
-                SystemSetting.Create("DateFormat", "dd/MM/yyyy", settingType: 1, category: "General", displayName: "تنسيق التاريخ", description: "تنسيق عرض التواريخ في النظام"),
+
                 SystemSetting.Create("PaperSize", "A4", settingType: 1, category: "Print", displayName: "حجم الورق", description: "حجم الورق الافتراضي للطباعة"),
                 SystemSetting.Create("PrintCopies", "1", settingType: 2, category: "Print", displayName: "عدد النسخ", description: "عدد نسخ الطباعة الافتراضية"),
                 SystemSetting.Create("ShowBalanceOnPrint", "true", settingType: 4, category: "Print", displayName: "إظهار الرصيد", description: "إظهار رصيد الحساب في الفاتورة المطبوعة"),
@@ -93,6 +79,28 @@ public static class DbSeeder
                 SystemSetting.Create("ExpiryAlert", "true", settingType: 4, category: "Notifications", displayName: "تنبيه تواريخ الانتهاء", description: "تفعيل التنبيه عند اقتراب تاريخ انتهاء المنتجات"),
                 SystemSetting.Create("ExpiryAlertDays", "30", settingType: 2, category: "Notifications", displayName: "أيام تنبيه الانتهاء", description: "عدد الأيام قبل تاريخ الانتهاء لإرسال التنبيه"),
                 SystemSetting.Create("CreditLimitAlert", "true", settingType: 4, category: "Notifications", displayName: "تنبيه الحد الائتماني", description: "تفعيل التنبيه عند تجاوز الحد الائتماني للعميل"),
+                // ─── New Settings (v4.10.7+) ─────────────────────────────
+                // Inventory
+                SystemSetting.Create("DefaultWarehouse", "1", settingType: 2, category: "Inventory", displayName: "المخزن الافتراضي", description: "معرف المخزن الافتراضي للمعاملات"),
+                // Sales
+                SystemSetting.Create("AutoPrintAfterPosting", "false", settingType: 4, category: "Sales", displayName: "طباعة تلقائية بعد الترحيل", description: "طباعة الفاتورة تلقائياً بعد الترحيل"),
+                SystemSetting.Create("DefaultSalesTax", "0", settingType: 1, category: "Sales", displayName: "الضريبة الافتراضية للمبيعات", description: "نسبة الضريبة الافتراضية لفواتير البيع"),
+                // Purchases
+                SystemSetting.Create("DefaultPurchaseTax", "0", settingType: 1, category: "Purchases", displayName: "الضريبة الافتراضية للمشتريات", description: "نسبة الضريبة الافتراضية لفواتير الشراء"),
+                SystemSetting.Create("RequireBatchOnPurchase", "false", settingType: 4, category: "Purchases", displayName: "إلزام رقم التشغيلة عند الشراء", description: "إجبار إدخال رقم التشغيلة عند إنشاء فاتورة شراء"),
+                SystemSetting.Create("RequireExpiryOnPurchase", "false", settingType: 4, category: "Purchases", displayName: "إلزام تاريخ الانتهاء عند الشراء", description: "إجبار إدخال تاريخ انتهاء الصلاحية عند إنشاء فاتورة شراء"),
+                // Barcode
+                SystemSetting.Create("AllowDuplicateBarcode", "false", settingType: 4, category: "Barcode", displayName: "السماح بالباركود المكرر", description: "السماح بوجود باركود مكرر لمنتجات مختلفة"),
+                // General
+                SystemSetting.Create("EnableAttachments", "true", settingType: 4, category: "General", displayName: "تفعيل المرفقات", description: "إظهار وإخفاء ميزة إرفاق الملفات في الفواتير"),
+                // Print
+                SystemSetting.Create("PrintBarcode", "false", settingType: 4, category: "Print", displayName: "طباعة الباركود", description: "طباعة باركود المنتج على الفاتورة"),
+                SystemSetting.Create("PrintQRCode", "false", settingType: 4, category: "Print", displayName: "طباعة رمز QR", description: "طباعة رمز QR على الفاتورة"),
+                SystemSetting.Create("PrintCompanyAddress", "true", settingType: 4, category: "Print", displayName: "طباعة عنوان الشركة", description: "طباعة عنوان الشركة في الفواتير المطبوعة"),
+                // Notifications
+                SystemSetting.Create("EnableNotifications", "true", settingType: 4, category: "Notifications", displayName: "تفعيل التنبيهات", description: "التشغيل/إيقاف تشغيل نظام التنبيهات بالكامل"),
+                // CashBox
+                SystemSetting.Create("AllowNegativeCash", "false", settingType: 4, category: "CashBox", displayName: "السماح بالرصيد السالب للصندوق", description: "السماح بجعل رصيد الصندوق النقدي أقل من صفر"),
             };
             db.SystemSettings.AddRange(settings);
             logger?.LogInformation("Seeded {Count} SystemSettings key-value pairs.", settings.Count);
@@ -119,11 +127,9 @@ public static class DbSeeder
                 SystemSetting.Create("Store.Address", "", settingType: 1, category: "Store"),
                 SystemSetting.Create("Store.LogoPath", "", settingType: 1, category: "Store"),
                 SystemSetting.Create("Store.Email", "", settingType: 1, category: "Store"),
-                SystemSetting.Create("Store.CurrencyCode", "SAR", settingType: 1, category: "Store"),
                 SystemSetting.Create("Store.TaxNumber", "", settingType: 1, category: "Store"),
                 SystemSetting.Create("Store.EnableStockAlerts", "true", settingType: 4, category: "Store"),
                 SystemSetting.Create("Store.AllowNegativeStock", "false", settingType: 4, category: "Store"),
-                SystemSetting.Create("Store.AutoUpdatePrices", "true", settingType: 4, category: "Store"),
                 SystemSetting.Create("Store.SignaturePath", "", settingType: 1, category: "Store"),
             };
             db.Set<SystemSetting>().AddRange(storeSettings);
@@ -132,14 +138,69 @@ public static class DbSeeder
 
         if (!await db.Set<Role>().AnyAsync())
         {
+            // ─── Bitmask values from Phase 21 plan ───
+            // Bit 0=SalesInvoice(1), 1=SalesReturn(2), 2=CustomerView(4), 3=PurchaseInvoice(8),
+            // 4=CustomerManagement(16), 5=PurchaseReturn(32), 6=ProductManagement(64),
+            // 7=SupplierManagement(128), 8=WarehouseTransfer(256), 9=Reports(512),
+            // 10=WarehouseManagement(1024), 11=Settings(2048), 12=UserManagement(4096),
+            // 13=Backup(8192), 14=ChartOfAccounts(16384), 15=JournalEntries(32768),
+            // 16=CashBoxes(65536), 17=Currencies(131072), 18=FiscalYear(262144),
+            // 19=AuditLog(524288), 20=Roles(1048576), 21=InventoryCount(2097152),
+            // 22=InventoryAdjust(4194304)
+
+            const long ALL_PERMISSIONS = -1L; // Super Admin
+
+            // Manager: all except Settings, UserManagement, Backup, Roles, FiscalYear
+            long managerMask = ALL_PERMISSIONS & ~(2048L | 4096L | 8192L | 1048576L | 262144L);
+
+            // Accountant: Reports(512) + ChartOfAccounts(16384) + JournalEntries(32768) + CashBoxes(65536)
+            //   + Currencies(131072) + AuditLog(524288) + view-only Sales(1) + CustomerView(4) + SupplierManagement(128)
+            long accountantMask = 512L | 16384L | 32768L | 65536L | 131072L | 524288L | 1L | 4L | 128L;
+
+            // Treasurer: CashBoxes(65536) + CustomerView(4) + SalesInvoice(1)
+            long treasurerMask = 65536L | 4L | 1L;
+
+            // Cashier: SalesInvoice(1) + SalesReturn(2) + CustomerView(4) + CashBoxes(65536)
+            long cashierMask = 1L | 2L | 4L | 65536L;
+
+            // Warehouse Supervisor: WarehouseTransfer(256) + Reports(512) + ProductManagement(64)
+            //   + SalesInvoice(1) + InventoryCount(2097152) + InventoryAdjust(4194304)
+            long warehouseMask = 256L | 512L | 64L | 1L | 2097152L | 4194304L;
+
+            // Sales Employee: SalesInvoice(1) + SalesReturn(2) + CustomerView(4) + CashBoxes(65536) + ProductManagement(64)
+            long salesEmployeeMask = 1L | 2L | 4L | 65536L | 64L;
+
+            // Observer: SalesInvoice(1) + CustomerView(4) + Reports(512)
+            long observerMask = 1L | 4L | 512L;
+
+            // Branch Manager: SalesInvoice(1) + SalesReturn(2) + CustomerView(4) + CustomerManagement(16)
+            //   + PurchaseInvoice(8) + PurchaseReturn(32) + ProductManagement(64) + SupplierManagement(128)
+            //   + Reports(512) + CashBoxes(65536) + WarehouseTransfer(256)
+            long branchManagerMask = 1L | 2L | 4L | 16L | 8L | 32L | 64L | 128L | 512L | 65536L | 256L;
+
             var adminRole = Role.Create("مدير النظام", "Administrator - كامل الصلاحيات");
+            adminRole.SetPermissionsMask(ALL_PERMISSIONS);
             var managerRole = Role.Create("مدير", "Manager - صلاحيات إدارية");
+            managerRole.SetPermissionsMask(managerMask);
+            var accountantRole = Role.Create("محاسب", "Accountant - صلاحيات محاسبية");
+            accountantRole.SetPermissionsMask(accountantMask);
+            var treasurerRole = Role.Create("أمين صندوق", "Treasurer - صلاحيات الصندوق");
+            treasurerRole.SetPermissionsMask(treasurerMask);
             var cashierRole = Role.Create("كاشير", "Cashier - صلاحيات مبيعات محدودة");
+            cashierRole.SetPermissionsMask(cashierMask);
+            var warehouseRole = Role.Create("مشرف مخزن", "Warehouse Supervisor - صلاحيات المخازن");
+            warehouseRole.SetPermissionsMask(warehouseMask);
+            var salesEmployeeRole = Role.Create("موظف مبيعات", "Sales Employee - صلاحيات بيع محدودة");
+            salesEmployeeRole.SetPermissionsMask(salesEmployeeMask);
             var observerRole = Role.Create("مراقب", "Observer - صلاحيات مشاهدة فقط");
+            observerRole.SetPermissionsMask(observerMask);
             var branchManagerRole = Role.Create("مدير فرع", "Branch Manager - صلاحيات محدودة بفرع محدد");
-            db.Set<Role>().AddRange(adminRole, managerRole, cashierRole, observerRole, branchManagerRole);
+            branchManagerRole.SetPermissionsMask(branchManagerMask);
+
+            db.Set<Role>().AddRange(adminRole, managerRole, accountantRole, treasurerRole,
+                cashierRole, warehouseRole, salesEmployeeRole, observerRole, branchManagerRole);
             await db.SaveChangesAsync();
-            logger?.LogInformation("Seeded 5 roles: Admin, Manager, Cashier, Observer, BranchManager.");
+            logger?.LogInformation("Seeded 9 roles with PermissionsMask.");
         }
 
         if (!await db.Set<Permission>().AnyAsync())
@@ -266,8 +327,6 @@ public static class DbSeeder
             ("Products.Delete",      "حذف منتج",            "Products"),
             ("Backup.Manage",        "إدارة النسخ الاحتياطي","System"),
             ("FiscalYear.Manage",    "إدارة السنة المالية",  "Accounting"),
-            ("Employees.View",       "عرض الموظفين",        "Employees"),
-            ("Employees.Manage",     "إدارة الموظفين",      "Employees"),
             ("Currencies.View",      "عرض العملات",         "Accounting"),
             ("Currencies.Manage",    "إدارة العملات",       "Accounting"),
             ("Warehouse.Manage",     "إدارة المخازن",       "Inventory"),
@@ -288,22 +347,43 @@ public static class DbSeeder
             logger?.LogInformation("Added {Count} missing permissions.", newPermissions.Count);
         }
 
-        // ─── New Roles (idempotent) ──────────────────────────────────
+        // ─── New Roles (idempotent) with PermissionsMask ──────────────
+        long accountantMask2 = 512L | 16384L | 32768L | 65536L | 131072L | 524288L | 1L | 4L | 128L;
+        long treasurerMask2 = 65536L | 4L | 1L;
+        long warehouseMask2 = 256L | 512L | 64L | 1L | 2097152L | 4194304L;
+        long salesEmployeeMask2 = 1L | 2L | 4L | 65536L | 64L;
+
         var newRoles = new List<Role>();
         if (!await db.Set<Role>().AnyAsync(r => r.Name == "محاسب"))
-            newRoles.Add(Role.Create("محاسب", "Accountant - صلاحيات محاسبية"));
+        {
+            var r = Role.Create("محاسب", "Accountant - صلاحيات محاسبية");
+            r.SetPermissionsMask(accountantMask2);
+            newRoles.Add(r);
+        }
         if (!await db.Set<Role>().AnyAsync(r => r.Name == "أمين صندوق"))
-            newRoles.Add(Role.Create("أمين صندوق", "Treasurer - صلاحيات الصندوق"));
+        {
+            var r = Role.Create("أمين صندوق", "Treasurer - صلاحيات الصندوق");
+            r.SetPermissionsMask(treasurerMask2);
+            newRoles.Add(r);
+        }
         if (!await db.Set<Role>().AnyAsync(r => r.Name == "مشرف مخزن"))
-            newRoles.Add(Role.Create("مشرف مخزن", "Warehouse Supervisor - صلاحيات المخازن"));
+        {
+            var r = Role.Create("مشرف مخزن", "Warehouse Supervisor - صلاحيات المخازن");
+            r.SetPermissionsMask(warehouseMask2);
+            newRoles.Add(r);
+        }
         if (!await db.Set<Role>().AnyAsync(r => r.Name == "موظف مبيعات"))
-            newRoles.Add(Role.Create("موظف مبيعات", "Sales Employee - صلاحيات بيع محدودة"));
+        {
+            var r = Role.Create("موظف مبيعات", "Sales Employee - صلاحيات بيع محدودة");
+            r.SetPermissionsMask(salesEmployeeMask2);
+            newRoles.Add(r);
+        }
 
         if (newRoles.Any())
         {
             db.Set<Role>().AddRange(newRoles);
             await db.SaveChangesAsync();
-            logger?.LogInformation("Added {Count} new roles: {Names}.", newRoles.Count,
+            logger?.LogInformation("Added {Count} new roles with PermissionsMask: {Names}.", newRoles.Count,
                 string.Join(", ", newRoles.Select(r => r.Name)));
         }
 
@@ -378,22 +458,30 @@ public static class DbSeeder
             }
         }
 
-        // ─── Branches ──────────────────────────────────────────────
-        if (!await db.Branches.AnyAsync())
+        // ─── Default CashBox (linked to Chart of Accounts) ────────
+        if (!await db.CashBoxes.AnyAsync())
         {
-            var branch = Branch.Create("الفرع الرئيسي", "HQ");
-            db.Branches.Add(branch);
+            var cashAccount = await db.Set<Account>()
+                .FirstAsync(a => a.AccountCode == "11010001");
+
+            var defaultCashBox = CashBox.Create(
+                name: "الصندوق الرئيسي",
+                accountId: cashAccount.Id,
+                description: "الصندوق النقدي الافتراضي للمنشأة",
+                createdByUserId: null
+            );
+            db.CashBoxes.Add(defaultCashBox);
             await db.SaveChangesAsync();
-            logger?.LogInformation("Seeded default branch 'الفرع الرئيسي'.");
+            logger?.LogInformation("Seeded default CashBox 'الصندوق الرئيسي' linked to account '{Code}'.", cashAccount.AccountCode);
         }
 
-        // ─── Departments ────────────────────────────────────────────
-        if (!await db.Departments.AnyAsync())
+        // ─── Default FiscalYear (current year) ─────────────────────
+        if (!await db.FiscalYears.AnyAsync())
         {
-            var branch = await db.Branches.FirstAsync();
-            db.Departments.Add(Department.Create("الإدارة العامة"));
+            var currentYear = DateTime.UtcNow.Year;
+            db.FiscalYears.Add(FiscalYear.Create(currentYear));
             await db.SaveChangesAsync();
-            logger?.LogInformation("Seeded default department 'الإدارة العامة'.");
+            logger?.LogInformation("Seeded default FiscalYear for {Year}.", currentYear);
         }
 
         // ─── ProductCategories ──────────────────────────────────────
@@ -432,7 +520,6 @@ public static class DbSeeder
         logger?.LogInformation("Assigned admin user to role '{Role}'.", adminRoleEntity.Name);
 
         var warehouse = Warehouse.Create(
-            branchId: 1,
             name: "المخزن الرئيسي",
             createdByUserId: null
         );
@@ -487,7 +574,6 @@ public static class DbSeeder
                 {
                     productPrices.Add(ProductPrice.Create(
                         productUnitId: pu.Id,
-                        currencyId: 1,
                         price: 100m,
                         effectiveFrom: DateTime.UtcNow,
                         createdByUserId: 1

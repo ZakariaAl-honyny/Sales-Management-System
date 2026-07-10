@@ -8,5 +8,4 @@ public record CashTransferRequest(
     int SourceCashBoxId,
     int DestinationCashBoxId,
     decimal Amount,
-    short CurrencyId,
     string? Notes = null);

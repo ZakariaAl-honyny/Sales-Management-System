@@ -26,12 +26,6 @@ public class PaymentVoucher : DocumentEntity
     public DateTime VoucherDate { get; private set; }
 
     /// <summary>
-    /// FK to Currencies table.
-    /// </summary>
-    public short CurrencyId { get; private set; }
-    public Currency? Currency { get; private set; }
-
-    /// <summary>
     /// FK to CashBoxes table — the cash box disbursing the funds.
     /// </summary>
     public int CashBoxId { get; private set; }
@@ -66,7 +60,6 @@ public class PaymentVoucher : DocumentEntity
     public static PaymentVoucher Create(
         int voucherNo,
         DateTime voucherDate,
-        short currencyId,
         int cashBoxId,
         int accountId,
         decimal totalAmount,
@@ -75,9 +68,6 @@ public class PaymentVoucher : DocumentEntity
     {
         if (voucherNo <= 0)
             throw new DomainException("رقم سند الصرف مطلوب");
-
-        if (currencyId <= 0)
-            throw new DomainException("عملة سند الصرف مطلوبة");
 
         if (cashBoxId <= 0)
             throw new DomainException("الصندوق النقدي مطلوب");
@@ -92,7 +82,6 @@ public class PaymentVoucher : DocumentEntity
         {
             VoucherNo = voucherNo,
             VoucherDate = voucherDate.Kind == DateTimeKind.Utc ? voucherDate : voucherDate.ToUniversalTime(),
-            CurrencyId = currencyId,
             CashBoxId = cashBoxId,
             AccountId = accountId,
             TotalAmount = totalAmount,

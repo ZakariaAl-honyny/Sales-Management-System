@@ -25,14 +25,10 @@ using SalesSystem.DesktopPWF.ViewModels.Taxes;
 using SalesSystem.DesktopPWF.ViewModels.Accounting;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
-using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Logs;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.ViewModels.Warehouses;
-using SalesSystem.DesktopPWF.ViewModels.Branch;
-using SalesSystem.DesktopPWF.ViewModels.Department;
-using SalesSystem.DesktopPWF.ViewModels.Employee;
 using SalesSystem.DesktopPWF.ViewModels.Bank;
 using SalesSystem.DesktopPWF.ViewModels.Payments;
 using SalesSystem.DesktopPWF.ViewModels.Expense;
@@ -68,20 +64,6 @@ public class MainViewModel : ViewModelBase
     {
         get => _currentUser;
         set => SetProperty(ref _currentUser, value);
-    }
-
-    private ObservableCollection<BranchDto> _userBranches = new();
-    public ObservableCollection<BranchDto> UserBranches
-    {
-        get => _userBranches;
-        set => SetProperty(ref _userBranches, value);
-    }
-
-    private BranchDto? _selectedUserBranch;
-    public BranchDto? SelectedUserBranch
-    {
-        get => _selectedUserBranch;
-        set => SetProperty(ref _selectedUserBranch, value);
     }
 
     public MainViewModel(ISessionService sessionService, IDialogService dialogService)
@@ -190,8 +172,6 @@ public class MainViewModel : ViewModelBase
         NavigateToProductPricesCommand = new RelayCommand(() => NavigateTo<ProductPricesListViewModel>());
         NavigateToInventoryBatchesCommand = new RelayCommand(() => NavigateTo<InventoryBatchesViewModel>());
         NavigateToTaxesCommand = new RelayCommand(() => NavigateTo<TaxesListViewModel>());
-        NavigateToCurrenciesCommand = new RelayCommand(() => NavigateTo<CurrenciesListViewModel>());
-        NavigateToCurrencyRatesCommand = new RelayCommand(() => NavigateTo<CurrencyRatesViewModel>());
         NavigateToChartOfAccountsCommand = new RelayCommand(() => NavigateTo<AccountsListViewModel>());
         NavigateToJournalEntriesCommand = new RelayCommand(() => NavigateTo<JournalEntriesListViewModel>());
         NavigateToFiscalYearsCommand = new RelayCommand(() => NavigateTo<FiscalYearListViewModel>());
@@ -201,9 +181,6 @@ public class MainViewModel : ViewModelBase
         NavigateToSystemAccountMappingsCommand = new RelayCommand(() => NavigateTo<SystemAccountMappingListViewModel>());
 
         // Organization Management section
-        NavigateToBranchesCommand = new RelayCommand(() => NavigateTo<BranchListViewModel>());
-        NavigateToDepartmentsCommand = new RelayCommand(() => NavigateTo<DepartmentListViewModel>());
-        NavigateToEmployeesCommand = new RelayCommand(() => NavigateTo<EmployeeListViewModel>());
         NavigateToBanksCommand = new RelayCommand(() => NavigateTo<BankListViewModel>());
         NavigateToExpensesCommand = new RelayCommand(() => NavigateTo<ExpenseListViewModel>());
 
@@ -266,7 +243,6 @@ public class MainViewModel : ViewModelBase
                 }
             }
         });
-        _ = LoadUserBranchesAsync();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -339,9 +315,6 @@ public class MainViewModel : ViewModelBase
     /// <summary>صلاحية الوصول إلى شاشات إدارة المؤسسة (الفروع، الأقسام، الموظفين، البنوك، الجهات، المصروفات)</summary>
     public bool HasOrganizationAccess => _sessionService.CanAccess(Permission.Settings)
                                       || _sessionService.CanAccess(Permission.UserManagement);
-
-    /// <summary>صلاحية الوصول إلى العملات</summary>
-    public bool HasCurrenciesAccess => _sessionService.CanAccess(Permission.Currencies);
 
     /// <summary>صلاحية الوصول إلى النسخ الاحتياطي</summary>
     public bool HasBackupAccess => _sessionService.CanAccess(Permission.Backup);
@@ -567,12 +540,6 @@ public class MainViewModel : ViewModelBase
     /// <summary>نقل إلى إدارة الضرائب</summary>
     public ICommand NavigateToTaxesCommand { get; }
 
-    /// <summary>نقل إلى إدارة العملات — إضافة وتعديل العملات وأسعار الصرف</summary>
-    public ICommand NavigateToCurrenciesCommand { get; }
-
-    /// <summary>نقل إلى إدارة أسعار العملات — عرض وتحديث أسعار صرف العملات</summary>
-    public ICommand NavigateToCurrencyRatesCommand { get; }
-
     /// <summary>نقل إلى دليل الحسابات — عرض وتعديل الحسابات المحاسبية</summary>
     public ICommand NavigateToChartOfAccountsCommand { get; }
 
@@ -593,15 +560,6 @@ public class MainViewModel : ViewModelBase
     // ═══════════════════════════════════════════════════════════════
     // Organization Management Commands
     // ═══════════════════════════════════════════════════════════════
-
-    /// <summary>نقل إلى إدارة الفروع — عرض وإضافة وتعديل الفروع</summary>
-    public ICommand NavigateToBranchesCommand { get; }
-
-    /// <summary>نقل إلى إدارة الأقسام — عرض وإضافة وتعديل الأقسام</summary>
-    public ICommand NavigateToDepartmentsCommand { get; }
-
-    /// <summary>نقل إلى إدارة الموظفين — عرض وإضافة وتعديل الموظفين</summary>
-    public ICommand NavigateToEmployeesCommand { get; }
 
     /// <summary>نقل إلى إدارة البنوك — عرض وإضافة وتعديل بيانات البنوك</summary>
     public ICommand NavigateToBanksCommand { get; }
@@ -679,21 +637,6 @@ public class MainViewModel : ViewModelBase
                     eventBus.Publish(new InventoryTransactionChangedMessage(editor.TransactionId.Value));
                     System.Windows.Application.Current.Dispatcher.InvokeAsync(() => NavigateTo<InventoryTransactionListViewModel>());
                 }
-            }
-        });
-    }
-
-    public async Task LoadUserBranchesAsync()
-    {
-        await ExecuteAsync(async () =>
-        {
-            var branchService = App.GetService<IBranchApiService>();
-            var result = await branchService.GetAllAsync();
-            if (result.IsSuccess && result.Value != null)
-            {
-                UserBranches = new ObservableCollection<BranchDto>(result.Value);
-                if (result.Value.Count > 0)
-                    SelectedUserBranch = result.Value[0];
             }
         });
     }
@@ -833,13 +776,7 @@ public class MainViewModel : ViewModelBase
             "Roles"            => _sessionService.CanAccess(Permission.Roles),
             "Sessions"         => _sessionService.CanAccess(Permission.UserManagement),
 
-            // ════ Currencies ════
-            "Currencies"       => _sessionService.CanAccess(Permission.Currencies),
-
             // ════ Organization Management ════
-            "Branches"         => _sessionService.CanAccess(Permission.Settings),
-            "Departments"      => _sessionService.CanAccess(Permission.Settings),
-            "Employees"        => _sessionService.CanAccess(Permission.UserManagement),
             "Banks"            => _sessionService.CanAccess(Permission.Settings),
             "Parties"          => _sessionService.CanAccess(Permission.Settings),
             "Expenses"         => _sessionService.CanAccess(Permission.Settings),
@@ -923,15 +860,10 @@ public class MainViewModel : ViewModelBase
             nameof(ProductImportViewModel)          => "ProductImport",
             nameof(ProductCategoriesListViewModel)  => "ProductCategories",
             nameof(TaxesListViewModel)              => "Taxes",
-            nameof(CurrenciesListViewModel)         => "Currencies",
-            nameof(CurrencyRatesViewModel)          => "Currencies",
             nameof(AccountsListViewModel)           => "ChartOfAccounts",
             nameof(JournalEntriesListViewModel)     => "JournalEntries",
             nameof(FiscalYearListViewModel)         => "FiscalYears",
             // Organization Management
-            nameof(BranchListViewModel)               => "Branches",
-            nameof(DepartmentListViewModel)           => "Departments",
-            nameof(EmployeeListViewModel)             => "Employees",
             nameof(BankListViewModel)                 => "Banks",
             nameof(ExpenseListViewModel)              => "Expenses",
             // Customer Receipts

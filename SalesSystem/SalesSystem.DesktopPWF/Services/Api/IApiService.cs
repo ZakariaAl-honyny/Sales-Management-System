@@ -192,12 +192,13 @@ public interface ISessionService
     bool HasRole(int roleId);
     bool IsAdmin { get; }
     bool IsManagerOrAbove { get; }
-    void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName);
+    void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName, long permissionsMask = 0);
     /// <summary>
     /// Updates the session with API-loaded permission codes after fetching CurrentUserDto.
     /// Overrides the hardcoded role-based permissions with actual DB-driven permissions.
     /// </summary>
     void SetApiPermissions(Permission permissions);
+    void SetPermissionsMask(long mask);
     void ClearSession();
     bool IsAuthenticated { get; }
     bool CanAccess(Permission permission);
@@ -318,8 +319,6 @@ public interface ISettingsApiService
     Task<Result<StoreSettingsDto>> UpdateSettingsAsync(UpdateSettingsRequest request, CancellationToken ct = default);
     Task<Result<PrintSettingsDto>> GetPrintSettingsAsync(CancellationToken ct = default);
     Task<Result> UpdatePrintSettingsAsync(UpdatePrintSettingsRequest request, CancellationToken ct = default);
-    Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default);
-    Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default);
     Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default);
     Task<Result> UpdateSystemSettingsAsync(Dictionary<string, string> settings, CancellationToken ct = default);
     void RefreshCache();
@@ -471,16 +470,6 @@ public interface ITaxesApiService
     Task<Result> DeletePermanentlyAsync(int id);
 }
 
-public interface ICurrencyApiService
-{
-    Task<Result<List<CurrencyDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<CurrencyDto>> GetByIdAsync(int id);
-    Task<Result<CurrencyDto>> CreateAsync(CreateCurrencyRequest request);
-    Task<Result<CurrencyDto>> UpdateAsync(int id, UpdateCurrencyRequest request);
-    Task<Result> DeleteAsync(int id);
-    Task<Result> DeletePermanentlyAsync(int id);
-}
-
 public interface IFinancialReportApiService
 {
     Task<Result<List<IncomeStatementDto>>> GetIncomeStatementAsync(DateTime from, DateTime to, CancellationToken ct = default);
@@ -521,39 +510,12 @@ public interface IPermissionApiService
     Task<Result> UpdateRolePermissionsAsync(byte role, List<int> permissionIds);
 }
 
-public interface IBranchApiService
-{
-    Task<Result<List<BranchDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<BranchDto>> GetByIdAsync(int id);
-    Task<Result<BranchDto>> CreateAsync(CreateBranchRequest request);
-    Task<Result<BranchDto>> UpdateAsync(int id, UpdateBranchRequest request);
-    Task<Result> DeactivateAsync(int id);
-}
-
-public interface IDepartmentApiService
-{
-    Task<Result<List<DepartmentDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<DepartmentDto>> GetByIdAsync(int id);
-    Task<Result<DepartmentDto>> CreateAsync(CreateDepartmentRequest request);
-    Task<Result<DepartmentDto>> UpdateAsync(int id, UpdateDepartmentRequest request);
-    Task<Result> DeactivateAsync(int id);
-}
-
 public interface IBankApiService
 {
     Task<Result<List<BankDto>>> GetAllAsync(bool includeInactive = false);
     Task<Result<BankDto>> GetByIdAsync(int id);
     Task<Result<BankDto>> CreateAsync(CreateBankRequest request);
     Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request);
-    Task<Result> DeactivateAsync(int id);
-}
-
-public interface IEmployeeApiService
-{
-    Task<Result<List<EmployeeDto>>> GetAllAsync(bool includeInactive = false);
-    Task<Result<EmployeeDto>> GetByIdAsync(int id);
-    Task<Result<EmployeeDto>> CreateAsync(CreateEmployeeRequest request);
-    Task<Result<EmployeeDto>> UpdateAsync(int id, UpdateEmployeeRequest request);
     Task<Result> DeactivateAsync(int id);
 }
 
@@ -610,6 +572,7 @@ public interface ICustomerReceiptApiService
     Task<Result<List<CustomerReceiptDto>>> GetAllAsync(bool includeInactive = false);
     Task<Result<CustomerReceiptDto>> GetByIdAsync(int id);
     Task<Result<CustomerReceiptDto>> CreateAsync(CreateCustomerReceiptRequest request);
+    Task<Result<CustomerReceiptDto>> UpdateAsync(int id, UpdateCustomerReceiptRequest request);
     Task<Result<CustomerReceiptDto>> PostAsync(int id);
     Task<Result> CancelAsync(int id);
     Task<Result<CustomerReceiptDto>> AddApplicationAsync(int id, AddReceiptApplicationRequest request);

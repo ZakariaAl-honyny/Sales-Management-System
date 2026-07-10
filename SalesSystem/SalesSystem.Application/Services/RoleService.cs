@@ -57,6 +57,7 @@ public class RoleService : IRoleService
                 return Result<RoleDto>.Failure("اسم الدور موجود بالفعل", ErrorCodes.DuplicateEntry);
 
             var role = Role.Create(request.Name, request.Description);
+            // PermissionsMask will be set separately via PermissionsController
 
             await _uow.Roles.AddAsync(role, ct);
             await _uow.SaveChangesAsync(ct);
@@ -175,6 +176,6 @@ public class RoleService : IRoleService
 
     private static RoleDto MapToDto(Role r)
     {
-        return new RoleDto(r.Id, r.Name, r.Description, r.IsActive);
+        return new RoleDto(r.Id, r.Name, r.Description, r.IsActive, r.PermissionsMask);
     }
 }

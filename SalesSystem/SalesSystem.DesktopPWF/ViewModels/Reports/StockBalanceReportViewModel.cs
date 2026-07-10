@@ -205,7 +205,7 @@ public class StockBalanceReportViewModel : ViewModelBase
                     Warehouses.Clear();
 
                     // Add "All Warehouses" option with Id=0
-                    Warehouses.Add(new WarehouseDto(0, 0, null, "جميع المخازن", null, null, null, true));
+                    Warehouses.Add(new WarehouseDto(0, "جميع المخازن", null, null, null, true));
 
                     foreach (var wh in result.Value)
                         Warehouses.Add(wh);

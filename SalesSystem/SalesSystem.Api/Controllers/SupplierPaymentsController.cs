@@ -70,7 +70,9 @@ public class SupplierPaymentsController : ControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken ct)
     {
         var result = await _paymentService.GetByIdAsync(id, ct);
-        return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
     }
 
     /// <summary>
@@ -87,7 +89,7 @@ public class SupplierPaymentsController : ControllerBase
 
         var result = await _paymentService.UpdateAsync(id, request, userId, ct);
         if (result.IsSuccess) return Ok(result.Value);
-        if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
@@ -105,8 +107,45 @@ public class SupplierPaymentsController : ControllerBase
 
         var result = await _paymentService.DeleteAsync(id, userId, ct);
         if (result.IsSuccess) return NoContent();
-        if (result.Error == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
+    /// <summary>
+    /// Posts (finalizes) a supplier payment — updates cash box and supplier balance.
+    /// </summary>
+    [HttpPost("{id:int}/post")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(typeof(SupplierPaymentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Post(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _paymentService.PostAsync(id, userId, ct);
+        if (result.IsSuccess) return Ok(new { success = true });
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Cancels a supplier payment. Reverses cash box and balance changes if already posted.
+    /// </summary>
+    [HttpPost("{id:int}/cancel")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Cancel(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _paymentService.CancelAsync(id, userId, ct);
+        if (result.IsSuccess) return Ok();
+        if (result.ErrorCode == ErrorCodes.NotFound) return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
 }

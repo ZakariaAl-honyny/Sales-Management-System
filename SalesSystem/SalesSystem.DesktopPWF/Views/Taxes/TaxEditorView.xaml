@@ -63,7 +63,8 @@
                              Style="{StaticResource ModernTextBox}"
                              Width="150"
                              TabIndex="2"
-                             ToolTip="أدخل نسبة الضريبة (0 إلى 100)"/>
+                             ToolTip="أدخل نسبة الضريبة (0 إلى 100)"
+                             helpers:InputHelper.NumericOnly="True"/>
                     <TextBlock Text="%" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextSecondaryBrush}"/>
                 </StackPanel>
                 <TextBlock Text="أدخل نسبة مئوية بين 0 و 100 — مثال: 15 يعني 15%" Style="{StaticResource HelperTextStyle}"/>

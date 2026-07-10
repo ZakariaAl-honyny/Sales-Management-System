@@ -95,17 +95,40 @@ public class UserService : IUserService
                 mustChangePassword: true
             );
 
-            await _uow.Users.AddAsync(user, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            // 3. Assign role via UserRole join entity (many-to-many)
-            var roleEntity = await _uow.Roles.GetByIdAsync(request.Role, ct);
-            if (roleEntity != null)
+            // 3. Atomic: save user + assign roles in single transaction
+            await _uow.ExecuteTransactionAsync(async () =>
             {
-                var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, roleEntity.Id);
-                await _uow.UserRoles.AddAsync(userRole, ct);
+                await _uow.Users.AddAsync(user, ct);
                 await _uow.SaveChangesAsync(ct);
-            }
+
+                // Assign roles and copy PermissionsMask
+                int assignedRoleId = 0;
+                if (request.RoleIds?.Any() == true)
+                {
+                    assignedRoleId = request.RoleIds.First();
+                    foreach (var roleId in request.RoleIds)
+                    {
+                        var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, (short)roleId);
+                        await _uow.UserRoles.AddAsync(userRole, ct);
+                    }
+                }
+                else if (request.Role > 0)
+                {
+                    assignedRoleId = request.Role;
+                    var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, (short)request.Role);
+                    await _uow.UserRoles.AddAsync(userRole, ct);
+                }
+
+                // Copy role's PermissionsMask to user
+                if (assignedRoleId > 0)
+                {
+                    var assignedRole = await _uow.Roles.GetByIdAsync(assignedRoleId, ct);
+                    if (assignedRole != null)
+                        user.SetPermissionsMask(assignedRole.PermissionsMask);
+                }
+
+                await _uow.SaveChangesAsync(ct);
+            }, ct);
 
             _logger.LogInformation("Created new user: {UserName} (Id={UserId})", user.UserName, user.Id);
 
@@ -150,7 +173,7 @@ public class UserService : IUserService
                 user.ChangePassword(passwordHash);
             }
 
-            // Update role assignment via UserRole join entity
+            // Update role assignment via UserRole join entity + copy PermissionsMask
             var existingRoles = await _uow.UserRoles.ToListAsync(ur => ur.UserId == user.Id, ct: ct);
             _uow.UserRoles.DeleteRange(existingRoles);
             var newRole = await _uow.Roles.GetByIdAsync(request.Role, ct);
@@ -158,6 +181,8 @@ public class UserService : IUserService
             {
                 var userRole = SalesSystem.Domain.Entities.UserRole.Create(user.Id, newRole.Id);
                 await _uow.UserRoles.AddAsync(userRole, ct);
+                // Copy role's PermissionsMask to user
+                user.SetPermissionsMask(newRole.PermissionsMask);
             }
 
             await _uow.SaveChangesAsync(ct);
@@ -277,6 +302,51 @@ public class UserService : IUserService
         {
             _logger.LogError(ex, "Error getting current user data for {Id}", id);
             return Result<CurrentUserDto>.Failure("حدث خطأ أثناء تحميل بيانات المستخدم.");
+        }
+    }
+
+    // ─── Role Management ────────────────────────────
+
+    public async Task<Result<List<UserRoleDto>>> GetUserRolesAsync(int userId, CancellationToken ct)
+    {
+        try
+        {
+            var userRoles = await _uow.UserRoles.ToListAsync(
+                ur => ur.UserId == userId, null, ct, ignoreQueryFilters: true, "Role");
+
+            var dtos = userRoles.Select(ur => new UserRoleDto(
+                ur.UserId, ur.RoleId, ur.Role?.Name)).ToList();
+
+            return Result<List<UserRoleDto>>.Success(dtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting roles for user {UserId}", userId);
+            return Result<List<UserRoleDto>>.Failure("حدث خطأ أثناء جلب أدوار المستخدم.");
+        }
+    }
+
+    public async Task<Result> UpdateUserRolesAsync(int userId, List<int> roleIds, CancellationToken ct)
+    {
+        try
+        {
+            var existingRoles = await _uow.UserRoles.ToListAsync(
+                ur => ur.UserId == userId, null, ct, ignoreQueryFilters: true);
+            _uow.UserRoles.DeleteRange(existingRoles);
+
+            foreach (var roleId in roleIds)
+            {
+                var userRole = SalesSystem.Domain.Entities.UserRole.Create(userId, (short)roleId);
+                await _uow.UserRoles.AddAsync(userRole, ct);
+            }
+
+            await _uow.SaveChangesAsync(ct);
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating roles for user {UserId}", userId);
+            return Result.Failure("حدث خطأ أثناء تحديث أدوار المستخدم.");
         }
     }
 

@@ -51,7 +51,6 @@ public class CompanySettingsService : ICompanySettingsService
 
             settings.Update(
                 request.CompanyName,
-                request.DefaultCurrencyId,
                 request.Phone,
                 request.Email,
                 request.Address,
@@ -86,9 +85,7 @@ public class CompanySettingsService : ICompanySettingsService
             settings.Email,
             settings.Address,
             settings.TaxNumber,
-            settings.LogoPath,
-            settings.DefaultCurrencyId,
-            null // CurrencyName will be populated by controller if needed
+            settings.LogoPath
         );
     }
 }

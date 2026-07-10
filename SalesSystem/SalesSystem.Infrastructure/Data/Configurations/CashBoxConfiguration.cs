@@ -22,10 +22,6 @@ public class CashBoxConfiguration : IEntityTypeConfiguration<CashBox>
         builder.Property(x => x.AccountId)
             .IsRequired();
 
-        builder.Property(x => x.BranchId)
-            .IsRequired()
-            .HasColumnType("smallint");
-
         // FK to Accounts
         builder.HasOne(x => x.Account)
             .WithMany()

@@ -8,8 +8,6 @@ public record ExpenseDto(
     string? ExpenseAccountName,
     int CashBoxId,
     string? CashBoxName,
-    int CurrencyId,
-    string? CurrencyName,
     decimal Amount,
     string? Notes,
     byte Status,

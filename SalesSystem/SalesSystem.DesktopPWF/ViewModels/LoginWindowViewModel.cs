@@ -124,7 +124,8 @@ public class LoginWindowViewModel : ViewModelBase
             response.UserName,
             response.UserId,
             new List<int> { response.Role },
-            GetRoleName(response.Role));
+            GetRoleName(response.Role),
+            response.PermissionsMask);
 
         var passwordChangeVm = new PasswordChangeViewModel(
             App.GetService<IAuthApiService>(),
@@ -214,7 +215,8 @@ public class LoginWindowViewModel : ViewModelBase
             response.UserName,
             response.UserId,
             new List<int> { response.Role },
-            GetRoleName(response.Role));
+            GetRoleName(response.Role),
+            response.PermissionsMask);
 
         NavigateToMainWindow();
     }

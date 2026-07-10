@@ -89,9 +89,10 @@
 
                                     <StackPanel Grid.Column="1" Margin="6,0,0,0">
                                         <TextBlock Text="تنبيه المخزون المنخفض" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding ReorderLevel, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N3}" 
+                                        <TextBox Text="{Binding ReorderLevel, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                                  Style="{StaticResource ModernTextBox}" 
                                                  TabIndex="6"
+                                                 helpers:InputHelper.NumericOnly="True"
                                                  ToolTip="الحد الأدنى للمخزون — سيتم تنبيهك عندما يصل المخزون إلى هذا الحد"/>
                                     </StackPanel>
                                 </Grid>
@@ -121,14 +122,16 @@
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Grid.Column="0" Margin="0,0,4,0">
                                         <TextBlock Text="الكمية الافتتاحية" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding OpeningQuantity, StringFormat=N3, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                                        <TextBox Text="{Binding OpeningQuantity, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                                  Style="{StaticResource ModernTextBox}"
+                                                 helpers:InputHelper.NumericOnly="True"
                                                  ToolTip="الكمية المتاحة عند إضافة المنتج لأول مرة — يمكن تركها فارغة لبدء المخزون من الصفر"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="1" Margin="4,0">
                                         <TextBlock Text="تكلفة الوحدة" Style="{StaticResource LabelStyle}"/>
-                                        <TextBox Text="{Binding OpeningUnitCost, StringFormat=N2, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
+                                        <TextBox Text="{Binding OpeningUnitCost, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                                  Style="{StaticResource ModernTextBox}"
+                                                 helpers:InputHelper.NumericOnly="True"
                                                  ToolTip="تكلفة شراء الوحدة الواحدة عند فتح المخزون — تستخدم لحساب تكلفة المخزون الافتتاحي"/>
                                     </StackPanel>
                                     <StackPanel Grid.Column="2" Margin="4,0,0,0">

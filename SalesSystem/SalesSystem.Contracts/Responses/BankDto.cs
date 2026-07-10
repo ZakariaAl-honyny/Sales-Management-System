@@ -4,7 +4,8 @@ namespace SalesSystem.Contracts.Responses;
 
 /// <summary>
 /// DTO for a bank record.
-/// Schema: Banks — Id, AccountId (int), Name, AccountNumber (nullable), IBAN (nullable), IsActive.
+/// Schema: Banks — Id, AccountId (int), Name,
+/// AccountNumber (nullable), IBAN (nullable), IsActive.
 /// </summary>
 public record BankDto(
     int Id,

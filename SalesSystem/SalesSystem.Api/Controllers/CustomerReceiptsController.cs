@@ -62,6 +62,42 @@ public class CustomerReceiptsController : ControllerBase
     }
 
     /// <summary>
+    /// Updates a customer receipt.
+    /// </summary>
+    [HttpPut("{id:int}")]
+    [Authorize(Policy = "ManagerAndAbove")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerReceiptRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var result = await _service.UpdateAsync(id, request, userId, ct);
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Deletes a customer receipt.
+    /// </summary>
+    [HttpDelete("{id:int}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> Delete(int id, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId))
+            return Unauthorized();
+
+        var result = await _service.DeleteAsync(id, userId, ct);
+        if (result.IsSuccess) return Ok();
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
     /// Posts (finalizes) a customer receipt — cash box and customer balance are updated.
     /// </summary>
     [HttpPost("{id:int}/post")]

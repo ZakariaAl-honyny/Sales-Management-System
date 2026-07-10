@@ -12,7 +12,6 @@ public class CreateSalesQuotationValidator : AbstractValidator<CreateSalesQuotat
     {
         RuleFor(x => x.CustomerId).GreaterThan(0).WithMessage("يجب اختيار العميل");
         RuleFor(x => x.WarehouseId).GreaterThan((short)0).WithMessage("يجب اختيار المستودع");
-        RuleFor(x => x.CurrencyId).GreaterThan((short)0).WithMessage("يجب اختيار العملة");
 
         RuleFor(x => x.QuotationNo)
             .GreaterThan(0).When(x => x.QuotationNo.HasValue)
@@ -32,14 +31,6 @@ public class CreateSalesQuotationValidator : AbstractValidator<CreateSalesQuotat
             .GreaterThan(x => x.QuotationDate ?? DateTime.UtcNow)
             .When(x => x.ValidUntil.HasValue && x.QuotationDate.HasValue)
             .WithMessage("تاريخ انتهاء الصلاحية يجب أن يكون بعد تاريخ العرض");
-
-        RuleFor(x => x.ExchangeRate)
-            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
-
-        RuleFor(x => x.ExchangeRate)
-            .NotNull().When(x => x.CurrencyId > 0)
-            .WithMessage("يجب تحديد سعر الصرف عند اختيار العملة");
 
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)
@@ -74,7 +65,6 @@ public class UpdateSalesQuotationValidator : AbstractValidator<UpdateSalesQuotat
     {
         RuleFor(x => x.CustomerId).GreaterThan(0).WithMessage("يجب اختيار العميل");
         RuleFor(x => x.WarehouseId).GreaterThan((short)0).WithMessage("يجب اختيار المستودع");
-        RuleFor(x => x.CurrencyId).GreaterThan((short)0).WithMessage("يجب اختيار العملة");
 
         RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0).WithMessage("الخصم لا يمكن أن يكون سالباً");
         RuleFor(x => x.TaxAmount).GreaterThanOrEqualTo(0).WithMessage("الضريبة لا يمكن أن تكون سالبة");
@@ -85,10 +75,6 @@ public class UpdateSalesQuotationValidator : AbstractValidator<UpdateSalesQuotat
         RuleFor(x => x.QuotationDate)
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.QuotationDate.HasValue)
             .WithMessage("تاريخ عرض السعر لا يمكن أن يكون في المستقبل");
-
-        RuleFor(x => x.ExchangeRate)
-            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
 
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)

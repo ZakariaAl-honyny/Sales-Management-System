@@ -33,6 +33,7 @@ public class AccountingIntegrationServiceTests : IDisposable
     private readonly Mock<IUnitOfWork> _mockUow;
     private readonly Mock<ISystemAccountService> _mockSystemAccountService;
     private readonly Mock<IJournalEntryService> _mockJournalEntryService;
+    private readonly Mock<ISystemSettingsRepository> _mockSystemSettingsRepo;
     private readonly Mock<ILogger<AccountingIntegrationService>> _mockLogger;
 
     private readonly AccountingIntegrationService _sut;
@@ -72,7 +73,12 @@ public class AccountingIntegrationServiceTests : IDisposable
         _mockUow = new Mock<IUnitOfWork>();
         _mockSystemAccountService = new Mock<ISystemAccountService>();
         _mockJournalEntryService = new Mock<IJournalEntryService>();
+        _mockSystemSettingsRepo = new Mock<ISystemSettingsRepository>();
         _mockLogger = new Mock<ILogger<AccountingIntegrationService>>();
+
+        // Default: AutoCreateJournalEntry is enabled (default: true)
+        _mockSystemSettingsRepo.Setup(r => r.GetBoolAsync("AutoCreateJournalEntry", true, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         // Setup UoW repositories for entities the SUT queries directly
         _mockUow.Setup(u => u.JournalEntries).Returns(new InMemoryEfCoreRepository<JournalEntry>(_dbContext));
@@ -106,6 +112,7 @@ public class AccountingIntegrationServiceTests : IDisposable
         _sut = new AccountingIntegrationService(
             _mockJournalEntryService.Object,
             _mockSystemAccountService.Object,
+            _mockSystemSettingsRepo.Object,
             _mockUow.Object,
             _mockLogger.Object);
     }
@@ -615,7 +622,6 @@ public class AccountingIntegrationServiceTests : IDisposable
             receiptDate: new DateTime(2026, 6, 1),
             customerId: 1,
             cashBoxId: 1,
-            currencyId: (short)1,
             amount: 500m,
             notes: null,
             createdByUserId: 1);
@@ -663,7 +669,6 @@ public class AccountingIntegrationServiceTests : IDisposable
             paymentNo: 1,
             supplierId: 1,
             cashBoxId: 1,
-            currencyId: (short)1,
             amount: 800m,
             paymentMethod: PaymentMethod.Cash);
 

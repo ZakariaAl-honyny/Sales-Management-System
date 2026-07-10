@@ -52,6 +52,7 @@ public class Bank : ActivatableEntity
     /// </summary>
     /// <param name="name">Bank name (required).</param>
     /// <param name="accountId">FK to the chart-of-accounts account (required).</param>
+    /// <param name="currencyId">FK to the Currencies table (required).</param>
     /// <param name="accountNumber">Optional bank account number.</param>
     /// <param name="iban">Optional IBAN.</param>
     /// <param name="createdByUserId">ID of the creating user.</param>
@@ -84,6 +85,7 @@ public class Bank : ActivatableEntity
     /// Updates the bank properties.
     /// </summary>
     /// <param name="name">Bank name (required).</param>
+    /// <param name="currencyId">FK to the Currencies table (required).</param>
     /// <param name="accountNumber">Optional bank account number.</param>
     /// <param name="iban">Optional IBAN.</param>
     /// <param name="updatedByUserId">ID of the updating user.</param>

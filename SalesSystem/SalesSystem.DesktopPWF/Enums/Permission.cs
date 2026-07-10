@@ -4,7 +4,7 @@ namespace SalesSystem.DesktopPWF.Enums;
 /// UI Permission flags matching CONSTITUTION.md Section 4
 /// </summary>
 [Flags]
-public enum Permission : int
+public enum Permission : long
 {
     None = 0,
 
@@ -28,7 +28,6 @@ public enum Permission : int
     ChartOfAccounts = 1 << 14,     // Chart of Accounts CRUD
     JournalEntries = 1 << 15,      // Journal Entries
     CashBoxes = 1 << 16,           // Cash Boxes access
-    Currencies = 1 << 17,          // Currencies (view-only for Cashier/Observer)
     FiscalYear = 1 << 18,          // Fiscal Year management
     AuditLog = 1 << 19,             // Audit Log viewing
     Roles = 1 << 20,                // Role management
@@ -82,7 +81,6 @@ public static class PermissionExtensions
                 | Permission.ChartOfAccounts
                 | Permission.JournalEntries
                 | Permission.CashBoxes
-                | Permission.Currencies
                 | Permission.FiscalYear
                 | Permission.WarehouseManagement
                 | Permission.Settings
@@ -104,15 +102,13 @@ public static class PermissionExtensions
                 | Permission.ChartOfAccounts
                 | Permission.JournalEntries
                 | Permission.CashBoxes
-                | Permission.Currencies
                 | Permission.AuditLog,
-
+            
             3 => Permission.PurchaseInvoice        // Accountant (محاسب)
                 | Permission.Reports
                 | Permission.ChartOfAccounts
                 | Permission.JournalEntries
                 | Permission.CashBoxes
-                | Permission.Currencies
                 | Permission.AuditLog
                 | Permission.SalesInvoice          // View-only
                 | Permission.CustomerView
@@ -218,10 +214,6 @@ public static class PermissionExtensions
         if (codeSet.Contains("FiscalYear.Manage"))
             flags |= Permission.FiscalYear;
 
-        // Currencies
-        if (codeSet.Any(c => c.StartsWith("Currencies.")))
-            flags |= Permission.Currencies;
-
         // Cashbox/Operations
         if (codeSet.Contains("Operations.Cashbox"))
             flags |= Permission.CashBoxes;
@@ -243,10 +235,6 @@ public static class PermissionExtensions
         // Roles
         if (codeSet.Contains("Roles.Manage"))
             flags |= Permission.Roles;
-
-        // Employees
-        if (codeSet.Any(c => c.StartsWith("Employees.")))
-            flags |= Permission.UserManagement; // Employees managed via same permission group
 
         return flags;
     }

@@ -183,9 +183,7 @@ public class AccountService : IAccountService
                     description: $"الرصيد الافتتاحي للحساب {account.NameAr}",
                     entryType: JournalEntryType.OpeningBalance,
                     fiscalYearId: fiscalYearId,
-                    currencyId: (short)1,
                     createdBy: userId,
-                    exchangeRate: 1m,
                     referenceType: "Account",
                     referenceId: account.Id);
 

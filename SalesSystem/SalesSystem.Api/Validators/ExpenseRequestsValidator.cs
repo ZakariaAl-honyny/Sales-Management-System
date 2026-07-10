@@ -16,9 +16,6 @@ public class CreateExpenseRequestValidator : AbstractValidator<CreateExpenseRequ
         RuleFor(x => x.CashBoxId)
             .GreaterThan(0).WithMessage("الصندوق مطلوب");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).WithMessage("العملة مطلوبة");
-
         RuleFor(x => x.Amount)
             .GreaterThan(0).WithMessage("المبلغ يجب أن يكون أكبر من صفر");
 
@@ -39,9 +36,6 @@ public class UpdateExpenseRequestValidator : AbstractValidator<UpdateExpenseRequ
 
         RuleFor(x => x.CashBoxId)
             .GreaterThan(0).WithMessage("الصندوق مطلوب");
-
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).WithMessage("العملة مطلوبة");
 
         RuleFor(x => x.Amount)
             .GreaterThan(0).WithMessage("المبلغ يجب أن يكون أكبر من صفر");

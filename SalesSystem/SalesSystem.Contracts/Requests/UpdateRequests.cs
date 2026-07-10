@@ -11,7 +11,7 @@ public record UpdateSupplierPaymentRequest(
 );
 
 /// <summary>
-/// طلب تحديث فاتورة شراء.
+/// طلب تحديث فاتورة شراء — مع دعم نوع الخصم.
 /// </summary>
 public record UpdatePurchaseInvoiceRequest(
     int WarehouseId,
@@ -19,13 +19,14 @@ public record UpdatePurchaseInvoiceRequest(
     DateTime? InvoiceDate,
     PaymentType? PaymentType,
     decimal DiscountAmount,
+    DiscountType? DiscountType,
+    decimal? DiscountRate,
     decimal TaxAmount,
     decimal OtherCharges,
     decimal PaidAmount,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     string? Notes,
     int? TaxId,
+    string? AttachmentPath,
     List<CreatePurchaseInvoiceLineRequest> Items);
 
 public record UpdateSalesInvoiceRequest(
@@ -39,7 +40,7 @@ public record UpdateSalesInvoiceRequest(
     decimal PaidAmount,
     int? CashBoxId,
     string? Notes,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     int? TaxId,
-    List<CreateSalesInvoiceLineRequest> Items);
+    List<CreateSalesInvoiceLineRequest> Items,
+    DiscountType DiscountType = DiscountType.Amount,
+    decimal? DiscountRate = null);

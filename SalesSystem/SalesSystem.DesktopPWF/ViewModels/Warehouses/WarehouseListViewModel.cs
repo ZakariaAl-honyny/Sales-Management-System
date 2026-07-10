@@ -295,7 +295,6 @@ public class WarehouseListViewModel : ViewModelBase
         ErrorMessage = null;
 
         var request = new UpdateWarehouseRequest(
-            BranchId: (short)1,
             Name: SelectedWarehouse.Name,
             Phone: SelectedWarehouse.Phone,
             Address: SelectedWarehouse.Address,

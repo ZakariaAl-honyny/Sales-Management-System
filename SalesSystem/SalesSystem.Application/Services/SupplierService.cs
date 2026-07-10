@@ -4,8 +4,6 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Accounting.Entities;
-using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -16,17 +14,22 @@ public class SupplierService : ISupplierService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<SupplierService> _logger;
+    private readonly IAccountLinkService _accountLink;
 
-    public SupplierService(IUnitOfWork uow, ILogger<SupplierService> logger)
+    public SupplierService(
+        IUnitOfWork uow,
+        ILogger<SupplierService> logger,
+        IAccountLinkService accountLink)
     {
         _uow = uow;
         _logger = logger;
+        _accountLink = accountLink;
     }
 
     public async Task<Result<SupplierDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var supplier = await _uow.Suppliers.FirstOrDefaultAsync(
-            s => s.Id == id, ct);
+            s => s.Id == id, ct, includePaths: "Account");
         if (supplier == null)
             return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
@@ -44,7 +47,8 @@ public class SupplierService : ISupplierService
         }
 
         var (items, total) = await _uow.Suppliers.GetPagedAsync(
-            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive);
+            predicate, q => q.OrderByDescending(s => s.Id), page, pageSize, ct, includeInactive,
+            includePaths: "Account");
 
         var dtos = items.Select(MapToDto).ToList();
         return Result<PagedResult<SupplierDto>>.Success(PagedResult<SupplierDto>.Create(dtos, total, page, pageSize));
@@ -56,7 +60,7 @@ public class SupplierService : ISupplierService
         {
             try
             {
-                // Step 1: Auto-create account under AP parent (1320 — الموردون)
+                // Step 1: Auto-create account under AP parent (2101 — الموردون)
                 var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
                 if (!accountResult.IsSuccess)
                     return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
@@ -70,6 +74,9 @@ public class SupplierService : ISupplierService
                     email: request.Email,
                     address: request.Address,
                     taxNumber: request.TaxNumber,
+                    notes: request.Notes,
+                    creditLimit: request.CreditLimit,
+                    categoryId: request.CategoryId,
                     createdByUserId: userId);
                 await _uow.Suppliers.AddAsync(supplier, ct);
                 await _uow.SaveChangesAsync(ct);
@@ -99,31 +106,50 @@ public class SupplierService : ISupplierService
             if (supplier == null)
                 return Result<SupplierDto>.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-            // Update supplier fields including contact information
-            supplier.Update(
-                name: request.Name,
-                phone: request.Phone,
-                email: request.Email,
-                address: request.Address,
-                taxNumber: request.TaxNumber,
-                updatedByUserId: userId);
-
-            if (request.IsActive != supplier.IsActive)
+            // ---- entity+account modification wrapped in atomic transaction ----
+            return await _uow.ExecuteTransactionAsync<Result<SupplierDto>>(async () =>
             {
-                if (request.IsActive) supplier.Restore();
-                else supplier.MarkAsDeleted();
-            }
+                try
+                {
+                    // Capture old values for Account sync BEFORE update
+                    var oldIsActive = supplier.IsActive;
 
-            await _uow.Suppliers.UpdateAsync(supplier, ct);
-            await _uow.SaveChangesAsync(ct);
+                    // Update supplier fields including contact information
+                    supplier.Update(
+                        name: request.Name,
+                        phone: request.Phone,
+                        email: request.Email,
+                        address: request.Address,
+                        taxNumber: request.TaxNumber,
+                        notes: request.Notes,
+                        creditLimit: request.CreditLimit,
+                        categoryId: request.CategoryId,
+                        updatedByUserId: userId);
 
-            _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
+                    if (request.IsActive != oldIsActive)
+                    {
+                        if (request.IsActive) supplier.Restore();
+                        else supplier.MarkAsDeleted();
+                    }
 
-            return Result<SupplierDto>.Success(MapToDto(supplier));
-        }
-        catch (DomainException ex)
-        {
-            return Result<SupplierDto>.Failure(ex.Message);
+                    // Sync linked Account Name — per accounts summry.md
+                    if (supplier.AccountId > 0)
+                    {
+                        await _accountLink.SyncNameAsync(supplier.AccountId, request.Name, ct);
+                    }
+
+                    await _uow.Suppliers.UpdateAsync(supplier, ct);
+                    await _uow.SaveChangesAsync(ct);
+
+                    _logger.LogInformation("Supplier updated: {SupplierName} (ID: {SupplierId})", supplier.Name, supplier.Id);
+
+                    return Result<SupplierDto>.Success(MapToDto(supplier));
+                }
+                catch (DomainException ex)
+                {
+                    return Result<SupplierDto>.Failure(ex.Message);
+                }
+            }, ct);
         }
         catch (Exception ex)
         {
@@ -138,11 +164,28 @@ public class SupplierService : ISupplierService
         if (supplier == null)
             return Result.Failure("المورد غير موجود", ErrorCodes.NotFound);
 
-        await _uow.Suppliers.SoftDeleteAsync(id, ct);
-        await _uow.SaveChangesAsync(ct);
+        // ---- entity+account modification wrapped in atomic transaction ----
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
+        {
+            try
+            {
+                // Deactivate linked Account — per accounts summry.md
+                if (supplier.AccountId > 0)
+                {
+                    await _accountLink.DeactivateAsync(supplier.AccountId, ct);
+                }
 
-        _logger.LogInformation("Supplier soft-deleted: {SupplierId} by user {UserId}", id, userId);
-        return Result.Success();
+                await _uow.Suppliers.SoftDeleteAsync(id, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Supplier soft-deleted: {SupplierId} by user {UserId}", id, userId);
+                return Result.Success();
+            }
+            catch (DomainException ex)
+            {
+                return Result.Failure(ex.Message);
+            }
+        }, ct);
     }
 
     public async Task<Result> PermanentDeleteAsync(int id, int userId, CancellationToken ct)
@@ -157,97 +200,51 @@ public class SupplierService : ISupplierService
         if (await _uow.SupplierPayments.AnyAsync(sp => sp.SupplierId == id, ct))
             return Result.Failure("لا يمكن حذف المورد نهائياً لأنه مرتبط بسندات صرف");
 
-        try
+        // ---- entity+account modification wrapped in atomic transaction ----
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
         {
-            await _uow.Suppliers.HardDeleteAsync(id, ct);
-            await _uow.SaveChangesAsync(ct);
+            try
+            {
+                // MarkAsDeleted linked Account — per accounts summry.md
+                if (supplier.AccountId > 0)
+                {
+                    await _accountLink.MarkAsDeletedAsync(supplier.AccountId, ct);
+                }
 
-            _logger.LogInformation("Supplier permanently deleted: {SupplierId} by user {UserId}", id, userId);
-            return Result.Success();
-        }
-        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
-        {
-            _logger.LogError(ex, "Failed to permanently delete supplier {SupplierId} due to database constraint", id);
-            return Result.Failure("لا يمكن حذف المورد نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
-        }
+                await _uow.Suppliers.HardDeleteAsync(id, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Supplier permanently deleted: {SupplierId} by user {UserId}", id, userId);
+                return Result.Success();
+            }
+            catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
+            {
+                _logger.LogError(ex, "Failed to permanently delete supplier {SupplierId} due to database constraint", id);
+                return Result.Failure("لا يمكن حذف المورد نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
+            }
+        }, ct);
     }
 
     /// <summary>
     /// Auto-creates a Level 4 Liability account under the AP parent account for this supplier.
-    /// Uses the parent account at code "1320 — الموردون" (Accounts Payable).
-    /// Falls back to SystemAccountMappings.AccountsPayableAccountId if 1320 not found.
+    /// Delegates to IAccountLinkService for centralized account creation.
     /// </summary>
     private async Task<Result<int>> AutoCreateSupplierAccountAsync(string supplierName, int userId, CancellationToken ct)
     {
         try
         {
-            var apParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-                a => a.AccountCode == "1320" && a.IsActive, ct);
+            var result = await _accountLink.CreateSupplierAccountAsync(supplierName, userId, ct);
+            if (!result.IsSuccess)
+                return result;
 
-            if (apParentAccount == null)
-            {
-                var apMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                    m => m.MappingKey == nameof(SystemAccountKey.AccountsPayable), ct);
-                if (apMapping == null)
-                    return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
-
-                var apAccount = await _uow.Accounts.GetByIdAsync(apMapping.AccountId, ct);
-                if (apAccount == null || apAccount.ParentId == null)
-                    return Result<int>.Failure("لم يتم العثور على حساب الموردين", ErrorCodes.NotFound);
-
-                apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentId.Value, ct);
-                if (apParentAccount == null)
-                    return Result<int>.Failure("لم يتم العثور على حساب الموردين الرئيسي", ErrorCodes.NotFound);
-            }
-
-            var nextCode = await GenerateNextAccountCodeAsync(apParentAccount.Id, apParentAccount.AccountCode, ct);
-
-            var newAccount = Account.Create(
-                accountCode: nextCode,
-                nameAr: supplierName,
-                nameEn: supplierName,
-                nature: (byte)AccountType.Liability,
-                isLeaf: true,
-                parentId: apParentAccount.Id,
-                isSystem: false,
-                categoryId: null,
-                level: 4,
-                createdByUserId: userId
-            );
-
-            await _uow.Accounts.AddAsync(newAccount, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Auto-created supplier account: {Code} - {Name} under parent {ParentCode}",
-                nextCode, supplierName, apParentAccount.AccountCode);
-            return Result<int>.Success(newAccount.Id);
+            _logger.LogInformation("Auto-created supplier account for {Name}, AccountId: {AccountId}", supplierName, result.Value);
+            return Result<int>.Success(result.Value);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to auto-create supplier account for {SupplierName}", supplierName);
             return Result<int>.Failure("فشل إنشاء الحساب المحاسبي للمورد");
         }
-    }
-
-    private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
-    {
-        var childAccounts = await _uow.Accounts.ToListAsync(
-            predicate: a => a.ParentId == parentAccountId,
-            ct: ct);
-
-        int maxSuffix = 0;
-        foreach (var child in childAccounts)
-        {
-            if (int.TryParse(child.AccountCode, out var code))
-            {
-                if (code > maxSuffix)
-                    maxSuffix = code;
-            }
-        }
-
-        return maxSuffix > 0
-            ? (maxSuffix + 1).ToString()
-            : parentCode + "1";
     }
 
     private static SupplierDto MapToDto(Supplier s)
@@ -259,8 +256,11 @@ public class SupplierService : ISupplierService
             s.Email,
             s.Address,
             s.TaxNumber,
+            s.Notes,
+            s.CreditLimit,
             s.IsActive,
             AccountId: s.AccountId,
+            AccountName: s.Account?.NameAr,
             CategoryId: s.CategoryId
         );
     }

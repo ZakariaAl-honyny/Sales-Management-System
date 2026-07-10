@@ -3,7 +3,7 @@ using SalesSystem.Contracts.Enums;
 namespace SalesSystem.Contracts.Requests;
 
 /// <summary>
-/// طلب إنشاء فاتورة شراء جديدة — مع دعم العملات المتعددة.
+/// طلب إنشاء فاتورة شراء جديدة — مع دعم نوع الخصم.
 /// </summary>
 public record CreatePurchaseInvoiceRequest(
     int WarehouseId,
@@ -12,20 +12,23 @@ public record CreatePurchaseInvoiceRequest(
     DateTime? InvoiceDate,
     PaymentType PaymentType,
     decimal DiscountAmount,
+    DiscountType? DiscountType,
+    decimal? DiscountRate,
     decimal TaxAmount,
     decimal OtherCharges,
     decimal PaidAmount,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     string? Notes,
     int? TaxId,
+    string? AttachmentPath,
     List<CreatePurchaseInvoiceLineRequest> Items);
 
 /// <summary>
-/// طلب إنشاء بند في فاتورة الشراء.
+/// طلب إنشاء بند في فاتورة الشراء — مع دعم الخصم.
 /// </summary>
 public record CreatePurchaseInvoiceLineRequest(
     int ProductId,
     int ProductUnitId,
     decimal Quantity,
-    decimal UnitPrice);
+    decimal UnitPrice,
+    DiscountType? DiscountType = null,
+    decimal? DiscountRate = null);

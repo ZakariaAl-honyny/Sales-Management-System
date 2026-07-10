@@ -620,7 +620,7 @@ When writing or reviewing code in ANY layer, check these:
 - [ ] CashBox has AccountId FK linking to Chart of Accounts Account?
 - [ ] CashTransaction uses RunningBalance (not BalanceBefore/BalanceAfter)?
 - [ ] CashTransaction.Create() is public (not internal)?
-- [ ] CashBox auto-creates Level-4 sub-account under "1110 — النقدية" when AccountId is null?
+- [ ] CashBox auto-creates Level-4 sub-account under "1101 — النقدية صناديق" when AccountId is null?
 - [ ] No Deposit()/Withdraw() methods on CashBox entity?
 - [ ] CashTransfer has NO client-side balance validation?
 - [ ] CashBoxEditorView has NO balance fields (OpeningBalance removed)?
@@ -671,7 +671,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 4. Deposit()/Withdraw() methods on CashBox → REMOVE
 5. Client-side balance validation → REMOVE (server validates via Account)
 6. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
-7. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+7. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1101 — النقدية صناديق"
 8. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 9. Missing `ProductPrices` table → Add per-unit pricing replacing SalePrice/RetailPrice on Product
 10. Missing `InventoryBatches` → Add FIFO batch tracking on purchase

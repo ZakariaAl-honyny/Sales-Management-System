@@ -462,6 +462,9 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             PaymentType: 1,
             SubTotal: totalAmount,
             DiscountAmount: 0,
+            DiscountType: 0,
+            DiscountRate: null,
+            CostInBaseCurrency: null,
             TaxAmount: 0,
             OtherCharges: 0,
             NetTotal: totalAmount,
@@ -469,12 +472,11 @@ public class PurchaseInvoiceListViewModelTests : IDisposable
             RemainingAmount: 0,
             Notes: null,
             SupplierInvoiceNo: null,
+            AttachmentPath: null,
             Status: status,
             TaxId: null,
             TaxName: null,
             TaxRate: null,
-            CurrencyId: null,
-            ExchangeRate: null,
             CashBoxId: null,
             Items: new List<PurchaseInvoiceLineDto>());
     }

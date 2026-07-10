@@ -12,8 +12,7 @@ public class UpdateCashBoxRequestValidator : AbstractValidator<UpdateCashBoxRequ
             .MaximumLength(150).WithMessage("اسم الخزنة لا يمكن أن يتجاوز 150 حرف")
             .When(x => !string.IsNullOrWhiteSpace(x.Name));
 
-        RuleFor(x => x.BranchId)
-            .GreaterThan((short)0).WithMessage("الفرع مطلوب");
+
 
         RuleFor(x => x.Description)
             .MaximumLength(300).When(x => x.Description != null)

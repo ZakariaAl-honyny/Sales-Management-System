@@ -3,16 +3,16 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateCustomerReceiptRequest(
     int CustomerId,
     int CashBoxId,
-    int CurrencyId,
     decimal Amount,
-    string? Notes = null
+    string? Notes = null,
+    byte PaymentMethod = 1
 );
 
 public record UpdateCustomerReceiptRequest(
     int CashBoxId,
-    int CurrencyId,
     decimal Amount,
-    string? Notes = null
+    string? Notes = null,
+    byte PaymentMethod = 1
 );
 
 public record AddReceiptApplicationRequest(

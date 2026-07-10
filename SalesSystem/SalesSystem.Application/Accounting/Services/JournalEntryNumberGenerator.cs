@@ -28,13 +28,14 @@ public class JournalEntryNumberGenerator : IJournalEntryNumberGenerator
     {
         try
         {
-            // Use DocumentSequenceService.GetNextIntAsync which is thread-safe:
-            // SemaphoreSlim held through SaveChangesAsync prevents duplicate numbers.
-            var seqResult = await _sequenceService.GetNextIntAsync("JournalEntry", ct);
+            // Use daily-scoped sequence key so the counter resets each day.
+            // JE-20260625-0001, JE-20260625-0002, then JE-20260626-0001 (daily reset).
+            var today = DateTime.Today;
+            var sequenceKey = $"JournalEntry-{today:yyyyMMdd}";
+            var seqResult = await _sequenceService.GetNextIntAsync(sequenceKey, ct);
             if (!seqResult.IsSuccess)
                 return Result<JournalEntryNumberResult>.Failure(seqResult.Error!);
 
-            var today = DateTime.Today;
             var entryNo = seqResult.Value;
             var entryNumber = $"JE-{today:yyyyMMdd}-{entryNo:D4}";
 

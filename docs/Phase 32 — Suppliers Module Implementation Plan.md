@@ -1,7 +1,9 @@
 # Phase 32 — Suppliers Module: Comprehensive Implementation Plan
 
-> **Version**: 2.0 — Architecture update: DIRECT contact fields on Supplier (NO Parties, NO SupplierGroup, NO SupplierType), AccountId mandatory under parent "1320"
-> **Scope**: Complete Suppliers Module enhancement — AccountId FK mandatory (auto-created under 1320), direct contact fields, CreditLimit validation, UI balance display, reports, and 12 implementation tasks
+> **Version**: 3.1 — Architecture update: DIRECT contact fields on Supplier (NO Parties, NO SupplierGroup, NO SupplierType), AccountId mandatory under parent "2101" (الموردون/AP in AccountingSeeder), Account synchronization on Name/IsActive/MarkAsDeleted
+> **Scope**: Complete Suppliers Module enhancement — AccountId FK mandatory (auto-created under 2101), direct contact fields, CreditLimit validation, UI balance display, reports, Account sync, and 15 implementation tasks
+> **Phase 18 Alignment (v3.1)**: Fixed parent code `"2101"`→`"2101"` (matches AccountingSeeder), removed fake `allowTransactions` param from Account.Create(), added CreditLimit to entity/DTOs/requests, added IAccountCodeGeneratorService injection, auto ColorCode from Nature
+> **Accounts Summary Alignment (v3.1)**: Added Account synchronization rules per `accounts summry.md` — when Supplier name changes, linked Account.NameAr must update; when Supplier deactivated/restored, linked Account must deactivate/activate; when Supplier hard-deleted, linked Account must MarkAsDeleted. All syncs happen in the same transaction.
 
 ---
 
@@ -81,7 +83,7 @@
 | Layer | Responsibilities | Forbidden |
 |-------|-----------------|-----------|
 | **Domain** (Supplier entity) | Business rules: Name required, CreditLimit >= 0, Guard Clauses, direct contact fields | ⛔ No DB access, no UI logic |
-| **Application** (SupplierService) | Orchestration: Result<T>, IUnitOfWork, logging, CreditLimit validation on purchase, auto-account creation under 1320 | ⛔ No direct DB access, no Domain duplication |
+| **Application** (SupplierService) | Orchestration: Result<T>, IUnitOfWork, logging, CreditLimit validation on purchase, auto-account creation under 2101 (الموردون) via `IAccountCodeGeneratorService` | ⛔ No direct DB access, no Domain duplication |
 | **API** (SuppliersController) | HTTP translation: map Result → StatusCode, secure with [Authorize] | ⛔ No business logic, no DbContext |
 | **Desktop** (ViewModels + Views) | UI: ExecuteAsync(), INotifyDataErrorInfo, DialogService, Arabic ToolTips | ⛔ No DB access, no business rules |
 
@@ -173,7 +175,7 @@ Supplier's Account balance < 0 = Supplier owes us (asset/prepayment)
 - `MapToDto` maps all fields ✅
 - Serilog logging on CRUD operations ✅
 - **🔧 UPDATE**: `CreateAsync` must accept direct contact fields (Name, Phone, Email, Address, TaxNumber, Notes) — NOT PartyId
-- **🔧 UPDATE**: `CreateAsync` must auto-create Account under parent "1320" (Accounts Payable/الموردون) when AccountId not provided
+- **🔧 UPDATE**: `CreateAsync` must auto-create Account under parent "2101" (Accounts Payable/الموردون) when AccountId not provided — using `IAccountCodeGeneratorService` for thread-safe code generation
 - **🔧 UPDATE**: `GetByIdAsync` must `.Include(s => s.Account)` for AccountName
 
 ### 2.4 API Layer ✅
@@ -299,11 +301,11 @@ Supplier's Account balance < 0 = Supplier owes us (asset/prepayment)
 
 **File**: `Infrastructure.Data.DbSeeder`
 
-> The default supplier `"مورد نقدي"` is created with auto-created account linked to COA under parent "1320" (Accounts Payable/الموردون).
+> The default supplier `"مورد نقدي"` is created with auto-created account linked to COA under parent "2101" (Accounts Payable/الموردون per AccountingSeeder).
 
 **Issues (fixed):**
 1. ✅ Name changed to `"مورد نقدي"` per AGENTS.md RULE-453
-2. ✅ `AccountId` auto-created via service — linked to Accounts Payable (1320)
+2. ✅ `AccountId` auto-created via service — linked to Accounts Payable (2101 — الموردون per AccountingSeeder)
 3. ✅ **NO** `SupplierType` — NOT in V1 (deferred per RULE-443)
 4. ✅ **NO** `SupplierGroup` — NOT in V1
 
@@ -344,7 +346,7 @@ The Party entity adds unnecessary complexity — contact data should be DIRECT f
 
 ### 3.2 Blocker 2: Supplier — AccountId FK Missing (Fixed)
 
-**Problem (previously)**: `Supplier` entity had no `AccountId` FK. **SOLUTION**: Already implemented. AccountId is mandatory `int` FK. Service auto-creates Level-4 detail account under parent `"1320 — الموردون"` (Accounts Payable).
+**Problem (previously)**: `Supplier` entity had no `AccountId` FK. **SOLUTION**: Already implemented. AccountId is mandatory `int` FK. Service auto-creates Level-4 detail account under parent `"2101 — الموردون"` (Accounts Payable per AccountingSeeder).
 
 **Current state**: ✅ Already implemented correctly.
 
@@ -433,7 +435,7 @@ public record CreateSupplierRequest(
     decimal CreditLimit,      // Optional, >= 0
     int? CategoryId           // Optional
 );
-// NO AccountId (auto-created by service under parent "1320")
+// NO AccountId (auto-created by service under parent "2101")
 // NO PartyId
 // NO SupplierType
 // NO SupplierGroupId
@@ -517,7 +519,7 @@ public record UpdateSupplierRequest(
 | Feature | Status | Action |
 |---------|--------|--------|
 | Create with direct fields (not Party) | ❌ Wrong | Update `CreateAsync` to accept direct Name/Phone/Email/Address/TaxNumber/Notes |
-| Account auto-creation on Supplier.Create | ✅ Exists | Create Account under 1320 parent, assign to supplier |
+| Account auto-creation on Supplier.Create | ✅ Exists | Create Account under 2101 parent, assign to supplier |
 | CreditLimit validation on purchase | ❌ Missing | Add `IsCreditLimitExceeded(supplierId, amount)` method |
 | Balance report service method | ❌ Missing | Add `GetBalanceReportAsync()` |
 | CreditLimit usage service method | ❌ Missing | Add `GetCreditLimitUsageAsync()` |
@@ -553,7 +555,7 @@ public record UpdateSupplierRequest(
 | Data | Status | Action |
 |------|--------|--------|
 | Default supplier name | ✅ Correct | `"مورد نقدي"` |
-| Default supplier AccountId | ✅ Correct | Auto-created under 1320 — حسابات الموردين |
+| Default supplier AccountId | ✅ Correct | Auto-created under 2101 — حسابات الموردين |
 | Default supplier direct fields | ✅ | Create with direct Name/Phone etc. — no Party needed |
 | Supplier groups seed | ❌ Not needed | SupplierGroup NOT in V1 |
 
@@ -624,7 +626,7 @@ Based on the accounts Details.md analysis conclusion:
 - `SupplierService.cs`: Auto-creates Level-4 detail account under parent `"1320 — الموردون"` (Accounts Payable)
 
 **Auto-creation pattern** (follows CashBoxService):
-1. Look up parent account by code `"1320"` (Accounts Payable/الموردون)
+1. Look up parent account by code `"2101"` (Accounts Payable/الموردون)
 2. Find max child code: `GetMaxChildCodeAsync(parentAccount.Id)`
 3. Increment code: `int.Parse(maxCode) + 1`
 4. Create `Account` with: `allowTransactions = true`, `level = 4`, `isSystem = false`
@@ -653,7 +655,77 @@ Based on the accounts Details.md analysis conclusion:
 
 ---
 
-## 7. Non-V1 Items (Deferred)
+## 7. Account Synchronization Rules (from accounts summry.md)
+
+> **Source**: `docs/all new Anylysis for update system features/accounts summry.md`
+> **Principle**: Customer, Supplier, Employee, CashBox, Bank are the "Source of Truth" for their data. The linked Account is an accounting reflection. When the operational entity changes, the Account must sync.
+
+### 7.1 Golden Rule — Account Sync Matrix
+
+| Operation | Supplier Field Changed | Account Field Changed | Sync Required |
+|-----------|----------------------|----------------------|---------------|
+| **Update (Name)** | `Supplier.Name` | `Account.NameAr` + `Account.NameEn` | ✅ YES — same transaction |
+| **Update (Phone/Email/Address/TaxNumber/Notes)** | Supplier contact fields | ❌ Account has no these fields | ❌ NO sync |
+| **Deactivate** | `Supplier.IsActive = false` | `Account.IsActive = false` | ✅ YES — same transaction |
+| **Restore** | `Supplier.IsActive = true` | `Account.IsActive = true` | ✅ YES — same transaction |
+| **Hard Delete (MarkAsDeleted)** | `Supplier.IsActive = false` | `Account.IsActive = false` | ✅ YES — same transaction |
+| **AccountId change** | ❌ NEVER changes | ❌ NEVER changes | ❌ N/A |
+
+### 7.2 Implementation Pattern
+
+```csharp
+// In SupplierService — private helper for Account sync
+private async Task SyncAccountAsync(
+    int accountId, string newName, string oldName,
+    bool newIsActive, bool oldIsActive, CancellationToken ct)
+{
+    var account = await _uow.Accounts.GetByIdAsync(accountId, ct);
+    if (account == null) return; // Log warning, don't fail
+
+    var nameChanged = newName != oldName;
+    var isActiveChanged = newIsActive != oldIsActive;
+
+    if (nameChanged)
+    {
+        account.Update(
+            nameAr: newName, nameEn: newName,
+            nature: account.Nature, isLeaf: account.IsLeaf,
+            parentId: account.ParentId, level: account.Level);
+    }
+
+    if (isActiveChanged)
+    {
+        if (newIsActive) account.Activate();
+        else account.Deactivate();
+    }
+
+    if (nameChanged || isActiveChanged)
+        await _uow.Accounts.UpdateAsync(account, ct);
+}
+```
+
+### 7.3 Where Sync Happens
+
+| Service Method | Sync Action | Notes |
+|---------------|-------------|-------|
+| `UpdateAsync` | `SyncAccountAsync(accountId, newName, oldName, newIsActive, oldIsActive)` | After `supplier.Update()`, before `SaveChangesAsync` |
+| `DeleteAsync` (soft) | `account.Deactivate()` + `UpdateAsync` | Before `SoftDeleteAsync` |
+| `PermanentDeleteAsync` | `account.MarkAsDeleted()` + `UpdateAsync` | Before `HardDeleteAsync` |
+| `CreateAsync` | Auto-created by `AutoCreateSupplierAccountAsync` | Already implemented |
+
+### 7.4 Guard Safety
+
+- `Account.Update()` throws `DomainException("لا يمكن تعديل حساب نظامي")` if `IsSystem = true` — linked supplier accounts are NOT system accounts (IsSystem = false), so safe
+- `Account.Activate()` / `Account.Deactivate()` throw if `IsSystem = true` — same safety
+- `Account.MarkAsDeleted()` throws if `IsSystem = true` or `HasChildren()` — linked accounts are leaf Level-4 accounts with no children, so safe
+
+### 7.5 Future Architecture (Deferred)
+
+The accounts summary recommends creating `IAccountLinkService` to centralize all entity-account linking for Customer, Supplier, Employee, CashBox, Bank. This is deferred — for now, each service handles its own Account sync inline.
+
+---
+
+## 8. Non-V1 Items (Deferred)
 
 | Feature | Reason | Target |
 |---------|--------|--------|
@@ -847,15 +919,24 @@ builder.HasQueryFilter(s => s.IsActive);
 
 ---
 
-### Task 2 — Auto-Create Account on Supplier Create (Parent "1320")
+### Task 2 — Fix Auto-Account Creation: Parent Code "2101" + IAccountCodeGeneratorService + ColorCode
 
-**Problem**: Currently `AccountId` is mandatory non-nullable. The service must auto-create a Level-4 detail account under parent `"1320 — الموردون"` (Accounts Payable) when creating a supplier.
+**Problem**: `SupplierService.AutoCreateSupplierAccountAsync()` has multiple issues:
+1. Searches for parent code `"2101"` which does NOT exist in AccountingSeeder (actual AP parent is `"2101"`)
+2. Uses inline `GenerateNextAccountCodeAsync()` instead of thread-safe `IAccountCodeGeneratorService`
+3. Doesn't set `ColorCode` on created account (Phase 18 requires auto-generation from Nature)
+4. Missing `description` parameter in `Account.Create()` call
 
-**Note**: This is already implemented. Verify and ensure the auto-creation logic follows the correct parent code `"1320"` (not old `"2100"`).
+**Fix**: 
+1. Change parent code lookup from `"2101"` to `"2101"` (matches AccountingSeeder's AP parent under Liabilities)
+2. Inject `IAccountCodeGeneratorService` and use `GenerateCodeAsync()` for thread-safe code generation
+3. Use `IAccountCodeGeneratorService.GetColorCode()` to auto-set ColorCode from Nature
+4. Add `description` parameter to `Account.Create()`
 
 **Parent code verification**:
 ```
-✅ CORRECT parent code: "1320" (Accounts Payable — الموردون)
+✅ CORRECT parent code: "2101" (الموردون — Accounts Payable under "21" Current Liabilities per AccountingSeeder)
+❌ WRONG parent code:   "2101" (does NOT exist in AccountingSeeder — was a documentation error)
 ❌ WRONG parent code:   "2100" (doesn't exist in COA)
 ```
 
@@ -863,83 +944,109 @@ builder.HasQueryFilter(s => s.IsActive);
 
 | File | Change |
 |------|--------|
-| `Application/Services/SupplierService.cs` | Verify `CreateAsync` auto-creates account under "1320". If not, update. |
+| `Application/Services/SupplierService.cs` | Fix `AutoCreateSupplierAccountAsync`: (1) lookup "2101" instead of "2101", (2) inject `IAccountCodeGeneratorService`, (3) use `IAccountCodeGeneratorService.GetColorCode()`, (4) add description to `Account.Create()` |
 | `Application/Interfaces/Services/ISupplierService.cs` | No change needed |
 
-**Auto-creation pattern** (mirrors CashBoxService):
+**Auto-creation pattern** (mirrors CashBoxService, uses Phase 18 patterns):
 
 ```csharp
-private async Task<int> AutoCreateAccountAsync(string supplierName, CancellationToken ct)
+// SupplierService.AutoCreateSupplierAccountAsync() — UPDATED
+private async Task<Result<int>> AutoCreateSupplierAccountAsync(string supplierName, int userId, CancellationToken ct)
 {
-    var parentAccount = await _uow.Accounts.GetByCodeAsync("1320", ct);
-    if (parentAccount == null)
-        throw new InvalidOperationException("الحساب الأب 1320 (الموردون) غير موجود");
+    // 1. Look up AP parent by code "2101" (الموردون per AccountingSeeder)
+    var apParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
+        a => a.AccountCode == "2101" && a.IsActive, ct);
 
-    var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-    var newCode = (int.Parse(maxCode ?? "13200000") + 1).ToString().PadLeft(8, '0');
+    if (apParentAccount == null)
+    {
+        // Fallback: find via SystemAccountMappings
+        var apMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
+            m => m.MappingKey == nameof(SystemAccountKey.AccountsPayable), ct);
+        if (apMapping == null)
+            return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
+        var apAccount = await _uow.Accounts.GetByIdAsync(apMapping.AccountId, ct);
+        if (apAccount?.ParentId == null)
+            return Result<int>.Failure("لم يتم العثور على حساب الموردين", ErrorCodes.NotFound);
+        apParentAccount = await _uow.Accounts.GetByIdAsync(apAccount.ParentId.Value, ct);
+        if (apParentAccount == null)
+            return Result<int>.Failure("لم يتم العثور على حساب الموردين الرئيسي", ErrorCodes.NotFound);
+    }
 
-    var account = Account.Create(
-        accountCode: newCode,
+    // 2. Auto-generate thread-safe account code via AccountCodeGeneratorService (Phase 18)
+    var codeResult = await _accountCodeGenerator.GenerateCodeAsync(
+        apParentAccount.Id, level: 4, ct);
+    if (!codeResult.IsSuccess)
+        return Result<int>.Failure("فشل توليد رقم الحساب");
+
+    // 3. Auto-set ColorCode from Nature (Phase 18 — IAccountCodeGeneratorService)
+    var colorCode = IAccountCodeGeneratorService.GetColorCode(apParentAccount.Nature);
+
+    // 4. Create Account with Phase 18 signature (13 params, NO allowTransactions)
+    var newAccount = Account.Create(
+        accountCode: codeResult.Value,
         nameAr: supplierName,
         nameEn: supplierName,
-        nature: AccountNature.Credit,     // Liability-nature account
-        isLeaf: true,
-        parentId: parentAccount.Id,
+        nature: apParentAccount.Nature,        // Inherit parent nature (Liability)
+        isLeaf: true,                           // Level 4 = detail account
+        parentId: apParentAccount.Id,
         isSystem: false,
         categoryId: null,
         level: 4,
         description: $"حساب المورد: {supplierName}",
-        colorCode: "#F44336",              // Red (Liability)
+        colorCode: colorCode,                   // Auto-generated from Nature
         notes: null,
-        createdByUserId: null,
-        allowTransactions: true            // Level 4 must allow transactions (RULE-506)
+        createdByUserId: userId
     );
 
-    await _uow.Accounts.AddAsync(account, ct);
+    await _uow.Accounts.AddAsync(newAccount, ct);
     await _uow.SaveChangesAsync(ct);
-    return account.Id;
+    return Result<int>.Success(newAccount.Id);
 }
 ```
 
 **Integration into CreateAsync flow**:
 
 ```csharp
-public async Task<Result<SupplierDto>> CreateAsync(CreateSupplierRequest request, CancellationToken ct)
+public async Task<Result<SupplierDto>> CreateAsync(CreateSupplierRequest request, int userId, CancellationToken ct)
 {
-    // Validate
-    if (string.IsNullOrWhiteSpace(request.Name))
-        return Result<SupplierDto>.Failure("اسم المورد مطلوب");
-
-    await using var transaction = await _uow.BeginTransactionAsync(ct);
-    try
+    return await _uow.ExecuteTransactionAsync<Result<SupplierDto>>(async () =>
     {
-        // 1. Auto-create account under parent "1320"
-        var accountId = await AutoCreateAccountAsync(request.Name, ct);
+        try
+        {
+            // 1. Auto-create account under parent "2101" (الموردون per AccountingSeeder)
+            var accountResult = await AutoCreateSupplierAccountAsync(request.Name, userId, ct);
+            if (!accountResult.IsSuccess)
+                return Result<SupplierDto>.Failure(accountResult.Error!, accountResult.ErrorCode);
 
-        // 2. Create supplier with direct fields
-        var supplier = Supplier.Create(
-            request.Name, request.Phone, request.Email,
-            request.Address, request.TaxNumber, request.Notes,
-            accountId, request.CreditLimit, request.CategoryId, currentUserId);
+            // 2. Create Supplier with ALL direct fields including Notes + CreditLimit
+            var supplier = Supplier.Create(
+                name: request.Name,
+                accountId: accountResult.Value,
+                phone: request.Phone,
+                email: request.Email,
+                address: request.Address,
+                taxNumber: request.TaxNumber,
+                notes: request.Notes,              // NEW — pass Notes
+                creditLimit: request.CreditLimit,   // NEW — pass CreditLimit
+                categoryId: request.CategoryId,
+                createdByUserId: userId);
 
-        await _uow.Suppliers.AddAsync(supplier, ct);
-        await _uow.SaveChangesAsync(ct);
-
-        await transaction.CommitAsync(ct);
-        return Result<SupplierDto>.Success(MapToDto(supplier));
-    }
-    catch (Exception ex)
-    {
-        await transaction.RollbackAsync(ct);
-        _logger.LogError(ex, "Failed to create supplier {Name}", request.Name);
-        return Result<SupplierDto>.Failure("حدث خطأ أثناء إنشاء المورد");
-    }
+            await _uow.Suppliers.AddAsync(supplier, ct);
+            await _uow.SaveChangesAsync(ct);
+            return Result<SupplierDto>.Success(MapToDto(supplier));
+        }
+        catch (DomainException ex)
+        {
+            return Result<SupplierDto>.Failure(ex.Message);
+        }
+    }, ct);
 }
 ```
 
 **⚠️ Cross-Phase Dependencies**:
-1. **Phase 22** (Chart of Accounts): Parent account `"1320 — الموردون"` must be seeded in AccountingSeeder
-2. If 1320 is not seeded, supplier creation returns `Result.Failure("الحساب الأب 1320 (الموردون) غير موجود")`
+1. **Phase 22** (Chart of Accounts): Parent account `"2101 — الموردون"` must be seeded in AccountingSeeder (it IS seeded under `"21"` Current Liabilities)
+2. If 2101 is not seeded, supplier creation returns `Result.Failure("لم يتم تهيئة دليل الحسابات بعد")`
+3. **Phase 18** (Accounting Foundation): `IAccountCodeGeneratorService` must be registered in DI for thread-safe code generation
 
 **Estimate**: ~1 hour (verification + any fixes)
 
@@ -1121,7 +1228,7 @@ public decimal CreditLimit
 │                                     │
 │ الحد الائتماني [___________]  0.00  │
 │                                     │
-│ الحساب المحاسبي: 13200001 — مورد نقدي│  (read-only, display after save)
+│ الحساب المحاسبي: 21010001 — مورد نقدي│  (read-only, display after save)
 │                                     │
 │ □ نشط                               │
 ├─────────────────────────────────────┤
@@ -1253,7 +1360,7 @@ public class CreateSupplierRequestValidator : AbstractValidator<CreateSupplierRe
 
 | File | Change |
 |------|--------|
-| `Infrastructure/Data/DbSeeder.cs` | Update default supplier creation with direct fields (no Party), AccountId auto-created under 1320 |
+| `Infrastructure/Data/DbSeeder.cs` | Update default supplier creation with direct fields (no Party), AccountId auto-created under "2101" (الموردون per AccountingSeeder) |
 
 **Seed update**:
 
@@ -1343,6 +1450,77 @@ if (!string.IsNullOrWhiteSpace(searchTerm))
 
 ---
 
+### Task 16 — Account Synchronization on Name/IsActive/MarkAsDeleted (per accounts summry.md)
+
+**Problem**: When a Supplier's name changes, the linked Account.NameAr is NOT updated. When a Supplier is deactivated/restored, the linked Account.IsActive is NOT synced. When a Supplier is hard-deleted, the linked Account is NOT MarkAsDeleted'd. This creates inconsistency between the operational entity and its accounting reflection.
+
+**Files**:
+
+| File | Change |
+|------|--------|
+| `Application/Services/SupplierService.cs` | Add `SyncAccountAsync()` private helper. Update `UpdateAsync`, `DeleteAsync`, `PermanentDeleteAsync` to call it |
+| `Application/Services/CustomerService.cs` | Same pattern — add `SyncAccountAsync()` for Customer-Account sync |
+
+**SupplierService changes**:
+
+```csharp
+// 1. UpdateAsync — add Account sync after supplier.Update()
+// Capture old values BEFORE supplier.Update():
+var oldName = supplier.Name;
+var oldIsActive = supplier.IsActive;
+// ... after supplier.Update() and IsActive toggle:
+await SyncAccountAsync(supplier.AccountId, request.Name, oldName, request.IsActive, oldIsActive, ct);
+
+// 2. DeleteAsync — deactivate linked Account before SoftDeleteAsync
+var account = await _uow.Accounts.GetByIdAsync(supplier.AccountId, ct);
+if (account != null && account.IsActive)
+{
+    account.Deactivate();
+    await _uow.Accounts.UpdateAsync(account, ct);
+}
+
+// 3. PermanentDeleteAsync — MarkAsDeleted linked Account before HardDeleteAsync
+var account = await _uow.Accounts.GetByIdAsync(supplier.AccountId, ct);
+if (account != null)
+{
+    account.MarkAsDeleted();
+    await _uow.Accounts.UpdateAsync(account, ct);
+}
+
+// 4. Private helper (same for CustomerService)
+private async Task SyncAccountAsync(
+    int accountId, string newName, string oldName,
+    bool newIsActive, bool oldIsActive, CancellationToken ct)
+{
+    var account = await _uow.Accounts.GetByIdAsync(accountId, ct);
+    if (account == null) return;
+
+    var nameChanged = newName != oldName;
+    var isActiveChanged = newIsActive != oldIsActive;
+
+    if (nameChanged)
+        account.Update(nameAr: newName, nameEn: newName, nature: account.Nature,
+            isLeaf: account.IsLeaf, parentId: account.ParentId, level: account.Level);
+
+    if (isActiveChanged)
+    {
+        if (newIsActive) account.Activate();
+        else account.Deactivate();
+    }
+
+    if (nameChanged || isActiveChanged)
+        await _uow.Accounts.UpdateAsync(account, ct);
+}
+```
+
+**CustomerService changes**: Identical pattern — `SyncAccountAsync` with Customer.AccountId.
+
+**Guard safety**: Linked accounts (Level-4 detail) are NOT system accounts and have no children — `Account.Update()`, `Activate()`, `Deactivate()`, `MarkAsDeleted()` all succeed without throwing.
+
+**Estimate**: ~1.5 hours
+
+---
+
 ### Task 15 — Comprehensive Unit Tests: Domain + Service + Validation + Config
 
 **Files**:
@@ -1379,7 +1557,7 @@ Test every `Create()` factory method with valid/invalid inputs:
 
 #### 15.2 — Service Tests (Mock<IUnitOfWork>)
 
-> Service test patterns follow existing mock-based tests in `SalesSystem.Application.Tests/Services/`. Key tests: CreateAsync with direct fields (success/empty name/negative credit limit), GetByIdAsync (found/not found), transaction rollback on exception, GetAllAsync paged results, soft delete, account auto-creation under 1320.
+> Service test patterns follow existing mock-based tests in `SalesSystem.Application.Tests/Services/`. Key tests: CreateAsync with direct fields (success/empty name/negative credit limit), GetByIdAsync (found/not found), transaction rollback on exception, GetAllAsync paged results, soft delete, account auto-creation under "2101" (الموردون).
 
 **Estimate**: ~3 hours
 
@@ -1403,7 +1581,7 @@ Test every `Create()` factory method with valid/invalid inputs:
 
 #### 15.5 — Phase-Specific Integration Tests
 
-> Integration test patterns follow `SalesSystem.Application.Tests/Services/SupplierServiceTests.cs`. Tests cover: account auto-creation under 1320 parent, transactional integrity with rollback on failure (RULE-281 — ExecuteTransactionAsync), AccountId FK eager loading.
+> Integration test patterns follow `SalesSystem.Application.Tests/Services/SupplierServiceTests.cs`. Tests cover: account auto-creation under "2101" parent, transactional integrity with rollback on failure (RULE-281 — ExecuteTransactionAsync), AccountId FK eager loading.
 
 **Estimate**: ~2 hours
 
@@ -1415,7 +1593,7 @@ Test every `Create()` factory method with valid/invalid inputs:
 | 15.2 Service Layer | `CreateAsync`, `GetByIdAsync`, transactions, rollback, auto-account | `SupplierServiceTests.cs` | 3 hours |
 | 15.3 FluentValidation | Name, CreditLimit, direct field rules (no PartyId) | `SupplierRequestValidatorTests.cs` | 1.5 hours |
 | 15.4 DB Config | Precision, MaxLength, Restrict FK, direct fields | `SupplierConfigurationTests.cs` | 1.5 hours |
-| 15.5 Phase-Specific | Account auto-creation under 1320, transactional flow | `SupplierServiceTests.cs` | 2 hours |
+| 15.5 Phase-Specific | Account auto-creation under "2101", transactional flow | `SupplierServiceTests.cs` | 2 hours |
 | **Total** | **5 sub-tasks** | **4 test files** | **~10 hours** |
 
 ---
@@ -1496,7 +1674,7 @@ Test every `Create()` factory method with valid/invalid inputs:
 | **RULE-449** | SupplierDto has AccountId + AccountName | ✅ | ✅ |
 | **RULE-450** | NO AccountId in Create/Update requests | Auto-created by service | ✅ |
 | **RULE-451** | NO OpeningBalance/SupplierType/AccountId in Desktop UI | Editor has no these fields | ✅ |
-| **RULE-452** | Account auto-created under 1320 parent | Service auto-creates under "1320 — الموردون" | ✅ |
+| **RULE-452** | Account auto-created under "2101" parent | Service auto-creates under "2101 — الموردون" (AccountingSeeder) | ✅ |
 | **RULE-453** | Seeder seeds "مورد نقدي" with auto-created account | ✅ | ✅ |
 | **RULE-454** | Phone regex `^05\d{8}$` + Email validation | In FluentValidators | ✅ |
 | **RULE-536** | Success/Error feedback on all operations | Toast + dialog per operation | ✅ |
@@ -1510,9 +1688,9 @@ Test every `Create()` factory method with valid/invalid inputs:
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | **Direct field migration drops PartyId FK** | **HIGH** — data loss if existing suppliers have Party records | Migration must: (1) copy Party.Name→Supplier.Name, Party.Phone→Supplier.Phone etc., (2) then drop PartyId column and FK |
-| **AccountId auto-creation fails if 1320 not seeded** | **HIGH** — supplier creation impossible | Ensure AccountingSeeder runs before SupplierSeeder. Guard with `if (parentAccount == null) return Result.Failure(...)` |
+| **AccountId auto-creation fails if "2101" not seeded** | **HIGH** — supplier creation impossible | Ensure AccountingSeeder runs before SupplierSeeder. Guard with `if (parentAccount == null) return Result.Failure(...)` |
 | **ExecuteAsync() refactor breaks existing behavior** | Medium — `DeleteSupplierAsync` and `RestoreSupplierAsync` also need refactoring | Test all 3 async methods after refactor (Task 5) |
-| **Chart of Accounts module not yet available** | Low — Account auto-creation depends on Phase 22 | Make 1320 parent check graceful: return descriptive error if missing |
+| **Chart of Accounts module not yet available** | Low — Account auto-creation depends on Phase 22 | Make 2101 parent check graceful: return descriptive error if missing |
 | **TaxNumber format validation too strict** | Low — some suppliers have different VAT formats | Use `MaximumLength(30)` only, make regex optional |
 | **Balance color coding in DataGrid** | Low — WPF limitation with decimal DataTriggers | Use `IValueConverter` for BalanceToColorConverter |
 | **UI compact fixes break existing layout** | Low — removing `Border Height="12"` spacers changes vertical spacing | Test all editor forms visually after compact fixes |
@@ -1547,6 +1725,11 @@ The following patterns are FORBIDDEN in the Suppliers module:
 ❌ CanExecute predicates on Commands — buttons always enabled (RULE-059)
 ❌ MessageBox.Show — use IDialogService (RULE-054)
 ❌ Manual try/catch/finally in ViewModels — use ExecuteAsync() (RULE-141)
+❌ Supplier name changed WITHOUT updating linked Account.NameAr — must sync in same transaction (per accounts summry.md)
+❌ Supplier deactivated WITHOUT deactivating linked Account — must sync IsActive in same transaction
+❌ Supplier restored WITHOUT restoring linked Account — must sync IsActive in same transaction
+❌ Supplier hard-deleted WITHOUT MarkAsDeleted on linked Account — must sync in same transaction
+❌ Account sync in separate transaction — must be atomic with supplier operation (ExecuteTransactionAsync)
 ```
 
 ---
@@ -1556,7 +1739,7 @@ The following patterns are FORBIDDEN in the Suppliers module:
 | Scenario | Action |
 |----------|--------|
 | **Direct field migration causes data loss** | Rollback migration: DROP new columns, ADD PartyId FK back. SQL: `ALTER TABLE Suppliers ADD PartyId int NOT NULL` + restore Party records |
-| **AccountId auto-creation fails for existing suppliers** | `UPDATE Suppliers SET AccountId = NULL WHERE AccountId IN (SELECT Id FROM Accounts WHERE Code LIKE '1320%')` manually relink |
+| **AccountId auto-creation fails for existing suppliers** | `UPDATE Suppliers SET AccountId = NULL WHERE AccountId IN (SELECT Id FROM Accounts WHERE AccountCode LIKE '2101%')` manually relink |
 | **CreditLimit validation too strict** | Remove `GreaterThanOrEqualTo(0)` from validator |
 | **SupplierListViewModel ExecuteAsync refactor breaks** | Revert to original `try/catch/finally` pattern, re-apply with full testing |
 | **New endpoints cause routing conflicts** | Remove 3 new endpoints from SuppliersController — no breaking change to existing endpoints |
@@ -1570,7 +1753,7 @@ The following patterns are FORBIDDEN in the Suppliers module:
 | Task | Description | Files Changed | Estimate |
 |------|-------------|---------------|----------|
 | **Task 1** | Refactor Supplier: direct contact fields (remove PartyId) + CreditLimit | 8+ | 3 hours |
-| **Task 2** | Verify auto-account creation under parent "1320" | 1 | 1 hour |
+| **Task 2** | Fix auto-account creation: parent "2101" + IAccountCodeGeneratorService + ColorCode | 1 | 1 hour |
 | **Task 3** | Add CreditLimit + balance report service methods | 3 | 1 hour |
 | **Task 4** | Add 3 new report endpoints to API | 1 | 30 min |
 | **Task 5** | Fix SupplierListViewModel ExecuteAsync pattern | 1 | 1.5 hours |
@@ -1584,13 +1767,14 @@ The following patterns are FORBIDDEN in the Suppliers module:
 | **Task 13** | Enhanced search by Account + direct fields | 1 | 30 min |
 | **Task 14** | Verify EventBus integration | 0 | 0 min |
 | **Task 15** | Comprehensive unit tests (5 sub-tasks) | 4 | 10 hours |
-| **Total** | **15 tasks** | **~29 files** | **~25 hours** |
+| **Task 16** | Account sync on Name/IsActive/MarkAsDeleted | 2 | 1.5 hours |
+| **Total** | **16 tasks** | **~31 files** | **~26.5 hours** |
 
 ### Key Metrics
 
 - **REMOVED**: PartyId, Party entity reference, SupplierType enum, SupplierGroup references
 - **ADDED**: Direct fields (Name, Phone, Email, Address, TaxNumber, Notes, CreditLimit) on Supplier
-- **KEPT**: AccountId (mandatory, auto-created under 1320), CategoryId (optional)
+- **KEPT**: AccountId (mandatory, auto-created under "2101" — الموردون per AccountingSeeder), CategoryId (optional)
 - **New DTOs**: 3 (`SupplierBalanceReportDto`, `CreditLimitUsageDto`, `SupplierTransactionDto`)
 - **New properties on Supplier**: 7 (Name, Phone, Email, Address, TaxNumber, Notes, CreditLimit) — replacing PartyId
 - **New API endpoints**: 3 (balance-summary, credit-limit, transactions)
@@ -1604,7 +1788,9 @@ The following patterns are FORBIDDEN in the Suppliers module:
 ```
 Task 1  (Remove PartyId, add direct fields + CreditLimit)
   ↓
-Task 2  (Verify auto-account under 1320)
+Task 2  (Fix auto-account under 2101 + AccountCodeGeneratorService + ColorCode)
+  ↓
+Task 16 (Account sync on Name/IsActive/MarkAsDeleted — Supplier + Customer)
   ↓
 Task 3-4 (Service + API methods)
     ↓

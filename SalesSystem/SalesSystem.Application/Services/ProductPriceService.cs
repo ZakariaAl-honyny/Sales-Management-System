@@ -10,7 +10,7 @@ using SalesSystem.Domain.Exceptions;
 namespace SalesSystem.Application.Services;
 
 /// <summary>
-/// Service to manage product prices — lookup, CRUD, and multi-currency pricing.
+/// Service to manage product prices — lookup, CRUD, and single-currency pricing.
 /// </summary>
 public interface IProductPriceService
 {
@@ -19,17 +19,11 @@ public interface IProductPriceService
     /// </summary>
     Task<Result<decimal>> GetPriceByUnitAsync(int productId, UnitType unitType, CancellationToken ct = default);
 
-    // ─── Effective Price with Fallback Chain (Phase 25) ────
-
     /// <summary>
-    /// Gets the effective price for a product unit with the configured fallback chain:
-    /// 1. Exact match (ProductUnitId + CurrencyId + effective date)
-    /// 2. Base currency conversion (price in base currency → convert via exchange rate)
-    /// 3. Returns Failure with Arabic message if nothing found
+    /// Gets the effective price for a product unit on a given date.
     /// </summary>
     Task<Result<EffectivePriceDto>> GetEffectivePriceAsync(
         int productUnitId,
-        int currencyId,
         DateTime? effectiveDate = null,
         CancellationToken ct = default);
 
@@ -38,10 +32,7 @@ public interface IProductPriceService
     /// </summary>
     Task<Result<EffectivePriceDto>> GetEffectivePriceForInvoiceAsync(
         int productUnitId,
-        int currencyId,
         CancellationToken ct = default);
-
-    // ─── CRUD Operations (Phase 25) ─────────────────────────
 
     /// <summary>
     /// Gets all active prices for a specific product unit.
@@ -107,16 +98,9 @@ public class ProductPriceService : IProductPriceService
             // Unit type is legacy — use flat price lookup without PriceLevel
             var saleMode = unitType == UnitType.Wholesale ? SaleMode.Wholesale : SaleMode.Retail;
 
-            // Look up the base currency for this lookup
-            var baseCurrency = await _uow.Currencies.FirstOrDefaultAsync(
-                c => c.IsBaseCurrency && c.IsActive, ct);
-            var currencyId = baseCurrency?.Id ?? 1; // fallback to currency ID 1 if no base currency found
-
-            // Prices are on ProductUnit → ProductPrice (no direct Product → Price FK).
-            // Use the fallback chain for reliable lookup.
+            // Look up the effective price for the base unit
             var effectiveResult = await GetEffectivePriceAsync(
                 baseUnit.Id,
-                currencyId,
                 DateTime.UtcNow,
                 ct);
 
@@ -128,10 +112,8 @@ public class ProductPriceService : IProductPriceService
             }
 
             _logger.LogInformation(
-                "GetPriceByUnitAsync: Product {ProductId}, SaleMode {SaleMode}, Price = {Price}" +
-                (effectiveResult.Value!.IsConverted ? " (converted from {OriginalCurrency})" : ""),
-                productId, saleMode, effectiveResult.Value.Price,
-                effectiveResult.Value.OriginalCurrencyCode);
+                "GetPriceByUnitAsync: Product {ProductId}, SaleMode {SaleMode}, Price = {Price}",
+                productId, saleMode, effectiveResult.Value!.Price);
 
             return Result<decimal>.Success(effectiveResult.Value.Price);
         }
@@ -143,12 +125,11 @@ public class ProductPriceService : IProductPriceService
     }
 
     // ═══════════════════════════════════════════
-    //  Effective Price with Fallback Chain
+    //  Effective Price Lookup
     // ═══════════════════════════════════════════
 
     public async Task<Result<EffectivePriceDto>> GetEffectivePriceAsync(
         int productUnitId,
-        int currencyId,
         DateTime? effectiveDate = null,
         CancellationToken ct = default)
     {
@@ -156,79 +137,28 @@ public class ProductPriceService : IProductPriceService
         {
             var date = effectiveDate ?? DateTime.UtcNow;
             _logger.LogDebug(
-                "GetEffectivePrice: Unit={ProductUnitId}, Currency={CurrencyId}, Date={Date}",
-                productUnitId, currencyId, date);
+                "GetEffectivePrice: Unit={ProductUnitId}, Date={Date}",
+                productUnitId, date);
 
-            // ─── Step 1: Exact match (ProductUnitId + CurrencyId + date) ─
+            // Look up price by ProductUnitId + effective date
             var exactPrice = await _uow.ProductPrices.FirstOrDefaultAsync(
                 pp => pp.ProductUnitId == productUnitId
-                   && pp.CurrencyId == currencyId
                    && pp.EffectiveFrom <= date
                    && (!pp.EffectiveTo.HasValue || pp.EffectiveTo.Value >= date),
-                ct, "ProductUnit", "Currency");
+                ct, "ProductUnit");
 
             if (exactPrice != null)
             {
                 _logger.LogInformation(
-                    "Effective price found (exact): Unit={ProductUnitId}, Currency={CurrencyId}, Price={Price}",
-                    productUnitId, currencyId, exactPrice.Price);
+                    "Effective price found: Unit={ProductUnitId}, Price={Price}",
+                    productUnitId, exactPrice.Price);
                 return Result<EffectivePriceDto>.Success(MapToEffectiveDto(exactPrice));
             }
 
-            // ─── Step 2: Base currency conversion ────────────────────
-            var baseCurrency = await _uow.Currencies.FirstOrDefaultAsync(
-                c => c.IsBaseCurrency && c.IsActive, ct);
-
-            if (baseCurrency != null && baseCurrency.Id != currencyId)
-            {
-                // Try in base currency
-                var basePrice = await _uow.ProductPrices.FirstOrDefaultAsync(
-                    pp => pp.ProductUnitId == productUnitId
-                       && pp.CurrencyId == baseCurrency.Id
-                   && pp.EffectiveFrom <= date
-                   && (!pp.EffectiveTo.HasValue || pp.EffectiveTo.Value >= date),
-                    ct, "Currency");
-
-                if (basePrice != null)
-                {
-                    // Target currency must have a valid exchange rate
-                    var targetCurrency = await _uow.Currencies.GetByIdAsync(currencyId, ct);
-                    if (targetCurrency != null)
-                    {
-                        // Convert: base_price / target_exchange_rate = price in target currency
-                        // Note: Exchange rates are stored in CurrencyExchangeRate table,
-                        // assuming 1:1 fallback for now
-                        var exchangeRate = 1m;
-                        var convertedPrice = Math.Round(
-                            basePrice.Price / exchangeRate, 2);
-
-                        var fallbackMsg = $"تم التحويل من {baseCurrency.Code} بسعر صرف {exchangeRate}";
-
-                        _logger.LogInformation(
-                            "Effective price found (base currency conversion): Unit={ProductUnitId}, " +
-                            "Price in {BaseCurrency}={BasePrice}, Converted to {TargetCurrency}={ConvertedPrice}, Rate={Rate}",
-                            productUnitId, baseCurrency.Code, basePrice.Price,
-                            targetCurrency.Code, convertedPrice, exchangeRate);
-
-                        return Result<EffectivePriceDto>.Success(new EffectivePriceDto(
-                            productUnitId,
-                            currencyId,
-                            targetCurrency.Code,
-                            targetCurrency.Name,
-                            convertedPrice,
-                            basePrice.Price,
-                            baseCurrency.Id,
-                            baseCurrency.Code,
-                            baseCurrency.Name,
-                            fallbackMsg));
-                    }
-                }
-            }
-
-            // ─── Step 3: Not found ───────────────────────────────────
+            // Not found
             _logger.LogWarning(
-                "No effective price found: Unit={ProductUnitId}, Currency={CurrencyId}",
-                productUnitId, currencyId);
+                "No effective price found: Unit={ProductUnitId}",
+                productUnitId);
             return Result<EffectivePriceDto>.Failure(
                 "لا يوجد سعر محدد لهذه التركيبة — يرجى إدخال السعر يدوياً",
                 ErrorCodes.NotFound);
@@ -236,18 +166,17 @@ public class ProductPriceService : IProductPriceService
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "Error getting effective price for unit {ProductUnitId}, currency {CurrencyId}",
-                productUnitId, currencyId);
+                "Error getting effective price for unit {ProductUnitId}",
+                productUnitId);
             return Result<EffectivePriceDto>.Failure("حدث خطأ أثناء استرجاع السعر الفعال");
         }
     }
 
     public async Task<Result<EffectivePriceDto>> GetEffectivePriceForInvoiceAsync(
         int productUnitId,
-        int currencyId,
         CancellationToken ct = default)
     {
-        return await GetEffectivePriceAsync(productUnitId, currencyId, DateTime.UtcNow, ct);
+        return await GetEffectivePriceAsync(productUnitId, DateTime.UtcNow, ct);
     }
 
     // ═══════════════════════════════════════════
@@ -262,7 +191,7 @@ public class ProductPriceService : IProductPriceService
                 p => p.ProductUnitId == productUnitId,
                 q => q.OrderByDescending(p => p.EffectiveFrom),
                 ct,
-                includePaths: new[] { "ProductUnit", "ProductUnit.Unit", "Currency" });
+                includePaths: new[] { "ProductUnit", "ProductUnit.Unit" });
 
             var dtos = prices.Select(MapToDto).ToList();
             return Result<List<ProductPriceDto>>.Success(dtos);
@@ -279,7 +208,7 @@ public class ProductPriceService : IProductPriceService
         try
         {
             var price = await _uow.ProductPrices.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "ProductUnit", "ProductUnit.Unit", "Currency");
+                p => p.Id == id, ct, "ProductUnit", "ProductUnit.Unit");
 
             if (price == null)
                 return Result<ProductPriceDto>.Failure("السعر غير موجود", ErrorCodes.NotFound);
@@ -302,14 +231,8 @@ public class ProductPriceService : IProductPriceService
             if (productUnit == null)
                 return Result<ProductPriceDto>.Failure("وحدة المنتج غير موجودة", ErrorCodes.NotFound);
 
-            // Validate currency exists
-            var currency = await _uow.Currencies.GetByIdAsync(request.CurrencyId, ct);
-            if (currency == null)
-                return Result<ProductPriceDto>.Failure("العملة غير موجودة", ErrorCodes.NotFound);
-
             var productPrice = ProductPrice.Create(
                 request.ProductUnitId,
-                (short)request.CurrencyId,
                 request.Price,
                 request.EffectiveFrom,
                 request.EffectiveTo,
@@ -319,8 +242,8 @@ public class ProductPriceService : IProductPriceService
             await _uow.SaveChangesAsync(ct);
 
             _logger.LogInformation(
-                "Product price created: Unit={ProductUnitId}, Currency={CurrencyId}, Price={Price} by User {UserId}",
-                request.ProductUnitId, request.CurrencyId, request.Price, userId);
+                "Product price created: Unit={ProductUnitId}, Price={Price} by User {UserId}",
+                request.ProductUnitId, request.Price, userId);
 
             return await GetByIdAsync(productPrice.Id, ct);
         }
@@ -343,8 +266,6 @@ public class ProductPriceService : IProductPriceService
             var price = await _uow.ProductPrices.GetByIdAsync(id, ct);
             if (price == null)
                 return Result<ProductPriceDto>.Failure("السعر غير موجود", ErrorCodes.NotFound);
-
-            var oldPrice = price.Price;
 
             // Update price, effective from, and effective to via domain method
             price.UpdatePrice(request.Price, request.EffectiveFrom, request.EffectiveTo, userId);
@@ -396,23 +317,13 @@ public class ProductPriceService : IProductPriceService
         price.Id,
         price.ProductUnitId,
         price.ProductUnit?.Unit?.Name ?? price.ProductUnitId.ToString(),
-        price.CurrencyId,
-        price.Currency?.Code,
-        price.Currency?.Name,
         price.Price,
         price.EffectiveFrom,
         price.EffectiveTo);
 
     private static EffectivePriceDto MapToEffectiveDto(ProductPrice price, string? fallbackDescription = null) => new(
         price.ProductUnitId,
-        price.CurrencyId,
-        price.Currency?.Code,
-        price.Currency?.Name,
         price.Price,
-        null, // OriginalPrice
-        null, // OriginalCurrencyId
-        null, // OriginalCurrencyCode
-        null, // OriginalCurrencyName
+        null, // OriginalPrice — single-currency, no conversion
         fallbackDescription);
-
 }

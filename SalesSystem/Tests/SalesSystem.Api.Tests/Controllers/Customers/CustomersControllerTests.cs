@@ -110,7 +110,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedCustomer()
     {
-        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
+        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, CreditLimit: 0.00m, IsActive: true);
         var updatedCustomer = CreateCustomerDto(1);
         CustomerServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedCustomer));
@@ -123,7 +123,7 @@ public class CustomersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenCustomerNotFound_ReturnsBadRequest()
     {
-        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, 0.00m, true);
+        var request = new UpdateCustomerRequest("عميل محدث", null, null, null, null, CreditLimit: 0.00m, IsActive: true);
         CustomerServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<CustomerDto>("العميل غير موجود"));
 

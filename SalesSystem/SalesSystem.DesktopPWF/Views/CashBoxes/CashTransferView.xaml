@@ -4,10 +4,11 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
-      mc:Ignorable="d"
-     
-      FlowDirection="RightToLeft"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
+      
+       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
     <i:Interaction.Triggers>
@@ -83,7 +84,8 @@
                         <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
                         <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource ModernTextBox}"
-                                 ToolTip="مبلغ التحويل — يجب أن يكون أكبر من صفر"/>
+                                 ToolTip="مبلغ التحويل — يجب أن يكون أكبر من صفر"
+                                 helpers:InputHelper.NumericOnly="True"/>
                     </StackPanel>
 
                     <!-- Notes -->

@@ -175,7 +175,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         if (IsEditMode)
         {
             var updateRequest = new UpdateWarehouseRequest(
-                BranchId: (short)1,
                 Name,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
@@ -187,7 +186,6 @@ public class WarehouseEditorViewModel : ViewModelBase
         else
         {
             var createRequest = new CreateWarehouseRequest(
-                BranchId: (short)1,
                 Name,
                 Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 Address: string.IsNullOrWhiteSpace(Address) ? null : Address,

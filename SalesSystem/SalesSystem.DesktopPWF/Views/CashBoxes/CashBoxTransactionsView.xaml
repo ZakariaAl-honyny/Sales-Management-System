@@ -4,10 +4,11 @@
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
-      mc:Ignorable="d"
-     
-      FlowDirection="RightToLeft"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.CashBoxes"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
+      
+       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
     <i:Interaction.Triggers>
@@ -44,7 +45,8 @@
                             <TextBox Text="{Binding ExpenseAmount, UpdateSourceTrigger=PropertyChanged}"
                                      Width="120"
                                      Style="{StaticResource ModernTextBox}"
-                                     ToolTip="أدخل مبلغ المصروف المراد تسجيله"/>
+                                     ToolTip="أدخل مبلغ المصروف المراد تسجيله"
+                                     helpers:InputHelper.NumericOnly="True"/>
                         </StackPanel>
                     </Border>
 

@@ -13,14 +13,12 @@ public class ExpenseEditorViewModel : ViewModelBase
     private readonly IExpenseApiService _expenseService;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
-
     private int _expenseId;
     private int _expenseNo;
     private DateTime _expenseDate = DateTime.Today;
     private int _expenseAccountId;
     private string? _expenseAccountName;
     private int _cashBoxId;
-    private int _currencyId;
     private decimal _amount;
     private string? _notes;
     private bool _isEditMode;
@@ -95,21 +93,6 @@ public class ExpenseEditorViewModel : ViewModelBase
         }
     }
 
-    public int CurrencyId
-    {
-        get => _currencyId;
-        set
-        {
-            if (SetProperty(ref _currencyId, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(CurrencyId), "يجب اختيار العملة");
-                else
-                    ClearErrors(nameof(CurrencyId));
-            }
-        }
-    }
-
     public decimal Amount
     {
         get => _amount;
@@ -156,7 +139,6 @@ public class ExpenseEditorViewModel : ViewModelBase
         _expenseAccountId = expense.ExpenseAccountId;
         _expenseAccountName = expense.ExpenseAccountName;
         _cashBoxId = expense.CashBoxId;
-        _currencyId = expense.CurrencyId;
         _amount = expense.Amount;
         _notes = expense.Notes;
         _isEditMode = true;
@@ -171,9 +153,6 @@ public class ExpenseEditorViewModel : ViewModelBase
 
         if (CashBoxId <= 0)
             AddError(nameof(CashBoxId), "يجب اختيار الصندوق");
-
-        if (CurrencyId <= 0)
-            AddError(nameof(CurrencyId), "يجب اختيار العملة");
 
         if (Amount <= 0)
             AddError(nameof(Amount), "المبلغ يجب أن يكون أكبر من صفر");
@@ -193,7 +172,6 @@ public class ExpenseEditorViewModel : ViewModelBase
                 ExpenseDate: ExpenseDate,
                 ExpenseAccountId: ExpenseAccountId,
                 CashBoxId: CashBoxId,
-                CurrencyId: CurrencyId,
                 Amount: Amount,
                 Notes: Notes);
 
@@ -216,7 +194,6 @@ public class ExpenseEditorViewModel : ViewModelBase
                 ExpenseDate: ExpenseDate,
                 ExpenseAccountId: ExpenseAccountId,
                 CashBoxId: CashBoxId,
-                CurrencyId: CurrencyId,
                 Amount: Amount,
                 Notes: Notes);
 

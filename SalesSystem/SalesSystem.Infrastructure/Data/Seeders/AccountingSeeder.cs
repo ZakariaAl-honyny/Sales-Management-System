@@ -127,7 +127,7 @@ public static class AccountingSeeder
         var level3 = new List<Account>();
 
         // Under "11" Current Assets
-        level3.Add(Account.Create("1101", "النقدية", "Cash & Cash Equivalents",
+        level3.Add(Account.Create("1101", "النقدية صناديق", "Cash & Cash Equivalents",
             nature: (byte)AccountType.Asset, isLeaf: false, parentId: l2["11"].Id, level: 3,
             description: "يشمل النقدية الموجودة في صندوق المنشأة والبنوك وما في حكمها من أموال سائلة.",
             colorCode: assetColor));
@@ -271,17 +271,6 @@ public static class AccountingSeeder
         level4.Add(Account.Create("11010002", "صندوق المصروفات النثرية", "Petty Cash",
             nature: (byte)AccountType.Asset, isLeaf: true, parentId: l3["1101"].Id, level: 4,
             description: "يمثل المبلغ المخصص للمصروفات اليومية الصغيرة والنثرية.",
-            colorCode: assetColor));
-
-        // Under "1102" Bank Accounts
-        level4.Add(Account.Create("11020001", "البنك الأهلي", "National Bank",
-            nature: (byte)AccountType.Asset, isLeaf: true, parentId: l3["1102"].Id, level: 4,
-            description: "الحساب الجاري لدى البنك الأهلي.",
-            colorCode: assetColor));
-
-        level4.Add(Account.Create("11020002", "بنك الرياض", "Riyad Bank",
-            nature: (byte)AccountType.Asset, isLeaf: true, parentId: l3["1102"].Id, level: 4,
-            description: "الحساب الجاري لدى بنك الرياض.",
             colorCode: assetColor));
 
         // Under "1103" Accounts Receivable
@@ -526,10 +515,6 @@ public static class AccountingSeeder
             SystemAccountMapping.Create(
                 SystemAccountKey.DefaultCash.ToString(),
                 allAccounts["11010001"].Id),  // الصندوق
-
-            SystemAccountMapping.Create(
-                SystemAccountKey.DefaultBank.ToString(),
-                allAccounts["11020001"].Id),  // البنك الأهلي
 
             SystemAccountMapping.Create(
                 SystemAccountKey.AccountsReceivable.ToString(),

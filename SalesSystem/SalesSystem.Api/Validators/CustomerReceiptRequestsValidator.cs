@@ -13,11 +13,11 @@ public class CreateCustomerReceiptRequestValidator : AbstractValidator<CreateCus
         RuleFor(x => x.CashBoxId)
             .GreaterThan(0).WithMessage("معرف الخزنة مطلوب");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).WithMessage("معرف العملة مطلوب");
-
         RuleFor(x => x.Amount)
             .GreaterThan(0).WithMessage("المبلغ يجب أن يكون أكبر من صفر");
+
+        RuleFor(x => x.PaymentMethod)
+            .InclusiveBetween((byte)1, (byte)4).WithMessage("طريقة الدفع يجب أن تكون بين 1 (نقدي) و 4 (بطاقة ائتمان)");
     }
 }
 

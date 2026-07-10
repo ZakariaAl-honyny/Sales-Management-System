@@ -106,7 +106,7 @@ public class CashBoxServiceTests
 
         // Create parent account (1110 — النقدية, Level 3)
         var parentAccount = Account.Create(
-            "1110", "النقدية", "Cash", AccountType.Asset, 3,
+            "1101", "النقدية", "Cash", AccountType.Asset, 3,
             null, true, "النقدية بالصندوق", "#2196F3",
             false, 0m, null, null, 1);
         typeof(Entity).GetProperty("Id")!.SetValue(parentAccount, 10);

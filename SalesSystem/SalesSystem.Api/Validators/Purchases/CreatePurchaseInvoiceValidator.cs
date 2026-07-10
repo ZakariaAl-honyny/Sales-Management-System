@@ -1,4 +1,5 @@
 using FluentValidation;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators.Purchases;
@@ -32,6 +33,22 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
         RuleFor(x => x.OtherCharges)
             .GreaterThanOrEqualTo(0).WithMessage("مصاريف إضافية لا يمكن أن تكون سالبة");
 
+        RuleFor(x => x.DiscountType)
+            .IsInEnum().When(x => x.DiscountType.HasValue)
+            .WithMessage("نوع الخصم غير صحيح");
+
+        RuleFor(x => x.DiscountRate)
+            .GreaterThan(0).When(x => x.DiscountType.HasValue && x.DiscountType.Value == DiscountType.Percentage)
+            .WithMessage("نسبة الخصم يجب أن تكون أكبر من صفر");
+
+        RuleFor(x => x.DiscountRate)
+            .LessThanOrEqualTo(100).When(x => x.DiscountType.HasValue && x.DiscountType.Value == DiscountType.Percentage)
+            .WithMessage("نسبة الخصم يجب أن تكون أقل من أو تساوي 100");
+
+        RuleFor(x => x.AttachmentPath)
+            .MaximumLength(255).When(x => x.AttachmentPath != null)
+            .WithMessage("رابط المرفق لا يمكن أن يتجاوز 255 حرف");
+
         RuleFor(x => x.PaymentType)
             .IsInEnum().WithMessage("نوع الدفع غير صحيح");
 
@@ -42,19 +59,6 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)
             .WithMessage("الملاحظات لا يمكن أن تتجاوز 500 حرف");
-
-        // Currency rules
-        RuleFor(x => (int)x.CurrencyId!.Value)
-            .GreaterThan(0).When(x => x.CurrencyId.HasValue)
-            .WithMessage("العملة غير صحيحة");
-
-        RuleFor(x => x.ExchangeRate)
-            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
-
-        RuleFor(x => x.ExchangeRate)
-            .NotNull().When(x => x.CurrencyId.HasValue)
-            .WithMessage("يجب تحديد سعر الصرف عند اختيار عملة أجنبية");
 
         RuleFor(x => x.Items)
             .NotEmpty().WithMessage("يجب إضافة صنف واحد على الأقل");
@@ -72,6 +76,18 @@ public class CreatePurchaseInvoiceValidator : AbstractValidator<CreatePurchaseIn
 
             item.RuleFor(i => i.UnitPrice)
                 .GreaterThanOrEqualTo(0).WithMessage("السعر لا يمكن أن يكون سالباً");
+
+            item.RuleFor(i => i.DiscountType)
+                .IsInEnum().When(i => i.DiscountType.HasValue)
+                .WithMessage("نوع الخصم في الصنف غير صحيح");
+
+            item.RuleFor(i => i.DiscountRate)
+                .GreaterThan(0).When(i => i.DiscountType.HasValue && i.DiscountType.Value == DiscountType.Percentage)
+                .WithMessage("نسبة الخصم في الصنف يجب أن تكون أكبر من صفر");
+
+            item.RuleFor(i => i.DiscountRate)
+                .LessThanOrEqualTo(100).When(i => i.DiscountType.HasValue && i.DiscountType.Value == DiscountType.Percentage)
+                .WithMessage("نسبة الخصم في الصنف يجب أن تكون أقل من أو تساوي 100");
         });
     }
 }

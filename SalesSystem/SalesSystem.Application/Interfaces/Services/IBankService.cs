@@ -11,4 +11,6 @@ public interface IBankService
     Task<Result<BankDto>> CreateAsync(CreateBankRequest request, int userId, CancellationToken ct);
     Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request, int userId, CancellationToken ct);
     Task<Result> DeactivateAsync(int id, CancellationToken ct);
+    Task<Result> PermanentDeleteAsync(int id, CancellationToken ct);
+    Task<Result> RestoreAsync(int id, CancellationToken ct);
 }

@@ -25,9 +25,6 @@ public class SalesQuotation : AuditableEntity
     public DateTime? ValidUntil { get; private set; }
     public int CustomerId { get; private set; }
     public short WarehouseId { get; private set; }
-    public short CurrencyId { get; private set; }
-    /// <summary>Exchange rate if CurrencyId is not the base currency.</summary>
-    public decimal? ExchangeRate { get; private set; }
     /// <summary>Cash=1, Credit=2 (default Cash).</summary>
     public PaymentType PaymentType { get; private set; }
     /// <summary>Sum of all line totals BEFORE discount and tax.</summary>
@@ -52,7 +49,6 @@ public class SalesQuotation : AuditableEntity
     // ─── Navigation Properties ─────────────────────────────────────────
     public virtual Customer? Customer { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
-    public virtual Currency? Currency { get; private set; }
     public IReadOnlyCollection<SalesQuotationItem> Items => _items.AsReadOnly();
 
     // ─── Constructors ──────────────────────────────────────────────────
@@ -62,10 +58,8 @@ public class SalesQuotation : AuditableEntity
         int quotationNo,
         int customerId,
         short warehouseId,
-        short currencyId,
         DateTime? quotationDate = null,
         DateTime? validUntil = null,
-        decimal? exchangeRate = null,
         PaymentType paymentType = PaymentType.Cash,
         decimal discountAmount = 0,
         decimal taxAmount = 0,
@@ -79,24 +73,18 @@ public class SalesQuotation : AuditableEntity
             throw new DomainException("العميل مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("العملة مطلوبة.");
         if (discountAmount < 0)
             throw new DomainException("الخصم لا يمكن أن يكون سالباً.");
         if (taxAmount < 0)
             throw new DomainException("الضريبة لا يمكن أن تكون سالبة.");
-        if (currencyId > 0 && !exchangeRate.HasValue)
-            throw new DomainException("يجب تحديد سعر الصرف عند اختيار العملة.");
 
         var quotation = new SalesQuotation
         {
             QuotationNo = quotationNo,
             CustomerId = customerId,
             WarehouseId = warehouseId,
-            CurrencyId = currencyId,
             QuotationDate = quotationDate ?? DateTime.UtcNow,
             ValidUntil = validUntil,
-            ExchangeRate = exchangeRate,
             PaymentType = paymentType,
             DiscountAmount = discountAmount,
             TaxAmount = taxAmount,

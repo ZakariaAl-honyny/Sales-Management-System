@@ -15,7 +15,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.UserName).IsRequired().HasMaxLength(50);
         builder.HasIndex(u => u.UserName).IsUnique();
         builder.Property(u => u.PasswordHash).IsRequired().HasMaxLength(256);
-        builder.Property(u => u.EmployeeId).IsRequired(false);
 
         // Lock state — bit flag, default unlocked
         builder.Property(u => u.IsLocked).IsRequired().HasDefaultValue(false);
@@ -23,28 +22,19 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         // Password policy
         builder.Property(u => u.MustChangePassword).IsRequired().HasDefaultValue(true);
         builder.Property(u => u.LoginAttempts).IsRequired().HasDefaultValue(0);
+
+        // PermissionsMask — bitmask of granted permissions (0 = none)
+        builder.Property(u => u.PermissionsMask).IsRequired().HasDefaultValue(0L);
+
         builder.Property(u => u.LastLoginAt).IsRequired(false);
 
         // Query filter — soft delete via IsActive (from ActivatableEntity)
         builder.HasQueryFilter(u => u.IsActive);
 
-        // FK to Employee (optional)
-        builder.HasOne<Employee>()
-            .WithMany()
-            .HasForeignKey(u => u.EmployeeId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired(false);
-
         // Navigation: UserRoles (many-to-many via join table)
         builder.HasMany(u => u.UserRoles)
             .WithOne(ur => ur.User)
             .HasForeignKey(ur => ur.UserId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // Navigation: UserBranches (many-to-many via join table)
-        builder.HasMany(u => u.UserBranches)
-            .WithOne(ub => ub.User)
-            .HasForeignKey(ub => ub.UserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

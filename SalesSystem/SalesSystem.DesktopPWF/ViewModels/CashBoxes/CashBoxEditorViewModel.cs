@@ -9,7 +9,7 @@ namespace SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 
 /// <summary>
 /// Editor ViewModel for creating and updating cash boxes.
-/// Schema §4.3: lightweight register with Name, BranchId, AccountId, Description.
+/// Schema §4.3: lightweight register with Name, AccountId, Description.
 /// Balance tracked on linked Account, not here.
 /// </summary>
 public class CashBoxEditorViewModel : ViewModelBase
@@ -24,7 +24,6 @@ public class CashBoxEditorViewModel : ViewModelBase
     private int? _accountId;
     private bool _isAccountAutoCreated = true;
     private string? _accountInfo;
-    private short _branchId;
     private string? _description;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -92,12 +91,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountInfo, value);
     }
 
-    public short BranchId
-    {
-        get => _branchId;
-        set => SetProperty(ref _branchId, value);
-    }
-
     public string? Description
     {
         get => _description;
@@ -135,7 +128,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         string name,
         int? accountId,
         string? accountName,
-        short branchId,
         string? description)
     {
         _editingId = id;
@@ -143,7 +135,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         AccountId = accountId;
         IsAccountAutoCreated = accountId == null;
         AccountInfo = accountName ?? "سيتم إنشاء حساب تلقائي";
-        BranchId = branchId;
         Description = description;
         IsEditMode = true;
     }
@@ -180,7 +171,6 @@ public class CashBoxEditorViewModel : ViewModelBase
         var request = new CreateCashBoxRequest(
             Name.Trim(),
             requestAccountId,
-            BranchId,
             string.IsNullOrWhiteSpace(Description) ? null : Description.Trim());
 
         var result = await _cashBoxService.CreateAsync(request);
@@ -210,7 +200,6 @@ public class CashBoxEditorViewModel : ViewModelBase
 
         var request = new UpdateCashBoxRequest(
             Name.Trim(),
-            BranchId,
             string.IsNullOrWhiteSpace(Description) ? null : Description.Trim());
 
         var result = await _cashBoxService.UpdateAsync(id, request);

@@ -478,3 +478,133 @@ Desktop permission tag: `"Currencies"` — uses `_sessionService.CanAccess(Permi
 | **Rate precision loss on payment entities** | Low | `.HasPrecision(18, 2)` on ExchangeRate fields (fixed v4.6.8) |
 | **BeginTransactionAsync crash** | Low | Removed all manual transactions (fixed v4.6.8) |
 | **Desktop offline: no cached rates** | Low | V1 requires network for currency screens — cache planned for future |
+
+---
+
+## 13. Multi-Currency Deep Analysis (v4.10.8 — June 2026)
+
+> **Source**: `docs/all new Anylysis for update system features/currencies new details.md`
+> **Status**: 🔄 **Implementation in progress**
+
+### 13.1 Multi-Currency Philosophy
+
+The system operates with:
+- **One Base Currency** (e.g., YER) — immutable after creation, used for ALL journal entries
+- **Foreign Currencies** (e.g., USD, SAR) — each document stores its currency + exchange rate
+
+**Core Principle**: Every financial document stores its original currency, but ALL journal entries (Debit/Credit) are recorded in base currency only.
+
+### 13.2 Key Requirements
+
+| # | Requirement | Status | Priority |
+|---|-------------|--------|----------|
+| 1 | Each document stores `CurrencyId` + `ExchangeRate` + `BaseNetTotal` | ❌ **MISSING BaseNetTotal** | 🔴 CRITICAL |
+| 2 | Journal entries (Debit/Credit) ALWAYS in base currency | ❌ **NO CONVERSION** | 🔴 CRITICAL |
+| 3 | CashBox has ONE currency (`CurrencyId` required) | ❌ **MISSING** | 🔴 CRITICAL |
+| 4 | Bank has ONE currency (`CurrencyId` required) | ❌ **MISSING** | 🔴 CRITICAL |
+| 5 | Exchange rate frozen at document creation — NEVER changed after posting | ⚠️ **PARTIAL** | 🟡 HIGH |
+| 6 | Customer/Supplier receipts store exchange rate at payment time | ❌ **MISSING** | 🟡 HIGH |
+| 7 | One currency per invoice (no mixed-currency lines) | ✅ PASS | — |
+| 8 | Exchange rate gain/loss deferred to V2 | ✅ PASS | — |
+
+### 13.3 Gap Analysis — What Needs to Change
+
+#### 13.3.1 BaseNetTotal Field (4 entities)
+
+`BaseNetTotal` = `NetTotal × ExchangeRate` — the base-currency equivalent stored on the document.
+
+| Entity | Current Fields | Missing | Action |
+|--------|---------------|---------|--------|
+| `SalesInvoice` | CurrencyId ✅, ExchangeRate ✅, CostInBaseCurrency ✅ | **BaseNetTotal** | Add `decimal? BaseNetTotal` |
+| `PurchaseInvoice` | CurrencyId ✅, ExchangeRate ✅, CostInBaseCurrency ✅ | **BaseNetTotal** | Add `decimal? BaseNetTotal` |
+| `SalesReturn` | CurrencyId ✅, ExchangeRate ✅ | **BaseNetTotal** | Add `decimal? BaseNetTotal` |
+| `PurchaseReturn` | CurrencyId ✅, ExchangeRate ✅ | **BaseNetTotal** | Add `decimal? BaseNetTotal` |
+
+**Formula**: `BaseNetTotal = NetTotal × ExchangeRate`
+**When set**: On document creation/update (Draft state only)
+**Used by**: Journal entries, financial reports, account statements
+
+#### 13.3.2 ExchangeRate + BaseNetTotal on Payment Entities (3 entities)
+
+| Entity | Has CurrencyId? | Has ExchangeRate? | Has BaseNetTotal? | Action |
+|--------|:-:|:-:|:-:|--------|
+| `CustomerReceipt` | ✅ | ❌ | ❌ | Add `ExchangeRate` + `BaseNetTotal` |
+| `SupplierPayment` | ✅ | ❌ | ❌ | Add `ExchangeRate` + `BaseNetTotal` |
+| `Expense` | ✅ | ❌ | ❌ | Add `ExchangeRate` + `BaseNetTotal` |
+
+#### 13.3.3 CurrencyId on CashBox and Bank
+
+| Entity | Has CurrencyId? | Has Currency Nav? | Action |
+|--------|:-:|:-:|--------|
+| `CashBox` | ❌ | ❌ | Add `short CurrencyId` (required) + `Currency?` nav |
+| `Bank` | ❌ | ❌ | Add `short CurrencyId` (required) + `Currency?` nav |
+
+**Design**: Each cashbox/bank operates in ONE currency. Transfers between different-currency boxes require exchange rate.
+
+#### 13.3.4 Status Guards on SetCurrency/SetExchangeRate
+
+| Entity | Method | Has Status Guard? | Action |
+|--------|--------|:-:|--------|
+| `SalesInvoice` | `SetCurrency()` | ❌ | Add `if (Status != InvoiceStatus.Draft) throw` |
+| `PurchaseInvoice` | `SetCurrency()` | ❌ | Add `if (Status != InvoiceStatus.Draft) throw` |
+| `SalesReturn` | `SetExchangeRate()` | ❌ | Add `if (Status != InvoiceStatus.Draft) throw` |
+| `PurchaseReturn` | `SetExchangeRate()` | ✅ | Already protected |
+
+#### 13.3.5 AccountingIntegrationService — Currency Conversion (CRITICAL)
+
+**Current Problem**: ALL 12+ journal entry methods use raw document amounts WITHOUT converting to base currency. The `CreateJournalEntryRequest` defaults to `CurrencyId=1, ExchangeRate=1m` and is NEVER overridden.
+
+**Required Fix**: Every journal entry method MUST:
+1. Pass `invoice.CurrencyId` and `invoice.ExchangeRate` to `CreateJournalEntryRequest`
+2. Multiply ALL Debit/Credit amounts by `ExchangeRate` before creating journal lines
+
+**Example — Sales Invoice (100 USD, ExchangeRate=700)**:
+```
+Before (WRONG):  Dr Cash 100 / Cr Revenue 100  (records USD as if YER)
+After (CORRECT): Dr Cash 70,000 / Cr Revenue 70,000  (converts to YER)
+```
+
+**Methods to fix**:
+- `CreateSalesPostEntryAsync` — multiply by `invoice.ExchangeRate`
+- `CreatePurchasePostEntryAsync` — multiply by `invoice.ExchangeRate`
+- `CreateCustomerPaymentEntryAsync` — multiply by `receipt.ExchangeRate`
+- `CreateSupplierPaymentEntryAsync` — multiply by `payment.ExchangeRate`
+- `CreateSalesReturnEntryAsync` — multiply by `return.ExchangeRate`
+- `CreatePurchaseReturnEntryAsync` — multiply by `return.ExchangeRate`
+- `CreateExpenseEntryAsync` — multiply by `expense.ExchangeRate`
+- All reversal methods — use the same ExchangeRate as the original entry
+
+### 13.4 Implementation Plan
+
+| Step | Layer | Files | Description |
+|------|-------|-------|-------------|
+| 1 | Domain | 4 invoice entities | Add `BaseNetTotal` property |
+| 2 | Domain | 3 payment entities | Add `ExchangeRate` + `BaseNetTotal` |
+| 3 | Domain | CashBox, Bank | Add `CurrencyId` + nav property |
+| 4 | Domain | 3 invoice entities | Add status guards to SetCurrency/SetExchangeRate |
+| 5 | Infrastructure | 7 EF configs | Map new fields |
+| 6 | Contracts | 7 DTOs | Add new fields to response DTOs |
+| 7 | Contracts | 5 Request DTOs | Add ExchangeRate/BaseNetTotal to requests |
+| 8 | Application | AccountingIntegrationService | Convert all amounts to base currency |
+| 9 | Application | Service DTOs | Update InvoicePrintDto, etc. |
+| 10 | API | Controllers | Pass new fields in responses |
+| 11 | Desktop | ViewModels | Show BaseNetTotal in editors |
+| 12 | Docs | database-schema.md | Update schema documentation |
+| 13 | Docs | Phase 20 plan | Update this document |
+
+### 13.5 Migration Strategy
+
+Since this is a schema change (new columns), we need an EF Core migration:
+- `BaseNetTotal` columns: nullable (`decimal?`) — existing rows get `NULL`
+- `ExchangeRate` on payments: nullable (`decimal?`) — existing rows get `NULL`
+- `CurrencyId` on CashBox/Bank: **required** — must seed default currency (YER) for existing rows
+- Backfill script: Calculate `BaseNetTotal` for existing posted invoices using their `ExchangeRate`
+
+### 13.6 Deferred to V2
+
+| Feature | Reason |
+|---------|--------|
+| Exchange rate gain/loss calculation | Requires unrealized gain/loss revaluation — complex accounting |
+| Multi-currency account statements | Needs dual-currency display (doc currency + base) |
+| Currency-specific rounding rules | Islamic finance requirements — not V1 |
+| Auto-exchange rate sync from central bank | External API dependency |

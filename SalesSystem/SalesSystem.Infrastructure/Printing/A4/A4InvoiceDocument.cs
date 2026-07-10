@@ -1,3 +1,4 @@
+using System.IO;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -39,7 +40,12 @@ public class A4InvoiceDocument : IDocument
     {
         container.Page(page =>
         {
-            page.Size(PageSizes.A4);
+            var pageSize = _data.PaperSize?.ToUpperInvariant() switch
+            {
+                "LETTER" => PageSizes.Letter,
+                _ => PageSizes.A4
+            };
+            page.Size(pageSize);
             page.Margin(1.5f, Unit.Centimetre);
             page.DefaultTextStyle(style =>
                 style.FontFamily(FontFamily).FontSize(BodyFontSize));
@@ -94,7 +100,7 @@ public class A4InvoiceDocument : IDocument
                         col.Item().Text($"هاتف: {_data.StorePhone}")
                             .FontSize(SmallFontSize).FontColor(MutedColor);
 
-                    if (!string.IsNullOrWhiteSpace(_data.StoreAddress))
+                    if (_data.PrintCompanyAddress && !string.IsNullOrWhiteSpace(_data.StoreAddress))
                         col.Item().Text($"العنوان: {_data.StoreAddress}")
                             .FontSize(SmallFontSize).FontColor(MutedColor);
 
@@ -164,10 +170,13 @@ public class A4InvoiceDocument : IDocument
                         c.Item().Text("تفاصيل الدفع")
                             .FontSize(SmallFontSize).FontColor(MutedColor).Bold();
                         c.Item().Text($"طريقة الدفع: {_data.PaymentMethod}");
-                        c.Item().Text($"المبلغ المدفوع: {_data.AmountPaid:N2} ر.س");
-                        if (_data.ChangeAmount > 0)
-                            c.Item().Text($"الباقي: {_data.ChangeAmount:N2} ر.س")
-                                .FontColor(SuccessColor);
+                        if (_data.ShowBalanceOnPrint)
+                        {
+                            c.Item().Text($"المبلغ المدفوع: {_data.AmountPaid:N2} ر.س");
+                            if (_data.ChangeAmount > 0)
+                                c.Item().Text($"الباقي: {_data.ChangeAmount:N2} ر.س")
+                                    .FontColor(SuccessColor);
+                        }
                     });
             });
 
@@ -191,6 +200,59 @@ public class A4InvoiceDocument : IDocument
                         c.Item().Text(_data.Notes).FontSize(BodyFontSize);
                     });
             }
+
+            // Signature line or image
+            if (_data.PrintSignature)
+            {
+                col.Item().PaddingTop(20).AlignRight()
+                    .Width(200)
+                    .Column(c =>
+                    {
+                        if (!string.IsNullOrEmpty(_data.SignatureImagePath) && File.Exists(_data.SignatureImagePath))
+                        {
+                            try
+                            {
+                                var signatureBytes = File.ReadAllBytes(_data.SignatureImagePath);
+                                c.Item().Height(40).Image(signatureBytes).FitWidth();
+                            }
+                            catch
+                            {
+                                c.Item().PaddingBottom(2)
+                                    .BorderBottom(1).BorderColor(TextColor)
+                                    .Text("التوقيع: _______________")
+                                    .FontSize(SmallFontSize).FontColor(TextColor);
+                            }
+                        }
+                        else
+                        {
+                            c.Item().PaddingBottom(2)
+                                .BorderBottom(1).BorderColor(TextColor)
+                                .Text("التوقيع: _______________")
+                                .FontSize(SmallFontSize).FontColor(TextColor);
+                        }
+                    });
+            }
+
+            // QR Code section
+            if (_data.PrintQRCode)
+            {
+                col.Item().PaddingTop(16).AlignCenter()
+                    .Column(c =>
+                    {
+                        c.Item().Width(100).Height(100)
+                            .Background("#FFFFFF")
+                            .Border(1).BorderColor("#000000")
+                            .Padding(8)
+                            .AlignCenter().AlignMiddle()
+                            .Text(_data.InvoiceNumber)
+                            .FontSize(10).FontColor("#000000").Bold();
+
+                        c.Item().PaddingTop(4)
+                            .AlignCenter()
+                            .Text($"رقم الفاتورة: {_data.InvoiceNumber}")
+                            .FontSize(SmallFontSize).FontColor(MutedColor);
+                    });
+            }
         });
     }
 
@@ -207,6 +269,10 @@ public class A4InvoiceDocument : IDocument
                 cols.RelativeColumn(2);
                 cols.RelativeColumn(1.5f);
                 cols.RelativeColumn(2);
+                if (_data.PrintBarcode)
+                    cols.RelativeColumn(2);
+                if (_data.ShowExpiryInInvoices)
+                    cols.RelativeColumn(1.5f);
             });
 
             // Header
@@ -219,6 +285,10 @@ public class A4InvoiceDocument : IDocument
                 header.Cell().Element(HeaderCell).AlignCenter().Text("السعر");
                 header.Cell().Element(HeaderCell).AlignCenter().Text("الخصم");
                 header.Cell().Element(HeaderCell).AlignCenter().Text("الإجمالي");
+                if (_data.PrintBarcode)
+                    header.Cell().Element(HeaderCell).AlignCenter().Text("باركود");
+                if (_data.ShowExpiryInInvoices)
+                    header.Cell().Element(HeaderCell).AlignCenter().Text("الانتهاء");
             });
 
             // Rows
@@ -250,6 +320,22 @@ public class A4InvoiceDocument : IDocument
 
                 table.Cell().Element(c => DataCell(c, rowBackground))
                     .AlignCenter().Text($"{item.Total:N2}").Bold();
+
+                if (_data.PrintBarcode)
+                {
+                    table.Cell().Element(c => DataCell(c, rowBackground))
+                        .AlignCenter()
+                        .Text(string.IsNullOrWhiteSpace(item.Barcode) ? "-" : item.Barcode)
+                        .FontSize(SmallFontSize);
+                }
+
+                if (_data.ShowExpiryInInvoices)
+                {
+                    table.Cell().Element(c => DataCell(c, rowBackground))
+                        .AlignCenter()
+                        .Text(item.ExpiryDate?.ToString("dd/MM/yyyy") ?? "-")
+                        .FontSize(SmallFontSize);
+                }
 
                 rowNumber++;
             }

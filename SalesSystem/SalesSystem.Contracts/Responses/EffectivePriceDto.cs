@@ -6,18 +6,6 @@ namespace SalesSystem.Contracts.Responses;
 /// </summary>
 public record EffectivePriceDto(
     int ProductUnitId,
-    int CurrencyId,
-    string? CurrencyCode,
-    string? CurrencyName,
     decimal Price,
     decimal? OriginalPrice,
-    int? OriginalCurrencyId,
-    string? OriginalCurrencyCode,
-    string? OriginalCurrencyName,
-    string? FallbackDescription)
-{
-    /// <summary>
-    /// True if the price was converted from another currency via exchange rate.
-    /// </summary>
-    public bool IsConverted => OriginalCurrencyId.HasValue && OriginalCurrencyId.Value != CurrencyId;
-}
+    string? FallbackDescription);

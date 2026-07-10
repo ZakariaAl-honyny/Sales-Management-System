@@ -618,7 +618,7 @@ public void Create_GivenNegativeAmount_ShouldThrowDomainException()
 [Fact]
 public async Task CreateAsync_GivenNoAccountId_ShouldAutoCreateAccount()
 {
-    // Arrange: Account parent "1110" exists in mock
+    // Arrange: Account parent "1101" exists in mock
     // Arrange: CashBoxService is the test target
     var request = new CreateCashBoxRequest { Name = "صندوق المندوب", 
         CurrencyId = 1, AccountId = null };
@@ -626,7 +626,7 @@ public async Task CreateAsync_GivenNoAccountId_ShouldAutoCreateAccount()
     // Act
     var result = await _service.CreateAsync(request, userId: 1, ct);
     
-    // Assert: account was created under parent "1110"
+    // Assert: account was created under parent "1101"
     _mockAccountRepo.Verify(r => r.AddAsync(It.Is<Account>(a => 
         a.Code == "1111" && a.ParentAccountId == parentAccountId), ct), Times.Once);
     Assert.True(result.IsSuccess);
@@ -645,7 +645,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 2. CashTransaction tests asserting BalanceBefore/BalanceAfter → CHANGE to RunningBalance
 3. Deposit/Withdraw tests → REMOVE (methods don't exist)
 4. Client-side balance validation tests → REMOVE
-5. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+5. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1101 — النقدية صناديق"
 6. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 7. `CustomerGroupId` on Customer → REMOVE (deferred to V2 — payment type is per-invoice)
 8. `CustomerType` / `SupplierType` on Customer/Supplier → REMOVE (not in V1)

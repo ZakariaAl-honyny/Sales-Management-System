@@ -3,8 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Products"
-      mc:Ignorable="d"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.Products"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
      
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
@@ -81,9 +82,10 @@
                         <!-- Price Value -->
                         <StackPanel Margin="0,0,0,6">
                             <TextBlock Text="السعر *" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding PriceValue, UpdateSourceTrigger=PropertyChanged, StringFormat=N2}"
+                            <TextBox Text="{Binding PriceValue, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
                                      AutomationProperties.AutomationId="TxtPriceValue"
+                                     helpers:InputHelper.NumericOnly="True"
                                      ToolTip="قيمة السعر بهذه العملة — يجب أن تكون أكبر من صفر"/>
                         </StackPanel>
 

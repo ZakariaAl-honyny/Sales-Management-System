@@ -45,7 +45,6 @@ public class ExpenseService : IExpenseService
                     request.ExpenseDate,
                     request.ExpenseAccountId,
                     request.CashBoxId,
-                    (short)request.CurrencyId,
                     request.Amount,
                     request.Notes,
                     userId);
@@ -57,7 +56,7 @@ public class ExpenseService : IExpenseService
                     expense.ExpenseNo, expense.Id, userId);
 
                 var created = await _uow.Expenses.FirstOrDefaultAsync(
-                    e => e.Id == expense.Id, ct, "ExpenseAccount", "CashBox", "Currency");
+                    e => e.Id == expense.Id, ct, "ExpenseAccount", "CashBox");
                 return Result<ExpenseDto>.Success(MapToDto(created!));
             }
             catch (DomainException ex)
@@ -78,7 +77,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox");
             if (expense == null)
                 return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
@@ -114,7 +113,7 @@ public class ExpenseService : IExpenseService
                 page,
                 pageSize,
                 ct,
-                includePaths: new[] { "ExpenseAccount", "CashBox", "Currency" });
+                includePaths: new[] { "ExpenseAccount", "CashBox" });
 
             var dtos = items.Select(MapToDto).ToList();
             var result = PagedResult<ExpenseDto>.Create(dtos, totalCount, page, pageSize);
@@ -133,7 +132,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox");
             if (expense == null)
                 return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
@@ -141,7 +140,6 @@ public class ExpenseService : IExpenseService
                 request.ExpenseDate,
                 request.ExpenseAccountId,
                 request.CashBoxId,
-                (short)request.CurrencyId,
                 request.Amount,
                 request.Notes);
 
@@ -151,7 +149,7 @@ public class ExpenseService : IExpenseService
             _logger.LogInformation("Expense {Id} updated by User {UserId}", id, userId);
 
             var updated = await _uow.Expenses.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                e => e.Id == id, ct, "ExpenseAccount", "CashBox");
             return Result<ExpenseDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -197,7 +195,7 @@ public class ExpenseService : IExpenseService
             try
             {
                 var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox");
                 if (expense == null)
                     return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
@@ -214,7 +212,7 @@ public class ExpenseService : IExpenseService
                 _logger.LogInformation("Expense {Id} posted by User {UserId}", id, userId);
 
                 var posted = await _uow.Expenses.FirstOrDefaultAsync(
-                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox");
                 return Result<ExpenseDto>.Success(MapToDto(posted!));
             }
             catch (DomainException ex)
@@ -237,7 +235,7 @@ public class ExpenseService : IExpenseService
             try
             {
                 var expense = await _uow.Expenses.FirstOrDefaultAsync(
-                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox");
                 if (expense == null)
                     return Result<ExpenseDto>.Failure("المصروف غير موجود", ErrorCodes.NotFound);
 
@@ -258,7 +256,7 @@ public class ExpenseService : IExpenseService
                 _logger.LogInformation("Expense {Id} cancelled", id);
 
                 var cancelled = await _uow.Expenses.FirstOrDefaultAsync(
-                    e => e.Id == id, ct, "ExpenseAccount", "CashBox", "Currency");
+                    e => e.Id == id, ct, "ExpenseAccount", "CashBox");
                 return Result<ExpenseDto>.Success(MapToDto(cancelled!));
             }
             catch (DomainException ex)
@@ -286,8 +284,6 @@ public class ExpenseService : IExpenseService
             expense.ExpenseAccount?.NameAr,
             expense.CashBoxId,
             expense.CashBox?.Name,
-            expense.CurrencyId,
-            expense.Currency?.Name,
             expense.Amount,
             expense.Notes,
             (byte)expense.Status,

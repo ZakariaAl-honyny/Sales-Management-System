@@ -1,6 +1,5 @@
 using FluentValidation;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Api.Validators.Misc;
 
@@ -23,16 +22,6 @@ public class ReportFilterRequestValidator : AbstractValidator<ReportFilterReques
         RuleFor(x => x.DateFrom)
             .LessThanOrEqualTo(x => x.DateTo).WithMessage("تاريخ البداية يجب أن يكون قبل تاريخ النهاية")
             .When(x => x.DateFrom.HasValue && x.DateTo.HasValue);
-    }
-}
-
-public class UpdateCostingMethodRequestValidator : AbstractValidator<UpdateCostingMethodRequest>
-{
-    public UpdateCostingMethodRequestValidator()
-    {
-        RuleFor(x => x.Method)
-            .Must(m => Enum.IsDefined(typeof(CostingMethod), m))
-            .WithMessage("طريقة التكلفة غير صالحة");
     }
 }
 

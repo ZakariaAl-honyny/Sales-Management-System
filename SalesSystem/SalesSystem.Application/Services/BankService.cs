@@ -14,16 +14,21 @@ namespace SalesSystem.Application.Services;
 public class BankService : IBankService
 {
     private readonly IUnitOfWork _uow;
+    private readonly IAccountLinkService _accountLink;
     private readonly ILogger<BankService> _logger;
 
     /// <summary>
     /// Parent account code for Bank sub-accounts (Level 3 under Current Assets).
     /// </summary>
-    private const string BankParentAccountCode = "1120";
+    private const string BankParentAccountCode = "1102";
 
-    public BankService(IUnitOfWork uow, ILogger<BankService> logger)
+    public BankService(
+        IUnitOfWork uow,
+        IAccountLinkService accountLink,
+        ILogger<BankService> logger)
     {
         _uow = uow;
+        _accountLink = accountLink;
         _logger = logger;
     }
 
@@ -125,56 +130,163 @@ public class BankService : IBankService
 
     public async Task<Result<BankDto>> UpdateAsync(int id, UpdateBankRequest request, int userId, CancellationToken ct)
     {
-        try
-        {
-            var bank = await _uow.Banks.FirstOrDefaultAsync(b => b.Id == id, ct, "Account");
-            if (bank == null)
-                return Result<BankDto>.Failure("البنك غير موجود", ErrorCodes.NotFound);
+        // ── Guard checks (OUTSIDE transaction) ──────────────────────────
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return Result<BankDto>.Failure("اسم البنك مطلوب");
 
-            bank.Update(
-                request.Name,
-                accountNumber: request.AccountNumber,
-                iban: request.Iban,
-                updatedByUserId: userId);
-            await _uow.SaveChangesAsync(ct);
+        var bank = await _uow.Banks.FirstOrDefaultAsync(b => b.Id == id, ct, "Account");
+        if (bank == null)
+            return Result<BankDto>.Failure("البنك غير موجود", ErrorCodes.NotFound);
 
-            _logger.LogInformation(
-                "Bank updated: {Name} (ID: {Id}) by User {UserId}",
-                bank.Name, id, userId);
+        var nameChanged = !string.Equals(request.Name.Trim(), bank.Name, StringComparison.Ordinal);
 
-            return Result<BankDto>.Success(MapToDto(bank));
-        }
-        catch (DomainException ex)
+        return await _uow.ExecuteTransactionAsync<Result<BankDto>>(async () =>
         {
-            _logger.LogWarning(ex, "Domain rule violation updating bank {Id}: {Message}", id, ex.Message);
-            return Result<BankDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating bank {Id}", id);
-            return Result<BankDto>.Failure("حدث خطأ أثناء تحديث بيانات البنك");
-        }
+            try
+            {
+                // 1. Update the Bank entity
+                bank.Update(
+                    request.Name,
+                    accountNumber: request.AccountNumber,
+                    iban: request.Iban,
+                    updatedByUserId: userId);
+
+                // 2. Sync the linked Account name when the bank name changes
+                if (nameChanged)
+                {
+                    await _accountLink.SyncNameAsync(bank.AccountId, request.Name, ct);
+                }
+
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "Bank updated: {Name} (ID: {Id}) by User {UserId}",
+                    bank.Name, id, userId);
+
+                return Result<BankDto>.Success(MapToDto(bank));
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation updating bank {Id}: {Message}", id, ex.Message);
+                return Result<BankDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating bank {Id}", id);
+                return Result<BankDto>.Failure("حدث خطأ أثناء تحديث بيانات البنك");
+            }
+        }, ct);
     }
 
     public async Task<Result> DeactivateAsync(int id, CancellationToken ct)
     {
-        try
-        {
-            var bank = await _uow.Banks.GetByIdAsync(id, ct);
-            if (bank == null)
-                return Result.Failure("البنك غير موجود", ErrorCodes.NotFound);
+        // ── Guard checks (OUTSIDE transaction) ──────────────────────────
+        var bank = await _uow.Banks.GetByIdAsync(id, ct);
+        if (bank == null)
+            return Result.Failure("البنك غير موجود", ErrorCodes.NotFound);
 
-            bank.MarkAsDeleted();
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Bank deactivated: {Name} (ID: {Id})", bank.Name, id);
-            return Result.Success();
-        }
-        catch (Exception ex)
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
         {
-            _logger.LogError(ex, "Error deactivating bank {Id}", id);
-            return Result.Failure("حدث خطأ أثناء إلغاء تنشيط البنك");
-        }
+            try
+            {
+                // 1. Deactivate the linked Account
+                await _accountLink.DeactivateAsync(bank.AccountId, ct);
+
+                // 2. Soft-delete the Bank entity
+                bank.MarkAsDeleted();
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Bank deactivated: {Name} (ID: {Id})", bank.Name, id);
+                return Result.Success();
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation deactivating bank {Id}: {Message}", id, ex.Message);
+                return Result.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating bank {Id}", id);
+                return Result.Failure("حدث خطأ أثناء إلغاء تنشيط البنك");
+            }
+        }, ct);
+    }
+
+    public async Task<Result> PermanentDeleteAsync(int id, CancellationToken ct)
+    {
+        // ── Guard checks (OUTSIDE transaction) ──────────────────────────
+        var bank = await _uow.Banks.FirstOrDefaultIgnoreFiltersAsync(b => b.Id == id, ct, "Account");
+        if (bank == null)
+            return Result.Failure("البنك غير موجود", ErrorCodes.NotFound);
+
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
+        {
+            try
+            {
+                // 1. Soft-delete the linked Account (permanent removal reference-safe)
+                await _accountLink.MarkAsDeletedAsync(bank.AccountId, ct);
+
+                // 2. Hard-delete the Bank entity
+                _uow.Banks.DeleteRange(new[] { bank });
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "Bank permanently deleted: {Name} (ID: {Id}), Account {AccountId}",
+                    bank.Name, bank.Id, bank.AccountId);
+
+                return Result.Success();
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation permanently deleting bank {Id}: {Message}", id, ex.Message);
+                return Result.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error permanently deleting bank {Id}", id);
+                return Result.Failure("حدث خطأ أثناء الحذف النهائي للبنك");
+            }
+        }, ct);
+    }
+
+    public async Task<Result> RestoreAsync(int id, CancellationToken ct)
+    {
+        // ── Guard checks (OUTSIDE transaction) ──────────────────────────
+        var bank = await _uow.Banks.FirstOrDefaultIgnoreFiltersAsync(b => b.Id == id, ct, "Account");
+        if (bank == null)
+            return Result.Failure("البنك غير موجود", ErrorCodes.NotFound);
+
+        if (bank.IsActive)
+            return Result.Failure("البنك نشط بالفعل");
+
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
+        {
+            try
+            {
+                // 1. Reactivate the linked Account
+                await _accountLink.ActivateAsync(bank.AccountId, ct);
+
+                // 2. Restore the Bank entity
+                bank.Restore();
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation(
+                    "Bank restored: {Name} (ID: {Id}) by User",
+                    bank.Name, bank.Id);
+
+                return Result.Success();
+            }
+            catch (DomainException ex)
+            {
+                _logger.LogWarning(ex, "Domain rule violation restoring bank {Id}: {Message}", id, ex.Message);
+                return Result.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error restoring bank {Id}", id);
+                return Result.Failure("حدث خطأ أثناء استعادة البنك");
+            }
+        }, ct);
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SalesSystem.Domain.Entities;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Infrastructure.Data.Configurations;
 
@@ -15,6 +16,7 @@ public class CustomerReceiptConfiguration : IEntityTypeConfiguration<CustomerRec
         builder.Property(r => r.ReceiptDate).IsRequired().HasColumnType("date");
         builder.Property(r => r.Amount).HasPrecision(18, 2).IsRequired();
         builder.Property(r => r.Status).HasConversion<byte>().IsRequired();
+        builder.Property(r => r.PaymentMethod).HasConversion<byte>().HasColumnType("tinyint").HasDefaultValue(PaymentMethod.Cash).IsRequired();
         builder.Property(r => r.Notes).HasMaxLength(500).IsRequired(false);
 
         // FK to Customer
@@ -28,13 +30,6 @@ public class CustomerReceiptConfiguration : IEntityTypeConfiguration<CustomerRec
         builder.HasOne(r => r.CashBox)
             .WithMany()
             .HasForeignKey(r => r.CashBoxId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
-
-        // FK to Currency
-        builder.HasOne(r => r.Currency)
-            .WithMany()
-            .HasForeignKey(r => r.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 

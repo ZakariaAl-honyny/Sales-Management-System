@@ -29,7 +29,7 @@ public class JournalEntryLine : Entity
         string? description = null)
     {
         if (amount <= 0)
-            throw new DomainException("قيمة الخصم يجب أن تكون أكبر من صفر");
+            throw new DomainException("قيمة المدين يجب أن تكون أكبر من صفر");
 
         return new JournalEntryLine
         {
@@ -49,7 +49,7 @@ public class JournalEntryLine : Entity
         string? description = null)
     {
         if (amount <= 0)
-            throw new DomainException("قيمة الإيداع يجب أن تكون أكبر من صفر");
+            throw new DomainException("قيمة الدائن يجب أن تكون أكبر من صفر");
 
         return new JournalEntryLine
         {

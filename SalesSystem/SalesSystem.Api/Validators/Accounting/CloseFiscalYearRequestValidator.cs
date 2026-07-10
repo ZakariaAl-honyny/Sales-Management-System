@@ -12,7 +12,7 @@ public class CloseFiscalYearRequestValidator : AbstractValidator<CloseFiscalYear
     public CloseFiscalYearRequestValidator()
     {
         RuleFor(x => x.FiscalYear)
-            .GreaterThan(2000).WithMessage("السنة المالية يجب أن تكون بعد عام 2000")
+            .GreaterThanOrEqualTo(2000).WithMessage("السنة المالية يجب أن تكون 2000 أو أكثر")
             .LessThanOrEqualTo(9999).WithMessage("السنة المالية غير صالحة")
             .Must(year => year <= DateTime.Today.Year + 1)
             .WithMessage("السنة المالية لا يمكن أن تكون بعد السنة القادمة");

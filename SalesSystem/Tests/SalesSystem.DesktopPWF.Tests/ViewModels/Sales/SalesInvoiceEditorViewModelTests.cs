@@ -32,7 +32,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
     private readonly Mock<ICashBoxApiService> _cashBoxApiServiceMock;
     private readonly Mock<IPrintApiService> _printApiServiceMock;
     private readonly Mock<IToastNotificationService> _mockToastService;
-    private readonly Mock<ICurrencyApiService> _mockCurrencyService;
     private readonly Mock<IProductCategoryApiService> _mockProductCategoryService;
     private readonly Mock<IProductUnitApiService> _mockUnitService;
     private readonly Mock<IProductPriceApiService> _mockPriceService;
@@ -51,7 +50,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         _cashBoxApiServiceMock = new Mock<ICashBoxApiService>();
         _printApiServiceMock = new Mock<IPrintApiService>();
         _mockToastService = new Mock<IToastNotificationService>();
-        _mockCurrencyService = new Mock<ICurrencyApiService>();
         _mockProductCategoryService = new Mock<IProductCategoryApiService>();
         _mockUnitService = new Mock<IProductUnitApiService>();
         _mockPriceService = new Mock<IProductPriceApiService>();
@@ -90,8 +88,8 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         var viewModel = CreateViewModel(null);
 
         // Assert
-        viewModel.SaveCommand.Should().NotBeNull();
-        viewModel.PostCommand.Should().NotBeNull();
+        viewModel.SaveDraftCommand.Should().NotBeNull();
+        viewModel.SaveAndPostCommand.Should().NotBeNull();
         viewModel.CancelCommand.Should().NotBeNull();
         viewModel.AddLineCommand.Should().NotBeNull();
         viewModel.RemoveLineCommand.Should().NotBeNull();
@@ -259,13 +257,11 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
                 Address: null,
                 LogoPath: null,
                 Email: null,
-                CurrencyCode: "SAR",
                 DefaultTaxRate: 15m,
                 IsTaxEnabled: false,
                 TaxNumber: null,
                 EnableStockAlerts: false,
                 AllowNegativeStock: false,
-                AutoUpdatePrices: true,
                 InvoicePrefix: "INV-")));
 
         await viewModel.InitializationTask;
@@ -350,7 +346,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         viewModel.Items.Clear();
 
         // Act & Assert
-        viewModel.SaveCommand.CanExecute(null).Should().BeTrue();
+        viewModel.SaveDraftCommand.CanExecute(null).Should().BeTrue();
     }
 
     [Fact]
@@ -362,7 +358,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         viewModel.SelectedWarehouseId = 0;
 
         // Act & Assert
-        viewModel.PostCommand.CanExecute(null).Should().BeTrue();
+        viewModel.SaveAndPostCommand.CanExecute(null).Should().BeTrue();
     }
 
     #endregion
@@ -600,7 +596,6 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
             _cashBoxApiServiceMock.Object,
             _printApiServiceMock.Object,
             _mockToastService.Object,
-            _mockCurrencyService.Object,
             _mockProductCategoryService.Object,
             _mockUnitService.Object,
             _mockPriceService.Object,
@@ -617,7 +612,7 @@ public class SalesInvoiceEditorViewModelTests : IDisposable
         };
         var warehouses = new List<WarehouseDto>
         {
-            new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "������ 1", Phone: null, Address: null, Notes: null, IsActive: true)
+            new WarehouseDto(Id: (short)1, Name: "المستودع 1", Phone: null, Address: null, Notes: null, IsActive: true)
         };
         var products = SetupProducts();
 

@@ -583,13 +583,13 @@ var newAvgCost = (totalOldValue + totalNewValue) / (oldStock + newQty);
 | RULE-083 | `DailyClosure` computes: OpeningBalance + TotalIncome - TotalExpense = ClosingBalance (OpeningBalance sourced from Account's opening balance via Chart of Accounts) |
 
 **Auto-Account Creation Pattern:**
-When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1110 — النقدية"` (Cash & Cash Equivalents — a Level 3 account under Current Assets 1100). Account codes auto-increment (1111, 1112, 1113...).
+When creating a CashBox without an `AccountId`, the service auto-creates a Level-4 detail account under parent `"1101 — النقدية صناديق"` (Cash & Cash Equivalents — a Level 3 account under Current Assets 1100). Account codes auto-increment (1111, 1112, 1113...).
 
 ```csharp
 // CashBoxService auto-account creation (when AccountId is null):
-var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct);
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1101", ct);
 var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var newCode = (int.Parse(maxCode ?? "1101") + 1).ToString();
 var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
     AccountType.Asset, 4, parentAccount!.Id, false);
 await _uow.Accounts.AddAsync(account, ct);
@@ -1545,9 +1545,9 @@ The following rules codify the bugs found and fixed during Phase 22 code review.
 
 | RULE | DIRECTIVE |
 |------|-----------|
-| RULE-502 | `Bank` entity MUST follow the same pattern as `CashBox`: `AccountId` is `int?` (nullable), with a `SetAccountId(int)` domain method. When `AccountId` is null at creation, `BankService` MUST auto-create a Level-4 detail account under parent `"1120 — البنوك"` (Bank Accounts) — mirroring `CashBoxService` auto-creation under `"1110 — النقدية"`. Account code auto-increments from existing child codes. |
+| RULE-502 | `Bank` entity MUST follow the same pattern as `CashBox`: `AccountId` is `int?` (nullable), with a `SetAccountId(int)` domain method. When `AccountId` is null at creation, `BankService` MUST auto-create a Level-4 detail account under parent `"1102 — البنوك"` (Bank Accounts) — mirroring `CashBoxService` auto-creation under `"1101 — النقدية صناديق"`. Account code auto-increments from existing child codes. |
 | RULE-503 | `EmployeesController` MUST expose `POST /api/v1/employees/{id}/auto-create-account` endpoint that calls `EmployeeService.AutoCreateEmployeeAccountAsync()` — creates a Level-4 detail account under parent `"1170 — عهد الموظفين"` (Employee Custody). This endpoint is needed because custody/advance/lone workflows need accounts created before transaction processing. |
-| RULE-504 | `CustomerService.AutoCreateCustomerAccountAsync()` MUST look up parent account by code `"1130"` (Accounts Receivable/العملاء) — NOT `"1210"` (Fixed Assets). `SupplierService.AutoCreateSupplierAccountAsync()` MUST look up parent account by code `"1320"` (Accounts Payable/الموردون) — NOT `"2100"` (doesn't exist). These parent codes were discovered during Accounts.md analysis and are CRITICAL for correct COA linking. |
+| RULE-504 | `CustomerService.AutoCreateCustomerAccountAsync()` MUST look up parent account by code `"1103"` (Accounts Receivable/العملاء) — NOT `"1210"` (Fixed Assets). `SupplierService.AutoCreateSupplierAccountAsync()` MUST look up parent account by code `"2101"` (Accounts Payable/الموردون) — NOT `"1320"` (doesn't exist). These parent codes were discovered during Accounts.md analysis and are CRITICAL for correct COA linking. |
 | RULE-505 | `RecalculateFromFlexibleInput()` in `InvoiceLineViewModel` and `PurchaseInvoiceLineViewModel` MUST ONLY call `FlexibleInputCalculator.Calculate()` when `_lastModifiedField == CalculationField.Total` — when user edited Quantity or UnitPrice/UnitCost, `_lineTotalInput` MUST be recomputed directly as `_quantity * _unitPrice` (or `_quantity * _unitCost`). NEVER pass Quantity or Price as `lastModifiedField` to the calculator because the auto-computed total is treated as a user-entered anchor, causing incorrect recalculation. |
 | RULE-506 | `Account.Create()` MUST receive `allowTransactions: true` when `level >= 4` — the domain guard `if (level >= 4 && !allowTransactions)` throws `DomainException("الحساب التفصيلي يجب أن يسمح بالحركات")`. This applies to ALL auto-creation callers: BankService, CashBoxService, CustomerService, SupplierService, EmployeeService, PartyService. NEVER omit `allowTransactions: true` for detail accounts. |
 | RULE-507 | EVERY service interface registered in DI MUST have a concrete implementation class. Missing implementations cause `InvalidOperationException` at DI resolution. Search for ALL `services.AddScoped<I, T>` / `services.AddTransient<I, T>` and verify `T` exists as a concrete class. |
@@ -2082,7 +2082,7 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `FlexibleInputCalculator` helper class missing
 ❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
 ❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
-❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1103"` (العملاء)
 ❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
 ❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
 ❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
@@ -2170,7 +2170,7 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `FlexibleInputCalculator` helper class missing
 ❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
 ❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
-❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1103"` (العملاء)
 ❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
 ❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
 ❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
@@ -2258,7 +2258,7 @@ public enum ChequeStatus : byte { Pending = 1, Cleared = 2, Bounced = 3, Cancell
 ❌ `FlexibleInputCalculator` helper class missing
 ❌ `RecalculateFromFlexibleInput()` calling `FlexibleInputCalculator.Calculate()` for Quantity/Price changes (calculator must ONLY be called when `_lastModifiedField == Total` — Quantity/Price changes should directly compute `_lineTotalInput = _quantity * _unitPrice`)
 ❌ `Bank.AccountId` as non-nullable `int` (use `int?` with `SetAccountId()` for auto-creation support)
-❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1130"` (العملاء)
+❌ `CustomerService` looking up AR parent by code `"1210"` (Fixed Assets) instead of `"1103"` (العملاء)
 ❌ `SupplierService` looking up AP parent by code `"2100"` (doesn't exist) instead of `"1320"` (الموردون)
 ❌ Missing `POST /api/v1/employees/{id}/auto-create-account` endpoint (Employee custody workflow needs it)
 ❌ `Account.Create()` for Level 4+ without `allowTransactions: true` (DomainException thrown)
@@ -2473,7 +2473,7 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] CashBox has NO OpeningBalance/CurrentBalance fields (removed)?
 - [ ] CashTransaction uses RunningBalance (not BalanceBefore/BalanceAfter)?
 - [ ] CashTransaction.Create() is public (not internal)?
-- [ ] CashBox auto-creates sub-account under "1110 — النقدية" when AccountId is null?
+- [ ] CashBox auto-creates sub-account under "1101 — النقدية صناديق" when AccountId is null?
 - [ ] Deposit()/Withdraw() methods removed from CashBox domain entity?
 - [ ] Cash transfer has NO client-side balance validation (server validates via Account)?
 - [ ] CashTransaction entries immutable (no direct editing)?
@@ -2644,7 +2644,7 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] CashTransactionType on purchase cancel = RefundOut?
 - [ ] All AccountingIntegrationService methods return Result<int>?
 - [ ] CashBox.AccountId FK exists with DeleteBehavior.Restrict?
-- [ ] CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية"?
+- [ ] CashBox auto-creates Level-4 sub-account under parent "1101 — النقدية صناديق"?
 - [ ] CashBoxService computes running balance from CashTransaction sum (no Deposit/Withdraw)?
 - [ ] CashBoxDto/CashTransactionDto reflect new architecture (no balance fields)?
 - [ ] CashBoxEditorView has Category dropdown, Phone/TaxNumber/Address fields?
@@ -2675,7 +2675,7 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] InventoryTransaction/InventoryTransactionLine replaced InventoryMovement?
 - [ ] Build: 0 errors, 0 warnings across ALL 6 production projects?
 - [ ] CashBoxService registered in API DI and all 13 methods return Result<T>?
-- [ ] CashBoxService auto-creates sub-account under "1110 — النقدية" when AccountId is null?
+- [ ] CashBoxService auto-creates sub-account under "1101 — النقدية صناديق" when AccountId is null?
 - [ ] CashBoxService uses IReceiptVoucherService/IPaymentVoucherService (no duplication)?
 - [ ] PDF export (QuestPDF) is first-choice export for ALL 27+ report ViewModels?
 - [ ] Multi-currency (SelectedCurrencyId, ExchangeRate) wired in SalesInvoiceEditorViewModel?
@@ -2695,10 +2695,10 @@ Supplier Payments:SP-{YYYY}-{000001}
 - [ ] `LineTotalInput`/`_lastModifiedField`/`_isRecalculating` in line ViewModels?
 - [ ] `RecalculateFromFlexibleInput()` ONLY calls `FlexibleInputCalculator` when Total is modified (NOT for Quantity/Price)?
 - [ ] `Bank.AccountId` is `int?` (nullable) with `SetAccountId()` domain method?
-- [ ] `BankService` auto-creates sub-account under parent "1120 — البنوك" when AccountId is null?
+- [ ] `BankService` auto-creates sub-account under parent "1102 — البنوك" when AccountId is null?
 - [ ] `BankConfiguration` makes AccountId FK optional (`.IsRequired(false)`)?
 - [ ] `EmployeesController` has `POST /api/v1/employees/{id}/auto-create-account` endpoint?
-- [ ] `CustomerService.AutoCreateCustomerAccountAsync()` uses parent code `"1130"` (NOT `"1210"`)?
+- [ ] `CustomerService.AutoCreateCustomerAccountAsync()` uses parent code `"1103"` (NOT `"1210"`)?
 - [ ] `SupplierService.AutoCreateSupplierAccountAsync()` uses parent code `"1320"` (NOT `"2100"`)?
 - [ ] All service interfaces have concrete implementations (no DI resolution crash)?
 - [ ] Report API endpoints match Desktop ViewModel calls (detailed-stock-ledger, returns, aging)?

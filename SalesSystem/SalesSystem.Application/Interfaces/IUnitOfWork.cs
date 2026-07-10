@@ -21,7 +21,6 @@ public interface IUnitOfWork
     IGenericRepository<SalesReturn> SalesReturns { get; }
     IGenericRepository<PurchaseReturn> PurchaseReturns { get; }
     IGenericRepository<SupplierPayment> SupplierPayments { get; }
-    IGenericRepository<CurrencyRate> CurrencyRates { get; }
     ISystemLogRepository SystemLogs { get; }
     IGenericRepository<SalesInvoiceLine> SalesInvoiceLines { get; }
     IGenericRepository<PurchaseInvoiceLine> PurchaseInvoiceLines { get; }
@@ -35,24 +34,19 @@ public interface IUnitOfWork
     IGenericRepository<ReceiptVoucher> ReceiptVouchers { get; }
     IGenericRepository<PaymentVoucher> PaymentVouchers { get; }
     IGenericRepository<FiscalYear> FiscalYears { get; }
-    IGenericRepository<Currency> Currencies { get; }
     IGenericRepository<Permission> Permissions { get; }
     IGenericRepository<RolePermission> RolePermissions { get; }
     IGenericRepository<InventoryBatch> InventoryBatches { get; }
     IGenericRepository<ProductPrice> ProductPrices { get; }
     IGenericRepository<Role> Roles { get; }
     IGenericRepository<UserRole> UserRoles { get; }
+    IGenericRepository<UserPermission> UserPermissions { get; }
     IAuditLogRepository AuditLogs { get; }
     IGenericRepository<UserSession> UserSessions { get; }
-    IGenericRepository<UserBranch> UserBranches { get; }
-
     // New entity repositories (v4.7+)
     IGenericRepository<Attachment> Attachments { get; }
     IGenericRepository<Notification> Notifications { get; }
-    IGenericRepository<Branch> Branches { get; }
-    IGenericRepository<Department> Departments { get; }
     IGenericRepository<Bank> Banks { get; }
-    IGenericRepository<Employee> Employees { get; }
     IGenericRepository<ProductCategory> ProductCategories { get; }
     IGenericRepository<InventoryCount> InventoryCounts { get; }
     IGenericRepository<InventoryCountLine> InventoryCountLines { get; }

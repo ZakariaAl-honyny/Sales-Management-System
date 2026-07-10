@@ -100,10 +100,10 @@ public class SalesReturnService : ISalesReturnService
                     request.SalesInvoiceId ?? 0,
                     request.CustomerId ?? 0,
                     request.WarehouseId,
-                    request.CurrencyId ?? 1,
                     request.ReturnDate,
                     request.Notes,
-                    userId
+                    returnReason: request.ReturnReason,
+                    createdByUserId: userId
                 );
 
                 foreach (var item in request.Items)
@@ -432,14 +432,14 @@ public class SalesReturnService : ISalesReturnService
     {
         return new SalesReturnDto(
             r.Id,
-            r.ReturnNo.ToString(),
+            r.ReturnNo,
             r.WarehouseId,
             r.Warehouse?.Name ?? "غير معروف",
             r.CustomerId,
             r.Customer?.Name ?? "غير معروف",
             r.SalesInvoiceId,
             r.ReturnDate,
-            0, // SubTotal removed
+            r.Lines?.Sum(l => l.Amount) ?? 0m,
             r.ReturnedTaxAmount,
             r.ReturnedDiscountAmount,
             r.TotalAmount,
@@ -447,13 +447,12 @@ public class SalesReturnService : ISalesReturnService
             r.ReturnedTaxAmount,
             r.ReturnedChargeAmount,
             r.TaxId,
-            r.CurrencyId,
-            null, // ExchangeRate removed
             r.Notes,
+            r.ReturnReason,
             (byte)r.Status,
-            null, // CashBoxId removed
-            null, // CashBoxName removed
-            0, // RefundAmount removed
+            null, // CashBoxId
+            null, // CashBoxName
+            r.RefundAmount,
             r.Lines.Select(it => new SalesReturnItemDto(
                 it.Id,
                 it.SalesInvoiceLine?.ProductId ?? 0,
@@ -461,9 +460,10 @@ public class SalesReturnService : ISalesReturnService
                 it.SalesInvoiceLine?.Product?.Name ?? "غير معروف",
                 it.Quantity,
                 it.Amount,
-                0, // DiscountAmount per line (not tracked separately)
+                0,
                 it.Amount,
-                1 // Mode default (Retail)
+                1,
+                it.CostInBaseCurrency
             )).ToList()
         );
     }

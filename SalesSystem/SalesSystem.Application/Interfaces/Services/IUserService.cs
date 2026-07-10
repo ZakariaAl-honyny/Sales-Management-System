@@ -26,4 +26,10 @@ public interface IUserService
     /// Returns the reset token that must be shared with the user.
     /// </summary>
     Task<Result<ResetPasswordResponse>> ResetPasswordAsync(int id, CancellationToken ct);
+
+    // ─── Role Management ────────────────────────────
+
+    Task<Result<List<UserRoleDto>>> GetUserRolesAsync(int userId, CancellationToken ct);
+    Task<Result> UpdateUserRolesAsync(int userId, List<int> roleIds, CancellationToken ct);
+
 }

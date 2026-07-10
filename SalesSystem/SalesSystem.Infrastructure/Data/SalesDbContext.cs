@@ -11,8 +11,6 @@ public class SalesDbContext : DbContext
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
-    public DbSet<Branch> Branches => Set<Branch>();
-    public DbSet<Department> Departments => Set<Department>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<WarehouseStock> WarehouseStocks => Set<WarehouseStock>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
@@ -45,10 +43,10 @@ public class SalesDbContext : DbContext
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<SystemAccountMapping> SystemAccountMappings => Set<SystemAccountMapping>();
     public DbSet<Tax> Taxes => Set<Tax>();
-    public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<FiscalYear> FiscalYears => Set<FiscalYear>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<InventoryAdjustment> InventoryAdjustments => Set<InventoryAdjustment>();

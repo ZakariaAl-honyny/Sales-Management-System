@@ -76,19 +76,22 @@ public class JournalEntryService : IJournalEntryService
             }
 
             // 6. Create the journal entry via domain factory (Draft status)
-            // Resolve fiscal year from entry date year
-            short fiscalYearId = (short)request.EntryDate.Year;
-            short currencyId = 1; // Default to base currency (resolved at service level)
+            // Resolve fiscal year from entry date — MUST look up actual FiscalYear.Id from DB
+            var fiscalYear = await _uow.FiscalYears.FirstOrDefaultAsync(
+                fy => fy.Year == request.EntryDate.Year && fy.IsActive,
+                ct: ct);
+            if (fiscalYear == null)
+                return Result<int>.Failure(
+                    $"السنة المالية {request.EntryDate.Year} غير موجودة أو غير نشطة — يرجى إنشاء السنة المالية أولاً");
+
             var entry = Domain.Accounting.Entities.JournalEntry.Create(
                 numberResult.Value.EntryNumber,
                 entryNo,
                 request.EntryDate,
                 request.Description ?? string.Empty,
                 request.EntryType,
-                fiscalYearId,
-                currencyId,
+                fiscalYear.Id,
                 userId,
-                exchangeRate: 1m,
                 referenceType: request.ReferenceType,
                 referenceId: request.ReferenceId,
                 referenceNumber: request.ReferenceNumber);
@@ -135,7 +138,7 @@ public class JournalEntryService : IJournalEntryService
                 page: page,
                 pageSize: pageSize,
                 ct: ct,
-                includePaths: "Lines");
+                includePaths: "Lines.Account");
 
             var dtos = items.Select(MapToListDto).ToList();
 
@@ -159,7 +162,7 @@ public class JournalEntryService : IJournalEntryService
             var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
                 e => e.Id == id,
                 ct,
-                "Lines");
+                "Lines.Account");
 
             if (entry == null)
                 return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
@@ -182,7 +185,7 @@ public class JournalEntryService : IJournalEntryService
         try
         {
             var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "Lines");
+                e => e.Id == id, ct, "Lines.Account");
 
             if (entry == null)
                 return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
@@ -213,7 +216,7 @@ public class JournalEntryService : IJournalEntryService
         try
         {
             var entry = await _uow.JournalEntries.FirstOrDefaultAsync(
-                e => e.Id == id, ct, "Lines");
+                e => e.Id == id, ct, "Lines.Account");
 
             if (entry == null)
                 return Result<JournalEntryDetailDto>.Failure("القيد المحاسبي غير موجود", ErrorCodes.NotFound);
@@ -259,6 +262,11 @@ public class JournalEntryService : IJournalEntryService
                 entry.EntryNumber, entry.Id, userId);
 
             return Result.Success();
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
+        {
+            _logger.LogWarning(ex, "Cannot delete draft journal entry {Id} — may be referenced by other records", id);
+            return Result.Failure("لا يمكن حذف القيد المحاسبي لأنه مرتبط ببيانات أخرى");
         }
         catch (Exception ex)
         {
@@ -318,6 +326,8 @@ public class JournalEntryService : IJournalEntryService
         var lineDtos = entry.Lines.Select(line => new JournalEntryLineDetailDto(
             line.Id,
             line.AccountId,
+            line.Account?.NameAr,
+            line.Account?.AccountCode,
             line.Debit,
             line.Credit,
             line.Description

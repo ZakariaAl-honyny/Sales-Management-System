@@ -10,9 +10,6 @@ public class CreateReceiptVoucherRequestValidator : AbstractValidator<CreateRece
         RuleFor(x => x.VoucherDate)
             .NotEmpty().WithMessage("تاريخ سند القبض مطلوب");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan((short)0).WithMessage("عملة سند القبض مطلوبة");
-
         RuleFor(x => x.CashBoxId)
             .GreaterThan(0).WithMessage("الصندوق النقدي مطلوب");
 

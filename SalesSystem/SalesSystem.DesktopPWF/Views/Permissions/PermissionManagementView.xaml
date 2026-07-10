@@ -26,22 +26,13 @@
         <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="12" Margin="0,0,0,8">
             <StackPanel>
                 <TextBlock Text="اختر الدور" FontWeight="Bold" FontSize="14" Margin="0,0,0,8"/>
-                <StackPanel Orientation="Horizontal">
-                    <RadioButton Content="مدير النظام"
-                                 GroupName="RoleSelector"
-                                 IsChecked="{Binding IsAdminSelected}"
-                                 Margin="0,0,20,0"
-                                 ToolTip="صلاحية كاملة — جميع الصلاحيات متاحة لمدير النظام"/>
-                    <RadioButton Content="مدير فرع"
-                                 GroupName="RoleSelector"
-                                 IsChecked="{Binding IsManagerSelected}"
-                                 Margin="0,0,20,0"
-                                 ToolTip="صلاحية مشرف — المبيعات والمشتريات والمنتجات والتقارير"/>
-                    <RadioButton Content="كاشير"
-                                 GroupName="RoleSelector"
-                                 IsChecked="{Binding IsCashierSelected}"
-                                 ToolTip="صلاحية محدودة — المبيعات ومرتجعات المبيعات فقط"/>
-                </StackPanel>
+                <ComboBox ItemsSource="{Binding Roles}"
+                          SelectedItem="{Binding SelectedRoleItem}"
+                          DisplayMemberPath="Name"
+                          Style="{StaticResource ModernComboBox}"
+                          MinWidth="200"
+                          Margin="0,0,0,0"
+                          ToolTip="اختر الدور لعرض وتعديل صلاحياته"/>
             </StackPanel>
         </Border>
 

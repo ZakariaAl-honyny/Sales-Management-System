@@ -42,6 +42,11 @@ public class Supplier : ActivatableEntity
     public string? Notes { get; private set; }
 
     /// <summary>
+    /// Maximum credit limit for this supplier (decimal(18,2)). Zero means no limit.
+    /// </summary>
+    public decimal CreditLimit { get; private set; }
+
+    /// <summary>
     /// FK to the Chart of Accounts Account that holds this supplier's balance.
     /// </summary>
     public int AccountId { get; private set; }
@@ -81,6 +86,7 @@ public class Supplier : ActivatableEntity
         string? address = null,
         string? taxNumber = null,
         string? notes = null,
+        decimal creditLimit = 0,
         int? categoryId = null,
         int? createdByUserId = null)
     {
@@ -88,6 +94,8 @@ public class Supplier : ActivatableEntity
             throw new DomainException("اسم المورد مطلوب.");
         if (accountId <= 0)
             throw new DomainException("معرّف الحساب غير صالح.");
+        if (creditLimit < 0)
+            throw new DomainException("الحد الائتماني لا يمكن أن يكون سالباً.");
 
         var supplier = new Supplier
         {
@@ -98,6 +106,7 @@ public class Supplier : ActivatableEntity
             Address = address?.Trim(),
             TaxNumber = taxNumber?.Trim(),
             Notes = notes?.Trim(),
+            CreditLimit = creditLimit,
             CategoryId = categoryId,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
@@ -125,11 +134,14 @@ public class Supplier : ActivatableEntity
         string? address = null,
         string? taxNumber = null,
         string? notes = null,
+        decimal creditLimit = 0,
         int? categoryId = null,
         int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم المورد مطلوب.");
+        if (creditLimit < 0)
+            throw new DomainException("الحد الائتماني لا يمكن أن يكون سالباً.");
 
         Name = name.Trim();
         Phone = phone?.Trim();
@@ -137,9 +149,20 @@ public class Supplier : ActivatableEntity
         Address = address?.Trim();
         TaxNumber = taxNumber?.Trim();
         Notes = notes?.Trim();
+        CreditLimit = creditLimit;
         if (categoryId.HasValue)
             CategoryId = categoryId;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Non-throwing SOFT WARNING check. Returns true if additional amount would exceed limit.
+    /// Caller decides whether to block (per RULE-448).
+    /// </summary>
+    public bool CheckCreditLimit(decimal additionalAmount, decimal currentBalance)
+    {
+        if (CreditLimit <= 0) return false; // No limit = always OK
+        return (currentBalance + additionalAmount) > CreditLimit;
     }
 }

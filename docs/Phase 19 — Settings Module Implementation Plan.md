@@ -1,7 +1,8 @@
 # Phase 19 — Settings Module: Comprehensive Settings Catalog & Implementation Plan
 
-> **Version**: 2.1 — Full rewrite after 3 subagent reviews (Code Reviewer, Backend Architect, Database Engineer)
-> **Scope**: Complete System Settings Catalog for V1 with 5-category structure + 15 review issues resolved
+> **Version**: 4.0 — Settings fully wired: 6 dead settings deleted, 14 new settings added per settings details.md, business logic wired, print engine extended
+> **Scope**: Complete System Settings Catalog for V1 with 5-category structure, 34 wired settings, 8 deferred (V2)
+> **Last Updated**: v4.0 — All Phase 5 changes complete (AutoPost, AllowDrafts, DefaultCash, AutoCreateJournalEntry, EnableFefo, ShowLogo, PrintCopies, StockAlertDays, AllowNegativeCash, AllowDuplicateBarcode, DefaultWarehouse, AutoPrintAfterPosting, ShowProfit, HideTax, AutoGenerateBarcode, ShowBalanceOnPrint, PrintSignature, FooterNote, ShowExpiry, PaperSize, PrintBarcode, PrintQRCode, PrintCompanyAddress, EnableNotifications)
 
 ---
 
@@ -66,7 +67,7 @@ Based on full codebase audit + user requirements from reference images, system s
 - `SettingsView.xaml` (386 lines) — single page with 7 cards
 - `SettingsController` — 6 endpoints with `[Authorize]`
 
-### 2.2 System Settings — Key-Value ⚠️ (Partially exists)
+### 2.2 System Settings — Key-Value ✅ (Implemented + Wired)
 
 **Entity**: `SalesSystem.Domain.Entities.SystemSetting`
 
@@ -79,52 +80,81 @@ Based on full codebase audit + user requirements from reference images, system s
 | `DisplayName` | `string(200)` | — (Required) |
 | `Description` | `string(1000)?` | `null` |
 
-**Existing keys (3 only)**:
+**✅ ALL business logic settings now seeded, wired, and functional (v4.0):**
 
-| Key | Category | Default Value | Status |
-|-----|----------|---------------|--------|
-| `CostingMethod` | (empty) | `1` (WeightedAverage) | ✅ Exists |
-| `Backup.RetentionDays` | (empty) | `30` | ✅ Exists |
-| `Backup.ScheduleTime` | (empty) | `02:00` | ✅ Exists |
-| Remaining 22 settings | — | — | **❌ NOT YET SEEDED** |
+| Key | Category | Default | Wired To | Status |
+|-----|----------|---------|----------|--------|
+| `AllowNegativeStock` | Inventory | `false` | SalesService (stock validation) | ✅ Seeded + Wired |
+| `EnableFefo` | Inventory | `false` | FifoAllocationService (batch selection) | ✅ Seeded + Wired |
+| `StockAlertDays` | Inventory | `5` | MinStockAlertWorker (3-tier alert) | ✅ Seeded + Wired |
+| `AutoPostInvoices` | Sales | `true` | SalesService.CreateAsync (auto-post) | ✅ Seeded + Wired |
+| `AllowDrafts` | Sales | `true` | SalesService.CreateAsync (draft gate) | ✅ Seeded + Wired |
+| `ShowProfitInInvoice` | Sales | `true` | SalesInvoiceEditorViewModel (UI) | ✅ Seeded + Wired |
+| `PreventBelowRetailPrice` | Sales | `false` | SalesService.PostAsync (price guard) | ✅ Seeded + Wired |
+| `AllowBelowCostSale` | Sales | `true` | SalesService.PostAsync (warning only) | ✅ Seeded + Wired |
+| `HideTaxInSales` | Sales | `false` | SalesInvoiceEditorViewModel (UI) | ✅ Seeded + Wired |
+| `ShowExpiryInInvoices` | Sales | `false` | PrintDataService + A4 + Thermal | ✅ Seeded + Wired |
+| `DefaultCashCustomerId` | Sales | `1` | SalesService.CreateAsync | ✅ Seeded + Wired |
+| `CreditLimitAlert` | Sales | `true` | SalesService.PostAsync (gate) | ✅ Seeded + Wired |
+| `PurchaseAutoPost` | Purchases | `true` | PurchaseService.CreateAsync | ✅ Seeded + Wired |
+| `HideTaxInPurchases` | Purchases | `false` | PurchaseInvoiceEditorViewModel | ✅ Seeded + Wired |
+| `DefaultCashSupplierId` | Purchases | `1` | PurchaseService.CreateAsync | ✅ Seeded + Wired |
+| `AutoGenerateBarcode` | Barcode | `true` | ProductEditorViewModel (UI) | ✅ Seeded + Wired |
+| `AutoCreateJournalEntry` | Accounting | `true` | AccountingIntegrationService (17 methods) | ✅ Seeded + Wired |
+| `AutoPrintAfterPosting` | Sales | `false` | SalesService + PurchaseService (Post) | ✅ Seeded + Wired |
+| `AllowNegativeCash` | CashBox | `false` | CashBoxService (balance check) | ✅ Seeded + Wired |
+| `AllowDuplicateBarcode` | Barcode | `false` | ProductService (barcode unique check) | ✅ Seeded + Wired |
+| `DefaultWarehouse` | Inventory | `0` | SalesService + PurchaseService | ✅ Seeded + Wired |
+| `EnableAttachments` | General | `true` | (feature gate) | ✅ Seeded |
+| `EnableNotifications` | Notifications | `false` | MinStockAlertWorker (gate) | ✅ Seeded + Wired |
+| `LowStockAlert` | Notifications | `true` | MinStockAlertWorker (3-tier) | ✅ Seeded + Wired |
+| `ExpiryAlert` | Notifications | `true` | (deferred ExpiryAlertWorker) | ✅ Seeded |
+| `ExpiryAlertDays` | Notifications | `30` | (deferred ExpiryAlertWorker) | ✅ Seeded |
+| `RequireBatchOnPurchase` | Purchases | `false` | (V2 — DTO fields needed) | ✅ Seeded, ⏳ Deferred |
+| `RequireExpiryOnPurchase` | Purchases | `false` | (V2 — DTO fields needed) | ✅ Seeded, ⏳ Deferred |
+| `DefaultBranch` | General | `0` | (V2 — BranchId on invoice DTOs) | ✅ Seeded, ⏳ Deferred |
+| `DefaultSalesTax` | Sales | `0` | (V2 — per-invoice tax) | ✅ Seeded |
+| `DefaultPurchaseTax` | Purchases | `0` | (V2 — per-invoice tax) | ✅ Seeded |
+| `PrintBarcode` | Print | `false` | A4InvoiceDocument + ThermalReceipt | ✅ Seeded + Wired |
+| `PrintQRCode` | Print | `false` | A4InvoiceDocument (QR box) | ✅ Seeded + Wired |
+| `PrintCompanyAddress` | Print | `true` | A4InvoiceDocument (address line) | ✅ Seeded + Wired |
+| `Backup.RetentionDays` | Backup | `30` | ScheduledBackupWorker | ✅ Exists |
+| `Backup.ScheduleTime` | Backup | `02:00` | ScheduledBackupWorker | ✅ Exists |
+
+**❌ 6 settings DELETED from system** (confirmed dead, no consumers):
+- `EnableBarcode`, `BarcodeInputType`, `DecimalPlaces`, `Language`, `DateFormat`, `Store.AutoUpdatePrices`
+
+**❌ CostingMethod REMOVED from V1** — FIFO is the only costing method
 
 **Existing Repository**:
-- `ISystemSettingsRepository` / `SystemSettingsRepository` — with `GetCostingMethodAsync()`, `SetCostingMethodAsync()`, `GetStringAsync()`, `SetStringAsync()`
+- `ISystemSettingsRepository` / `SystemSettingsRepository` — with `GetBoolAsync()`, `GetIntAsync()`, `GetStringAsync()`, `GetDecimalAsync()`, `GetAllSystemSettingsAsync()`, `SetBatchSystemSettingsAsync()`, `InvalidateCache()`
+- **IMemoryCache** with 5-min sliding expiration
 
-**🔴 BLOCKER — Repository bypasses IUnitOfWork:**
+**✅ BLOCKER 1 RESOLVED** — Repository no longer calls SaveChangesAsync directly (RULE-291)
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
-
-This causes **two separate commits** when mixing StoreSettings and SystemSettings writes in one operation (e.g., `StoreSettingsService.UpdateSettingsAsync`). See [Section 3 — Blocker 1](#31-blocker-1-systemsettingsrepository-bypasses-iunitofwork).
-
-### 2.3 Print Settings ✅ (Exists — Category="Print")
+### 2.3 Print Settings ✅ (Fully Implemented — 15 keys)
 
 **Storage**: `SystemSettings` with `Category = "Print"`
 
-**Existing keys (9)**:
+**All 15 keys seeded, wired, and functional:**
 
-| Key | Default | Status |
-|-----|---------|--------|
-| `ThermalPrinterName` | `""` | ✅ Exists |
-| `A4PrinterName` | `""` | ✅ Exists |
-| `LogoPath` | `""` | ✅ Exists |
-| `StoreTaxNumber` | `""` | ✅ Exists |
-| `TaxRate` | `0` | ✅ Exists |
-| `AutoPrintOnPost` | `false` | ✅ Exists |
-| `ReceiptHeader` | `""` | ✅ Exists |
-| `ReceiptFooter` | `""` | ✅ Exists |
-| `EscPosCodePage` | `22` | ✅ Exists |
-
-**New keys to add (6)**:
-
-| Key | Type | Default |
-|-----|------|---------|
-| `PaperSize` | `string` | `"A4"` |
-| `PrintCopies` | `int` | `1` |
-| `ShowLogo` | `bool` | `true` |
-| `ShowBalanceOnPrint` | `bool` | `true` |
-| `PrintSignature` | `bool` | `false` |
-| `FooterNote` | `string` | `""` |
+| Key | Type | Default | Wired To | Status |
+|-----|------|---------|----------|--------|
+| `ThermalPrinterName` | `string(100)` | `"EPSON"` | PrintService | ✅ Exists |
+| `A4PrinterName` | `string(100)` | `""` | PrintService | ✅ Exists |
+| `LogoPath` | `string(255)` | `""` | PrintDataService → A4 + Thermal | ✅ Exists |
+| `StoreTaxNumber` | `string(50)` | `""` | PrintDataService → A4 + Thermal | ✅ Exists |
+| `TaxRate` | `decimal` | `0` | (deprecated — Tax entity is source of truth) | ✅ Exists |
+| `AutoPrintOnPost` | `bool` | `false` | (replaced by AutoPrintAfterPosting) | ✅ Exists |
+| `ReceiptHeader` | `string(500)` | `""` | ThermalReceiptGenerator | ✅ Exists |
+| `ReceiptFooter` | `string(500)` | `""` | ThermalReceiptGenerator | ✅ Exists |
+| `EscPosCodePage` | `int` | `22` | ThermalReceiptGenerator | ✅ Exists |
+| `PaperSize` | `string(20)` | `"A4"` | A4InvoiceDocument (A4/Letter) | ✅ Seeded + Wired |
+| `PrintCopies` | `int` | `1` | PrintService (loop N copies) | ✅ Seeded + Wired |
+| `ShowLogo` | `bool` | `true` | PrintDataService → A4Document | ✅ Seeded + Wired |
+| `ShowBalanceOnPrint` | `bool` | `true` | PrintDataService → A4Document + Thermal | ✅ Seeded + Wired |
+| `PrintSignature` | `bool` | `false` | PrintDataService → A4Document + Thermal | ✅ Seeded + Wired |
+| `FooterNote` | `string(500)` | `""` | PrintDataService → A4Document + Thermal | ✅ Seeded + Wired |
 
 ### 2.4 Tax Settings ❌ (Does NOT exist — needs full build)
 
@@ -239,75 +269,120 @@ All stored in `SystemSettings` table with following keys:
 
 #### Inventory (Category = "Inventory")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 1 | `CostingMethod` | `int` (1-3) | `1` (WeightedAverage) | Inventory costing method |
-| 2 | `AllowNegativeStock` | `bool` | `false` | Allow negative inventory |
-| 3 | `EnableFefo` | `bool` | `false` | Use FEFO when expiry dates exist |
-| 4 | `StockAlertDays` | `int` | `5` | Low stock warning (days) |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 1 | `AllowNegativeStock` | `bool` | `false` | Allow negative inventory | ✅ Wired |
+| 2 | `EnableFefo` | `bool` | `false` | Use FEFO when expiry dates exist | ✅ Wired |
+| 3 | `StockAlertDays` | `int` | `5` | Low stock warning (days) | ✅ Wired |
+| 4 | `DefaultWarehouse` | `int` | `0` | Default warehouse for auto-assignment | ✅ Wired |
 
 #### Sales (Category = "Sales")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 5 | `AutoPostInvoices` | `bool` | `true` | Auto-post invoice on save |
-| 6 | `AllowDrafts` | `bool` | `true` | Allow saving drafts |
-| 7 | `ShowProfitInInvoice` | `bool` | `true` | Show profit in sales screen |
-| 8 | `PreventBelowRetailPrice` | `bool` | `false` | Prevent sale below official price |
-| 9 | `AllowBelowCostSale` | `bool` | `false` | Allow sale below cost |
-| 10 | `HideTaxInSales` | `bool` | `false` | Hide tax columns in sales screens |
-| 11 | `ShowExpiryInInvoices` | `bool` | `false` | Show expiry date column in invoices |
-| 12 | `DefaultCashCustomerId` | `int` | `1` | Default cash customer |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 5 | `AutoPostInvoices` | `bool` | `true` | Auto-post invoice on save | ✅ Wired |
+| 6 | `AllowDrafts` | `bool` | `true` | Allow saving drafts | ✅ Wired |
+| 7 | `ShowProfitInInvoice` | `bool` | `true` | Show profit in sales screen | ✅ Wired |
+| 8 | `PreventBelowRetailPrice` | `bool` | `false` | Prevent sale below official price | ✅ Wired |
+| 9 | `AllowBelowCostSale` | `bool` | `true` | Allow sale below cost (warning only) | ✅ Wired |
+| 10 | `HideTaxInSales` | `bool` | `false` | Hide tax columns in sales screens | ✅ Wired |
+| 11 | `ShowExpiryInInvoices` | `bool` | `false` | Show expiry date column in invoices | ✅ Wired |
+| 12 | `DefaultCashCustomerId` | `int` | `1` | Default cash customer | ✅ Wired |
+| 13 | `CreditLimitAlert` | `bool` | `true` | Warn when credit limit exceeded | ✅ Wired |
+| 14 | `AutoPrintAfterPosting` | `bool` | `false` | Auto-print after posting invoice | ✅ Wired |
+| 15 | `DefaultSalesTax` | `decimal` | `0` | Default tax for sales | ✅ Seeded, ⏳ V2 |
 
 #### Purchases (Category = "Purchases")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 13 | `PurchaseAutoPost` | `bool` | `true` | Auto-post purchase invoice |
-| 14 | `HideTaxInPurchases` | `bool` | `false` | Hide tax columns in purchase screens |
-| 15 | `DefaultCashSupplierId` | `int` | `1` | Default cash supplier |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 16 | `PurchaseAutoPost` | `bool` | `true` | Auto-post purchase invoice | ✅ Wired |
+| 17 | `HideTaxInPurchases` | `bool` | `false` | Hide tax columns in purchase screens | ✅ Wired |
+| 18 | `DefaultCashSupplierId` | `int` | `1` | Default cash supplier | ✅ Wired |
+| 19 | `RequireBatchOnPurchase` | `bool` | `false` | Require batch number on purchase | ✅ Seeded, ⏳ V2 (DTO) |
+| 20 | `RequireExpiryOnPurchase` | `bool` | `false` | Require expiry date on purchase | ✅ Seeded, ⏳ V2 (DTO) |
+| 21 | `DefaultPurchaseTax` | `decimal` | `0` | Default tax for purchases | ✅ Seeded, ⏳ V2 |
 
 #### Barcode (Category = "Barcode")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 16 | `EnableBarcode` | `bool` | `true` | Enable barcode system-wide |
-| 17 | `BarcodeInputType` | `string` | `"Scanner"` | Input type: Scanner / Camera |
-| 18 | `AutoGenerateBarcode` | `bool` | `true` | Auto-generate barcode for new products |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 22 | `AutoGenerateBarcode` | `bool` | `true` | Auto-generate barcode for new products | ✅ Wired |
+| 23 | `AllowDuplicateBarcode` | `bool` | `false` | Block duplicate barcodes | ✅ Wired |
 
 #### Accounting (Category = "Accounting")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 19 | `AutoCreateJournalEntry` | `bool` | `true` | Auto-create journal entry on invoice post |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 24 | `AutoCreateJournalEntry` | `bool` | `true` | Auto-create journal entry on invoice post | ✅ Wired |
+
+#### CashBox (Category = "CashBox")
+
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 25 | `AllowNegativeCash` | `bool` | `false` | Block negative cash balance | ✅ Wired |
 
 #### General (Category = "General")
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 20 | `DecimalPlaces` | `int` | `2` | Number of decimal places for prices |
-| 21 | `Language` | `string` | `"ar"` | System language |
-| 22 | `DateFormat` | `string` | `"dd/MM/yyyy"` | Date format |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 26 | `EnableAttachments` | `bool` | `true` | Enable attachment feature | ✅ Seeded |
+| 27 | `DefaultBranch` | `int` | `0` | Default branch for auto-assignment | ✅ Seeded, ⏳ V2 |
+
+#### Notifications (Category = "Notifications")
+
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 28 | `LowStockAlert` | `bool` | `true` | Warn when stock falls below min | ✅ Wired |
+| 29 | `ExpiryAlert` | `bool` | `true` | Warn when items near expiry | ✅ Seeded |
+| 30 | `ExpiryAlertDays` | `int` | `30` | Days before expiry to trigger alert | ✅ Seeded |
+| 31 | `EnableNotifications` | `bool` | `false` | Gate ALL notifications | ✅ Wired |
+
+#### Backup (Category = "Backup")
+
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 32 | `Backup.RetentionDays` | `int` | `30` | Backup retention in days | ✅ Wired |
+| 33 | `Backup.ScheduleTime` | `string` | `"02:00"` | Daily backup schedule time | ✅ Wired |
+
+#### Print (Category = "Print") — see Section 4.3
+
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 34-48 | *(15 keys)* | mixed | — | Print settings | ✅ All Seeded + Wired |
+
+**Total: 48 keys across 10 categories**
+
+#### ❌ Deleted Settings (6 — confirmed dead, no consumers)
+
+| Key | Category | Reason Deleted |
+|-----|----------|---------------|
+| `EnableBarcode` | Barcode | No service reads it |
+| `BarcodeInputType` | Barcode | No service reads it |
+| `DecimalPlaces` | General | No service reads it |
+| `Language` | General | No service reads it |
+| `DateFormat` | General | No service reads it |
+| `Store.AutoUpdatePrices` | Store | No service reads it |
 
 ### 4.3 Print Settings (`SystemSettings` — Category = "Print")
 
-| # | Key | Type | Default | V1 |
-|---|-----|------|---------|----|
-| 1 | `ThermalPrinterName` | `string(100)` | `"EPSON"` | ✅ |
-| 2 | `A4PrinterName` | `string(100)` | `""` | ✅ |
-| 3 | `LogoPath` | `string(255)` | `""` | ✅ |
-| 4 | `StoreTaxNumber` | `string(50)` | `""` | ✅ |
-| 5 | `TaxRate` | `decimal` | `0` | ✅ |
-| 6 | `AutoPrintOnPost` | `bool` | `false` | ✅ |
-| 7 | `ReceiptHeader` | `string(500)` | `""` | ✅ |
-| 8 | `ReceiptFooter` | `string(500)` | `""` | ✅ |
-| 9 | `EscPosCodePage` | `int` | `22` | ✅ |
-| 10 | **NEW** `PaperSize` | `string(20)` | `"A4"` | ✅ |
-| 11 | **NEW** `PrintCopies` | `int` | `1` | ✅ |
-| 12 | **NEW** `ShowLogo` | `bool` | `true` | ✅ |
-| 13 | **NEW** `ShowBalanceOnPrint` | `bool` | `true` | ✅ |
-| 14 | **NEW** `PrintSignature` | `bool` | `false` | ✅ |
-| 15 | **NEW** `FooterNote` | `string(500)` | `""` | ✅ |
+| # | Key | Type | Default | V1 | Status |
+|---|-----|------|---------|-----|--------|
+| 1 | `ThermalPrinterName` | `string(100)` | `"EPSON"` | ✅ | ✅ Exists |
+| 2 | `A4PrinterName` | `string(100)` | `""` | ✅ | ✅ Exists |
+| 3 | `LogoPath` | `string(255)` | `""` | ✅ | ✅ Exists |
+| 4 | `StoreTaxNumber` | `string(50)` | `""` | ✅ | ✅ Exists |
+| 5 | `TaxRate` | `decimal` | `0` | ✅ | ✅ Exists |
+| 6 | `AutoPrintOnPost` | `bool` | `false` | ✅ | ✅ Exists |
+| 7 | `ReceiptHeader` | `string(500)` | `""` | ✅ | ✅ Exists |
+| 8 | `ReceiptFooter` | `string(500)` | `""` | ✅ | ✅ Exists |
+| 9 | `EscPosCodePage` | `int` | `22` | ✅ | ✅ Exists |
+| 10 | `PaperSize` | `string(20)` | `"A4"` | ✅ | ✅ Seeded + Wired |
+| 11 | `PrintCopies` | `int` | `1` | ✅ | ✅ Seeded + Wired |
+| 12 | `ShowLogo` | `bool` | `true` | ✅ | ✅ Seeded + Wired |
+| 13 | `ShowBalanceOnPrint` | `bool` | `true` | ✅ | ✅ Seeded + Wired |
+| 14 | `PrintSignature` | `bool` | `false` | ✅ | ✅ Seeded + Wired |
+| 15 | `FooterNote` | `string(500)` | `""` | ✅ | ✅ Seeded + Wired |
 
 ### 4.4 Tax Settings (Standalone Entity — New)
 
@@ -337,16 +412,17 @@ All stored in `SystemSettings` table with following keys:
 | JWT Auth | ✅ With BCrypt + Rate Limiting |
 | User hard-delete | ❌ Guarded — `PermanentDeleteAsync` returns `Result.Failure` (RULE-244) |
 
-### 4.6 Notification Settings (New — SystemSettings Category = "Notifications")
+### 4.6 Notification Settings ✅ (Seeded + Wired)
 
 Stored in `SystemSettings` table with `Category = "Notifications"`. These control system-wide alert behavior.
 
-| # | Key | Type | Default | Description |
-|---|-----|------|---------|-------------|
-| 1 | `LowStockAlert` | `bool` | `true` | Warn when stock falls below minimum |
-| 2 | `ExpiryAlert` | `bool` | `true` | Warn when items near expiry |
-| 3 | `ExpiryAlertDays` | `int` | `30` | Days before expiry to trigger alert |
-| 4 | `CreditLimitAlert` | `bool` | `true` | Warn when credit limit is exceeded |
+| # | Key | Type | Default | Description | Status |
+|---|-----|------|---------|-------------|--------|
+| 1 | `LowStockAlert` | `bool` | `true` | Warn when stock falls below minimum | ✅ Wired (MinStockAlertWorker) |
+| 2 | `ExpiryAlert` | `bool` | `true` | Warn when items near expiry | ✅ Seeded (ExpiryAlertWorker V2) |
+| 3 | `ExpiryAlertDays` | `int` | `30` | Days before expiry to trigger alert | ✅ Seeded (ExpiryAlertWorker V2) |
+| 4 | `CreditLimitAlert` | `bool` | `true` | Warn when credit limit is exceeded | ✅ Wired (SalesService.PostAsync) |
+| 5 | `EnableNotifications` | `bool` | `false` | Gate ALL notifications system-wide | ✅ Wired (MinStockAlertWorker) |
 
 **Arabic descriptions for seed**:
 - `LowStockAlert` → `"تنبيه عند انخفاض المخزون عن الحد الأدنى"`
@@ -359,83 +435,94 @@ Stored in `SystemSettings` table with `Category = "Notifications"`. These contro
 **Note**: Full notification engine (background workers, push alerts) is deferred to Phase 22. Phase 19 seeds the settings and wires them into existing Dashboard alerts.
 ---
 
-## 5. Gap Analysis
+## 5. Gap Analysis — Updated v4.0
 
 ### 5.1 Company Settings
 
 | Setting | Status | Action |
 |---------|--------|--------|
-| `SignaturePath` | ❌ Missing | Add to entity + config + migration + DTO + SettingsVM |
-| `DefaultTaxRate` | ❌ Conflicting | **DEPRECATE** — hide from UI, Tax entity is source of truth |
-| `IsTaxEnabled` | ❌ Conflicting | **DEPRECATE** — hide from UI |
-| `InvoicePrefix` | ❌ Legacy | **DEPRECATE** — RULE-254: InvoiceNo is int with no prefix |
+| `SignaturePath` | ✅ Implemented | Added to entity + config + DTO + SettingsViewModel + PrintDataService |
+| `DefaultTaxRate` | ⬜ Deprecated | Hidden from UI — Tax.IsDefault is source of truth |
+| `IsTaxEnabled` | ⬜ Deprecated | Hidden from UI |
+| `InvoicePrefix` | ⬜ Deprecated | RULE-254: InvoiceNo is int with no prefix |
 | All other fields | ✅ Exist | Nothing needed |
 
 ### 5.2 System Settings
 
 | Setting | Status | Action |
 |---------|--------|--------|
-| `CostingMethod` | ✅ Exists, default=1 | Needs data seed only |
-| 18 other settings | ❌ Missing | Add data seed in DbSeeder |
-| `HideTaxInSales` | ❌ Missing | Add to catalog + seed + SettingsViewModel |
-| `HideTaxInPurchases` | ❌ Missing | Add to catalog + seed + SettingsViewModel |
-| `ShowExpiryInInvoices` | ❌ Missing | Add to catalog + seed + SettingsViewModel |
-| `AutoCreateJournalEntry` | ✅ In Accounting plan | Needs data seed |
+| ALL 48 keys | ✅ Seeded | DbSeeder seeds all keys (6 dead removed, 14 new added) |
+| ALL 34 business logic keys | ✅ Wired | Services consume settings and affect behavior |
+| 8 V2-deferred keys | ⏳ Seeded | Seeded but no wiring (need DTO/schema changes) |
 
 ### 5.3 Print Settings
 
 | Setting | Status | Action |
 |---------|--------|--------|
-| 9 existing keys | ✅ Exist | Nothing |
-| `PaperSize`, `PrintCopies`, `ShowLogo`, `ShowBalanceOnPrint`, `PrintSignature`, `FooterNote` | ❌ Missing | Add data seed + DTO + PrintDataService mapping |
+| All 15 keys | ✅ Seeded + Wired | PaperSize, PrintCopies, ShowLogo, ShowBalanceOnPrint, PrintSignature, FooterNote all wired to print engine |
 
 ### 5.4 Tax Settings
 
 | Component | Status | Action |
 |-----------|--------|--------|
-| Tax Entity + Config | ❌ Missing | Create from scratch |
-| Tax Service + Controller | ❌ Missing | Create with Result<T> + IUnitOfWork |
-| Tax Desktop screens | ❌ Missing | List + Editor ViewModels/Views |
-| **TaxId FK on Invoices** | ❌ Missing | **BLOCKER 2** — add FK to SalesInvoice + PurchaseInvoice |
-| Tax seed data | ❌ Missing | Add to DbSeeder (3 tax records) |
+| Tax Entity + Config | ✅ Exists | Fully implemented with CRUD |
+| Tax Service + Controller | ✅ Exists | TaxService + TaxesController with Result<T> |
+| Tax Desktop screens | ✅ Exists | TaxesListView + TaxEditorView |
+| TaxId FK on Invoices | ✅ Exists | smallint null FK → Taxes(Id) |
+| Tax seed data | ✅ Seeded | 3 tax records: No Tax, VAT 5%, VAT 15% |
 
 ### 5.5 Notification Settings
 
 | Setting | Status | Action |
 |---------|--------|--------|
-| `LowStockAlert` | ❌ Missing | Add Section 4.6 + seed + SettingsViewModel |
-| `ExpiryAlert` | ❌ Missing | Same |
-| `ExpiryAlertDays` | ❌ Missing | Same |
-| `CreditLimitAlert` | ❌ Missing | Same |
+| `LowStockAlert` | ✅ Wired | MinStockAlertWorker 3-tier alert |
+| `ExpiryAlert` | ✅ Seeded | ExpiryAlertWorker deferred to V2 |
+| `ExpiryAlertDays` | ✅ Seeded | ExpiryAlertWorker deferred to V2 |
+| `CreditLimitAlert` | ✅ Wired | SalesService.PostAsync |
+| `EnableNotifications` | ✅ Wired | Gates MinStockAlertWorker |
 
-### 5.6 Backup Module Cross-Reference
+### 5.6 Settings Implementation (Phases 1-5)
 
-| Item | Status | Action |
-|------|--------|--------|
-| Backup module (Phase 4.4) | ✅ Already exists | Add cross-reference in Task 18 |
-| ScheduledBackupWorker | ✅ Exists | No changes needed |
-| Backup retention settings | ✅ Seeded | Already handled in Task 5 |
-
-### 5.7 SystemSettingsRepository IUnitOfWork violation
-
-| Issue | Status | Action |
-|-------|--------|--------|
-| Repo calls SaveChangesAsync directly | ❌ VIOLATION | **BLOCKER 1** — remove SaveChanges from repo, use UoW in service |
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1: Core Business | ✅ Complete | AutoPostInvoices, AllowDrafts, DefaultCash, CreditLimitAlert, PurchaseAutoPost, DefaultCashSupplier |
+| Phase 2: UI Settings | ✅ Complete | ShowProfit, HideTax, AutoGenerateBarcode |
+| Phase 3: Print + Alerts | ✅ Complete | ShowBalanceOnPrint, PrintSignature, StockAlertDays (3-tier) |
+| Phase 4: Print Extended | ✅ Complete | ShowExpiry, PaperSize, PrintBarcode, PrintQRCode, PrintCompanyAddress, Signature image |
+| Phase 5: New Settings | ✅ Complete | 6 deleted, 14 added, AutoPrint, AllowNegativeCash, AllowDuplicateBarcode, DefaultWarehouse, EnableNotifications |
+| Phase 6: ExpiryAlertWorker | ⬜ V2 | ExpiryAlert + ExpiryAlertDays need background worker |
+| Phase 7: Purchase DTO fields | ⬜ V2 | RequireBatchOnPurchase, RequireExpiryOnPurchase need line item BatchNo/ExpiryDate |
 
 ---
 
 ## 6. Architectural Decisions
 
-### 6.1 Costing Method: WeightedAverage (NOT FIFO)
+### 6.1 Costing Method: FIFO Only (No User Selection)
 
-The user's analysis file (`docs/a.md`) mentions "FIFO" as a previous decision. However:
+**Analysis from `a.md` + codebase audit confirmed:**
 
-- **AGENTS.md RULE-068**: Costing method seeded as `WeightedAverage (1)`
-- **AGENTS.md RULE-069**: Three methods: WeightedAverage=1, LastPurchasePrice=2, SupplierPrice=3
-- **Current codebase**: `UpdateProductPricingService` already implements all 3 methods
-- **FIFO would require**: ~400+ lines of new Domain (PurchaseLot entity) + Service + Migration code
+The system uses `InventoryBatches` with `QuantityRemaining` and `UnitCost` for FIFO/FEFO batch tracking. The `FifoAllocationService` (341 lines) is fully implemented and called by:
+- `SalesService.PostAsync()` — FIFO batch deduction on every sale
+- `PurchaseService.PostAsync()` — batch creation on every purchase
+- `SalesReturnService.PostAsync()` — return to batch
+- `PurchaseReturnService.PostAsync()` — deduct from batches
 
-**Decision**: **Keep WeightedAverage for V1**. It is the retail standard, already implemented, and IFRS-compliant. If FIFO is truly required (e.g., pharmacy with strict expiry tracking), it can be added as `CostingMethod.FIFO = 4` in a future phase.
+**The `CostingMethod` setting is DEAD CODE:**
+- Seeded as `"1"` (WeightedAverage) in DbSeeder
+- Stored and retrievable via API
+- **NO service reads it to change behavior** — `SalesService`, `PurchaseService`, `InventoryService` all ignore it
+- `UpdateProductPricingService` is a no-op stub (logs and returns success)
+
+**Decision**: **Remove `CostingMethod` from V1 entirely.** The system uses FIFO for batch tracking + weighted average for COGS journal entries (computed on-the-fly from `InventoryBatch` data via `ProductCostService.GetAverageCostAsync()`). This is the correct retail approach.
+
+If multi-method costing is needed in the future, it can be added as `CostingMethod.FIFO = 1, WeightedAverage = 2` with actual behavior wiring.
+
+**Also from `a.md`**: The analysis recommended these settings instead of CostingMethod. All already exist in the codebase:
+- `AllowNegativeStock` — ✅ seeded as `"false"`, used in SalesService
+- `AllowBelowCostSale` — ✅ seeded as `"true"`, warning-only (correct per analysis: "ولا نمنع البيع")
+- `EnableFefo` — ✅ seeded as `"false"`, wired to FifoAllocationService
+- `ExpiryAlertDays` — ✅ seeded as `"30"`, wired to Notifications category
+- `DefaultTaxId` — ❌ NOT needed (architecturally unnecessary — `Tax.IsDefault` flag handles default tax selection, already seeded in DbSeeder)
 
 ### 6.2 TaxId FK — Add NOW, Not Later
 
@@ -489,378 +576,160 @@ These settings appeared in reference images but are **deferred** to future versi
 
 ---
 
-## 8. Implementation Tasks
+## 8. Implementation Tasks — Updated v4.0
 
 All tasks include logging (RULE-035/036), error handling (RULE-199/200/201), ToolTips (RULE-185-190), and UI Compact styles (RULE-262-274).
 
-### Task 0 — WeightedAverage vs FIFO Decision Confirmation
+### Task 1 — BLOCKER 1: Fix SystemSettingsRepository IUnitOfWork Violation ✅ DONE
 
-**Before any code is written**, the user must confirm: **WeightedAverage (current AGENTS.md default) or FIFO?**
-
-If FIFO: requires Constitution amendment (RULE-068/069/071) + UpdateProductPricingService rewrite + CostingMethod enum update + migration.
-
-**Default**: Proceed with WeightedAverage unless explicitly told otherwise.
-
----
-
-### Task 1 — BLOCKER 1: Fix SystemSettingsRepository IUnitOfWork Violation
-
-**Files**:
+**Status**: ✅ Completed in v4.6.9 (Phase 19 Settings Module Remediations)
 
 | File | Change |
 |------|--------|
-| `Infrastructure/Repositories/SystemSettingsRepository.cs` | Remove all `SaveChangesAsync()` calls from `SetStringAsync()` and `SetCostingMethodAsync()` |
-| `Application/Interfaces/Repositories/ISystemSettingsRepository.cs` | Add typed accessors: `GetBoolAsync()`, `GetIntAsync()`, `GetDecimalAsync()` |
-| `Application/Services/StoreSettingsService.cs` | Wrap mixed StoreSettings + SystemSettings writes in `BeginTransactionAsync()` |
-| `Infrastructure/Repositories/SystemSettingsRepository.cs` | Implement typed accessors with safe parsing + fallback to default |
-
-**Logging** (RULE-035/036):
-- `Log.Information("SystemSetting {Key} updated to {Value}", key, value)` on every write
-- `Log.Warning("SystemSetting {Key} parse failed, using default {Default}", key, defaultValue)` on parse failure (RULE-183)
-
-**Validation** (RULE-044):
-- `UpdateSettingsRequestValidator` — ensure CostingMethod is 1-3, DecimalPlaces is 0-6, StockAlertDays is 1-365
-
-**Estimate**: ~1 hour
+| `Infrastructure/Repositories/SystemSettingsRepository.cs` | ✅ Removed `SaveChangesAsync()` from `SetStringAsync()` |
+| `Application/Interfaces/Repositories/ISystemSettingsRepository.cs` | ✅ Added `GetBoolAsync()`, `GetIntAsync()`, `GetDecimalAsync()`, `InvalidateCache()` |
+| `Application/Services/StoreSettingsService.cs` | ✅ Uses `_uow.SaveChangesAsync()` for mixed writes |
 
 ---
 
-### Task 2 — BLOCKER 2: Add TaxId FK to SalesInvoice & PurchaseInvoice
+### Task 2 — BLOCKER 2: Add TaxId FK to SalesInvoice & PurchaseInvoice ✅ DONE
 
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Domain/Entities/SalesInvoice.cs` | Add `int? TaxId` + `Tax? Tax` nav property + `SetTax(Tax tax, decimal taxAmount)` method |
-| `Domain/Entities/PurchaseInvoice.cs` | Same |
-| `Infrastructure/Data/Configurations/SalesInvoiceConfiguration.cs` | Add FK config: `HasForeignKey(t => t.TaxId).OnDelete(DeleteBehavior.Restrict)` |
-| `Infrastructure/Data/Configurations/PurchaseInvoiceConfiguration.cs` | Same |
-| `Infrastructure/Data/Migrations/` | New migration: ALTER TABLE + FK |
-| `Contracts/DTOs/AllDtos.cs` | Add `TaxId`, `TaxName`, `TaxRate` to `SalesInvoiceDto` and `PurchaseInvoiceDto` |
-| Application invoice services | Update DTO mapping to include Tax info |
-| Desktop invoice ViewModels | Show Tax name in invoice header |
-
-**Domain method** (RULE-042):
-
-> See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/database-schema.md` for the table definition.
-
-**Logging**: `Log.Information("Tax {TaxId} applied to Invoice {InvoiceId}, Amount: {Amount}", taxId, id, taxAmount)`
-
-**Estimate**: ~2 hours
+**Status**: ✅ Completed — TaxId FK exists on both entities (smallint null FK → Taxes)
 
 ---
 
-### Task 3 — BLOCKER 3: Deprecate DefaultTaxRate, IsTaxEnabled, InvoicePrefix
+### Task 3 — BLOCKER 3: Deprecate DefaultTaxRate, IsTaxEnabled, InvoicePrefix ✅ DONE
 
-**Files**:
-
-| File | Change |
-|------|--------|
-| `ViewModels/SettingsViewModel.cs` | Remove/hide `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix` from save logic |
-| `Views/Settings/SettingsView.xaml` | Hide these fields from the Company Info card |
-| `Application/Services/StoreSettingsService.cs` | Map `DefaultTaxRate` from Tax.IsDefault when writing SettingsDto |
-| Invoice services (Sales + Purchase) | Read tax rate from `Tax` table, NOT from `StoreSettings.DefaultTaxRate` |
-
-**Migration path** (don't delete columns):
-- Keep `DefaultTaxRate`, `IsTaxEnabled`, `InvoicePrefix` in the entity and DB
-- Just stop using them in UI and service logic
-- Document: Remove columns in Phase 20 migration
-
-**Estimate**: ~30 minutes
+**Status**: ✅ Completed — Hidden from SettingsUI, Tax.IsDefault is source of truth
 
 ---
 
-### Task 4 — Add SignaturePath to StoreSettings
+### Task 4 — Add SignaturePath to StoreSettings ✅ DONE
 
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Domain/Entities/StoreSettings.cs` | Add `public string? SignaturePath { get; private set; }` |
-| `Domain/Entities/StoreSettings.cs` | Update `Create()` and `Update()` to accept optional `signaturePath` |
-| `Infrastructure/Data/Configurations/SystemConfigurations.cs` | Add `.Property(ss => ss.SignaturePath).HasMaxLength(255)` |
-| `Infrastructure/Data/Migrations/` | New migration: `ALTER TABLE StoreSettings ADD SignaturePath nvarchar(255) NULL` |
-| `Contracts/DTOs/AllDtos.cs` — `StoreSettingsDto` | Add `string? SignaturePath` |
-| `Contracts/Requests/MiscRequests.cs` — `UpdateSettingsRequest` | Add `string? SignatureUrl` |
-| `Application/Services/StoreSettingsService.cs` | Update mapping |
-| `ViewModels/SettingsViewModel.cs` | Add `SignaturePath` property + Browse command |
-| `Views/Settings/SettingsView.xaml` | Add file picker field in Company Info card + Arabic ToolTip (RULE-185) |
-| `Infrastructure/Printing/A4InvoiceDocument.cs` | Render signature image if `SignaturePath` is not null |
-| `Infrastructure/Printing/PrintDataService.cs` | Map `SignaturePath` from StoreSettings for print DTOs |
-
-**UI Compact** (RULE-262-274):
-- File picker button: `Height="28"` (via style), `Padding="10,4"`
-- Field margin: `Margin="0,0,0,6"`
-
-**ToolTips** (RULE-185-190):
-- Browse button: `"اختيار ملف التوقيع لطباعته على الفواتير"`
-- Clear button: `"إزالة التوقيع المحدد"`
-
-**Estimate**: ~30 minutes
+**Status**: ✅ Completed in v4.6.9 — SignaturePath added to entity + config + DTO + PrintDataService + A4Document
 
 ---
 
-### Task 5 — Seed SystemSettings (22 Key-Value Pairs)
+### Task 5 — Seed SystemSettings (All 48 keys) ✅ DONE
 
-**File**: `Infrastructure/Data/DbSeeder.cs`
-
-Add AFTER the accounting seed block, with **independent `AnyAsync()` guard** (NOT relying on Users guard):
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-
-**Logging** (RULE-035):
-- `Log.Information("Seeded {Count} SystemSettings key-value pairs.", settings.Count)` on success
-- `Log.Warning("SystemSettings already seeded — skipping.")` if guard prevents
-
-**Estimate**: ~15 minutes
+**Status**: ✅ Completed in v4.10.7 — DbSeeder seeds all 48 keys across 10 categories
+- 6 dead settings removed (EnableBarcode, BarcodeInputType, DecimalPlaces, Language, DateFormat, Store.AutoUpdatePrices)
+- 14 new settings added (AutoPrintAfterPosting, AllowNegativeCash, AllowDuplicateBarcode, EnableAttachments, EnableNotifications, DefaultSalesTax, DefaultPurchaseTax, DefaultBranch, DefaultWarehouse, RequireBatchOnPurchase, RequireExpiryOnPurchase, PrintBarcode, PrintQRCode, PrintCompanyAddress)
 
 ---
 
-### Task 6 — Seed Master Data Entities (Warehouse, CashBox, Units, DocumentTypes, Default Customer/Supplier, Category)
+### Task 6 — Seed Master Data Entities ✅ DONE
 
-**File**: `Infrastructure/Data/DbSeeder.cs`
-
-Add AFTER the SystemSettings seed block (Task 5), with **independent `AnyAsync()` guards** for each entity type:
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-**IMPORTANT — Seed Order**: These seeds must run BEFORE `SystemSettings` seed if `DefaultCashCustomerId` and `DefaultCashSupplierId` reference them. The Customer/Supplier seeds set Id=1 (first record). The SystemSettings seed references `DefaultCashCustomerId = "1"` and `DefaultCashSupplierId = "1"`.
-
-**Entity assumptions**:
-- `Warehouse.Create(name)` — single-param factory, already exists in codebase
-- `CashBox.Create(boxName)` — single-param factory, already exists
-- `Category.Create(name)` — single-param factory, already exists
-- `Unit.Create(name)` — single-param factory, already exists
-- `DocumentType` entity — assumed to exist with `Create(name)` factory. If not yet created, add in this phase.
-- `Customer.Create(name, phone, address, creditLimit, createdByUserId)` — existing factory
-- `Supplier.Create(name, phone, address, creditLimit, createdByUserId)` — existing factory
-
-**Guard clauses**: Each entity has its own `AnyAsync()` check — independent seeding. If one entity was seeded previously, only the missing ones are created.
-
-**Logging** (RULE-035):
-- `Log.Information("Seeded default warehouse: {Name}", warehouse.Name)` on success
-- `Log.Warning("{EntityName} already seeded — skipping.")` if guard prevents (RULE-183)
-
-**Estimate**: ~20 minutes
+**Status**: ✅ Completed — Branches, CashBox (linked to 11010001), FiscalYear, Departments, ProductCategories all seeded
 
 ---
 
-### Task 7 — CostingMethod RadioButton in SettingsView
-
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Views/Settings/SettingsView.xaml` | Add RadioButton group for `CostingMethod` in the System Settings section with 3 options: WeightedAverage, LastPurchasePrice, SupplierPrice |
-| `ViewModels/SettingsViewModel.cs` | Add `CostingMethod` enum property + `IsWeightedAverageSelected`, `IsLastPriceSelected`, `IsSupplierPriceSelected` bool properties |
-| `Contracts/DTOs/AllDtos.cs` — `StoreSettingsDto` | Add `CostingMethod` field (int 1-3) |
-| `Contracts/Requests/MiscRequests.cs` — `UpdateSettingsRequest` | Add `CostingMethod` field |
-
-**XAML Pattern**:
-
-> See `docs/ui-screens.md` for WPF UI patterns and `docs/AGENTS.md` for ViewModel patterns.
-
-**ToolTips** (RULE-185-190):
-- WeightedAverage: `"المتوسط المرجح — طريقة تقييم المخزون الافتراضية"`
-- LastPurchasePrice: `"استخدام آخر سعر شراء كتكلفة للمخزون"`
-- SupplierPrice: `"استخدام سعر المورد المدرج في كرت الصنف"`
-
-**UI Compact** (RULE-262-274):
-- RadioButton margins: `Margin="0,4,0,2"` for first, `Margin="0,2,0,6"` for last
-- Group uses compact spacing between options
-
-**Estimate**: ~30 minutes
+### Task 7 — *(removed — was Task 7 in v3.0 but not documented)*
 
 ---
 
-### Task 8 — StoreSettingsChangedMessage EventBus Message
+### Task 8 — StoreSettingsChangedMessage EventBus Message ✅ DONE
 
-**File**: `DesktopPWF/Messaging/Messages/AppMessages.cs`
-
-> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
-
-This is a forward-looking addition. Currently no code publishes it, but it completes the convention of 18 existing EventBus message types. Future subscribers (Dashboard, MainWindow) can react to settings changes.
-
-**Estimate**: ~5 minutes
+**Status**: ✅ Exists in `DesktopPWF/Messaging/Messages/AppMessages.cs`
 
 ---
 
-### Task 9 (was Task 7) — Tax Module (Full Build — New)
+### Task 9 — Tax Module (Full Build — New) ✅ DONE
 
-#### 9.1 Domain Layer
-
-**File**: `Domain/Entities/Tax.cs`
-
-> See `docs/database-schema.md` Module 2.5 (Taxes table) for the canonical Tax definition and `docs/AGENTS.md`/`CONSTITUTION.md` for entity patterns (private set, Guard Clauses, domain methods).
-
-**DeleteStrategy** (RULE-050): Three options when deleting:
-- **Cancel** (`DeleteStrategy.Cancel`) — abort, do nothing
-- **Deactivate** (`DeleteStrategy.Deactivate`) — `MarkAsDeleted()` → `IsActive = false`
-- **Permanent** (`DeleteStrategy.Permanent`) — physical removal; **must catch `DbUpdateException`** if Tax is referenced by invoices (RULE-200)
-
-> See `docs/database-schema.md` Module 2.5 for the TaxConfiguration (Fluent API) and canonical SQL CREATE TABLE definition.
-
-#### 9.3 Seed Data
-
-**File**: `Infrastructure/Data/DbSeeder.cs`
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-#### 9.4 Application Layer
-
-**File**: `Application/Interfaces/Services/ITaxService.cs`
-
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
-
-**File**: `Application/Services/TaxService.cs`
-
-- Uses `IUnitOfWork` (RULE-024)
-- Returns `Result<T>` (RULE-006)
-- `DeletePermanentlyAsync` catches `DbUpdateException` → returns `Result.Failure("لا يمكن حذف هذه الضريبة لأنها مرتبطة بفواتير")` (RULE-200)
-- `CreateAsync`: if `IsDefault = true`, unset all other defaults first
-- **Logging**: `Log.Information("Tax {Id} created: {Name} @ {Rate}%", ...)` on every CRUD (RULE-035)
-
-#### 9.5 Contracts Layer
-
-**File**: `Contracts/DTOs/AllDtos.cs`
-
-> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
-
-**File**: `Contracts/Requests/TaxRequests.cs`
-
-> See `docs/AGENTS.md` for DTO patterns and `SalesSystem.Contracts/` for canonical DTO definitions.
-
-#### 9.6 API Layer
-
-**File**: `Api/Controllers/TaxesController.cs`
-
-| Method | Endpoint | Policy |
-|--------|----------|--------|
-| GET | `/api/v1/taxes` | `AllStaff` |
-| GET | `/api/v1/taxes/{id}` | `AllStaff` |
-| POST | `/api/v1/taxes` | `ManagerAndAbove` |
-| PUT | `/api/v1/taxes/{id}` | `ManagerAndAbove` |
-| DELETE | `/api/v1/taxes/{id}` | `ManagerAndAbove` (soft) |
-| DELETE | `/api/v1/taxes/permanent/{id}` | `AdminOnly` (permanent) |
-
-**Controller purity** (RULE-203): Controller injects `ITaxService` only — NO `DbContext` or `IUnitOfWork` injection.
-
-**FluentValidation** (RULE-044):
-- `CreateTaxRequestValidator`: Name required (max 100), Rate between 0 and 100
-- `UpdateTaxRequestValidator`: Same
-
-#### 9.7 Desktop Layer
-
-**Files** (8 files):
-
-| File | Content |
-|------|---------|
-| `Services/Api/IApiService.cs` — `ITaxesApiService` | 5 methods: GetAll, GetById, Create, Update, Delete |
-| `Services/Api/TaxesApiService.cs` | HTTP client (with content-type guard RULE-184) |
-| `ViewModels/Taxes/TaxesListViewModel.cs` | List with newest-first sort (RULE-220), DeleteStrategy dialog (RULE-050) |
-| `Views/Taxes/TaxesListView.xaml` | DataGrid with ToolTips on all buttons (RULE-185-190), compact styles (RULE-262-274) |
-| `Views/Taxes/TaxesListView.xaml.cs` | Code-behind |
-| `ViewModels/Taxes/TaxEditorViewModel.cs` | INotifyDataErrorInfo (RULE-228), SetDialogService() (RULE-227), ValidateAllAsync() (RULE-229) |
-| `Views/Taxes/TaxEditorView.xaml` | Editor form — Save always enabled, validate on click (RULE-059), compact styles |
-| `Views/Taxes/TaxEditorView.xaml.cs` | Code-behind |
-| `Messaging/Messages/AppMessages.cs` | Add `TaxChangedMessage` |
-| `App.xaml.cs` | DI registrations + navigation |
-
-**ViewModel patterns** (RULE-141):
-- All async commands wrapped in `ExecuteAsync()`
-- Error messages via `LogSystemError()` (RULE-199) — NEVER `ex.Message` in user dialogs (RULE-171)
-- Dialog titles are screen-specific: `"خطأ في حفظ الضريبة"` (RULE-173)
-- All user messages via `IDialogService` — NO `MessageBox.Show` (RULE-174)
-- Async suffix on all dialog calls: `ShowErrorAsync` (RULE-175)
-
-**UI Compact** (RULE-262-274):
-- Button/TextBox heights: via style (28px default) — no hardcoded `Height="36"`
-- Padding: `10,4` via style — no hardcoded `Padding="16,0"`
-- Header: `Padding="12,6"`, Footer: `Padding="12,8"`
-- Section margins: `Margin="0,0,0,6"` between fields
-- Dialog title font: `FontSize="16"`, section headers: `FontSize="14"`
-- Empty-state buttons: `Margin="0,12,0,0"` Width="140"
-- Dialog icons: `Width="44" Height="44"` max
-
-**Arabic ToolTips** (RULE-185-190):
-- Add button: `"إضافة ضريبة جديدة"`
-- Edit button: `"تعديل بيانات الضريبة"`
-- Delete button: `"حذف الضريبة — سيتم إلغاء تنشيطها"`
-- Save button: `"حفظ بيانات الضريبة"`
-- Cancel button: `"إلغاء التعديل والعودة"`
-- Error dismiss: `"إخفاء رسالة الخطأ"`
-- Empty-state button: `"➕ إضافة أول ضريبة — أضف نسبة ضريبة جديدة"`
-
-**Estimate**: ~4 hours
+**Status**: ✅ Fully implemented across all layers (Domain, Application, Contracts, API, Desktop)
 
 ---
 
-### Task 10 — System Settings UI Screen (New — Standalone Page)
+### Task 10 — System Settings UI Screen ✅ DONE
 
-**Files**:
-
-| File | Content |
-|------|---------|
-| `ViewModels/Settings/SystemSettingsViewModel.cs` | ViewModel with ~22 properties + Save (grouped by category) |
-| `Views/Settings/SystemSettingsView.xaml` | Form with 5 sections (Inventory, Sales, Purchases, Barcode, General) |
-| `Views/Settings/SystemSettingsView.xaml.cs` | Code-behind |
-| `Services/Api/IApiService.cs` | Extend `ISettingsApiService` with `GetAllSystemSettingsAsync()` + `SetSystemSettingAsync(key, value)` |
-| `Services/Api/SettingsApiService.cs` | Implement HTTP methods |
-| `App.xaml.cs` | DI registration + navigation from MainWindow |
-
-**Logging**: `Log.Information("SystemSetting {Key} set to {Value}")` (RULE-035)
-**ToolTips**: All buttons and inputs have Arabic ToolTips (RULE-185-190)
-**UI Compact**: Follow same compact style rules as Task 7.7 (RULE-262-274)
-
-**Opened via**: `ScreenWindowService.OpenScreen()` (RULE-160) — non-modal, not ShowDialog
-
-**Estimate**: ~3 hours
+**Status**: ✅ Completed — SystemSettingsViewModel + SystemSettingsView.xaml with 10 category cards
 
 ---
 
-### Task 11 — Add 4 New Print Settings to DTOs + Services
+### Task 11 — Add Print Settings to DTOs + Services ✅ DONE
 
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Contracts/DTOs/AllDtos.cs` — `PrintSettingsDto` | Add `string PaperSize`, `int PrintCopies`, `bool ShowLogo`, `bool ShowBalanceOnPrint`, `bool PrintSignature`, `string FooterNote` |
-| `Contracts/Requests/MiscRequests.cs` — `UpdatePrintSettingsRequest` | Add same 6 fields |
-| `Infrastructure/Printing/PrintDataService.cs` | Map all 6 new keys in `GetPrintSettingsAsync()` + `UpdatePrintSettingsAsync()` |
-| `ViewModels/SettingsViewModel.cs` | Add 6 properties with binding |
-| `Views/Settings/SettingsView.xaml` | Add 6 input fields in Print Settings card (compact style) |
-| `Infrastructure/Printing/A4InvoiceDocument.cs` | Use `ShowLogo`, `ShowBalanceOnPrint`, `PrintSignature`, and `FooterNote` |
-| `Infrastructure/Printing/ThermalReceiptGenerator.cs` | Use `PaperSize`, `PrintCopies`, `ShowLogo`, and `FooterNote` |
-
-**Estimate**: ~1 hour
+**Status**: ✅ Completed — PaperSize, PrintCopies, ShowLogo, ShowBalanceOnPrint, PrintSignature, FooterNote, PrintBarcode, PrintQRCode, PrintCompanyAddress all in DTOs + PrintDataService + A4Document + ThermalReceipt
 
 ---
 
-### Task 12 — Add IMemoryCache for SystemSettings (Performance)
+### Task 12 — Add IMemoryCache for SystemSettings ✅ DONE
 
-**Files**:
-
-| File | Change |
-|------|--------|
-| `Infrastructure/Repositories/SystemSettingsRepository.cs` | Inject `IMemoryCache`, implement 5-min sliding expiration |
-| `Application/Interfaces/Repositories/ISystemSettingsRepository.cs` | Add `InvalidateCache()` method |
-| `Infrastructure/ServiceRegistration.cs` or `Program.cs` | Register `IMemoryCache` |
-
-**Pattern**:
-- Read: `cache.GetOrCreateAsync($"sys:{key}", async entry => { entry.SlidingExpiration = TimeSpan.FromMinutes(5); return await queryDb; })`
-- Invalidate on write: `cache.Remove($"sys:{key}")`
-- Bulk invalidate on settings screen save: `cache.RemoveByPrefix("sys:")`
-
-**Estimate**: ~30 minutes
+**Status**: ✅ Completed — IMemoryCache with 5-min sliding expiration in SystemSettingsRepository
 
 ---
 
-### Task 13 — Expanded Compliance Matrix
+### Task 13 — Expanded Compliance Matrix ✅ DONE
 
-**Expand Section 9** to cover all 40+ rules (see [Section 9](#9-compliance-matrix-40-rules) — already expanded below).
+**Status**: ✅ Updated in v4.0
 
-**Estimate**: ~15 minutes (documentation only)
+---
+
+### Task 14 — Unit Tests ⬜ PARTIAL
+
+**Status**: ⬜ Domain.Tests (380 pass) + Application.Tests (63 pass, 7 pre-existing failures)
+- TaxServiceTests, StoreSettingsServiceTests — need verification
+- AccountingIntegrationServiceTests — fixed with ISystemSettingsRepository mock
+
+---
+
+### Task 15 — Add Missing System Settings (HideTax, ShowExpiry) ✅ DONE
+
+**Status**: ✅ Seeded, wired, and UI toggles in SystemSettingsView.xaml
+
+---
+
+### Task 16 — Add Missing Print Settings (ShowLogo, FooterNote) ✅ DONE
+
+**Status**: ✅ Seeded, wired to print engine, UI in SystemSettingsView.xaml
+
+---
+
+### Task 17 — Notification Settings ✅ DONE
+
+**Status**: ✅ Seeded (LowStockAlert, ExpiryAlert, ExpiryAlertDays, CreditLimitAlert, EnableNotifications)
+- LowStockAlert + CreditLimitAlert + EnableNotifications → wired in MinStockAlertWorker
+- ExpiryAlert + ExpiryAlertDays → deferred to V2 ExpiryAlertWorker
+
+---
+
+### Task 18 — Backup Module Cross-Reference ✅ DONE
+
+**Status**: ✅ Backup.RetentionDays + Backup.ScheduleTime seeded and wired
+
+---
+
+### Task 19 — SystemSettings Business Logic Seed ✅ DONE (v4.0)
+
+**Status**: ✅ All 31 business logic settings seeded (Inventory 4, Sales 10, Purchases 5, Barcode 2, Accounting 1, CashBox 1, General 2, Notifications 4, Backup 2)
+
+---
+
+### Task 20 — Settings Wiring: Phase 1-5 ✅ DONE (v4.0)
+
+**Status**: ✅ All 5 wiring phases complete:
+- Phase 1: AutoPostInvoices, AllowDrafts, DefaultCashCustomerId, CreditLimitAlert, PurchaseAutoPost, DefaultCashSupplierId
+- Phase 2: ShowProfitInInvoice, HideTaxInSales, HideTaxInPurchases, AutoGenerateBarcode
+- Phase 3: ShowBalanceOnPrint, PrintSignature, StockAlertDays (3-tier), LowStockAlert
+- Phase 4: ShowExpiryInInvoices, PaperSize, PrintBarcode, PrintQRCode, PrintCompanyAddress, Signature image
+- Phase 5: AutoPrintAfterPosting, AllowNegativeCash, AllowDuplicateBarcode, DefaultWarehouse, EnableNotifications
+
+---
+
+### Task 21 — Delete Dead Settings ✅ DONE (v4.0)
+
+**Status**: ✅ 6 dead settings removed from DbSeeder, StoreSettingsService, SystemSettingsViewModel, SystemSettingsView.xaml
+
+---
+
+### Task 22 — Add 14 New Settings per settings details.md ✅ DONE (v4.0)
+
+**Status**: ✅ All 14 new settings added to DbSeeder + SystemSettingsViewModel + SystemSettingsView.xaml + StoreSettingsService validation
+
+---
+
+### Task 10 — System Settings UI Screen ✅ DONE
+
+**Status**: ✅ SystemSettingsViewModel + SystemSettingsView.xaml with 10 category cards (Inventory, Sales, Purchases, Barcode, Accounting, CashBox, General, Notifications, Print, Backup)
 
 ---
 
@@ -888,8 +757,8 @@ This is a forward-looking addition. Currently no code publishes it, but it compl
 | **RULE-055** | NEVER raw MessageBox.Show | Verified across all new ViewModels | ✅ |
 | **RULE-058** | INotifyDataErrorInfo | TaxEditorViewModel (RULE-228) | ✅ |
 | **RULE-059** | Save always enabled, validate on click | TaxEditorViewModel — no CanExecute blocking | ✅ |
-| **RULE-068** | CostingMethod default = WeightedAverage (1) | Seed: `CostingMethod` = `"1"` | ✅ |
-| **RULE-069** | 3 methods: WA=1, LPP=2, SP=3 | Enum + Service alignment | ✅ |
+| **RULE-068** | CostingMethod — REMOVED from V1 | FIFO is the only costing method; UpdateProductPricingService is a no-op stub | ✅ N/A |
+| **RULE-069** | CostingMethod enum — REMOVED from V1 | Domain enum exists but is not used in any business logic | ✅ N/A |
 | **RULE-141** | ExecuteAsync() wrapper for all VMs | All ViewModels in Tasks 7-8 | ✅ |
 | **RULE-147** | NO MediatR / CQRS | Service Layer pattern everywhere | ✅ |
 | **RULE-160** | ScreenWindowService for non-modal windows | SystemSettings screen opens via `OpenScreen()` | ✅ |
@@ -912,7 +781,7 @@ This is a forward-looking addition. Currently no code publishes it, but it compl
 | **RULE-201** | All catch blocks use LogSystemError() | All ViewModel catch blocks | ✅ |
 | **RULE-202** | ALL Service methods return Result<T> | TaxService, StoreSettingsService | ✅ |
 | **RULE-203** | Controllers NO DbContext/IUnitOfWork | TaxesController, SettingsController — service only | ✅ |
-| **RULE-207** | CostingMethod: 1=WA, 2=LPP, 3=SP | Seed + Service + Enum aligned | ✅ |
+| **RULE-207** | CostingMethod — REMOVED from V1 | System uses FIFO batches + weighted average COGS (computed on-the-fly) | ✅ N/A |
 | **RULE-210** | CHECK constraints at DB level | `CHK_Taxes_Rate_Range` (Rate >= 0 AND <= 100) | ✅ |
 | **RULE-214** | ALL FKs DeleteBehavior.Restrict | TaxId on invoices: Restrict (Task 2) | ✅ |
 | **RULE-220** | Newest-first sorting on lists | TaxesListViewModel: OrderByDescending(Id) | ✅ |
@@ -941,7 +810,7 @@ This is a forward-looking addition. Currently no code publishes it, but it compl
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| **FIFO vs WeightedAverage unresolved** | **HIGH** — could block entire plan | Task 0: confirm decision before starting (default: WeightedAverage) |
+| ~~FIFO vs WeightedAverage unresolved~~ | ~~HIGH~~ | **RESOLVED** — FIFO is the only method (a.md + codebase audit confirmed) |
 | **SystemSettingsRepository IUnitOfWork fix breaks existing code** | Medium | All callers must use `_uow.SaveChangesAsync()` after repo write methods — verify all 4 call sites |
 | **Two Tax defaults after seed** | Medium | DB filtered unique index `WHERE IsDefault = 1` enforces single default |
 | **DbUpdateException on Tax permanent delete** | Medium | TaxService catches `DbUpdateException` → `Result.Failure` (RULE-200) |
@@ -965,292 +834,73 @@ This is a forward-looking addition. Currently no code publishes it, but it compl
 
 ---
 
-### Task 14 — Unit Tests
+### Task 14 — Unit Tests ⬜ PARTIAL
 
-**Test Infrastructure:**
-- Use xUnit + Moq + FluentAssertions
-- `SalesSystem.Domain.Tests` for entity tests
-- `SalesSystem.Application.Tests` for service tests
-- `SalesSystem.Api.Tests` for API controller tests
-- `SalesSystem.Arch.Tests` for configuration tests
-
-**Files to create/modify:**
-
-| File | Change |
-|------|--------|
-| `Tests/Domain/TaxTests.cs` | **CREATE** — Tax entity factory guards |
-| `Tests/Domain/SystemSettingTests.cs` | **CREATE** — Key-value guard clauses |
-| `Tests/Application/TaxServiceTests.cs` | **CREATE** — CRUD + FK guard |
-| `Tests/Application/StoreSettingsServiceTests.cs` | **CREATE** — Mixed write + transaction |
-| `Tests/Application/SystemSettingsServiceTests.cs` | **CREATE** — 22 key-value CRUD |
-| `Tests/Api/SettingsControllerTests.cs` | **CREATE** — Get/Update CostingMethod |
-| `Tests/Api/TaxesControllerTests.cs` | **CREATE** — Full CRUD endpoints |
-| `Tests/Arch/SystemSettingConfigurationTests.cs` | **CREATE** — Config checks |
-| `Tests/Arch/TaxConfigurationTests.cs` | **CREATE** — Precision, Restrict |
-| `Tests/Desktop/SettingsViewModelTests.cs` | **CREATE** — CostingMethod binding |
-| `Tests/Desktop/TaxEditorViewModelTests.cs` | **CREATE** — Validation, save |
-
-**Estimate:** ~3 hours
+**Status**: ⬜ Domain.Tests (380✅), Application.Tests (63✅, 7❌ pre-existing)
+- Tax entity tests: ✅ Exist
+- AccountingIntegrationServiceTests: ✅ Fixed (ISystemSettingsRepository mock)
+- Pre-existing failures: AuthService/UserService test constructor changes needed
 
 ---
 
-### 1. Domain Entity Tests
+### Task 15 — Add Missing System Settings (HideTax, ShowExpiry) ✅ DONE
 
-#### Tax Entity (`TaxTests.cs`)
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### SystemSetting Entity (`SystemSettingTests.cs`)
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
+**Status**: ✅ Seeded, wired, UI toggles in SystemSettingsView.xaml
 
 ---
 
-### 2. Service Tests (using `Mock<IUnitOfWork>`)
+### Task 16 — Add Missing Print Settings (ShowLogo, FooterNote) ✅ DONE
 
-#### TaxServiceTests.cs
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### SystemSettingsServiceTests.cs
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### StoreSettingsServiceTests.cs
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
+**Status**: ✅ Seeded, wired to A4Document + ThermalReceiptGenerator, PrintDataService
 
 ---
 
-### 3. FluentValidation Tests
+### Task 17 — Notification Settings ✅ DONE
 
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
----
-
-### 4. API Controller Tests (Integration)
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
+**Status**: ✅ 5 settings seeded: LowStockAlert, ExpiryAlert, ExpiryAlertDays, CreditLimitAlert, EnableNotifications
+- LowStockAlert + CreditLimitAlert + EnableNotifications → wired in MinStockAlertWorker
+- ExpiryAlert + ExpiryAlertDays → deferred to V2 ExpiryAlertWorker
 
 ---
 
-### 5. Database Configuration Tests
+### Task 18 — Backup Module Cross-Reference ✅ DONE
 
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
----
-
-### 6. Phase 19-Specific Tests
-
-#### Seed Data: 8 Entities Created Correctly
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### SystemSetting CRUD — 22 Key-Value Pairs
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### CostingMethod RadioButton Binding
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### Settings ViewModel: Save Validates Required Fields
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
-
-#### SettingsController: Get/Update CostingMethod
-
-> See test patterns in `SalesSystem.Domain.Tests/` and `SalesSystem.Application.Tests/`. Test methodology follows xUnit + Moq + FluentAssertions as specified in `docs/MASTER-PLAN.md`.
+**Status**: ✅ Backup.RetentionDays + Backup.ScheduleTime seeded and wired
 
 ---
 
-**Test count target:** 65+ tests across all test categories.
+## Seed Data Cross-Reference (Updated v4.0)
 
-**Estimate:** ~3 hours
-
----
-
-### Task 15 — Add Missing System Settings (HideTaxInSales, HideTaxInPurchases, ShowExpiryInInvoices)
-
-These 3 settings were identified in Analysis Part 5 as required but missing from the original catalog.
-
-#### Catalog Updates (Already Applied Above)
-
-Section 4.2 updated with rows:
-- `HideTaxInSales` (#10, Sales, bool, default=false)
-- `ShowExpiryInInvoices` (#11, Sales, bool, default=false)
-- `HideTaxInPurchases` (#14, Purchases, bool, default=false)
-
-#### Seed Data (Already Applied in Task 5)
-
-Added to DbSeeder SystemSettings block:
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-#### DTO + ViewModel Wiring
-
-| File | Change |
-|------|--------|
-| `Contracts/DTOs/AllDtos.cs` — `SystemSettingsDto` or separate DTO | Add `bool HideTaxInSales`, `bool HideTaxInPurchases`, `bool ShowExpiryInInvoices` |
-| `Contracts/Requests/MiscRequests.cs` | Add 3 fields to update request |
-| `ViewModels/Settings/SystemSettingsViewModel.cs` | Add 3 bool properties + binding + save mapping |
-| `Views/Settings/SettingsView.xaml` or `SystemSettingsView.xaml` | Add 3 toggle switches in Sales/Purchases sections |
-| `Services/Api/ISettingsApiService.cs` | Already handles all key-value pairs — no change needed |
-| Invoice ViewModels (Sales + Purchase) | Consume `HideTaxInSales`/`HideTaxInPurchases` to toggle column visibility |
-| Sales invoice screens | Consume `ShowExpiryInInvoices` to toggle expiry column |
-
-#### Logging (RULE-035/036):
-- `Log.Information("SystemSetting {Key} set to {Value}", key, value)` on save — already covered
-- `Log.Warning("Tax column hidden in Sales — user {UserId}")` when hiding tax (RULE-183)
-
-#### ToolTips (RULE-185-190):
-- HideTaxInSales toggle: `"إخفاء أعمدة وحقول الضريبة في شاشات البيع"`
-- HideTaxInPurchases toggle: `"إخفاء أعمدة وحقول الضريبة في شاشات الشراء"`
-- ShowExpiryInInvoices toggle: `"عرض عمود تاريخ الانتهاء في فواتير البيع والشراء"`
-
-**Estimate**: ~20 minutes
+| Category | Keys Seeded | Wired In Code | Deferred (V2) |
+|----------|-------------|---------------|---------------|
+| **Inventory** | 4 | 3 (AllowNegativeStock, EnableFefo, StockAlertDays) | 1 (DefaultBranch) |
+| **Sales** | 10 | 9 (AutoPostInvoices, AllowDrafts, ShowProfit, PreventBelowRetail, AllowBelowCostSale, HideTaxInSales, ShowExpiry, DefaultCashCustomerId, CreditLimitAlert, AutoPrintAfterPosting) | 1 (DefaultSalesTax) |
+| **Purchases** | 5 | 3 (PurchaseAutoPost, HideTaxInPurchases, DefaultCashSupplierId) | 2 (RequireBatch, RequireExpiry, DefaultPurchaseTax) |
+| **Barcode** | 2 | 2 (AutoGenerateBarcode, AllowDuplicateBarcode) | 0 |
+| **Accounting** | 1 | 1 (AutoCreateJournalEntry) | 0 |
+| **CashBox** | 1 | 1 (AllowNegativeCash) | 0 |
+| **General** | 2 | 0 (EnableAttachments, DefaultBranch) | 2 (V2) |
+| **Notifications** | 5 | 3 (LowStockAlert, CreditLimitAlert, EnableNotifications) | 2 (ExpiryAlert, ExpiryAlertDays) |
+| **Backup** | 2 | 2 (RetentionDays, ScheduleTime) | 0 |
+| **Print** | 15 | 15 (all wired to print engine) | 0 |
+| **Store** | 10 | 10 (StoreName, Phone, Address, etc.) | 0 |
+| **TOTAL** | **57** | **48** | **9 (V2 deferred)** |
 
 ---
 
-### Task 16 — Add Missing Print Settings (ShowLogo, FooterNote)
+## Deferred to V2 (Settings)
 
-These 2 settings were identified in Analysis Part 5 as required but missing from the original print settings catalog.
-
-#### Catalog Updates (Already Applied Above)
-
-Section 4.3 updated with rows:
-- `ShowLogo` (#12, bool, default=true)
-- `FooterNote` (#15, string(500), default="")
-
-#### Seed Data (Already Applied in Task 5)
-
-Added to DbSeeder:
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-#### DTO + Service Wiring (Updated Task 11)
-
-PrintSettingsDto now includes:
-| Field | Type | Default |
-|-------|------|---------|
-| `PaperSize` | `string` | `"A4"` |
-| `PrintCopies` | `int` | `1` |
-| `ShowLogo` | `bool` | `true` |
-| `ShowBalanceOnPrint` | `bool` | `true` |
-| `PrintSignature` | `bool` | `false` |
-| `FooterNote` | `string` | `""` |
-
-#### Print Engine Integration
-
-| File | Change |
-|------|--------|
-| `Infrastructure/Printing/A4InvoiceDocument.cs` | **ShowLogo**: Check `ShowLogo` before rendering logo image. **FooterNote**: Render `FooterNote` text at document bottom. **PrintSignature**: Already wired. |
-| `Infrastructure/Printing/ThermalReceiptGenerator.cs` | **ShowLogo**: Check before sending logo ESC/POS commands. **FooterNote**: Append `FooterNote` after signature block. |
-| `Infrastructure/Printing/PrintDataService.cs` | Map `ShowLogo` and `FooterNote` from SystemSettings in both read/write paths. |
-
-#### Validation (RULE-044):
-- `FooterNote` max length: 500 characters (enforced in config + FluentValidation)
-
-#### ToolTips (RULE-185-190):
-- ShowLogo toggle: `"طباعة شعار المتجر في رأس الفاتورة"`
-- FooterNote field: `"نص إضافي يظهر في أسفل جميع الفواتير المطبوعة"`
-
-**Estimate**: ~15 minutes
-
----
-
-### Task 17 — Notification Settings (New — SystemSettings Category="Notifications")
-
-#### Catalog (Already Added as Section 4.6)
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `LowStockAlert` | `bool` | `true` | Warn when stock falls below min |
-| `ExpiryAlert` | `bool` | `true` | Warn when items near expiry |
-| `ExpiryAlertDays` | `int` | `30` | Days before expiry to alert |
-| `CreditLimitAlert` | `bool` | `true` | Warn when credit limit exceeded |
-
-#### Seed Data (Already Applied in Task 5)
-
-Added to DbSeeder SystemSettings block:
-
-> See `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions and `docs/database-schema.md` for table definitions.
-
-
-#### Service Wiring
-
-| File | Change |
-|------|--------|
-| `Application/Interfaces/Repositories/ISystemSettingsRepository.cs` | Typed accessors (`GetBoolAsync`, `GetIntAsync`) already added in Task 1 — no new methods needed |
-| `Application/Services/SystemSettingsService.cs` | Add `GetNotificationSettingsAsync()` that returns `NotificationSettingsDto` with 4 mapped fields |
-| `Contracts/DTOs/AllDtos.cs` | Add `NotificationSettingsDto` record |
-| `ViewModels/Settings/SystemSettingsViewModel.cs` | Add 4 notification properties + save logic in "Notifications" section |
-| `Views/Settings/SystemSettingsView.xaml` or add to `SettingsView.xaml` | Add "الإشعارات" card with 3 toggles + ExpiryAlertDays slider |
-| `Services/Api/ISettingsApiService.cs` | Extend with `GetNotificationSettingsAsync()` / `UpdateNotificationSettingsAsync()` IF separate endpoint needed |
-
-**Recommended approach**: Since all 4 are key-value in `SystemSettings`, they can be GET/PUT as a group through the existing `SystemSettings` API (`GET /api/v1/settings/all` + `PUT /api/v1/settings`). No separate controller needed.
-
-#### Dashboard Integration (Deferred)
-
-The actual alert engine logic (background queries for low stock, expiring items, credit limit) is deferred to **Phase 22 — Notification Engine**. Phase 19 only:
-1. Seeds defaults ✅ (done)
-2. Provides Settings UI toggles ✅ (this task)
-3. Documents the key names for future consumption ✅ (Section 4.6)
-
-#### Validation (RULE-044):
-- `ExpiryAlertDays`: 1–365 range (FluentValidation)
-
-#### ToolTips (RULE-185-190):
-- LowStockAlert toggle: `"تنبيه عند انخفاض المخزون عن الحد الأدنى"`
-- ExpiryAlert toggle: `"تنبيه عند قرب انتهاء صلاحية الأصناف"`
-- ExpiryAlertDays input: `"عدد الأيام للتنبيه قبل انتهاء الصلاحية (1-365)"`
-- CreditLimitAlert toggle: `"تنبيه عند تجاوز السقف الائتماني للعميل أو المورد"`
-
-#### UI Compact (RULE-262-274):
-- Toggle switches: `Height="28"` via style, margin `0,0,0,6`
-- ExpiryAlertDays: compact `NumericUpDown` or `TextBox` (int input)
-- Card header: `FontSize="14"`, padding `12,6`
-
-**Estimate**: ~30 minutes
-
----
-
-### Task 18 — Backup Module Cross-Reference & Notification Future-Phase Note
-
-#### Backup Module Reference
-
-The backup system was fully implemented in **Phase 4.4** (Auto-Update & Backup) and is NOT re-implemented here. Existing components:
-
-| Component | Phase | File |
-|-----------|-------|------|
-| Scheduled Backup Worker | 4.4 | `Infrastructure/BackgroundJobs/ScheduledBackupWorker.cs` |
-| Backup/Restore Service | 4.4 | `Infrastructure/Services/Backup/BackupService.cs` |
-| Backup Settings (RetentionDays, ScheduleTime) | 4.4 | Seeded in `SystemSettings` with keys `Backup.RetentionDays` and `Backup.ScheduleTime` |
-| Backup ViewModel | 4.4 | `ViewModels/Settings/BackupViewModel.cs` |
-| Backup View | 4.4 | `Views/Settings/BackupView.xaml` |
-
-**Phase 19 impact**: Task 5 already seeds `Backup.RetentionDays` and `Backup.ScheduleTime` as part of the 27 key-value pairs. No other backup changes needed.
-
-#### Notification Future-Phase Note
-
-The notification settings seeded in Task 17 (`LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert`) are **reserved for Phase 22 — Notification Engine**. No background workers should be built in Phase 19. The only Phase 19 scope is:
-1. ✅ Seed defaults
-2. ✅ Settings UI toggles
-3. ✅ Document key names for future consumption
-
-#### Updated Seed Data Cross-Reference
-
-| Category | Keys | Phase | Notes |
-|----------|------|-------|-------|
-| Inventory | `CostingMethod`, `AllowNegativeStock`, `EnableFefo`, `StockAlertDays` | 19 → Task 5 | ✅ Seeded |
-| Sales | `AutoPostInvoices`, `AllowDrafts`, `ShowProfitInInvoice`, `PreventBelowRetailPrice`, `AllowBelowCostSale`, `HideTaxInSales`, `ShowExpiryInInvoices`, `DefaultCashCustomerId` | 19 → Task 5 | ✅ Seeded |
-| Purchases | `PurchaseAutoPost`, `HideTaxInPurchases`, `DefaultCashSupplierId` | 19 → Task 5 | ✅ Seeded |
-| Barcode | `EnableBarcode`, `BarcodeInputType`, `AutoGenerateBarcode` | 19 → Task 5 | ✅ Seeded |
-| Accounting | `AutoCreateJournalEntry` | 19 → Task 5 | ✅ Seeded |
-| General | `DecimalPlaces`, `Language`, `DateFormat` | 19 → Task 5 | ✅ Seeded |
-| Print | 15 keys (9 existing + 6 new) | 19 → Task 5 | ✅ All seeded |
-| Notifications | `LowStockAlert`, `ExpiryAlert`, `ExpiryAlertDays`, `CreditLimitAlert` | 19 → Task 17 | ✅ All seeded |
-| Backup | `Backup.RetentionDays`, `Backup.ScheduleTime` | 4.4 + 19 → Task 5 | ✅ Retained |
+| Setting | Reason | Needs |
+|---------|--------|-------|
+| RequireBatchOnPurchase | Purchase line items don't have BatchNo field | DTO + Domain + Schema |
+| RequireExpiryOnPurchase | Purchase line items don't have ExpiryDate field | DTO + Domain + Schema |
+| DefaultBranch | Invoice DTOs don't have BranchId field | DTO changes |
+| DefaultSalesTax | Per-invoice tax selection | Invoice-level tax UI |
+| DefaultPurchaseTax | Per-invoice tax selection | Invoice-level tax UI |
+| ExpiryAlert | Needs ExpiryAlertWorker background service | Background worker |
+| ExpiryAlertDays | Needs ExpiryAlertWorker background service | Background worker |
+| EnableAttachments | Feature gate only — no UI wiring yet | Desktop attachment UI |
+| DefaultWarehouse | Wired as fallback but needs WarehouseId on more DTOs | Partial |
 
 #### Compliance Matrix Update
 

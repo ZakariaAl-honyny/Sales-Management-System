@@ -5,8 +5,6 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Accounting.Entities;
-using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Entities;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Exceptions;
@@ -17,11 +15,16 @@ public class CustomerService : ICustomerService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<CustomerService> _logger;
+    private readonly IAccountLinkService _accountLink;
 
-    public CustomerService(IUnitOfWork uow, ILogger<CustomerService> logger)
+    public CustomerService(
+        IUnitOfWork uow,
+        ILogger<CustomerService> logger,
+        IAccountLinkService accountLink)
     {
         _uow = uow;
         _logger = logger;
+        _accountLink = accountLink;
     }
 
     public async Task<Result<CustomerDto>> GetByIdAsync(int id, CancellationToken ct)
@@ -71,6 +74,7 @@ public class CustomerService : ICustomerService
                     email: request.Email,
                     address: request.Address,
                     taxNumber: request.TaxNumber,
+                    notes: request.Notes,
                     creditLimit: request.CreditLimit,
                     createdByUserId: userId);
                 await _uow.Customers.AddAsync(customer, ct);
@@ -94,45 +98,59 @@ public class CustomerService : ICustomerService
 
     public async Task<Result<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request, int userId, CancellationToken ct)
     {
-        try
+        var customer = await _uow.Customers.FirstOrDefaultIgnoreFiltersAsync(
+            c => c.Id == id, ct);
+        if (customer == null)
+            return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
+
+        // Capture old values for Account sync BEFORE transaction
+        var oldName = customer.Name;
+        var oldIsActive = customer.IsActive;
+
+        return await _uow.ExecuteTransactionAsync<Result<CustomerDto>>(async () =>
         {
-            var customer = await _uow.Customers.FirstOrDefaultIgnoreFiltersAsync(
-                c => c.Id == id, ct);
-            if (customer == null)
-                return Result<CustomerDto>.Failure("العميل غير موجود", ErrorCodes.NotFound);
-
-            // Update customer fields including contact information
-            customer.Update(
-                name: request.Name,
-                phone: request.Phone,
-                email: request.Email,
-                address: request.Address,
-                taxNumber: request.TaxNumber,
-                creditLimit: request.CreditLimit,
-                updatedByUserId: userId);
-
-            if (request.IsActive != customer.IsActive)
+            try
             {
-                if (request.IsActive) customer.Restore();
-                else customer.MarkAsDeleted();
+                // Update customer fields including contact information
+                customer.Update(
+                    name: request.Name,
+                    phone: request.Phone,
+                    email: request.Email,
+                    address: request.Address,
+                    taxNumber: request.TaxNumber,
+                    notes: request.Notes,
+                    creditLimit: request.CreditLimit,
+                    updatedByUserId: userId);
+
+                if (request.IsActive != oldIsActive)
+                {
+                    if (request.IsActive) customer.Restore();
+                    else customer.MarkAsDeleted();
+                }
+
+                // Sync linked Account Name — per accounts summry.md
+                if (customer.AccountId > 0)
+                {
+                    await _accountLink.SyncNameAsync(customer.AccountId, request.Name, ct);
+                }
+
+                await _uow.Customers.UpdateAsync(customer, ct);
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Customer updated: {CustomerName} (ID: {CustomerId})", customer.Name, customer.Id);
+
+                return Result<CustomerDto>.Success(MapToDto(customer));
             }
-
-            await _uow.Customers.UpdateAsync(customer, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Customer updated: {CustomerName} (ID: {CustomerId})", customer.Name, customer.Id);
-
-            return Result<CustomerDto>.Success(MapToDto(customer));
-        }
-        catch (DomainException ex)
-        {
-            return Result<CustomerDto>.Failure(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error occurred while updating customer {Id}", id);
-            return Result<CustomerDto>.Failure("حدث خطأ أثناء تحديث بيانات العميل.");
-        }
+            catch (DomainException ex)
+            {
+                return Result<CustomerDto>.Failure(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while updating customer {Id}", id);
+                return Result<CustomerDto>.Failure("حدث خطأ أثناء تحديث بيانات العميل.");
+            }
+        }, ct);
     }
 
     public async Task<Result> DeleteAsync(int id, int userId, CancellationToken ct)
@@ -141,11 +159,20 @@ public class CustomerService : ICustomerService
         if (customer == null)
             return Result.Failure("العميل غير موجود", ErrorCodes.NotFound);
 
-        customer.MarkAsDeleted();
-        await _uow.SaveChangesAsync(ct);
+        return await _uow.ExecuteTransactionAsync(async () =>
+        {
+            // Deactivate linked Account — per accounts summry.md
+            if (customer.AccountId > 0)
+            {
+                await _accountLink.DeactivateAsync(customer.AccountId, ct);
+            }
 
-        _logger.LogInformation("Customer soft-deleted: {CustomerId} by user {UserId}", id, userId);
-        return Result.Success();
+            customer.MarkAsDeleted();
+            await _uow.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Customer soft-deleted: {CustomerId} by user {UserId}", id, userId);
+            return Result.Success();
+        }, ct);
     }
 
     public async Task<Result> PermanentDeleteAsync(int id, int userId, CancellationToken ct)
@@ -157,19 +184,28 @@ public class CustomerService : ICustomerService
         if (await _uow.SalesInvoices.AnyAsync(si => si.CustomerId == id, ct))
             return Result.Failure("لا يمكن حذف العميل نهائياً لأنه مرتبط بفواتير بيع");
 
-        try
+        return await _uow.ExecuteTransactionAsync<Result>(async () =>
         {
-            _uow.Customers.DeleteRange(new[] { customer });
-            await _uow.SaveChangesAsync(ct);
+            try
+            {
+                // MarkAsDeleted linked Account — per accounts summry.md
+                if (customer.AccountId > 0)
+                {
+                    await _accountLink.MarkAsDeletedAsync(customer.AccountId, ct);
+                }
 
-            _logger.LogInformation("Customer permanently deleted: {CustomerId} by user {UserId}", id, userId);
-            return Result.Success();
-        }
-        catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
-        {
-            _logger.LogError(ex, "Failed to permanently delete customer {CustomerId} due to database constraint", id);
-            return Result.Failure("لا يمكن حذف العميل نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
-        }
+                _uow.Customers.DeleteRange(new[] { customer });
+                await _uow.SaveChangesAsync(ct);
+
+                _logger.LogInformation("Customer permanently deleted: {CustomerId} by user {UserId}", id, userId);
+                return Result.Success();
+            }
+            catch (Exception ex) when (ex.GetType().Name.Contains("DbUpdate") || ex.GetType().Name.Contains("Sql"))
+            {
+                _logger.LogError(ex, "Failed to permanently delete customer {CustomerId} due to database constraint", id);
+                return Result.Failure("لا يمكن حذف العميل نهائياً. قد يكون مرتبطاً ببيانات أخرى في النظام.");
+            }
+        }, ct);
     }
 
     public async Task<Result<PagedResult<CustomerBalanceReportDto>>> GetCustomerBalanceReportAsync(int page, int pageSize, string? search = null, CancellationToken ct = default)
@@ -234,80 +270,24 @@ public class CustomerService : ICustomerService
 
     /// <summary>
     /// Auto-creates a Level 4 detail account under the AR parent account for this customer.
-    /// Uses the parent account at code "1130 — العملاء" (Accounts Receivable).
-    /// Falls back to SystemAccountMappings.AccountsReceivableAccountId if 1130 not found.
+    /// Delegates to IAccountLinkService for centralized account creation.
     /// </summary>
     private async Task<Result<int>> AutoCreateCustomerAccountAsync(string customerName, int userId, CancellationToken ct)
     {
         try
         {
-            var arParentAccount = await _uow.Accounts.FirstOrDefaultAsync(
-                a => a.AccountCode == "1130" && a.IsActive, ct);
+            var result = await _accountLink.CreateCustomerAccountAsync(customerName, userId, ct);
+            if (!result.IsSuccess)
+                return result;
 
-            if (arParentAccount == null)
-            {
-                var arMapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
-                    m => m.MappingKey == nameof(SystemAccountKey.AccountsReceivable), ct);
-                if (arMapping == null)
-                    return Result<int>.Failure("لم يتم تهيئة دليل الحسابات بعد", ErrorCodes.NotFound);
-
-                var arAccount = await _uow.Accounts.GetByIdAsync(arMapping.AccountId, ct);
-                if (arAccount == null || arAccount.ParentId == null)
-                    return Result<int>.Failure("لم يتم العثور على حساب العملاء", ErrorCodes.NotFound);
-
-                arParentAccount = await _uow.Accounts.GetByIdAsync(arAccount.ParentId.Value, ct);
-                if (arParentAccount == null)
-                    return Result<int>.Failure("لم يتم العثور على حساب العملاء الرئيسي", ErrorCodes.NotFound);
-            }
-
-            var nextCode = await GenerateNextAccountCodeAsync(arParentAccount.Id, arParentAccount.AccountCode, ct);
-
-            var newAccount = Account.Create(
-                accountCode: nextCode,
-                nameAr: customerName,
-                nameEn: customerName,
-                nature: (byte)AccountType.Asset,
-                isLeaf: true,
-                parentId: arParentAccount.Id,
-                isSystem: false,
-                categoryId: null,
-                level: 4,
-                createdByUserId: userId
-            );
-
-            await _uow.Accounts.AddAsync(newAccount, ct);
-            await _uow.SaveChangesAsync(ct);
-
-            _logger.LogInformation("Auto-created customer account: {Code} - {Name} under parent {ParentCode}",
-                nextCode, customerName, arParentAccount.AccountCode);
-            return Result<int>.Success(newAccount.Id);
+            _logger.LogInformation("Auto-created customer account for {Name}, AccountId: {AccountId}", customerName, result.Value);
+            return Result<int>.Success(result.Value);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to auto-create customer account for {CustomerName}", customerName);
             return Result<int>.Failure("فشل إنشاء الحساب المحاسبي للعميل");
         }
-    }
-
-    private async Task<string> GenerateNextAccountCodeAsync(int parentAccountId, string parentCode, CancellationToken ct)
-    {
-        var childAccounts = await _uow.Accounts.ToListAsync(
-            predicate: a => a.ParentId == parentAccountId,
-            ct: ct);
-
-        int maxSuffix = 0;
-        foreach (var child in childAccounts)
-        {
-            if (int.TryParse(child.AccountCode, out var code))
-            {
-                if (code > maxSuffix)
-                    maxSuffix = code;
-            }
-        }
-
-        return maxSuffix > 0
-            ? (maxSuffix + 1).ToString()
-            : parentCode + "1";
     }
 
     private static CustomerDto MapToDto(Customer c)
@@ -322,7 +302,8 @@ public class CustomerService : ICustomerService
             c.CreditLimit,
             c.IsActive,
             AccountId: c.AccountId,
-            CategoryId: c.CategoryId
+            CategoryId: c.CategoryId,
+            Notes: c.Notes
         );
     }
 }

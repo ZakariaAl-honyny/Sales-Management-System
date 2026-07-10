@@ -87,6 +87,29 @@ public class PrintService : IPrintService
                 System.Diagnostics.Process.Start(startInfo);
             });
 
+            var copies = await _settingsRepo.GetIntAsync("PrintCopies", 1, ct: default);
+            if (copies > 1)
+            {
+                for (int i = 1; i < copies; i++)
+                {
+                    await Task.Delay(500);
+                    await Task.Run(() =>
+                    {
+                        var startInfo = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = tempPath,
+                            Verb = "printto",
+                            Arguments = $"\"{printerName}\"",
+                            CreateNoWindow = true,
+                            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                            UseShellExecute = true
+                        };
+                        System.Diagnostics.Process.Start(startInfo);
+                    });
+                }
+                _logger.LogInformation("Printed {Copies} copies of A4 invoice {InvoiceNumber}", copies, invoice.InvoiceNumber);
+            }
+
             _logger.LogInformation(
                 "A4 invoice {InvoiceNumber} sent to printer {Printer}",
                 invoice.InvoiceNumber, printerName);
@@ -123,6 +146,17 @@ public class PrintService : IPrintService
             var escPosData = _thermalGenerator.GenerateEscPosCommands(invoice, escPosCodePage);
 
             await Task.Run(() => SendRawToPrinter(printerName, escPosData));
+
+            var copies = await _settingsRepo.GetIntAsync("PrintCopies", 1, ct: default);
+            if (copies > 1)
+            {
+                for (int i = 1; i < copies; i++)
+                {
+                    await Task.Delay(500);
+                    await Task.Run(() => SendRawToPrinter(printerName, escPosData));
+                }
+                _logger.LogInformation("Printed {Copies} copies of thermal receipt {InvoiceNumber}", copies, invoice.InvoiceNumber);
+            }
 
             _logger.LogInformation(
                 "Thermal receipt {InvoiceNumber} printed to {Printer}",

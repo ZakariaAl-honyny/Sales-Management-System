@@ -89,4 +89,34 @@ public class BanksController : ControllerBase
             return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
+
+    /// <summary>
+    /// Permanently deletes a bank and marks its linked Account as deleted.
+    /// </summary>
+    [HttpDelete("permanent/{id:int}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
+    {
+        var result = await _service.PermanentDeleteAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم حذف البنك نهائياً" });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
+    /// Restores a previously deactivated bank and its linked Account.
+    /// </summary>
+    [HttpPost("{id:int}/restore")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> Restore(int id, CancellationToken ct)
+    {
+        var result = await _service.RestoreAsync(id, ct);
+        if (result.IsSuccess)
+            return Ok(new { message = "تم استعادة البنك بنجاح" });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
 }

@@ -3,8 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
-      mc:Ignorable="d"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.JournalEntries"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
       d:DataContext="{d:DesignInstance vm:JournalEntryEditorViewModel, IsDesignTimeCreatable=False}"
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
@@ -109,8 +110,9 @@
                             <DataGridTemplateColumn Header="مدين" Width="120">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate DataType="vm:JournalEntryLineViewModel">
-                                        <TextBox Text="{Binding Debit, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox Text="{Binding Debit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource ModernTextBox}"
+                                                 helpers:InputHelper.NumericOnly="True"
                                                  ToolTip="المبلغ المدين — أدخل صفر إذا كان البند دائناً"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -120,8 +122,9 @@
                             <DataGridTemplateColumn Header="دائن" Width="120">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate DataType="vm:JournalEntryLineViewModel">
-                                        <TextBox Text="{Binding Credit, Mode=TwoWay, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
+                                        <TextBox Text="{Binding Credit, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource ModernTextBox}"
+                                                 helpers:InputHelper.NumericOnly="True"
                                                  ToolTip="المبلغ الدائن — أدخل صفر إذا كان البند مديناً"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>

@@ -3,8 +3,9 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.DocumentSequences"
-      mc:Ignorable="d"
+       xmlns:vm="clr-namespace:SalesSystem.DesktopPWF.ViewModels.DocumentSequences"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
       d:DataContext="{d:DesignInstance vm:DocumentSequenceListViewModel, IsDesignTimeCreatable=False}"
       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
@@ -115,7 +116,8 @@
                 <TextBlock Text="الرقم التالي الجديد:" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <TextBox Text="{Binding ResetValue, UpdateSourceTrigger=PropertyChanged}"
                          Width="100" Style="{StaticResource ModernTextBox}"
-                         ToolTip="أدخل الرقم التالي الجديد للتسلسل"/>
+                         ToolTip="أدخل الرقم التالي الجديد للتسلسل"
+                         helpers:InputHelper.NumericOnly="True"/>
             </StackPanel>
         </Border>
 

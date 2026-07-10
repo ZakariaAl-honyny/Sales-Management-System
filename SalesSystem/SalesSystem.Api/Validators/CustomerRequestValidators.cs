@@ -28,6 +28,10 @@ public class CreateCustomerRequestValidator : AbstractValidator<CreateCustomerRe
         RuleFor(x => x.CreditLimit)
             .GreaterThanOrEqualTo(0).WithMessage("حد الائتمان لا يمكن أن يكون سالباً");
 
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).WithMessage("الملاحظات لا يمكن أن تتجاوز 1000 حرف")
+            .When(x => !string.IsNullOrEmpty(x.Notes));
+
     }
 }
 
@@ -58,5 +62,9 @@ public class UpdateCustomerRequestValidator : AbstractValidator<UpdateCustomerRe
 
         RuleFor(x => x.IsActive)
             .NotNull().WithMessage("حالة التفعيل مطلوبة");
+
+        RuleFor(x => x.Notes)
+            .MaximumLength(1000).WithMessage("الملاحظات لا يمكن أن تتجاوز 1000 حرف")
+            .When(x => !string.IsNullOrEmpty(x.Notes));
     }
 }

@@ -32,13 +32,6 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             .OnDelete(DeleteBehavior.Restrict)
             .IsRequired();
 
-        // FK to Currency
-        builder.HasOne(e => e.Currency)
-            .WithMany()
-            .HasForeignKey(e => e.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
-
         // Unique index on ExpenseNo
         builder.HasIndex(e => e.ExpenseNo)
             .IsUnique()

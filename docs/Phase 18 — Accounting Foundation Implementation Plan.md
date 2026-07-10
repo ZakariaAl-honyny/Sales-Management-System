@@ -203,7 +203,7 @@ public class AccountCodeGeneratorService
 {
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
-    public async Task<string> GenerateCodeAsync(int level, int? parentId, CancellationToken ct)
+    public async Task<Result<string>> GenerateCodeAsync(int? parentId, byte level, CancellationToken ct)
     {
         await _semaphore.WaitAsync(ct);
         try
@@ -239,16 +239,19 @@ public class AccountCodeGeneratorService
 Static helper mapping Account Nature → hex color:
 
 ```csharp
-public static class AccountColorHelper
+// Defined as a static interface method in IAccountCodeGeneratorService:
+public interface IAccountCodeGeneratorService
 {
-    public static string GetColorCodeForNature(byte nature) => nature switch
+    // ... GenerateCodeAsync ...
+
+    static string GetColorCode(byte nature) => nature switch
     {
-        1 => "#2B579A",  // Asset → Blue
-        2 => "#D32F2F",  // Liability → Red
-        3 => "#6A1B9A",  // Equity → Purple
-        4 => "#2E7D32",  // Revenue → Green
-        5 => "#795548",  // Expense → Brown
-        _ => "#757575"   // Default → Gray
+        1 => "#2196F3",  // Asset → Blue
+        2 => "#F44336",  // Liability → Red
+        3 => "#4CAF50",  // Equity → Green
+        4 => "#4CAF50",  // Revenue → Green
+        5 => "#FF9800",  // Expense → Orange
+        _ => "#9E9E9E"   // Unknown → Grey
     };
 }
 ```
@@ -279,7 +282,7 @@ public async Task<Result<AccountDto>> CreateAsync(CreateAccountRequest request, 
         request.Level, request.ParentId, ct);
 
     // 3. Auto-set ColorCode from Nature
-    var colorCode = AccountColorHelper.GetColorCodeForNature(request.Nature);
+    var colorCode = IAccountCodeGeneratorService.GetColorCode(request.Nature);
 
     // 4. Begin transaction
     await using var transaction = await _uow.BeginTransactionAsync(ct);
@@ -929,7 +932,7 @@ public record AccountDto(
 
 | Code | Parent | Name (Ar) | Nature |
 |------|--------|-----------|--------|
-| 1101 | 11 | النقدية | Asset |
+| 1101 | 11 | النقدية صناديق | Asset |
 | 1102 | 11 | البنوك | Asset |
 | 1103 | 11 | العملاء | Asset |
 | 1104 | 11 | المخزون | Asset |
@@ -960,8 +963,6 @@ public record AccountDto(
 |------|--------|-----------|--------|
 | 11010001 | 1101 | صندوق النقدية | Asset |
 | 11010002 | 1101 | نقدية في الطريق | Asset |
-| 11020001 | 1102 | البنك الأهلي - جاري | Asset |
-| 11020002 | 1102 | البنك التجاري - جاري | Asset |
 | 11030001 | 1103 | عملاء نقدي | Asset |
 | 11040001 | 1104 | بضاعة بالمخازن | Asset |
 | 11040002 | 1104 | مواد خام | Asset |
@@ -1003,7 +1004,6 @@ public record AccountDto(
 | Mapping | Account Code | Account Name |
 |---------|-------------|--------------|
 | CashAccountId | 11010001 | صندوق النقدية |
-| BankAccountId | 11020001 | البنك الأهلي - جاري |
 | AccountsReceivableAccountId | 11030001 | عملاء نقدي |
 | InventoryAssetAccountId | 11040001 | بضاعة بالمخازن |
 | AccountsPayableAccountId | 21010001 | موردون نقدي |

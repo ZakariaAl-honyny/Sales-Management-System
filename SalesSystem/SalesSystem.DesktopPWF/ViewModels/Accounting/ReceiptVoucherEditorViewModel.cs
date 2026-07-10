@@ -20,7 +20,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
     private readonly IReceiptVoucherApiService _voucherService;
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IAccountApiService _accountService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
@@ -32,8 +31,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
     private string? _cashBoxName;
     private int _accountId;
     private string? _accountName;
-    private short _currencyId;
-    private string? _currencyCode;
     private decimal _totalAmount;
     private string _notes = string.Empty;
     private byte _status = 1; // Draft
@@ -43,18 +40,15 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
 
     private ObservableCollection<CashBoxDto> _cashBoxes = new();
     private ObservableCollection<AccountDto> _accounts = new();
-    private ObservableCollection<CurrencyDto> _currencies = new();
 
     private CashBoxDto? _selectedCashBox;
     private AccountDto? _selectedAccount;
-    private CurrencyDto? _selectedCurrency;
 
     public ReceiptVoucherEditorViewModel()
         : this(
             App.GetService<IReceiptVoucherApiService>(),
             App.GetService<ICashBoxApiService>(),
             App.GetService<IAccountApiService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
             App.GetService<IToastNotificationService>())
@@ -65,7 +59,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         IReceiptVoucherApiService voucherService,
         ICashBoxApiService cashBoxService,
         IAccountApiService accountService,
-        ICurrencyApiService currencyService,
         IDialogService dialogService,
         IEventBus eventBus,
         IToastNotificationService? toastService = null)
@@ -73,7 +66,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         _voucherService = voucherService ?? throw new ArgumentNullException(nameof(voucherService));
         _cashBoxService = cashBoxService ?? throw new ArgumentNullException(nameof(cashBoxService));
         _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
-        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
@@ -101,8 +93,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         CashBoxName = voucher.CashBoxName;
         AccountId = voucher.AccountId;
         AccountName = voucher.AccountName;
-        CurrencyId = voucher.CurrencyId;
-        CurrencyCode = voucher.CurrencyCode;
         TotalAmount = voucher.TotalAmount;
         Notes = voucher.Notes ?? string.Empty;
         Status = voucher.Status;
@@ -185,27 +175,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountName, value);
     }
 
-    public short CurrencyId
-    {
-        get => _currencyId;
-        set
-        {
-            if (SetProperty(ref _currencyId, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(CurrencyId), "العملة مطلوبة");
-                else
-                    ClearErrors(nameof(CurrencyId));
-            }
-        }
-    }
-
-    public string? CurrencyCode
-    {
-        get => _currencyCode;
-        set => SetProperty(ref _currencyCode, value);
-    }
-
     public decimal TotalAmount
     {
         get => _totalAmount;
@@ -253,12 +222,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         set => SetProperty(ref _accounts, value);
     }
 
-    public ObservableCollection<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
     public CashBoxDto? SelectedCashBox
     {
         get => _selectedCashBox;
@@ -285,19 +248,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         }
     }
 
-    public CurrencyDto? SelectedCurrency
-    {
-        get => _selectedCurrency;
-        set
-        {
-            if (SetProperty(ref _selectedCurrency, value) && value != null)
-            {
-                CurrencyId = (short)value.Id;
-                CurrencyCode = value.Code;
-            }
-        }
-    }
-
     #endregion
 
     #region Commands
@@ -315,9 +265,8 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
         {
             var cashBoxTask = _cashBoxService.GetAllAsync();
             var accountTask = _accountService.GetAllAsync();
-            var currencyTask = _currencyService.GetAllAsync();
 
-            await Task.WhenAll(cashBoxTask, accountTask, currencyTask);
+            await Task.WhenAll(cashBoxTask, accountTask);
 
             if (cashBoxTask.Result.IsSuccess && cashBoxTask.Result.Value != null)
             {
@@ -354,22 +303,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
                 });
             }
 
-            if (currencyTask.Result.IsSuccess && currencyTask.Result.Value != null)
-            {
-                InvokeOnUIThread(() =>
-                {
-                    Currencies.Clear();
-                    foreach (var cur in currencyTask.Result.Value.Where(c => c.IsActive).OrderBy(c => c.Code))
-                    {
-                        Currencies.Add(cur);
-                    }
-
-                    if (IsEditMode && CurrencyId > 0)
-                    {
-                        SelectedCurrency = Currencies.FirstOrDefault(c => c.Id == CurrencyId);
-                    }
-                });
-            }
         }
         catch (Exception ex)
         {
@@ -386,8 +319,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
             AddError(nameof(CashBoxId), "الصندوق مطلوب");
         if (AccountId <= 0)
             AddError(nameof(AccountId), "الحساب مطلوب");
-        if (CurrencyId <= 0)
-            AddError(nameof(CurrencyId), "العملة مطلوبة");
         if (TotalAmount <= 0)
             AddError(nameof(TotalAmount), "المبلغ يجب أن يكون أكبر من صفر");
 
@@ -414,7 +345,6 @@ public class ReceiptVoucherEditorViewModel : ViewModelBase
     {
         var request = new CreateReceiptVoucherRequest(
             VoucherDate,
-            CurrencyId,
             CashBoxId,
             AccountId,
             TotalAmount,

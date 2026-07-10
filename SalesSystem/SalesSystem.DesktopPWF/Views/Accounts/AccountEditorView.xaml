@@ -3,7 +3,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
+             xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+              mc:Ignorable="d"
              Background="{StaticResource BackgroundBrush}"
              FlowDirection="RightToLeft">
 
@@ -135,7 +136,8 @@
                              HorizontalAlignment="Right"
                              TabIndex="8"
                              Visibility="{Binding IsCreating, Converter={StaticResource BoolToVisibility}}"
-                             ToolTip="الرصيد الافتتاحي للحساب عند بدء استخدام النظام"/>
+                             ToolTip="الرصيد الافتتاحي للحساب عند بدء استخدام النظام"
+                             helpers:InputHelper.NumericOnly="True"/>
 
                     <!-- Description -->
                     <TextBlock Text="الوصف التفصيلي" Style="{StaticResource LabelStyle}" Margin="4,8,0,8"/>

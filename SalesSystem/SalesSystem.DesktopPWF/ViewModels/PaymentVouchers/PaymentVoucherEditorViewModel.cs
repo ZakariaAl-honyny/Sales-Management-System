@@ -26,7 +26,6 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
     private string? _cashBoxName;
     private int _accountId;
     private string? _accountName;
-    private int _currencyId;
     private decimal _totalAmount;
     private string _notes = string.Empty;
     private byte _status = 1; // Draft
@@ -75,7 +74,6 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
         _cashBoxName = voucher.CashBoxName;
         _accountId = voucher.AccountId;
         _accountName = voucher.AccountName;
-        _currencyId = voucher.CurrencyId;
         _totalAmount = voucher.TotalAmount;
         _notes = voucher.Notes ?? string.Empty;
         _status = voucher.Status;
@@ -146,21 +144,6 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
         set => SetProperty(ref _accountName, value);
     }
 
-    public int CurrencyId
-    {
-        get => _currencyId;
-        set
-        {
-            if (SetProperty(ref _currencyId, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(CurrencyId), "العملة مطلوبة");
-                else
-                    ClearErrors(nameof(CurrencyId));
-            }
-        }
-    }
-
     public decimal TotalAmount
     {
         get => _totalAmount;
@@ -218,8 +201,6 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
             AddError(nameof(CashBoxId), "الصندوق مطلوب");
         if (AccountId <= 0)
             AddError(nameof(AccountId), "الحساب مطلوب");
-        if (CurrencyId <= 0)
-            AddError(nameof(CurrencyId), "العملة مطلوبة");
         if (TotalAmount <= 0)
             AddError(nameof(TotalAmount), "المبلغ يجب أن يكون أكبر من صفر");
 
@@ -246,7 +227,6 @@ public class PaymentVoucherEditorViewModel : ViewModelBase
     {
         var request = new CreatePaymentVoucherRequest(
             VoucherDate,
-            (short)CurrencyId,
             CashBoxId,
             AccountId,
             TotalAmount,

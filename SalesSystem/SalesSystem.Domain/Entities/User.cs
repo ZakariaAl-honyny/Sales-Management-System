@@ -21,12 +21,15 @@ public class User : ActivatableEntity
     public DateTime? LastLoginAt { get; private set; }
     public short LoginAttempts { get; private set; }
 
+    /// <summary>
+    /// Bitmask of all user-level permissions override.
+    /// 0 = use role-based permissions, -1 = super admin (all permissions bypassed).
+    /// </summary>
+    public long PermissionsMask { get; private set; }
+
     // ─── Navigation ─────────────────────────────────
     private readonly List<UserRole> _userRoles = new();
     public IReadOnlyCollection<UserRole> UserRoles => _userRoles.AsReadOnly();
-
-    private readonly List<UserBranch> _userBranches = new();
-    public IReadOnlyCollection<UserBranch> UserBranches => _userBranches.AsReadOnly();
 
     protected User() { } // EF Core
 
@@ -36,7 +39,8 @@ public class User : ActivatableEntity
     /// <see cref="ChangePassword"/> to set the password later.
     /// Roles/branches are assigned separately via UserRole/UserBranch join entities.
     /// </summary>
-    public static User Create(string userName, int? employeeId = null, int? createdByUserId = null)
+    public static User Create(string userName, int? employeeId = null,
+        long permissionsMask = 0, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new DomainException("اسم المستخدم مطلوب.");
@@ -46,6 +50,7 @@ public class User : ActivatableEntity
             UserName = userName.Trim(),
             EmployeeId = employeeId,
             MustChangePassword = true,
+            PermissionsMask = permissionsMask,
             LoginAttempts = 0
         };
         user.SetCreatedBy(createdByUserId);
@@ -57,8 +62,8 @@ public class User : ActivatableEntity
     /// MustChangePassword is false by default for seeds.
     /// </summary>
     public static User CreateWithPassword(string userName, string passwordHash,
-        int? employeeId = null, int? createdByUserId = null,
-        bool mustChangePassword = false)
+        int? employeeId = null, long permissionsMask = 0,
+        int? createdByUserId = null, bool mustChangePassword = false)
     {
         if (string.IsNullOrWhiteSpace(userName))
             throw new DomainException("اسم المستخدم مطلوب.");
@@ -71,6 +76,7 @@ public class User : ActivatableEntity
             PasswordHash = passwordHash,
             EmployeeId = employeeId,
             MustChangePassword = mustChangePassword,
+            PermissionsMask = permissionsMask,
             LoginAttempts = 0
         };
         user.SetCreatedBy(createdByUserId);
@@ -207,6 +213,24 @@ public class User : ActivatableEntity
         IsActive = true;
         IsLocked = false;
         base.Restore();
+    }
+
+    // ─── Permissions Mask ──────────────────────────
+
+    /// <summary>
+    /// Returns true if this user has a super admin bitmask (all permissions).
+    /// </summary>
+    public bool IsSuperAdmin => PermissionsMask == -1;
+
+    /// <summary>
+    /// Sets a user-level permissions override bitmask.
+    /// Pass 0 to clear the override (fall back to role-based permissions).
+    /// Pass -1 to grant all permissions (super admin — bypasses all checks).
+    /// </summary>
+    public void SetPermissionsMask(long mask)
+    {
+        PermissionsMask = mask;
+        UpdateTimestamp();
     }
 
     // ─── Employee Link ────────────────────────────

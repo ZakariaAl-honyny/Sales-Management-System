@@ -25,13 +25,6 @@ public class ReceiptVoucherConfiguration : IEntityTypeConfiguration<ReceiptVouch
             .HasDefaultValue(VoucherStatus.Draft)
             .HasSentinel((VoucherStatus)0);
 
-        // FK to Currency
-        builder.Property(x => x.CurrencyId).IsRequired();
-        builder.HasOne(x => x.Currency)
-            .WithMany()
-            .HasForeignKey(x => x.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // FK to CashBox
         builder.Property(x => x.CashBoxId).IsRequired();
         builder.HasOne(x => x.CashBox)

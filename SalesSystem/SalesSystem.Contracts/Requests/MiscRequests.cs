@@ -2,7 +2,6 @@ namespace SalesSystem.Contracts.Requests;
 
 public record UpdateCompanySettingsRequest(
     string CompanyName,
-    short DefaultCurrencyId,
     string? Phone = null,
     string? Email = null,
     string? Address = null,
@@ -23,20 +22,15 @@ public record ReportFilterRequest(
 
 public record UpdateSettingsRequest(
     string StoreName, string? Address, string? Phone, string? Email,
-    string? LogoUrl, string Currency, decimal DefaultTaxRate, // DEPRECATED: DefaultTaxRate — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
+    string? LogoUrl, decimal DefaultTaxRate, // DEPRECATED: DefaultTaxRate — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
     bool IsTaxEnabled, string? TaxNumber, // DEPRECATED: IsTaxEnabled — use Tax entity instead (kept for backwards compat). Remove in Phase 20.
-    bool EnableStockAlerts, bool AllowNegativeStock, bool AutoUpdatePrices,
+    bool EnableStockAlerts, bool AllowNegativeStock,
     string InvoicePrefix, // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead. Remove in Phase 20.
-    int CostingMethod = 1,
     string? BackupPath = null,
     string? BackupScheduleTime = null,
     int BackupRetentionDays = 30,
     string? UpdateServerUrl = null,
     string? SignatureUrl = null);
-
-public record UpdateCostingMethodRequest(
-    int Method);
-
 
 public record UpdatePrintSettingsRequest(
     string ThermalPrinterName,
@@ -53,4 +47,7 @@ public record UpdatePrintSettingsRequest(
     bool ShowBalanceOnPrint = true,
     bool PrintSignature = false,
     bool ShowLogo = true,
-    string FooterNote = "");
+    string FooterNote = "",
+    bool PrintBarcode = false,
+    bool PrintQRCode = false,
+    bool PrintCompanyAddress = true);

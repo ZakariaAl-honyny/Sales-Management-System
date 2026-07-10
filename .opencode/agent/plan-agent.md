@@ -149,7 +149,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 3. CashTransaction.Create() internal → CHANGE to public
 4. Deposit()/Withdraw() methods on CashBox → REMOVE (service creates CashTransaction directly)
 5. Client-side balance validation → REMOVE (server validates via Account)
-6. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+6. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1101 — النقدية صناديق"
 7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 8. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
 9. Missing `CurrencyId` on financial entities → Add multi-currency support (NOT on Customer/Supplier)

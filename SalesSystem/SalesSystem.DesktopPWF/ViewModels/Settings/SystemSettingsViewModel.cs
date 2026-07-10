@@ -44,41 +44,8 @@ public class SystemSettingsViewModel : ViewModelBase
     public ICommand SaveCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
-    // ── Inventory (4) ──
+    // ── Inventory (5) ──
     // ═══════════════════════════════════════════════════════════════
-
-    private int _costingMethod = 1;
-    public int CostingMethod
-    {
-        get => _costingMethod;
-        set
-        {
-            if (SetProperty(ref _costingMethod, value))
-            {
-                OnPropertyChanged(nameof(IsWeightedAverageSelected));
-                OnPropertyChanged(nameof(IsLastPurchasePriceSelected));
-                OnPropertyChanged(nameof(IsSupplierPriceSelected));
-            }
-        }
-    }
-
-    public bool IsWeightedAverageSelected
-    {
-        get => _costingMethod == 1;
-        set { if (value) CostingMethod = 1; }
-    }
-
-    public bool IsLastPurchasePriceSelected
-    {
-        get => _costingMethod == 2;
-        set { if (value) CostingMethod = 2; }
-    }
-
-    public bool IsSupplierPriceSelected
-    {
-        get => _costingMethod == 3;
-        set { if (value) CostingMethod = 3; }
-    }
 
     private bool _allowNegativeStock;
     public bool AllowNegativeStock
@@ -101,8 +68,22 @@ public class SystemSettingsViewModel : ViewModelBase
         set => SetProperty(ref _stockAlertDays, value);
     }
 
+    private bool _requireBatchOnPurchase;
+    public bool RequireBatchOnPurchase
+    {
+        get => _requireBatchOnPurchase;
+        set => SetProperty(ref _requireBatchOnPurchase, value);
+    }
+
+    private bool _requireExpiryOnPurchase;
+    public bool RequireExpiryOnPurchase
+    {
+        get => _requireExpiryOnPurchase;
+        set => SetProperty(ref _requireExpiryOnPurchase, value);
+    }
+
     // ═══════════════════════════════════════════════════════════════
-    // ── Sales (8) ──
+    // ── Sales (9) ──
     // ═══════════════════════════════════════════════════════════════
 
     private bool _autoPostInvoices = true;
@@ -161,6 +142,13 @@ public class SystemSettingsViewModel : ViewModelBase
         set => SetProperty(ref _showExpiryInInvoices, value);
     }
 
+    private bool _autoPrintAfterPosting;
+    public bool AutoPrintAfterPosting
+    {
+        get => _autoPrintAfterPosting;
+        set => SetProperty(ref _autoPrintAfterPosting, value);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // ── Purchases (3) ──
     // ═══════════════════════════════════════════════════════════════
@@ -187,22 +175,8 @@ public class SystemSettingsViewModel : ViewModelBase
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // ── Barcode (3) ──
+    // ── Barcode (2) ──
     // ═══════════════════════════════════════════════════════════════
-
-    private bool _enableBarcode = true;
-    public bool EnableBarcode
-    {
-        get => _enableBarcode;
-        set => SetProperty(ref _enableBarcode, value);
-    }
-
-    private string _barcodeInputType = "Scanner";
-    public string BarcodeInputType
-    {
-        get => _barcodeInputType;
-        set => SetProperty(ref _barcodeInputType, value);
-    }
 
     private bool _autoGenerateBarcode = true;
     public bool AutoGenerateBarcode
@@ -211,8 +185,15 @@ public class SystemSettingsViewModel : ViewModelBase
         set => SetProperty(ref _autoGenerateBarcode, value);
     }
 
+    private bool _allowDuplicateBarcode;
+    public bool AllowDuplicateBarcode
+    {
+        get => _allowDuplicateBarcode;
+        set => SetProperty(ref _allowDuplicateBarcode, value);
+    }
+
     // ═══════════════════════════════════════════════════════════════
-    // ── Print (6) ──
+    // ── Print (13) ──
     // ═══════════════════════════════════════════════════════════════
 
     private string _thermalPrinterName = string.Empty;
@@ -255,6 +236,55 @@ public class SystemSettingsViewModel : ViewModelBase
     {
         get => _footerNote;
         set => SetProperty(ref _footerNote, value);
+    }
+
+    private int _printCopies = 1;
+    public int PrintCopies
+    {
+        get => _printCopies;
+        set => SetProperty(ref _printCopies, value);
+    }
+
+    private bool _showBalanceOnPrint;
+    public bool ShowBalanceOnPrint
+    {
+        get => _showBalanceOnPrint;
+        set => SetProperty(ref _showBalanceOnPrint, value);
+    }
+
+    private bool _printSignature;
+    public bool PrintSignature
+    {
+        get => _printSignature;
+        set => SetProperty(ref _printSignature, value);
+    }
+
+    private string _paperSize = "A4";
+    public string PaperSize
+    {
+        get => _paperSize;
+        set => SetProperty(ref _paperSize, value);
+    }
+
+    private bool _printBarcode;
+    public bool PrintBarcode
+    {
+        get => _printBarcode;
+        set => SetProperty(ref _printBarcode, value);
+    }
+
+    private bool _printQRCode;
+    public bool PrintQRCode
+    {
+        get => _printQRCode;
+        set => SetProperty(ref _printQRCode, value);
+    }
+
+    private bool _printCompanyAddress = true;
+    public bool PrintCompanyAddress
+    {
+        get => _printCompanyAddress;
+        set => SetProperty(ref _printCompanyAddress, value);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -301,47 +331,61 @@ public class SystemSettingsViewModel : ViewModelBase
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // ── General (3) ──
+    // ── CashBox (1) ──
     // ═══════════════════════════════════════════════════════════════
 
-    private int _decimalPlaces = 2;
-    public int DecimalPlaces
+    private bool _allowNegativeCash;
+    public bool AllowNegativeCash
     {
-        get => _decimalPlaces;
-        set => SetProperty(ref _decimalPlaces, value);
-    }
-
-    private string _language = "ar";
-    public string Language
-    {
-        get => _language;
-        set => SetProperty(ref _language, value);
-    }
-
-    private string _dateFormat = "dd/MM/yyyy";
-    public string DateFormat
-    {
-        get => _dateFormat;
-        set => SetProperty(ref _dateFormat, value);
+        get => _allowNegativeCash;
+        set => SetProperty(ref _allowNegativeCash, value);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // Barcode Input Types for ComboBox
+    // ── General (6) ──
     // ═══════════════════════════════════════════════════════════════
 
-    public List<string> BarcodeInputTypes { get; } = new() { "Scanner", "Camera" };
+    private bool _enableAttachments = true;
+    public bool EnableAttachments
+    {
+        get => _enableAttachments;
+        set => SetProperty(ref _enableAttachments, value);
+    }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Decimal Places options for ComboBox
-    // ═══════════════════════════════════════════════════════════════
+    private bool _enableNotifications = true;
+    public bool EnableNotifications
+    {
+        get => _enableNotifications;
+        set => SetProperty(ref _enableNotifications, value);
+    }
 
-    public List<int> DecimalPlacesOptions { get; } = new() { 0, 1, 2, 3, 4, 5, 6 };
+    private int _defaultSalesTax;
+    public int DefaultSalesTax
+    {
+        get => _defaultSalesTax;
+        set => SetProperty(ref _defaultSalesTax, value);
+    }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Language options for ComboBox
-    // ═══════════════════════════════════════════════════════════════
+    private int _defaultPurchaseTax;
+    public int DefaultPurchaseTax
+    {
+        get => _defaultPurchaseTax;
+        set => SetProperty(ref _defaultPurchaseTax, value);
+    }
 
-    public List<string> LanguageOptions { get; } = new() { "ar", "en" };
+    private int _defaultBranch = 1;
+    public int DefaultBranch
+    {
+        get => _defaultBranch;
+        set => SetProperty(ref _defaultBranch, value);
+    }
+
+    private int _defaultWarehouse = 1;
+    public int DefaultWarehouse
+    {
+        get => _defaultWarehouse;
+        set => SetProperty(ref _defaultWarehouse, value);
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // Operations
@@ -400,10 +444,11 @@ public class SystemSettingsViewModel : ViewModelBase
     private void MapFromDictionary(Dictionary<string, string> settings)
     {
         // Inventory
-        CostingMethod = ParseInt(settings, "CostingMethod", 1);
         AllowNegativeStock = ParseBool(settings, "AllowNegativeStock");
         EnableFefo = ParseBool(settings, "EnableFefo");
         StockAlertDays = ParseInt(settings, "StockAlertDays", 5);
+        RequireBatchOnPurchase = ParseBool(settings, "RequireBatchOnPurchase");
+        RequireExpiryOnPurchase = ParseBool(settings, "RequireExpiryOnPurchase");
 
         // Sales
         AutoPostInvoices = ParseBool(settings, "AutoPostInvoices", true);
@@ -414,6 +459,7 @@ public class SystemSettingsViewModel : ViewModelBase
         DefaultCashCustomerId = ParseInt(settings, "DefaultCashCustomerId", 1);
         HideTaxInSales = ParseBool(settings, "HideTaxInSales");
         ShowExpiryInInvoices = ParseBool(settings, "ShowExpiryInInvoices", true);
+        AutoPrintAfterPosting = ParseBool(settings, "AutoPrintAfterPosting");
 
         // Purchases
         PurchaseAutoPost = ParseBool(settings, "PurchaseAutoPost", true);
@@ -421,9 +467,8 @@ public class SystemSettingsViewModel : ViewModelBase
         HideTaxInPurchases = ParseBool(settings, "HideTaxInPurchases");
 
         // Barcode
-        EnableBarcode = ParseBool(settings, "EnableBarcode", true);
-        BarcodeInputType = settings.GetValueOrDefault("BarcodeInputType", "Scanner");
         AutoGenerateBarcode = ParseBool(settings, "AutoGenerateBarcode", true);
+        AllowDuplicateBarcode = ParseBool(settings, "AllowDuplicateBarcode");
 
         // Print
         ThermalPrinterName = settings.GetValueOrDefault("ThermalPrinterName", "");
@@ -432,6 +477,13 @@ public class SystemSettingsViewModel : ViewModelBase
         StoreTaxNumber = settings.GetValueOrDefault("StoreTaxNumber", "");
         ShowLogo = ParseBool(settings, "ShowLogo");
         FooterNote = settings.GetValueOrDefault("FooterNote", "");
+        PrintCopies = ParseInt(settings, "PrintCopies", 1);
+        ShowBalanceOnPrint = ParseBool(settings, "ShowBalanceOnPrint");
+        PrintSignature = ParseBool(settings, "PrintSignature");
+        PaperSize = settings.GetValueOrDefault("PaperSize", "A4");
+        PrintBarcode = ParseBool(settings, "PrintBarcode");
+        PrintQRCode = ParseBool(settings, "PrintQRCode");
+        PrintCompanyAddress = ParseBool(settings, "PrintCompanyAddress", true);
 
         // Notifications
         LowStockAlert = ParseBool(settings, "LowStockAlert", true);
@@ -442,10 +494,16 @@ public class SystemSettingsViewModel : ViewModelBase
         // Accounting
         AutoCreateJournalEntry = ParseBool(settings, "AutoCreateJournalEntry", true);
 
-        // General
-        DecimalPlaces = ParseInt(settings, "DecimalPlaces", 2);
-        Language = settings.GetValueOrDefault("Language", "ar");
-        DateFormat = settings.GetValueOrDefault("DateFormat", "dd/MM/yyyy");
+        // CashBox
+        AllowNegativeCash = ParseBool(settings, "AllowNegativeCash");
+
+        // General / Invoice Defaults
+        EnableAttachments = ParseBool(settings, "EnableAttachments", true);
+        EnableNotifications = ParseBool(settings, "EnableNotifications", true);
+        DefaultSalesTax = ParseInt(settings, "DefaultSalesTax");
+        DefaultPurchaseTax = ParseInt(settings, "DefaultPurchaseTax");
+        DefaultBranch = ParseInt(settings, "DefaultBranch", 1);
+        DefaultWarehouse = ParseInt(settings, "DefaultWarehouse", 1);
     }
 
     private Dictionary<string, string> BuildDictionary()
@@ -453,10 +511,11 @@ public class SystemSettingsViewModel : ViewModelBase
         var dict = new Dictionary<string, string>
         {
             // Inventory
-            ["CostingMethod"] = CostingMethod.ToString(),
             ["AllowNegativeStock"] = AllowNegativeStock.ToString().ToLower(),
             ["EnableFefo"] = EnableFefo.ToString().ToLower(),
             ["StockAlertDays"] = StockAlertDays.ToString(),
+            ["RequireBatchOnPurchase"] = RequireBatchOnPurchase.ToString().ToLower(),
+            ["RequireExpiryOnPurchase"] = RequireExpiryOnPurchase.ToString().ToLower(),
 
             // Sales
             ["AutoPostInvoices"] = AutoPostInvoices.ToString().ToLower(),
@@ -467,6 +526,7 @@ public class SystemSettingsViewModel : ViewModelBase
             ["DefaultCashCustomerId"] = DefaultCashCustomerId.ToString(),
             ["HideTaxInSales"] = HideTaxInSales.ToString().ToLower(),
             ["ShowExpiryInInvoices"] = ShowExpiryInInvoices.ToString().ToLower(),
+            ["AutoPrintAfterPosting"] = AutoPrintAfterPosting.ToString().ToLower(),
 
             // Purchases
             ["PurchaseAutoPost"] = PurchaseAutoPost.ToString().ToLower(),
@@ -474,9 +534,8 @@ public class SystemSettingsViewModel : ViewModelBase
             ["HideTaxInPurchases"] = HideTaxInPurchases.ToString().ToLower(),
 
             // Barcode
-            ["EnableBarcode"] = EnableBarcode.ToString().ToLower(),
-            ["BarcodeInputType"] = BarcodeInputType,
             ["AutoGenerateBarcode"] = AutoGenerateBarcode.ToString().ToLower(),
+            ["AllowDuplicateBarcode"] = AllowDuplicateBarcode.ToString().ToLower(),
 
             // Print
             ["ThermalPrinterName"] = ThermalPrinterName,
@@ -485,6 +544,13 @@ public class SystemSettingsViewModel : ViewModelBase
             ["StoreTaxNumber"] = StoreTaxNumber,
             ["ShowLogo"] = ShowLogo.ToString().ToLower(),
             ["FooterNote"] = FooterNote,
+            ["PrintCopies"] = PrintCopies.ToString(),
+            ["ShowBalanceOnPrint"] = ShowBalanceOnPrint.ToString().ToLower(),
+            ["PrintSignature"] = PrintSignature.ToString().ToLower(),
+            ["PaperSize"] = PaperSize,
+            ["PrintBarcode"] = PrintBarcode.ToString().ToLower(),
+            ["PrintQRCode"] = PrintQRCode.ToString().ToLower(),
+            ["PrintCompanyAddress"] = PrintCompanyAddress.ToString().ToLower(),
 
             // Notifications
             ["LowStockAlert"] = LowStockAlert.ToString().ToLower(),
@@ -495,10 +561,16 @@ public class SystemSettingsViewModel : ViewModelBase
             // Accounting
             ["AutoCreateJournalEntry"] = AutoCreateJournalEntry.ToString().ToLower(),
 
-            // General
-            ["DecimalPlaces"] = DecimalPlaces.ToString(),
-            ["Language"] = Language,
-            ["DateFormat"] = DateFormat,
+            // CashBox
+            ["AllowNegativeCash"] = AllowNegativeCash.ToString().ToLower(),
+
+            // General / Invoice Defaults
+            ["EnableAttachments"] = EnableAttachments.ToString().ToLower(),
+            ["EnableNotifications"] = EnableNotifications.ToString().ToLower(),
+            ["DefaultSalesTax"] = DefaultSalesTax.ToString(),
+            ["DefaultPurchaseTax"] = DefaultPurchaseTax.ToString(),
+            ["DefaultBranch"] = DefaultBranch.ToString(),
+            ["DefaultWarehouse"] = DefaultWarehouse.ToString(),
         };
 
         return dict;

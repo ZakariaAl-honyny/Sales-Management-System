@@ -15,24 +15,19 @@ public class CompanySettingsViewModel : ViewModelBase
 {
     private readonly ICompanySettingsApiService _settingsApi;
     private readonly IDialogService _dialogService;
-    private readonly ICurrencyApiService _currencyApi;
-
     public CompanySettingsViewModel()
         : this(
             App.GetService<ICompanySettingsApiService>(),
-            App.GetService<IDialogService>(),
-            App.GetService<ICurrencyApiService>())
+            App.GetService<IDialogService>())
     {
     }
 
     public CompanySettingsViewModel(
         ICompanySettingsApiService settingsApi,
-        IDialogService dialogService,
-        ICurrencyApiService currencyApi)
+        IDialogService dialogService)
     {
         _settingsApi = settingsApi ?? throw new ArgumentNullException(nameof(settingsApi));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
-        _currencyApi = currencyApi ?? throw new ArgumentNullException(nameof(currencyApi));
         SetDialogService(dialogService);
 
         LoadCommand = new AsyncRelayCommand(
@@ -98,27 +93,6 @@ public class CompanySettingsViewModel : ViewModelBase
         set => SetProperty(ref _logoPath, value);
     }
 
-    private int _defaultCurrencyId;
-    public int DefaultCurrencyId
-    {
-        get => _defaultCurrencyId;
-        set => SetProperty(ref _defaultCurrencyId, value);
-    }
-
-    private string? _currencyName;
-    public string? CurrencyName
-    {
-        get => _currencyName;
-        set => SetProperty(ref _currencyName, value);
-    }
-
-    private List<CurrencyDto> _currencies = new();
-    public List<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
     private string? _errorMessage;
     public string? ErrorMessage
     {
@@ -138,8 +112,6 @@ public class CompanySettingsViewModel : ViewModelBase
             AddError(nameof(CompanyName), "اسم الشركة مطلوب");
         if (CompanyName?.Trim().Length > 200)
             AddError(nameof(CompanyName), "اسم الشركة لا يمكن أن يتجاوز 200 حرف");
-        if (DefaultCurrencyId <= 0)
-            AddError(nameof(DefaultCurrencyId), "العملة الافتراضية مطلوبة");
         if (Phone?.Length > 30)
             AddError(nameof(Phone), "رقم الهاتف لا يمكن أن يتجاوز 30 حرفاً");
         if (Email?.Length > 100)
@@ -165,16 +137,6 @@ public class CompanySettingsViewModel : ViewModelBase
     {
         ErrorMessage = null;
 
-        // Load currencies for dropdown
-        var currenciesResult = await _currencyApi.GetAllAsync(true);
-        if (currenciesResult.IsSuccess && currenciesResult.Value != null)
-        {
-            await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
-            {
-                Currencies = currenciesResult.Value;
-            });
-        }
-
         var result = await _settingsApi.GetAsync();
         if (result.IsSuccess && result.Value != null)
         {
@@ -186,8 +148,6 @@ public class CompanySettingsViewModel : ViewModelBase
                 Address = result.Value.Address;
                 TaxNumber = result.Value.TaxNumber;
                 LogoPath = result.Value.LogoPath;
-                DefaultCurrencyId = result.Value.DefaultCurrencyId;
-                CurrencyName = result.Value.CurrencyName;
             });
         }
         else
@@ -208,7 +168,6 @@ public class CompanySettingsViewModel : ViewModelBase
 
         var request = new UpdateCompanySettingsRequest(
             CompanyName.Trim(),
-            (short)DefaultCurrencyId,
             Phone?.Trim(),
             Email?.Trim(),
             Address?.Trim(),

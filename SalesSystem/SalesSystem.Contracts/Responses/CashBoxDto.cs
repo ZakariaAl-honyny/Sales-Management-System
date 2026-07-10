@@ -4,7 +4,7 @@ namespace SalesSystem.Contracts.Responses;
 
 /// <summary>
 /// DTO for a cash box.
-/// Schema: CashBoxes — Id, AccountId (int), BranchId (smallint), Name, Description (nullable).
+/// Schema: CashBoxes — Id, AccountId (int), Name, Description (nullable).
 /// Balance is tracked on the linked Account, never stored here.
 /// </summary>
 public record CashBoxDto(
@@ -13,8 +13,6 @@ public record CashBoxDto(
     [property: JsonPropertyName("accountId")] int AccountId,
     [property: JsonPropertyName("accountName")] string? AccountName,
     [property: JsonPropertyName("accountCode")] string? AccountCode,
-    [property: JsonPropertyName("branchId")] short BranchId,
-    [property: JsonPropertyName("branchName")] string? BranchName,
     [property: JsonPropertyName("description")] string? Description,
     [property: JsonPropertyName("isActive")] bool IsActive
 );

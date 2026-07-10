@@ -127,7 +127,6 @@ public class WarehouseRequestValidatorTests
         {
             // Arrange
             var request = new CreateWarehouseRequest(
-                BranchId: 1,
                 Name: "مستودع - Warehouse",
                 Address: "القاهرة - Cairo"
             );
@@ -142,7 +141,6 @@ public class WarehouseRequestValidatorTests
         #endregion
 
         private static CreateWarehouseRequest CreateValidRequest() => new(
-            BranchId: 1,
             Name: "Main Warehouse",
             Address: "Cairo, Egypt"
         );
@@ -251,7 +249,6 @@ public class WarehouseRequestValidatorTests
         #endregion
 
         private static UpdateWarehouseRequest CreateValidRequest() => new(
-            BranchId: 1,
             Name: "Updated Warehouse",
             Address: "Alexandria, Egypt",
             IsActive: true

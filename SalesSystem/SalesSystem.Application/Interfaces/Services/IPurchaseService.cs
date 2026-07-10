@@ -7,6 +7,7 @@ namespace SalesSystem.Application.Interfaces.Services;
 public interface IPurchaseService
 {
     Task<Result<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct);
+    Task<Result<PurchaseInvoiceDto>> CreateAndPostAsync(CreatePurchaseInvoiceRequest request, int userId, CancellationToken ct);
     Task<Result<PurchaseInvoiceDto>> PostAsync(int id, int userId, CancellationToken ct);
     Task<Result<PurchaseInvoiceDto>> CancelAsync(int id, int userId, CancellationToken ct);
     Task<Result<PurchaseInvoiceDto>> GetByIdAsync(int id, CancellationToken ct);
@@ -21,4 +22,9 @@ public interface IPurchaseService
         int pageSize = 10, 
         bool includeInactive = false, 
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Updates the attachment path for a purchase invoice.
+    /// </summary>
+    Task<Result<PurchaseInvoiceDto>> SetAttachmentAsync(int id, string filePath, CancellationToken ct);
 }

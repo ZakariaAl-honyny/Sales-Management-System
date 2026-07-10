@@ -1,14 +1,14 @@
 <Solution>
-  <!--<Project Path="Tests/SalesSystem.Api.Tests/SalesSystem.Api.Tests.csproj" />-->
+  <!-- <Project Path="Tests/SalesSystem.Api.Tests/SalesSystem.Api.Tests.csproj" /> -->
   <Project Path="SalesSystem.Api/SalesSystem.Api.csproj" />
-  <!--<Project Path="Tests/SalesSystem.Application.Tests/SalesSystem.Application.Tests.csproj" />-->
+  <!-- <Project Path="Tests/SalesSystem.Application.Tests/SalesSystem.Application.Tests.csproj" /> -->
   <Project Path="SalesSystem.Application/SalesSystem.Application.csproj" />
   <Project Path="SalesSystem.Contracts/SalesSystem.Contracts.csproj" />
   <!-- <Project Path="Tests/SalesSystem.Domain.Tests/SalesSystem.Domain.Tests.csproj" /> -->
   <Project Path="SalesSystem.Domain/SalesSystem.Domain.csproj" />
-  <!--<Project Path="Tests/SalesSystem.Infrastructure.Tests/SalesSystem.Infrastructure.Tests.csproj" />-->
+  <!-- <Project Path="Tests/SalesSystem.Infrastructure.Tests/SalesSystem.Infrastructure.Tests.csproj" /> -->
   <Project Path="SalesSystem.Infrastructure/SalesSystem.Infrastructure.csproj" />
-  <!--<Project Path="Tests/SalesSystem.DesktopPWF.Tests/SalesSystem.DesktopPWF.Tests.csproj" />-->
+  <!-- <Project Path="Tests/SalesSystem.DesktopPWF.Tests/SalesSystem.DesktopPWF.Tests.csproj" /> -->
   <Project Path="SalesSystem.DesktopPWF/SalesSystem.DesktopPWF.csproj" />
-  <!--<Project Path="Tests/SalesSystem.E2ETests/SalesSystem.E2ETests.csproj" />-->
+  <!-- <Project Path="Tests/SalesSystem.E2ETests/SalesSystem.E2ETests.csproj" /> -->
 </Solution>

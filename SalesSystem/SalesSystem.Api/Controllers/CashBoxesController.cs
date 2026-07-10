@@ -82,6 +82,28 @@ public class CashBoxesController : ControllerBase
         return BadRequest(new { error = result.Error });
     }
 
+    [HttpDelete("permanent/{id:int}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> PermanentDelete(int id, CancellationToken ct)
+    {
+        var result = await _service.PermanentDeleteAsync(id, ct);
+        if (result.IsSuccess) return Ok(new { message = "تم حذف الصندوق نهائياً" });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
+    [HttpPost("{id:int}/restore")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> Restore(int id, CancellationToken ct)
+    {
+        var result = await _service.RestoreAsync(id, ct);
+        if (result.IsSuccess) return Ok(new { message = "تم استعادة الصندوق بنجاح" });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
+        return BadRequest(new { error = result.Error });
+    }
+
     // ═══════════════════════════════════════════
     // Receipt Vouchers (سندات قبض)
     // ═══════════════════════════════════════════

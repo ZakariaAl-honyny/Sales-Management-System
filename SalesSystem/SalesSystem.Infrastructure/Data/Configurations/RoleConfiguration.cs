@@ -19,6 +19,9 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
         // Description — optional, max 300
         builder.Property(r => r.Description).IsRequired(false).HasMaxLength(300);
 
+        // PermissionsMask — bitmask of granted permissions (0 = none)
+        builder.Property(r => r.PermissionsMask).IsRequired().HasDefaultValue(0L);
+
         builder.HasQueryFilter(r => r.IsActive);
 
         // Navigation: UserRoles

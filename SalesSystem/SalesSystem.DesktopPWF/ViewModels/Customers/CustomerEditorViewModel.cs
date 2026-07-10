@@ -199,12 +199,13 @@ public class CustomerEditorViewModel : ViewModelBase
         {
             var updateRequest = new UpdateCustomerRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                string.IsNullOrWhiteSpace(Email) ? null : Email,
-                string.IsNullOrWhiteSpace(Address) ? null : Address,
-                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                CreditLimit,
-                IsActive);
+                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
+                Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
+                TaxNumber: string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes,
+                CreditLimit: CreditLimit,
+                IsActive: IsActive);
 
             result = await _customerService.UpdateAsync(_customerId, updateRequest);
         }
@@ -212,11 +213,12 @@ public class CustomerEditorViewModel : ViewModelBase
         {
             var createRequest = new CreateCustomerRequest(
                 Name,
-                string.IsNullOrWhiteSpace(Phone) ? null : Phone,
-                string.IsNullOrWhiteSpace(Email) ? null : Email,
-                string.IsNullOrWhiteSpace(Address) ? null : Address,
-                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                CreditLimit);
+                Phone: string.IsNullOrWhiteSpace(Phone) ? null : Phone,
+                Email: string.IsNullOrWhiteSpace(Email) ? null : Email,
+                Address: string.IsNullOrWhiteSpace(Address) ? null : Address,
+                TaxNumber: string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                Notes: string.IsNullOrWhiteSpace(Notes) ? null : Notes,
+                CreditLimit: CreditLimit);
 
             result = await _customerService.CreateAsync(createRequest);
         }

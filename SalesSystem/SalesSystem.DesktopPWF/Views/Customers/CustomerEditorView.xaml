@@ -107,31 +107,18 @@
 
                         <!-- Credit Limit -->
                         <TextBlock Text="الحد الائتماني" Style="{StaticResource LabelStyle}"/>
-<TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
+<TextBox Text="{Binding CreditLimit, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" 
                                   Style="{StaticResource ModernTextBox}" 
                                   Tag="0.00"
                                   TabIndex="7"
                                   helpers:FocusHelper.AdvanceOnEnter="True"
+                                  helpers:InputHelper.NumericOnly="True"
                                   AutomationProperties.AutomationId="TxtCustomerCreditLimit"
                               ToolTip="أقصى مبلغ يمكن أن يدين به العميل — أدخل 0 إذا كنت لا تريد تحديد حد"/>
                         <TextBlock Text="أقصى مبلغ مديونية مسموح به — 0 يعني بدون حد ائتماني" Style="{StaticResource HelperTextStyle}"/>
                         <Border Height="12"/>
 
-                        <!-- Opening Balance -->
-                        <StackPanel Visibility="{Binding IsEditMode, Converter={StaticResource InverseBoolToVisibility}}">
-                            <TextBlock Text="الرصيد الافتتاحي (رصيد سابق)" Style="{StaticResource LabelStyle}"/>
-<TextBox Text="{Binding OpeningBalance, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}" 
-                                      Style="{StaticResource ModernTextBox}" 
-                                      Tag="0.00"
-                                      TabIndex="8"
-                                      helpers:FocusHelper.AdvanceOnEnter="True"
-                                      AutomationProperties.AutomationId="TxtCustomerOpeningBalance"
-                              ToolTip="الرصيد السابق للعميل — المبلغ المستحق عليك (بالسالب) أو المستحق له (بالموجب)"/>
-                            <TextBlock Text="المبلغ المستحق على العميل (بالموجب) أو المستحق له (بالسالب) قبل استخدام النظام" Style="{StaticResource HelperTextStyle}"/>
-                            <Border Height="12"/>
-                        </StackPanel>
-
-                        <!-- Account - Auto-created by system -->
+                        <!-- Account - Auto-created by system (Phase 18: opening balance is a Journal Entry) -->
                         <Border Height="12"/>
                         <Border Background="#E3F2FD" CornerRadius="6" Padding="12,8">
                             <StackPanel>

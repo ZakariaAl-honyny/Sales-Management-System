@@ -58,16 +58,31 @@
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                <TextBlock Text="رقم العملة *" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding CurrencyId, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
-                                         Style="{StaticResource ModernTextBox}" Tag="أدخل رقم العملة"
-                                         ToolTip="أدخل رقم العملة (مثال: 1 للريال اليمني)"/>
+                                <TextBlock Text="العملة *" Style="{StaticResource LabelStyle}"/>
+                                <ComboBox ItemsSource="{Binding Currencies}"
+                                          SelectedValue="{Binding CurrencyId, ValidatesOnDataErrors=True}"
+                                          SelectedValuePath="Id"
+                                          DisplayMemberPath="Name"
+                                          Style="{StaticResource ModernComboBox}"
+                                          ToolTip="اختر العملة — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+                                <!-- Exchange Rate (Visible only for foreign currencies) -->
+                                <Border Height="4"/>
+                                <TextBox Text="{Binding ExchangeRate, UpdateSourceTrigger=PropertyChanged}"
+                                         helpers:InputHelper.NumericOnly="True"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                                         ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية — يمكن تعديله"/>
+                                <TextBlock Text="{Binding CurrentExchangeRateInfo, StringFormat='السعر الحالي: {0}'}"
+                                           FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                           Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                                           ToolTip="سعر الصرف الحالي من قاعدة البيانات — للمعلومات فقط"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                 <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
+                                <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                          Style="{StaticResource ModernTextBox}" Tag="0.00"
+                                         helpers:InputHelper.NumericOnly="True"
                                          ToolTip="المبلغ المقبوض — يجب أن يكون أكبر من صفر"/>
                             </StackPanel>
                         </Grid>

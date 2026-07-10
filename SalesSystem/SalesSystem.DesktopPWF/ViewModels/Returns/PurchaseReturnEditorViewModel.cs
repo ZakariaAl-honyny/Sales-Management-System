@@ -27,7 +27,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private readonly ILogger<PurchaseReturnEditorViewModel> _logger;
     private readonly ISoundService _soundService;
     private readonly IDialogService _dialogService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IToastNotificationService _toastService;
 
     private DateTime _returnDate = DateTime.Now;
@@ -46,12 +45,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
     private int? _returnId;
     private ReturnImpactSummary _impact = new();
 
-    // Currency fields
-    private int? _selectedCurrencyId;
-    private decimal? _exchangeRate;
-    private bool _isForeignCurrency;
-    private ObservableCollection<CurrencyDto> _currencies = new();
-
 
     public PurchaseReturnEditorViewModel()
     {
@@ -64,7 +57,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         _soundService = App.GetService<ISoundService>();
         _logger = App.GetService<ILogger<PurchaseReturnEditorViewModel>>();
         _dialogService = App.GetService<IDialogService>();
-        _currencyService = App.GetService<ICurrencyApiService>();
         _toastService = App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
@@ -237,66 +229,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         set => SetProperty(ref _impact, value);
     }
 
-    // Currency properties
-    public ObservableCollection<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
-    public int? SelectedCurrencyId
-    {
-        get => _selectedCurrencyId;
-        set
-        {
-            if (SetProperty(ref _selectedCurrencyId, value))
-            {
-                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
-                OnPropertyChanged(nameof(IsForeignCurrency));
-                OnPropertyChanged(nameof(CurrencyName));
-                OnPropertyChanged(nameof(IsBaseCurrency));
-            }
-        }
-    }
-
-    public decimal? ExchangeRate
-    {
-        get => _exchangeRate;
-        set => SetProperty(ref _exchangeRate, value);
-    }
-
-    public bool IsForeignCurrency
-    {
-        get => _isForeignCurrency;
-        set => SetProperty(ref _isForeignCurrency, value);
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // XAML-bound properties added for view compatibility
-    // ═══════════════════════════════════════════════════════════
-
-    /// <summary>توافق مع XAML — اسم IsInvoiceLinked (يعادل IsLinkedToInvoice)</summary>
-    public bool IsInvoiceLinked => IsLinkedToInvoice;
-
-    /// <summary>اسم العملة المحددة للعرض في الواجهة</summary>
-    public string CurrencyName
-    {
-        get
-        {
-            if (SelectedCurrencyId.HasValue)
-            {
-                var currency = Currencies.FirstOrDefault(c => c.Id == SelectedCurrencyId.Value);
-                if (currency != null) return currency.Name;
-            }
-            return "ريال يمني";
-        }
-    }
-
     /// <summary>قائمة الموردين للوضع المستقل (ComboBox)</summary>
     public ObservableCollection<SupplierDto> Suppliers { get; } = new();
-
-    /// <summary>هل العملة المحددة هي العملة الأساسية (لعكس IsForeignCurrency)</summary>
-    public bool IsBaseCurrency => !IsForeignCurrency;
 
     // Discount properties
     private byte _selectedDiscountType; // 0 = Amount, 1 = Percentage
@@ -526,9 +460,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 Notes = dto.Notes ?? string.Empty;
                 SelectedWarehouseId = dto.WarehouseId;
                 Status = (InvoiceStatus)dto.Status;
-                SelectedCurrencyId = dto.CurrencyId;
-                ExchangeRate = dto.ExchangeRate ?? 1.0m;
-
                 if (dto.PurchaseInvoiceId.HasValue)
                 {
                     var invResult = await _invoiceService.GetByIdAsync(dto.PurchaseInvoiceId.Value);
@@ -578,15 +509,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             {
                 Warehouses = new ObservableCollection<WarehouseDto>(warehouseResult.Value);
                 if (Warehouses.Any()) SelectedWarehouseId = Warehouses.First().Id;
-            }
-
-            var currenciesResult = await _currencyService.GetAllAsync();
-            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
-            {
-                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
-                var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-                if (baseCurrency != null)
-                    SelectedCurrencyId = baseCurrency.Id;
             }
 
             // Load suppliers for standalone mode ComboBox
@@ -734,8 +656,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
                 SupplierId: supplierId,
                 WarehouseId: SelectedWarehouseId,
                 ReturnDate: ReturnDate,
-                CurrencyId: SelectedCurrencyId,
-                ExchangeRate: ExchangeRate,
+                DiscountType: (DiscountType?)SelectedDiscountType,
+                DiscountRate: DiscountRate,
                 Notes: Notes,
                 Items: returnItems
             );
@@ -763,8 +685,8 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
             SupplierId: IsStandaloneMode ? (StandaloneSupplierId ?? 0) : (SelectedInvoice?.SupplierId ?? 0),
             WarehouseId: SelectedWarehouseId,
             ReturnDate: ReturnDate,
-            CurrencyId: SelectedCurrencyId,
-            ExchangeRate: ExchangeRate,
+            DiscountType: (DiscountType?)SelectedDiscountType,
+            DiscountRate: DiscountRate,
             Notes: Notes,
             Items: Items.Where(i => i.ReturnQuantity > 0).Select(i => new CreatePurchaseReturnItemRequest(
                 PurchaseInvoiceLineId: i.PurchaseInvoiceLineId,
@@ -903,11 +825,6 @@ public class PurchaseReturnEditorViewModel : ViewModelBase
         return false;
     }
 
-    private int GetBaseCurrencyId()
-    {
-        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-        return baseCurrency?.Id ?? 0;
-    }
     #endregion
 }
 

@@ -86,7 +86,8 @@ public class LoginViewModel : ViewModelBase
                 response.UserName,
                 response.UserId,
                 new List<int> { response.Role },
-                GetRoleName(response.Role));
+                GetRoleName(response.Role),
+                response.PermissionsMask);
 
             // Navigate to main window
             await InvokeOnUIThreadAsync(() =>

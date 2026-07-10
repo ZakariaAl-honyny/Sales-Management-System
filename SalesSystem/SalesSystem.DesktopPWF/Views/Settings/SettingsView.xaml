@@ -130,7 +130,7 @@
                             
                             <StackPanel Grid.Column="0" Margin="0,0,12,0">
                                 <TextBlock Text="نسبة الضريبة الافتراضية (%)" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding DefaultTaxRate, StringFormat=N2}" TabIndex="6" helpers:FocusHelper.AdvanceOnEnter="True" AutomationProperties.AutomationId="TxtDefaultTaxRate"/>
+                                <TextBox Text="{Binding DefaultTaxRate}" TabIndex="6" helpers:FocusHelper.AdvanceOnEnter="True" helpers:InputHelper.NumericOnly="True" AutomationProperties.AutomationId="TxtDefaultTaxRate"/>
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="12,0,0,0">
@@ -147,22 +147,8 @@
                         <TextBlock Text="⚙️ خيارات النظام" Style="{StaticResource HeaderStyle}" Margin="0,0,0,20"/>
                         
                         <CheckBox Content="تفعيل نظام تنبيهات المخزون" IsChecked="{Binding EnableStockAlerts}" Margin="0,0,0,12" TabIndex="8" AutomationProperties.AutomationId="ChkEnableStockAlerts"/>
-                        <CheckBox Content="تحديث الأسعار تلقائياً عند الشراء" IsChecked="{Binding AutoUpdatePrices}" TabIndex="9" AutomationProperties.AutomationId="ChkAutoUpdatePrices"/>
 
-                        <!-- Costing Method -->
-                        <TextBlock Text="طريقة تقييم المخزون" Style="{StaticResource LabelStyle}" Margin="0,12,0,0"/>
-                        <RadioButton Content="المتوسط المرجح (Weighted Average)"
-                                     IsChecked="{Binding IsWeightedAverageSelected}"
-                                     ToolTip="المتوسط المرجح — طريقة تقييم المخزون الافتراضية"
-                                     GroupName="CostingMethod" Margin="0,4,0,2"/>
-                        <RadioButton Content="آخر سعر شراء (Last Purchase Price)"
-                                     IsChecked="{Binding IsLastPriceSelected}"
-                                     ToolTip="استخدام آخر سعر شراء كتكلفة للمخزون"
-                                     GroupName="CostingMethod" Margin="0,2,0,2"/>
-                        <RadioButton Content="سعر المورد (Supplier Price)"
-                                     IsChecked="{Binding IsSupplierPriceSelected}"
-                                     ToolTip="استخدام سعر المورد المدرج في كرت الصنف"
-                                     GroupName="CostingMethod" Margin="0,2,0,6"/>
+
                     </StackPanel>
                 </Border>
 
@@ -226,7 +212,8 @@
                                 <TextBlock Text="كود صفحة ESC/POS" Style="{StaticResource LabelStyle}"/>
                                 <TextBox Text="{Binding EscPosCodePage, TargetNullValue=22}"
                                          ToolTip="كود الصفحة للطابعة الحرارية — 22 = IBM864 يدعم اللغة العربية"
-                                         AutomationProperties.AutomationId="TxtEscPosCodePage"/>
+                                         AutomationProperties.AutomationId="TxtEscPosCodePage"
+                                         helpers:InputHelper.NumericOnly="True"/>
                             </StackPanel>
 
                             <CheckBox Grid.Row="3" Grid.ColumnSpan="2"
@@ -275,7 +262,8 @@
                             <!-- Print Copies -->
                             <StackPanel Grid.Row="7" Grid.Column="1" Margin="12,0,0,16">
                                 <TextBlock Text="عدد النسخ" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding PrintCopies}" ToolTip="عدد نسخ الطباعة الافتراضية"/>
+                                <TextBox Text="{Binding PrintCopies}" ToolTip="عدد نسخ الطباعة الافتراضية"
+                                         helpers:InputHelper.NumericOnly="True"/>
                             </StackPanel>
 
                             <!-- Show Balance -->

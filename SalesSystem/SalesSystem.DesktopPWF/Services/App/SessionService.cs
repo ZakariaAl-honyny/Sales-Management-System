@@ -33,30 +33,38 @@ public class SessionService : ISessionService
 
     public ViewMode GetViewMode() => _viewMode;
 
-    public void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName)
+    public void SetSession(string token, string userName, int userId, List<int> roleIds, string roleName, long permissionsMask = 0)
     {
         _token = token;
         _userName = userName;
         _userId = userId;
         _roleIds = roleIds ?? new List<int>();
         _roleName = roleName;
-        // Calculate permissions based on primary role
-        var primaryRoleId = _roleIds.Count > 0 ? _roleIds[0] : 0;
-        _permissions = primaryRoleId.GetPermissionsForRole();
-        // Determine view mode based on role: Admin(1), Manager(2), Accountant(3), BranchManager(9) get Advanced, others get Basic
-        _viewMode = primaryRoleId switch
+
+        // Use API-provided PermissionsMask as single source of truth; fall back to hardcoded role mapping
+        if (permissionsMask != 0)
         {
-            1 => ViewMode.Advanced,  // Admin
-            2 => ViewMode.Advanced,  // Manager
-            3 => ViewMode.Advanced,  // Accountant (needs accounting screens)
-            4 => ViewMode.Basic,     // Treasurer
-            5 => ViewMode.Basic,     // Cashier
-            6 => ViewMode.Basic,     // Warehouse Supervisor
-            7 => ViewMode.Basic,     // Sales Employee
-            8 => ViewMode.Basic,     // Observer
-            9 => ViewMode.Advanced,  // Branch Manager (needs accounting)
-            _ => ViewMode.Basic
-        };
+            SetPermissionsMask(permissionsMask);
+        }
+        else
+        {
+            // Fallback: hardcoded role-based permissions (until login response always includes mask)
+            var primaryRoleId = _roleIds.Count > 0 ? _roleIds[0] : 0;
+            _permissions = primaryRoleId.GetPermissionsForRole();
+            _viewMode = primaryRoleId switch
+            {
+                1 => ViewMode.Advanced,  // Admin
+                2 => ViewMode.Advanced,  // Manager
+                3 => ViewMode.Advanced,  // Accountant
+                4 => ViewMode.Basic,     // Treasurer
+                5 => ViewMode.Basic,     // Cashier
+                6 => ViewMode.Basic,     // Warehouse Supervisor
+                7 => ViewMode.Basic,     // Sales Employee
+                8 => ViewMode.Basic,     // Observer
+                9 => ViewMode.Advanced,  // Branch Manager
+                _ => ViewMode.Basic
+            };
+        }
     }
 
     public void ClearSession()
@@ -96,6 +104,19 @@ public class SessionService : ISessionService
         _permissions |= permissions;
         // Update view mode based on whether the user has accounting permissions
         _viewMode = permissions.HasPermission(Permission.ChartOfAccounts)
+            ? ViewMode.Advanced
+            : ViewMode.Basic;
+    }
+
+    /// <summary>
+    /// Sets permissions directly from a PermissionsMask value (from API LoginResponse).
+    /// The mask is a long bitmask where each bit corresponds to a Desktop Permission flag.
+    /// This replaces the dual system (hardcoded role + API codes) with a single source of truth.
+    /// </summary>
+    public void SetPermissionsMask(long mask)
+    {
+        _permissions = (Permission)mask;
+        _viewMode = _permissions.HasPermission(Permission.ChartOfAccounts)
             ? ViewMode.Advanced
             : ViewMode.Basic;
     }

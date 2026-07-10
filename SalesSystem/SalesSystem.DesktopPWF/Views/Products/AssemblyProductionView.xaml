@@ -2,10 +2,11 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      mc:Ignorable="d"
-     
-      FlowDirection="RightToLeft"
+       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+       xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+       mc:Ignorable="d"
+      
+       FlowDirection="RightToLeft"
       Background="{StaticResource BackgroundBrush}">
 
     <Grid Margin="12">
@@ -53,7 +54,8 @@
                 <TextBlock Text="الكمية المطلوب إنتاجها *" Style="{StaticResource LabelStyle}"/>
                 <TextBox Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource ModernTextBox}"
-                         ToolTip="أدخل كمية المنتج المُجمَّع المراد إنتاجها — سيتم صرف المكونات بنفس النسبة"/>
+                         ToolTip="أدخل كمية المنتج المُجمَّع المراد إنتاجها — سيتم صرف المكونات بنفس النسبة"
+                         helpers:InputHelper.NumericOnly="True"/>
                 <TextBlock Text="عدد وحدات المُجمَّع المراد إنتاجها (بالوحدة الأساسية)" 
                            Style="{StaticResource HelperTextStyle}" Margin="0,0,0,8"/>
 

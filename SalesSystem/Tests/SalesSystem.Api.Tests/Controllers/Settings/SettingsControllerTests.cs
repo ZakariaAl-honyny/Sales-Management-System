@@ -8,7 +8,6 @@ using SalesSystem.Application.Printing.Contracts;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Enums;
 using System.Security.Claims;
 
 namespace SalesSystem.Api.Tests.Controllers.Settings;
@@ -35,13 +34,6 @@ public class SettingsControllerTests
             HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext { User = principal }
         };
 
-        // Setup default costing method responses
-        _settingsServiceMock
-            .Setup(x => x.GetCostingMethodAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result<CostingMethod?>.Success(CostingMethod.WeightedAverage));
-        _settingsServiceMock
-            .Setup(x => x.SetCostingMethodAsync(It.IsAny<CostingMethod>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success());
     }
 
     [Fact]
@@ -73,8 +65,8 @@ public class SettingsControllerTests
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedSettings()
     {
-        var request = new UpdateSettingsRequest("متجري المحدث", "جدة", "0123456789", "info@store.com", null, "SAR", 15m, true, null, true, false, true, "INV-");
-        var settings = new StoreSettingsDto(1, request.StoreName, request.Phone, request.Address, null, request.Email, request.Currency, request.DefaultTaxRate, request.IsTaxEnabled, request.TaxNumber, request.EnableStockAlerts, request.AllowNegativeStock, request.AutoUpdatePrices, request.InvoicePrefix);
+        var request = new UpdateSettingsRequest("متجري المحدث", "جدة", "0123456789", "info@store.com", null, "SAR", 15m, true, null, true, false, "INV-");
+        var settings = new StoreSettingsDto(1, request.StoreName, request.Phone, request.Address, null, request.Email, request.Currency, request.DefaultTaxRate, request.IsTaxEnabled, request.TaxNumber, request.EnableStockAlerts, request.AllowNegativeStock, request.InvoicePrefix);
 
         _settingsServiceMock
             .Setup(x => x.UpdateSettingsAsync(It.IsAny<UpdateSettingsRequest>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))

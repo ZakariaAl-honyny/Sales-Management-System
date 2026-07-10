@@ -46,11 +46,6 @@ public class CompanySettings : Entity
     public string? LogoPath { get; private set; }
 
     /// <summary>
-    /// FK to the Currencies table — the default currency for all financial transactions.
-    /// </summary>
-    public short DefaultCurrencyId { get; private set; }
-
-    /// <summary>
     /// Audit timestamps — schema has only CreatedAt/UpdatedAt, no CreatedByUserId/UpdatedByUserId.
     /// </summary>
     public DateTime CreatedAt { get; protected set; }
@@ -62,7 +57,6 @@ public class CompanySettings : Entity
     /// Factory method to create the single CompanySettings row.
     /// </summary>
     /// <param name="companyName">Company legal name (required).</param>
-    /// <param name="defaultCurrencyId">FK to Currencies (required, must be > 0).</param>
     /// <param name="phone">Optional phone number.</param>
     /// <param name="email">Optional email address.</param>
     /// <param name="address">Optional physical address.</param>
@@ -73,7 +67,6 @@ public class CompanySettings : Entity
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public static CompanySettings Create(
         string companyName,
-        short defaultCurrencyId,
         string? phone = null,
         string? email = null,
         string? address = null,
@@ -85,8 +78,6 @@ public class CompanySettings : Entity
             throw new DomainException("اسم الشركة مطلوب.");
         if (companyName.Trim().Length > 200)
             throw new DomainException("اسم الشركة لا يمكن أن يتجاوز 200 حرف.");
-        if (defaultCurrencyId <= 0)
-            throw new DomainException("العملة الافتراضية غير صالحة.");
         if (phone != null && phone.Trim().Length > 30)
             throw new DomainException("رقم الهاتف لا يمكن أن يتجاوز 30 حرفاً.");
         if (email != null && email.Trim().Length > 100)
@@ -101,7 +92,6 @@ public class CompanySettings : Entity
         var settings = new CompanySettings
         {
             CompanyName = companyName.Trim(),
-            DefaultCurrencyId = defaultCurrencyId,
             Phone = phone?.Trim(),
             Email = email?.Trim(),
             Address = address?.Trim(),
@@ -116,7 +106,6 @@ public class CompanySettings : Entity
     /// Updates the company settings fields.
     /// </summary>
     /// <param name="companyName">Company legal name (required).</param>
-    /// <param name="defaultCurrencyId">FK to Currencies (required, must be > 0).</param>
     /// <param name="phone">Optional phone number.</param>
     /// <param name="email">Optional email address.</param>
     /// <param name="address">Optional physical address.</param>
@@ -126,7 +115,6 @@ public class CompanySettings : Entity
     /// <exception cref="DomainException">If any guard clause fails.</exception>
     public void Update(
         string companyName,
-        short defaultCurrencyId,
         string? phone = null,
         string? email = null,
         string? address = null,
@@ -138,8 +126,6 @@ public class CompanySettings : Entity
             throw new DomainException("اسم الشركة مطلوب.");
         if (companyName.Trim().Length > 200)
             throw new DomainException("اسم الشركة لا يمكن أن يتجاوز 200 حرف.");
-        if (defaultCurrencyId <= 0)
-            throw new DomainException("العملة الافتراضية غير صالحة.");
         if (phone != null && phone.Trim().Length > 30)
             throw new DomainException("رقم الهاتف لا يمكن أن يتجاوز 30 حرفاً.");
         if (email != null && email.Trim().Length > 100)
@@ -152,7 +138,6 @@ public class CompanySettings : Entity
             throw new DomainException("مسار الشعار لا يمكن أن يتجاوز 500 حرف.");
 
         CompanyName = companyName.Trim();
-        DefaultCurrencyId = defaultCurrencyId;
         Phone = phone?.Trim();
         Email = email?.Trim();
         Address = address?.Trim();

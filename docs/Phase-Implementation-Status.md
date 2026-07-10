@@ -24,7 +24,7 @@
 | 💰 **29** | **Receipts & Payments** | 🟡 Partial — CashBox ✅ | ~2,500 | CustomerReceipts (سندات قبض) with multi-invoice allocation, SupplierPayments with multi-invoice allocation, ReceiptVouchers/PaymentVouchers replace CashTransactions, NO Cheques/DailyClosure in V1 |
 | 📓 **30** | **Journal Entries** | 📝 Planned | — | 3-state lifecycle, multi-currency, attachments, FiscalYear, Annual Closing, ReceiptVouchers (سندات قبض) and PaymentVouchers (سندات صرف) for manual entries |
 | 📊 **31** | **Reports** | 📝 Planned | — | 35+ DTOs, Hierarchical Income Statement + Balance Sheet, Excel export |
-| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Direct contact fields (Name, Phone, Email, Address, TaxNumber) on Supplier entity, AccountId mandatory (auto-created under `"1320"` — الموردون/Accounts Payable), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
+| 👥 **32** | **Suppliers Module** | 📝 Planned | — | Direct contact fields (Name, Phone, Email, Address, TaxNumber) on Supplier entity, AccountId mandatory (auto-created under `"2101"` — الموردون/Accounts Payable per AccountingSeeder), NO SupplierType in V1, CreditLimit, NO OpeningBalance on entity (journal entry is source of truth) |
 
 ---
 

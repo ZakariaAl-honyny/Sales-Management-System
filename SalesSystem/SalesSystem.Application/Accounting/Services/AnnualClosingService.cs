@@ -156,9 +156,7 @@ public class AnnualClosingService : IAnnualClosingService
                 $"قفل السنة المالية {fiscalYear}",
                 JournalEntryType.Manual,
                 fiscalYearEntity.Id,
-                currencyId: 1, // Default base currency
                 createdBy: closedByUserId,
-                exchangeRate: 1m,
                 referenceType: "FiscalYearClosure",
                 referenceId: null,
                 referenceNumber: fiscalYear.ToString());

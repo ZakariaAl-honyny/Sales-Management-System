@@ -15,7 +15,6 @@ public class UserEditorViewModel : ViewModelBase
 {
     private readonly IUserApiService _userService;
     private readonly IRoleApiService _roleService;
-    private readonly IBranchApiService _branchService;
     private readonly IEventBus _eventBus;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
@@ -40,12 +39,6 @@ public class UserEditorViewModel : ViewModelBase
     private RoleDto? _selectedAvailableRole;
     private RoleDto? _selectedAssignedRole;
 
-    // Branch assignment fields
-    private ObservableCollection<BranchDto> _availableBranches = new();
-    private ObservableCollection<BranchDto> _assignedBranches = new();
-    private BranchDto? _selectedAvailableBranch;
-    private BranchDto? _selectedAssignedBranch;
-
     public bool IsEditMode
     {
         get => _isEditMode;
@@ -57,7 +50,6 @@ public class UserEditorViewModel : ViewModelBase
     {
         _userService = App.GetService<IUserApiService>();
         _roleService = App.GetService<IRoleApiService>();
-        _branchService = App.GetService<IBranchApiService>();
         _eventBus = App.GetService<IEventBus>();
         _dialogService = App.GetService<IDialogService>();
         _toastService = App.GetService<IToastNotificationService>();
@@ -83,7 +75,7 @@ public class UserEditorViewModel : ViewModelBase
         _isEditMode = true;
         _isLocked = user.IsLocked;
         WindowTitle = $"تعديل مستخدم: {user.UserName}";
-        _ = LoadUserRolesAndBranchesAsync(user.Id);
+        _ = LoadUserRolesAsync(user.Id);
     }
 
     private void InitializeCommands()
@@ -98,9 +90,6 @@ public class UserEditorViewModel : ViewModelBase
         AddRoleCommand = new RelayCommand(AddRole, () => SelectedAvailableRole != null);
         RemoveRoleCommand = new RelayCommand(RemoveRole, () => SelectedAssignedRole != null);
 
-        // Branch assignment commands
-        AddBranchCommand = new RelayCommand(AddBranch, () => SelectedAvailableBranch != null);
-        RemoveBranchCommand = new RelayCommand(RemoveBranch, () => SelectedAssignedBranch != null);
     }
 
     #region Properties
@@ -219,44 +208,6 @@ public class UserEditorViewModel : ViewModelBase
         }
     }
 
-    // ─── Branch Assignment Properties ───────────────────────────────
-
-    public ObservableCollection<BranchDto> AvailableBranches
-    {
-        get => _availableBranches;
-        set => SetProperty(ref _availableBranches, value);
-    }
-
-    public ObservableCollection<BranchDto> AssignedBranches
-    {
-        get => _assignedBranches;
-        set => SetProperty(ref _assignedBranches, value);
-    }
-
-    public BranchDto? SelectedAvailableBranch
-    {
-        get => _selectedAvailableBranch;
-        set
-        {
-            if (SetProperty(ref _selectedAvailableBranch, value))
-            {
-                (AddBranchCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
-    public BranchDto? SelectedAssignedBranch
-    {
-        get => _selectedAssignedBranch;
-        set
-        {
-            if (SetProperty(ref _selectedAssignedBranch, value))
-            {
-                (RemoveBranchCommand as RelayCommand)?.RaiseCanExecuteChanged();
-            }
-        }
-    }
-
     #endregion
 
     #region Commands
@@ -270,9 +221,6 @@ public class UserEditorViewModel : ViewModelBase
     public ICommand AddRoleCommand { get; private set; } = null!;
     public ICommand RemoveRoleCommand { get; private set; } = null!;
 
-    // Branch assignment commands
-    public ICommand AddBranchCommand { get; private set; } = null!;
-    public ICommand RemoveBranchCommand { get; private set; } = null!;
     #endregion
 
     #region Methods
@@ -298,24 +246,9 @@ public class UserEditorViewModel : ViewModelBase
                 return Task.CompletedTask;
             });
         }
-
-        // Load available branches
-        var branchesResult = await _branchService.GetAllAsync();
-        if (branchesResult.IsSuccess && branchesResult.Value != null)
-        {
-            await InvokeOnUIThreadAsync(() =>
-            {
-                AvailableBranches.Clear();
-                foreach (var branch in branchesResult.Value.Where(b => b.IsActive))
-                {
-                    AvailableBranches.Add(branch);
-                }
-                return Task.CompletedTask;
-            });
-        }
     }
 
-    private async Task LoadUserRolesAndBranchesAsync(int userId)
+    private async Task LoadUserRolesAsync(int userId)
     {
         // Load user roles from API
         try
@@ -353,35 +286,10 @@ public class UserEditorViewModel : ViewModelBase
                     });
                 }
             }
-
-            var branchesResponse = await httpClient.GetAsync($"api/v1/users/{userId}/branches");
-            if (branchesResponse.IsSuccessStatusCode)
-            {
-                var userBranches = System.Text.Json.JsonSerializer.Deserialize<List<UserBranchDto>>(
-                    await branchesResponse.Content.ReadAsStringAsync(),
-                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                if (userBranches != null)
-                {
-                    await InvokeOnUIThreadAsync(() =>
-                    {
-                        foreach (var ub in userBranches)
-                        {
-                            var branch = AvailableBranches.FirstOrDefault(b => b.Id == ub.BranchId);
-                            if (branch != null)
-                            {
-                                AssignedBranches.Add(branch);
-                                AvailableBranches.Remove(branch);
-                            }
-                        }
-                        return Task.CompletedTask;
-                    });
-                }
-            }
         }
         catch (Exception ex)
         {
-            Serilog.Log.Warning(ex, "Failed to load user roles and branches for user {UserId}", userId);
+            Serilog.Log.Warning(ex, "Failed to load user roles for user {UserId}", userId);
         }
     }
 
@@ -445,42 +353,12 @@ public class UserEditorViewModel : ViewModelBase
 
     #endregion
 
-    #region Branch Assignment
-
-    private void AddBranch()
-    {
-        if (SelectedAvailableBranch == null) return;
-
-        var branch = SelectedAvailableBranch;
-        AvailableBranches.Remove(branch);
-        AssignedBranches.Add(branch);
-        SelectedAvailableBranch = AvailableBranches.FirstOrDefault();
-    }
-
-    private void RemoveBranch()
-    {
-        if (SelectedAssignedBranch == null) return;
-
-        var branch = SelectedAssignedBranch;
-        AssignedBranches.Remove(branch);
-        AvailableBranches.Add(branch);
-        SelectedAssignedBranch = AssignedBranches.FirstOrDefault();
-    }
-
-    #endregion
-
     private async Task<bool> ValidateAsync()
     {
         ClearAllErrors();
 
         if (string.IsNullOrWhiteSpace(Username))
             AddError(nameof(Username), "اسم المستخدم مطلوب — تأكد من إدخال اسم فريد للدخول إلى النظام");
-
-        
-
-        
-
-        
 
         return await ValidateAllAsync();
     }
@@ -526,13 +404,6 @@ public class UserEditorViewModel : ViewModelBase
                 await SaveUserRolesAsync(result.Value.Id, roleIds);
             }
 
-            // Save branch assignments
-            var branchIds = AssignedBranches.Select(b => (short)b.Id).ToList();
-            if (branchIds.Any())
-            {
-                await SaveUserBranchesAsync(result.Value.Id, branchIds);
-            }
-
             _eventBus.Publish(new UserChangedMessage(result.Value.Id));
             _toastService.ShowSuccess(IsEditMode ? "تم تحديث بيانات المستخدم بنجاح" : "تم إنشاء المستخدم بنجاح");
             RequestClose();
@@ -570,35 +441,6 @@ public class UserEditorViewModel : ViewModelBase
         catch (Exception ex)
         {
             Serilog.Log.Warning(ex, "Failed to save roles for user {UserId}", userId);
-        }
-    }
-
-    private async Task SaveUserBranchesAsync(int userId, List<short> branchIds)
-    {
-        try
-        {
-            var httpClient = App.GetService<System.Net.Http.HttpClient>();
-            var session = App.GetService<ISessionService>();
-            var token = session.GetToken();
-            if (!string.IsNullOrEmpty(token))
-            {
-                httpClient.DefaultRequestHeaders.Authorization =
-                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            }
-
-            var json = System.Text.Json.JsonSerializer.Serialize(branchIds);
-            var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-            var response = await httpClient.PutAsync($"api/v1/users/{userId}/branches", content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                Serilog.Log.Warning("Failed to save branches for user {UserId}: {Error}", userId, errorBody);
-            }
-        }
-        catch (Exception ex)
-        {
-            Serilog.Log.Warning(ex, "Failed to save branches for user {UserId}", userId);
         }
     }
 

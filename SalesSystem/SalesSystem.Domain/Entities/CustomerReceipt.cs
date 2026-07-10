@@ -15,16 +15,26 @@ public class CustomerReceipt : DocumentEntity
     public DateTime ReceiptDate { get; private set; }
     public int CustomerId { get; private set; }
     public int CashBoxId { get; private set; }
-    public short CurrencyId { get; private set; }
+
     public decimal Amount { get; private set; }
+
+    /// <summary>
+    /// The receipt amount converted to the base currency using the exchange rate.
+    /// Null when no exchange rate is specified (same as Amount).
+    /// </summary>
+    public decimal? BaseNetTotal { get; private set; }
+
+    /// <summary>
+    /// Payment method: Cash, Cheque, BankTransfer, or CreditCard.
+    /// </summary>
+    public PaymentMethod PaymentMethod { get; private set; }
+
     public string? Notes { get; private set; }
     public InvoiceStatus Status { get; private set; }
 
     // Navigation properties
     public virtual Customer? Customer { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
-    public virtual Currency? Currency { get; private set; }
-
     private readonly List<CustomerReceiptApplication> _applications = new();
     public IReadOnlyCollection<CustomerReceiptApplication> Applications => _applications.AsReadOnly();
 
@@ -35,9 +45,10 @@ public class CustomerReceipt : DocumentEntity
         DateTime receiptDate,
         int customerId,
         int cashBoxId,
-        short currencyId,
         decimal amount,
+        PaymentMethod paymentMethod = PaymentMethod.Cash,
         string? notes = null,
+        decimal? baseNetTotal = null,
         int? createdByUserId = null)
     {
         if (receiptNo <= 0)
@@ -46,8 +57,6 @@ public class CustomerReceipt : DocumentEntity
             throw new DomainException("العميل مطلوب.");
         if (cashBoxId <= 0)
             throw new DomainException("الصندوق مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("العملة مطلوبة.");
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
 
@@ -59,13 +68,25 @@ public class CustomerReceipt : DocumentEntity
                 : receiptDate.ToUniversalTime(),
             CustomerId = customerId,
             CashBoxId = cashBoxId,
-            CurrencyId = currencyId,
             Amount = amount,
+            BaseNetTotal = baseNetTotal,
+            PaymentMethod = paymentMethod,
             Notes = notes,
             Status = InvoiceStatus.Draft
         };
         receipt.SetCreatedBy(createdByUserId);
         return receipt;
+    }
+
+    /// <summary>
+    /// Sets the payment method. Only allowed while the receipt is in Draft status.
+    /// </summary>
+    public void SetPaymentMethod(PaymentMethod method)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن تغيير طريقة الدفع لسند غير مسود.");
+        PaymentMethod = method;
+        UpdateTimestamp();
     }
 
     /// <summary>
@@ -97,23 +118,23 @@ public class CustomerReceipt : DocumentEntity
     /// </summary>
     public void Update(
         int cashBoxId,
-        short currencyId,
         decimal amount,
         string? notes,
+        PaymentMethod paymentMethod = PaymentMethod.Cash,
+        decimal? baseNetTotal = null,
         int? updatedByUserId = null)
     {
         if (Status != InvoiceStatus.Draft)
             throw new DomainException("فقط السندات المسودة يمكن تعديلها.");
         if (cashBoxId <= 0)
             throw new DomainException("الصندوق مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("العملة مطلوبة.");
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
 
         CashBoxId = cashBoxId;
-        CurrencyId = currencyId;
         Amount = amount;
+        BaseNetTotal = baseNetTotal;
+        PaymentMethod = paymentMethod;
         if (notes != null) Notes = notes;
         SetUpdatedBy(updatedByUserId);
         UpdateTimestamp();

@@ -145,7 +145,6 @@ builder.Services.AddScoped<IDocumentSequenceService, DocumentSequenceService>();
 builder.Services.AddScoped<IAccountCategoryService, AccountCategoryService>();
 builder.Services.AddScoped<ICompanySettingsService, CompanySettingsService>();
 builder.Services.AddScoped<ITaxService, TaxService>();
-builder.Services.AddScoped<ICurrencyService, CurrencyService>();
 builder.Services.AddScoped<IUnitService, UnitService>();
 builder.Services.AddScoped<IBarcodeLookupService, BarcodeLookupService>();
 builder.Services.AddScoped<IProductPriceService, ProductPriceService>();
@@ -177,6 +176,8 @@ builder.Services.AddScoped<InvoicePrintDtoBuilder>();
 builder.Services.AddScoped<ILogService, LogService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<ISessionManagementService, SessionManagementService>();
 builder.Services.AddScoped<IInventoryBatchService, InventoryBatchService>();
 builder.Services.AddScoped<IFifoAllocationService, FifoAllocationService>();
 // REMOVED: PurchaseOrderService (V1-deferred)
@@ -190,15 +191,13 @@ builder.Services.AddScoped<IJournalEntryNumberGenerator, JournalEntryNumberGener
 builder.Services.AddScoped<IAnnualClosingService, AnnualClosingService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IAccountCodeGeneratorService, AccountCodeGeneratorService>();
+builder.Services.AddScoped<IAccountLinkService, AccountLinkService>();
 builder.Services.AddScoped<IAccountingIntegrationService, AccountingIntegrationService>();
 builder.Services.AddScoped<IFiscalYearService, FiscalYearService>();
 
 // ─── New Entity Services (v4.7+) ──────────────────────────────
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
-builder.Services.AddScoped<IBranchService, BranchService>();
-builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IBankService, BankService>();
-builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IProductCategoryService, ProductCategoryService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IInventoryCountService, InventoryCountService>();

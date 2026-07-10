@@ -41,17 +41,6 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
         builder.Property(w => w.IsActive)
             .HasDefaultValue(true);
 
-        builder.Property(w => w.BranchId)
-            .HasColumnType("smallint")
-            .IsRequired();
-
-        // === FK: BranchId → Branches ===
-        builder.HasOne(w => w.Branch)
-            .WithMany()
-            .HasForeignKey(w => w.BranchId)
-            .OnDelete(DeleteBehavior.Restrict)
-            .IsRequired();
-
         // === Global query filter — soft delete ===
         builder.HasQueryFilter(w => w.IsActive);
     }

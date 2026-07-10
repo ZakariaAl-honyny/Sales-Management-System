@@ -107,7 +107,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}" 
-                                                     Style="{StaticResource ModernTextBox}" 
+                                                     helpers:InputHelper.NumericOnly="True" Style="{StaticResource ModernTextBox}" 
                                                      Padding="8,4" 
                                                      FontWeight="Bold"
                                                      HorizontalContentAlignment="Center"
@@ -246,8 +246,8 @@
                                 </StackPanel>
                                 <StackPanel>
                                     <TextBlock Text="مبلغ الاسترداد" Style="{StaticResource LabelStyle}"/>
-                                    <TextBox Text="{Binding RefundAmount, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
-                                             Style="{StaticResource ModernTextBox}"
+                                    <TextBox Text="{Binding RefundAmount, UpdateSourceTrigger=PropertyChanged}"
+                                             helpers:InputHelper.NumericOnly="True" Style="{StaticResource ModernTextBox}"
                                              Width="110"
                                              ToolTip="المبلغ الذي سيتم استرداده — لا يمكن أن يتجاوز إجمالي قيمة المرتجع"/>
                                 </StackPanel>

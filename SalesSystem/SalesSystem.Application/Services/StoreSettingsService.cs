@@ -5,7 +5,6 @@ using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
-using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
@@ -26,11 +25,9 @@ public sealed class StoreSettingsService : IStoreSettingsService
     private const string KeyAddress = Prefix + "Address";
     private const string KeyLogoPath = Prefix + "LogoPath";
     private const string KeyEmail = Prefix + "Email";
-    private const string KeyCurrencyCode = Prefix + "CurrencyCode";
     private const string KeyTaxNumber = Prefix + "TaxNumber";
     private const string KeyEnableStockAlerts = Prefix + "EnableStockAlerts";
     private const string KeyAllowNegativeStock = Prefix + "AllowNegativeStock";
-    private const string KeyAutoUpdatePrices = Prefix + "AutoUpdatePrices";
     private const string KeySignaturePath = Prefix + "SignaturePath";
 
     public StoreSettingsService(IUnitOfWork uow, ISystemSettingsRepository systemSettingsRepo, ILogger<StoreSettingsService> logger)
@@ -66,16 +63,11 @@ public sealed class StoreSettingsService : IStoreSettingsService
                 await _systemSettingsRepo.SetStringAsync(KeyAddress, request.Address ?? "", category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeyLogoPath, request.LogoUrl ?? "", category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeyEmail, request.Email ?? "", category: "Store", userId: userId, ct: ct);
-                await _systemSettingsRepo.SetStringAsync(KeyCurrencyCode, request.Currency ?? "SAR", category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeyTaxNumber, request.TaxNumber ?? "", category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeyEnableStockAlerts, request.EnableStockAlerts.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeyAllowNegativeStock, request.AllowNegativeStock.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
-                await _systemSettingsRepo.SetStringAsync(KeyAutoUpdatePrices, request.AutoUpdatePrices.ToString().ToLower(), category: "Store", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync(KeySignaturePath, request.SignatureUrl ?? "", category: "Store", userId: userId, ct: ct);
 
-                // Write other SystemSettings via repo
-                var costingMethod = (CostingMethod)request.CostingMethod;
-                await _systemSettingsRepo.SetCostingMethodAsync(costingMethod, ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.BackupPath", request.BackupPath ?? "", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.ScheduleTime", request.BackupScheduleTime ?? "02:00", userId: userId, ct: ct);
                 await _systemSettingsRepo.SetStringAsync("Backup.RetentionDays", request.BackupRetentionDays.ToString(), userId: userId, ct: ct);
@@ -97,40 +89,6 @@ public sealed class StoreSettingsService : IStoreSettingsService
         {
             _logger.LogError(ex, "Error saving store settings");
             return Result<StoreSettingsDto>.Failure("حدث خطأ أثناء حفظ الإعدادات");
-        }
-    }
-
-    public async Task<Result<CostingMethod?>> GetCostingMethodAsync(CancellationToken ct = default)
-    {
-        try
-        {
-            var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
-            return Result<CostingMethod?>.Success(costingMethod);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error loading costing method");
-            return Result<CostingMethod?>.Failure("فشل في تحميل طريقة التكلفة");
-        }
-    }
-
-    public async Task<Result> SetCostingMethodAsync(CostingMethod method, int userId, CancellationToken ct = default)
-    {
-        try
-        {
-            await _uow.ExecuteTransactionAsync(async () =>
-            {
-                await _systemSettingsRepo.SetCostingMethodAsync(method, ct);
-                await _uow.SaveChangesAsync(ct);
-            }, ct);
-
-            _logger.LogInformation("Costing method updated by user {UserId}", userId);
-            return Result.Success();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error saving costing method");
-            return Result.Failure("فشل في حفظ طريقة التكلفة");
         }
     }
 
@@ -170,7 +128,6 @@ public sealed class StoreSettingsService : IStoreSettingsService
 
     private async Task<StoreSettingsDto> LoadSettingsFromSystemAsync(CancellationToken ct)
     {
-        var costingMethod = await _systemSettingsRepo.GetCostingMethodAsync(ct);
         var backupPath = await _systemSettingsRepo.GetStringAsync("Backup.BackupPath", "", ct);
         var scheduleTime = await _systemSettingsRepo.GetStringAsync("Backup.ScheduleTime", "02:00", ct);
         var retentionStr = await _systemSettingsRepo.GetStringAsync("Backup.RetentionDays", "30", ct);
@@ -182,13 +139,11 @@ public sealed class StoreSettingsService : IStoreSettingsService
         var address = await _systemSettingsRepo.GetStringAsync(KeyAddress, "", ct);
         var logoPath = await _systemSettingsRepo.GetStringAsync(KeyLogoPath, "", ct);
         var email = await _systemSettingsRepo.GetStringAsync(KeyEmail, "", ct);
-        var currencyCode = await _systemSettingsRepo.GetStringAsync(KeyCurrencyCode, "SAR", ct);
         var taxNumber = await _systemSettingsRepo.GetStringAsync(KeyTaxNumber, "", ct);
         var signaturePath = await _systemSettingsRepo.GetStringAsync(KeySignaturePath, "", ct);
 
         _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyEnableStockAlerts, "false", ct), out var enableStockAlerts);
         _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyAllowNegativeStock, "false", ct), out var allowNegativeStock);
-        _ = bool.TryParse(await _systemSettingsRepo.GetStringAsync(KeyAutoUpdatePrices, "false", ct), out var autoUpdatePrices);
 
         return new StoreSettingsDto(
             1,                          // Virtual Id
@@ -197,15 +152,12 @@ public sealed class StoreSettingsService : IStoreSettingsService
             address,
             logoPath,
             email,
-            currencyCode ?? "",
             0m,                         // DEPRECATED: DefaultTaxRate — Tax entity is source of truth
             true,                       // DEPRECATED: IsTaxEnabled — Tax entity is source of truth
             taxNumber,
             enableStockAlerts,
             allowNegativeStock,
-            autoUpdatePrices,
             "",                         // DEPRECATED: InvoicePrefix — use InvoiceNo (int) instead
-            (int)costingMethod,
             backupPath,
             scheduleTime,
             retentionDays,
@@ -224,20 +176,21 @@ public sealed class StoreSettingsService : IStoreSettingsService
             switch (kvp.Key)
             {
                 // Integer-only settings
-                case "CostingMethod":
                 case "StockAlertDays":
-                case "DecimalPlaces":
                 case "DefaultCashCustomerId":
                 case "DefaultCashSupplierId":
                 case "ExpiryAlertDays":
                     if (!int.TryParse(value, out var intVal) || intVal < 0)
                         return $"قيمة '{kvp.Key}' يجب أن تكون رقماً صحيحاً موجباً";
-                    if (kvp.Key == "CostingMethod" && (intVal < 1 || intVal > 3))
-                        return "طريقة التكلفة يجب أن تكون 1 (متوسط مرجح) أو 2 (آخر سعر شراء) أو 3 (سعر المورد)";
-                    if (kvp.Key == "DecimalPlaces" && (intVal < 0 || intVal > 6))
-                        return "عدد المنازل العشرية يجب أن يكون بين 0 و 6";
                     if (kvp.Key == "StockAlertDays" && (intVal < 1 || intVal > 365))
                         return "أيام تنبيه المخزون يجب أن تكون بين 1 و 365";
+                    break;
+
+                case "PrintCopies":
+                    if (!int.TryParse(value, out var copiesVal))
+                        return $"قيمة '{kvp.Key}' يجب أن تكون رقماً صحيحاً";
+                    if (copiesVal < 1 || copiesVal > 10)
+                        return $"قيمة '{kvp.Key}' يجب أن تكون بين 1 و 10";
                     break;
 
                 // Boolean-only settings
@@ -252,15 +205,52 @@ public sealed class StoreSettingsService : IStoreSettingsService
                 case "ShowExpiryInInvoices":
                 case "PurchaseAutoPost":
                 case "HideTaxInPurchases":
-                case "EnableBarcode":
                 case "AutoGenerateBarcode":
                 case "ShowLogo":
                 case "LowStockAlert":
                 case "ExpiryAlert":
                 case "CreditLimitAlert":
                 case "AutoCreateJournalEntry":
+                case "ShowBalanceOnPrint":
+                case "PrintSignature":
+                case "AutoPrintAfterPosting":
+                case "AllowNegativeCash":
+                case "AllowDuplicateBarcode":
+                case "EnableAttachments":
+                case "EnableNotifications":
+                case "RequireBatchOnPurchase":
+                case "RequireExpiryOnPurchase":
+                case "PrintBarcode":
+                case "PrintQRCode":
+                case "PrintCompanyAddress":
                     if (!bool.TryParse(value, out _))
                         return $"قيمة '{kvp.Key}' يجب أن تكون true أو false";
+                    break;
+
+                // Integer-only settings (additional)
+                case "DefaultSalesTax":
+                    if (!int.TryParse(value, out var salesTaxVal) || salesTaxVal < 0 || salesTaxVal > 100)
+                        return "نسبة ضريبة المبيعات يجب أن تكون بين 0 و 100";
+                    break;
+
+                case "DefaultPurchaseTax":
+                    if (!int.TryParse(value, out var purchaseTaxVal) || purchaseTaxVal < 0 || purchaseTaxVal > 100)
+                        return "نسبة ضريبة المشتريات يجب أن تكون بين 0 و 100";
+                    break;
+
+                case "DefaultBranch":
+                    if (!int.TryParse(value, out var branchVal) || branchVal < 1)
+                        return "الفرع الافتراضي يجب أن يكون رقماً موجباً أكبر من 0";
+                    break;
+
+                case "DefaultWarehouse":
+                    if (!int.TryParse(value, out var warehouseVal) || warehouseVal < 1)
+                        return "المستودع الافتراضي يجب أن يكون رقماً موجباً أكبر من 0";
+                    break;
+
+                case "PaperSize":
+                    if (value != "A4" && value != "Letter" && value != "Thermal")
+                        return $"قيمة '{kvp.Key}' يجب أن تكون A4 أو Letter أو Thermal";
                     break;
             }
         }

@@ -142,7 +142,7 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
 
             var detailsMessage = string.Join("\n",
                 lines.Select(l =>
-                    $"    حساب #{l.AccountId}\n" +
+                    $"    {l.AccountCode} — {l.AccountName ?? $"حساب #{l.AccountId}"}\n" +
                     $"    مدين: {l.Debit:N2}    دائن: {l.Credit:N2}" +
                     (string.IsNullOrEmpty(l.Description) ? "" : $"    ({l.Description})")
                 ));
@@ -203,11 +203,8 @@ public class JournalEntriesListViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (SelectedEntry.IsReversed)
-        {
-            await _dialogService.ShowWarningAsync("تنبيه", "لا يمكن ترحيل قيد ملغي.");
-            return;
-        }
+        // Note: IsReversed (Cancelled) entries are filtered out by HasQueryFilter in JournalEntryConfiguration,
+        // so they never appear in the list — this guard is defense-in-depth only.
 
         var confirmed = await _dialogService.ShowConfirmationAsync("تأكيد الترحيل",
             $"سيتم ترحيل القيد: {SelectedEntry.EntryNumber}\n" +

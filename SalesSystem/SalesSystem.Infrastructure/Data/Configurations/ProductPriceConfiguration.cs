@@ -12,10 +12,6 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
         builder.HasKey(x => x.Id);
 
         // Properties
-        builder.Property(x => x.CurrencyId)
-            .HasColumnType("smallint")
-            .IsRequired();
-
         builder.Property(x => x.Price)
             .HasPrecision(18, 2)
             .IsRequired()
@@ -37,19 +33,14 @@ public class ProductPriceConfiguration : IEntityTypeConfiguration<ProductPrice>
             .HasForeignKey(x => x.ProductUnitId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.Currency)
-            .WithMany()
-            .HasForeignKey(x => x.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         // CHECK constraints
         builder.ToTable(t => t.HasCheckConstraint(
             "CHK_ProductPrices_Price_NonNegative",
             "[Price] >= 0"));
 
         // Indexes
-        builder.HasIndex(x => new { x.ProductUnitId, x.CurrencyId, x.EffectiveFrom })
+        builder.HasIndex(x => new { x.ProductUnitId, x.EffectiveFrom })
             .IsUnique()
-            .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Date");
+            .HasDatabaseName("IX_ProductPrices_ProductUnit_Date");
     }
 }

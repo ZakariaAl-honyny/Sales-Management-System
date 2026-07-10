@@ -27,18 +27,6 @@ public class JournalEntryConfiguration : IEntityTypeConfiguration<JournalEntry>
             .HasForeignKey(x => x.FiscalYearId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // ─── FK to Currency (smallint) ──────────────────────────────────
-        builder.Property(x => x.CurrencyId).IsRequired().HasColumnType("smallint");
-        builder.HasOne(x => x.Currency)
-            .WithMany()
-            .HasForeignKey(x => x.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        // ─── ExchangeRate (decimal(18,6)) ───────────────────────────────
-        builder.Property(x => x.ExchangeRate)
-            .HasPrecision(18, 6)
-            .HasDefaultValue(1m);
-
         // ─── AttachmentPath ─────────────────────────────────────────────
         builder.Property(x => x.AttachmentPath)
             .HasMaxLength(500);

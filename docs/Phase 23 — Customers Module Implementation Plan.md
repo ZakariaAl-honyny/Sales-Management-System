@@ -1,7 +1,17 @@
 # Phase 23 — Customers Module: Comprehensive Implementation Plan
 
-> **Version**: 2.0 — Updated per accounts Details.md: ❌ Parties removed, ❌ CustomerGroup removed, ❌ CustomerType removed, ✅ AccountId mandatory auto-created under "1130", ✅ Contact fields direct on Customer, ✅ Balance via JournalEntryLines
-> **Scope**: Complete Customer CRUD enhancement with Account auto-creation (parent code "1130"), CategoryId classification, CreditLimit enforcement, enhanced validation, customer reports, and UI improvements
+> **Version**: 2.1 — Updated per Phase 18 Accounting Foundation: ❌ Parties removed, ❌ CustomerGroup removed, ❌ CustomerType removed, ✅ AccountId mandatory auto-created under "1103", ✅ Contact fields direct on Customer, ✅ Balance via JournalEntryLines, ✅ Account.Create() uses 13-param signature (Phase 18 aligned)
+> **Scope**: Complete Customer CRUD enhancement with Account auto-creation (parent code "1103"), CategoryId classification, CreditLimit enforcement, enhanced validation, customer reports, and UI improvements
+> **Phase 18 Cross-References**: RULE-321→340 (Account entity/hierarchy), RULE-506 (allowTransactions for Level 4), RULE-504 (parent code "1103")
+
+### v2.1 Changelog (Phase 18 Alignment)
+- Fixed `Account.Create()` signature from 14 params to 13 (removed `allowTransactions` — now computed `=> IsLeaf`)
+- Fixed `nature` type from `AccountNature.Debit` (enum) to `byte 1` (Asset)
+- Fixed `ColorCode` from hardcoded `#2196F3` to `IAccountCodeGeneratorService.GetColorCode(nature)` → `#2196F3` (auto-generated, matching codebase)
+- Fixed `AccountCode` generation from manual `GetMaxChildCodeAsync` to `AccountCodeGeneratorService.GenerateCodeAsync()` (Phase 18 hierarchical numbering)
+- Added Phase 18 cross-reference rules (RULE-321→340, RULE-353) to compliance matrix
+- Added FORBIDDEN patterns for hardcoded ColorCode, `allowTransactions` param, and `AccountNature` enum
+- Updated test assertions to match Phase 18 entity signatures
 
 ---
 
@@ -29,7 +39,7 @@ The Customers Module is a **single focused scope**: managing customer records wi
 | # | Aspect | Purpose | Existing Status |
 |---|--------|---------|-----------------|
 | 🧑‍🤝‍🧑 | **Customer CRUD** | Create, Read, Update, Soft-Delete, Permanent-Delete with DeleteStrategy | ✅ Core CRUD exists — needs enhancement |
-| 🔗 | **Customer-Account Link** | Auto-create a Level-4 Account under "1130 — العملاء" parent on creation | ✅ Already in code — parent code must be "1130" |
+| 🔗 | **Customer-Account Link** | Auto-create a Level-4 Account under "1103 — العملاء" parent on creation | ✅ Already in code — parent code must be "1103" |
 | 🚫 | **CustomerGroup** | ❌ NOT IN V1 — removed per accounts Details.md | ✅ Already absent from code |
 | 🚫 | **CustomerType** | ❌ NOT IN V1 — payment type is per-invoice (SalesInvoice.PaymentType), not per-customer | ✅ Already absent from code |
 | 🚫 | **Party entity** | ❌ NOT USED — contact fields go DIRECTLY on Customer entity | ✅ Removed from code |
@@ -70,7 +80,7 @@ Account (Chart of Accounts — Phase 22)
 
 ```text
 ✅ حذف Parties → Contact fields directly on Customer entity
-✅ لكل عميل حساب محاسبي تلقائياً تحت 1130
+✅ لكل عميل حساب محاسبي تلقائياً تحت 1103
 ✅ الرصيد الحقيقي يأتي من JournalEntryLines وليس من جدول العميل
 ✅ No CustomerGroup in V1
 ✅ No CustomerType in V1 — payment classification per-invoice
@@ -168,7 +178,7 @@ Account (Chart of Accounts — Phase 22)
 | Seed Data | Status | Action |
 |-----------|--------|--------|
 | Default customer "عميل نقدي" | ✅ Exists | Keep — but seed with direct fields, not via Party |
-| Default customer Account linking | ✅ Exists | Keep — link to auto-created Account under "1130" |
+| Default customer Account linking | ✅ Exists | Keep — link to auto-created Account under "1103" |
 | CustomerGroup seeds | ❌ Already absent | ✅ Nothing to do |
 | CustomerType references | ❌ Already absent | ✅ Nothing to do |
 
@@ -186,7 +196,7 @@ Account (Chart of Accounts — Phase 22)
 | `PermanentDeleteAsync(id, ct)` | `Result` | ✅ Exists | Will change: no Party to cascade delete |
 
 **Key service behavior changes:**
-- `CreateAsync()`: No longer creates a Party record. Creates Customer directly with Name, Phone, Email, Address, TaxNumber, Notes. Auto-creates Account under parent "1130" if AccountId not provided.
+- `CreateAsync()`: No longer creates a Party record. Creates Customer directly with Name, Phone, Email, Address, TaxNumber, Notes. Auto-creates Account under parent "1103" if AccountId not provided.
 - `UpdateAsync()`: No longer calls Party.Update(). Updates fields directly on Customer entity.
 - `PermanentDeleteAsync()`: No Party FK to check — simpler cleanup. Still catches FK exceptions from SalesInvoice/Payment references.
 
@@ -243,7 +253,7 @@ Observations:
 | ~~CustomerType~~ | ❌ Already absent | ✅ |
 
 **Key insight**: Since AccountId is auto-created (mandatory, non-nullable, system-generated), it MUST NOT be in Create/Update requests. The service always generates it.
-- `CreateCustomerRequest`: No AccountId field — service creates Account under "1130"
+- `CreateCustomerRequest`: No AccountId field — service creates Account under "1103"
 - `UpdateCustomerRequest`: No AccountId field — cannot change the linked account
 
 ### 2.6 API Layer ✅ (Core exists — minor enhancements)
@@ -401,39 +411,40 @@ Observations:
 - `Infrastructure/Data/Configurations/CustomerConfiguration.cs` — Remove PartyId FK, add direct field configs
 - `Infrastructure/Data/Migrations/` — NEW migration
 
-### 3.2 Blocker 2: AccountId Mandatory — Auto-Creation Under Parent "1130"
+### 3.2 Blocker 2: AccountId Mandatory — Auto-Creation Under Parent "1103"
 
-**Problem**: AccountId is already mandatory (non-nullable `int` FK) on Customer entity. The service must auto-create a Level-4 detail account under parent code "1130" (Accounts Receivable/العملاء) when creating a customer.
+**Problem**: AccountId is already mandatory (non-nullable `int` FK) on Customer entity. The service must auto-create a Level-4 detail account under parent code "1103" (Accounts Receivable/العملاء) when creating a customer.
 
-> ⚠️ **CRITICAL**: The parent account code is "1130" — NOT "1210" as previously documented. RULE-504 stipulates: "CustomerService.AutoCreateCustomerAccountAsync() MUST look up parent account by code '1130' (Accounts Receivable/العملاء) — NOT '1210' (Fixed Assets)."
+> ⚠️ **CRITICAL**: The parent account code is "1103" — NOT "1210" as previously documented. RULE-504 stipulates: "CustomerService.AutoCreateCustomerAccountAsync() MUST look up parent account by code '1103' (Accounts Receivable/العملاء) — NOT '1210' (Fixed Assets)."
 
 **Solution**: Auto-create Account in `CustomerService.CreateAsync()`:
-1. Look up parent account by code `"1130"` (seeded in Phase 22)
-2. Generate next child code: max existing code under 1130 + 1 (e.g., 1131, 1132, 1133...)
-3. Create Level-4 Account with `allowTransactions: true` (RULE-506)
+1. Look up parent account by code `"1103"` (seeded in Phase 22)
+2. Generate next child code via `AccountCodeGeneratorService.GenerateCodeAsync()` (Phase 18: SemaphoreSlim thread-safe)
+3. Create Level-4 Account with `isLeaf: true` (AllowTransactions is computed `=> IsLeaf`)
 4. Link Customer to the new Account via `AccountId`
 5. Wrap in `ExecuteTransactionAsync()` — if customer creation fails, account creation rolls back
 
-**Auto-creation logic**:
+**Auto-creation logic** (aligned with Phase 18 Account.Create — 13 params):
 ```csharp
-// Inside CustomerService.CreateAsync()
-var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
-var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-var newCode = (int.Parse(maxCode ?? "1130") + 1).ToString();
+// Inside CustomerService.CreateAsync() — Phase 18 aligned
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1103", ct);
+// Phase 18: AccountCodeGeneratorService generates hierarchical codes (SemaphoreSlim)
+var newCode = await _accountCodeGenerator.GenerateCodeAsync(parentAccount.Id, level: 4, ct);
+// Phase 18: ColorCode auto-generated from Nature via IAccountCodeGeneratorService
+var colorCode = IAccountCodeGeneratorService.GetColorCode(parentAccount.Nature);
 var account = Account.Create(
     accountCode: newCode,
     nameAr: customer.Name,
     nameEn: customer.Name,
-    nature: AccountNature.Debit,   // AR is a debit-nature asset account
-    isLeaf: true,                  // Level 4 detail account
+    nature: parentAccount.Nature,    // byte (1=Asset) from parent, NOT enum class
+    isLeaf: true,                    // Level 4 detail (AllowTransactions computed => IsLeaf)
     parentId: parentAccount.Id,
-    isSystem: false,               // Not a system account
+    isSystem: false,                 // Not a system account
     categoryId: null,
-    level: 4,                      // Detail/leaf level
+    level: 4,                        // Detail/leaf level
     description: $"حساب العميل: {customer.Name}",
-    colorCode: "#2196F3",          // Asset blue
+    colorCode: colorCode,            // Auto-generated, NOT hardcoded
     notes: null,
-    allowTransactions: true,       // REQUIRED for Level 4 (RULE-506)
     createdByUserId: userId
 );
 await _uow.Accounts.AddAsync(account, ct);
@@ -544,7 +555,7 @@ await _uow.Accounts.AddAsync(account, ct);
 | Customer entity with PartyId | ✅ Exists | ❌ Remove PartyId |
 | Customer with direct Name, Phone, Email, Address | ❌ On Party entity | ⬜ Move fields to Customer |
 | Customer with direct TaxNumber, Notes | ❌ On Party entity | ⬜ Move fields to Customer |
-| AccountId FK (mandatory, non-nullable) | ✅ Already exists | Keep — auto-creation under "1130" |
+| AccountId FK (mandatory, non-nullable) | ✅ Already exists | Keep — auto-creation under "1103" |
 | CategoryId FK (optional) | ✅ Already exists | Keep |
 | CreditLimit field | ✅ Already exists | Keep |
 | CheckCreditLimit() domain method | ✅ Already exists | Keep — returns bool (non-throwing) |
@@ -569,7 +580,7 @@ await _uow.Accounts.AddAsync(account, ct);
 |-----------|--------|--------|
 | ICustomerService — 6 CRUD methods | ✅ Exists | Update signatures |
 | CustomerService — CRUD implementation | ✅ Exists | Remove Party creation, add Account auto-creation, fix mapping |
-| CustomerService — Account auto-creation | ❌ Missing | ⬜ Add auto-creation under parent "1130" |
+| CustomerService — Account auto-creation | ❌ Missing | ⬜ Add auto-creation under parent "1103" |
 | Credit limit check in SalesService | ❌ Missing | ⬜ Add CheckCreditLimitAsync |
 | Customer reports (balance, aging) | ❌ Missing | ⬜ Add report services |
 | CustomerService — fix GetAllAsync sort order | ❌ Sorted A-Z | ⬜ Change to Id desc (RULE-220) |
@@ -625,6 +636,17 @@ await _uow.Accounts.AddAsync(account, ct);
 ✅ جعل Customers, Suppliers, Employees جداول مستقلة
 ```
 
+**Architectural Pattern** (from `accounts summry.md` — Source of Truth):
+```
+الكيان التشغيلي (Customer) هو المالك لبياناته.
+الحساب المحاسبي (Account) هو انعكاس محاسبي له.
+
+Customer → Account (mirrors Name only)
+Phone/Email/Address → NOT synced to Account (Account has no such fields)
+Name change → synced to Account.Name
+IsActive change → synced to Account.IsActive
+```
+
 | Option | Pros | Cons |
 |--------|------|------|
 | **Direct fields on Customer** ✅ | Simple queries, no joins, direct API mapping | Duplication if fields shared with Supplier |
@@ -637,17 +659,17 @@ await _uow.Accounts.AddAsync(account, ct);
 
 ### 6.2 AccountId: MANDATORY, Auto-Created, NOT User-Supplied
 
-**Decision**: `AccountId` is a mandatory non-nullable `int` FK to Account. The service auto-creates a Level-4 detail account under parent code "1130" (Accounts Receivable/العملاء) when creating a customer. AccountId is NEVER accepted from the user in Create/Update requests.
+**Decision**: `AccountId` is a mandatory non-nullable `int` FK to Account. The service auto-creates a Level-4 detail account under parent code "1103" (Accounts Receivable/العملاء) when creating a customer. AccountId is NEVER accepted from the user in Create/Update requests.
 
 **Key design points**:
-- Parent account code: **"1130"** (NOT "1210" — RULE-504)
+- Parent account code: **"1103"** (NOT "1210" — RULE-504)
 - Account level: 4 (detail/leaf — allowTransactions: true)
-- Account code: auto-generated hierarchically (1131, 1132, 1133...)
+- Account code: auto-generated hierarchically via `AccountCodeGeneratorService` (1131, 1132, 1133... — Phase 18 hierarchical expanding numbering)
 - Account name: matches Customer.Name in both Arabic and English
-- Nature: **Debit** (Asset — Accounts Receivable)
-- Color: `#2196F3` (Asset blue)
+- Nature: **1** (Asset — Accounts Receivable) — byte value, not enum class
+- Color: auto-generated from ``IAccountCodeGeneratorService.GetColorCode(nature: 1)` → `#2196F3` (Asset blue — actual codebase value)
 - Wrapped in `ExecuteTransactionAsync()` — atomic with customer creation
-- If parent "1130" doesn't exist (Phase 22 not deployed), return clear error message
+- If parent "1103" doesn't exist (Phase 22 not deployed), return clear error message
 
 **Why mandatory (not nullable)**:
 - Every customer needs a balance tracking mechanism
@@ -737,7 +759,7 @@ await _uow.Accounts.AddAsync(account, ct);
 - Different behavior: Customers have credit limits (due to us), suppliers have credit limits (we owe them)
 - Different permissions: Cashiers can view customers but not suppliers (AGENTS.md §6)
 - Different reports: Customer aging vs. Supplier aging
-- Different COA parents: Customers under "1130" (AR), Suppliers under "1320" (AP)
+- Different COA parents: Customers under "1103" (AR), Suppliers under "2101" (AP)
 - Existing codebase: Both modules already exist and are well-separated
 
 ---
@@ -873,9 +895,9 @@ public void Update(
 
 ---
 
-### Task 2 — Add Account Auto-Creation Under Parent "1130" in CustomerService
+### Task 2 — Add Account Auto-Creation Under Parent "1103" in CustomerService
 
-**Description**: When `CustomerService.CreateAsync()` is called, auto-create a Level-4 detail account under parent account code "1130" (Accounts Receivable/العملاء). The AccountId is NEVER supplied by the user — it is always system-generated.
+**Description**: When `CustomerService.CreateAsync()` is called, auto-create a Level-4 detail account under parent account code "1103" (Accounts Receivable/العملاء). The AccountId is NEVER supplied by the user — it is always system-generated.
 
 **Files**:
 
@@ -886,7 +908,7 @@ public void Update(
 | `Contracts/DTOs/AllDtos.cs` — `CustomerDto` | Ensure `AccountId` and `AccountName` are included in response after creation |
 | `Contracts/Requests/CustomerRequests.cs` | Ensure NO `AccountId` field in Create/Update — it is system-generated |
 
-**Auto-creation logic** (in CustomerService.CreateAsync):
+**Auto-creation logic** (in CustomerService.CreateAsync — aligned with Phase 18 Account.Create 13-param signature):
 ```csharp
 // Step 1: Create Customer entity (no AccountId yet)
 var customer = Customer.Create(
@@ -904,7 +926,7 @@ var customer = Customer.Create(
 await _uow.Customers.AddAsync(customer, ct);
 await _uow.SaveChangesAsync(ct);  // Get customer.Id
 
-// Step 2: Auto-create Account under parent "1130"
+// Step 2: Auto-create Account under parent "1103"
 var result = await AutoCreateCustomerAccountAsync(customer.Id, userId, ct);
 
 // Step 3: Update Customer with AccountId
@@ -912,7 +934,7 @@ customer.SetAccountId(result.Value);
 await _uow.SaveChangesAsync(ct);
 ```
 
-**AutoCreateCustomerAccountAsync**:
+**AutoCreateCustomerAccountAsync** (aligned with Phase 18 Account.Create — 13 params, no `allowTransactions`):
 ```csharp
 public async Task<Result<int>> AutoCreateCustomerAccountAsync(
     int customerId, int userId, CancellationToken ct)
@@ -923,28 +945,33 @@ public async Task<Result<int>> AutoCreateCustomerAccountAsync(
     if (customer.AccountId > 0)
         return Result<int>.Failure("العميل لديه حساب محاسبي بالفعل");
 
-    var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("1103", ct);
     if (parentAccount == null)
         return Result<int>.Failure(
-            "الحساب الرئيسي 1130 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات.");
+            "الحساب الرئيسي 1103 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات.");
 
-    var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-    var newCode = (int.Parse(maxCode ?? "1130") + 1).ToString();
-    
+    // Phase 18: AccountCodeGeneratorService generates hierarchical codes (SemaphoreSlim thread-safe)
+    var newCode = await _accountCodeGenerator.GenerateCodeAsync(
+        parentAccount.Id, level: 4, ct);
+
+    // Phase 18: ColorCode auto-generated from Nature via IAccountCodeGeneratorService
+    var colorCode = IAccountCodeGeneratorService.GetColorCode(parentAccount.Nature);
+
+    // Phase 18: Account.Create() 13-param signature — NO `allowTransactions` param
+    // `isLeaf: true` means AllowTransactions=true (computed property per Phase 18)
     var account = Account.Create(
         accountCode: newCode,
         nameAr: customer.Name,
         nameEn: customer.Name,
-        nature: AccountNature.Debit,
-        isLeaf: true,
+        nature: parentAccount.Nature, // byte (1=Asset) inherited from parent account
+        isLeaf: true,                 // Level 4 detail account (AllowTransactions computed => IsLeaf)
         parentId: parentAccount.Id,
-        isSystem: false,
+        isSystem: false,              // Not a system account (user-modifiable)
         categoryId: null,
-        level: 4,
+        level: 4,                     // Detail/leaf level
         description: $"حساب العميل: {customer.Name}",
-        colorCode: "#2196F3",
+        colorCode: colorCode,         // Auto-generated from nature, NOT hardcoded
         notes: null,
-        allowTransactions: true,
         createdByUserId: userId
     );
     await _uow.Accounts.AddAsync(account, ct);
@@ -954,11 +981,18 @@ public async Task<Result<int>> AutoCreateCustomerAccountAsync(
 }
 ```
 
-**⚠️ Dependency**: Phase 22 (Chart of Accounts) must be complete — account "1130" must exist. If Phase 22 is not deployed, return clear error message.
+**⚠️ Phase 18 Alignment Notes**:
+- `Account.Create()` has **13 parameters** (Phase 18 Task 1.2) — NO `allowTransactions` param (it's a computed property `=> IsLeaf`)
+- `nature` is `byte` (1=Asset, 2=Liability, 3=Equity, 4=Revenue, 5=Expense) — NOT an enum class
+- `ColorCode` is auto-generated from `IAccountCodeGeneratorService.GetColorCode()` — NOT hardcoded
+- `AccountCode` is generated by `AccountCodeGeneratorService` using hierarchical expanding numbering (1→11→1101→11010001) — NOT simple increment
+- The parent account "1103" is a Level 3 sub-account seeded by `AccountingSeeder` in Phase 22
+
+**⚠️ Dependency**: Phase 22 (Chart of Accounts) must be complete — account "1103" must exist. If Phase 22 is not deployed, return clear error message.
 
 **Logging**:
 - `Log.Information("Account auto-created for Customer {CustomerId}: AccountCode={Code}, AccountId={Id}", customerId, newCode, account.Id)`
-- `Log.Warning("Cannot auto-create account for customer {Id}: parent account 1130 not found", customerId)`
+- `Log.Warning("Cannot auto-create account for customer {Id}: parent account 1103 not found", customerId)`
 
 **Estimate**: ~1.5 hours
 
@@ -1234,7 +1268,7 @@ private async Task SaveAsync()
         <StackPanel Grid.Row="1" Margin="0,6,0,0">
             <TextBlock Text="رقم الحساب: يتم إنشاؤه تلقائياً" 
                        Style="{StaticResource ReadOnlyFieldStyle}"
-                       ToolTip="الحساب المحاسبي للعميل — يتم إنشاؤه تلقائياً تحت 1130"/>
+                       ToolTip="الحساب المحاسبي للعميل — يتم إنشاؤه تلقائياً تحت 1103"/>
             <TextBlock Text="{Binding AccountName, StringFormat='اسم الحساب: {0}'}"
                        Visibility="{Binding AccountName, Converter={StaticResource StringNotEmptyToVisibility}}"
                        Style="{StaticResource ReadOnlyFieldStyle}"/>
@@ -1517,10 +1551,10 @@ services.AddTransient<CustomerSelectionViewModel>();
 #### 2. Service Tests (using Mock<IUnitOfWork>)
 
 **CustomerService.CreateAsync()**:
-- Valid request with all fields → `Result<CustomerDto>.Success`; Account auto-created under "1130"
+- Valid request with all fields → `Result<CustomerDto>.Success`; Account auto-created under "1103"
 - Valid request with minimal fields → `Result<CustomerDto>.Success`
 - Duplicate TaxNumber (unique index violation caught) → `Result<CustomerDto>.Failure`
-- Parent account "1130" not found → `Result.Failure` with Arabic message
+- Parent account "1103" not found → `Result.Failure` with Arabic message
 - Transaction rollback if account creation succeeds but customer save fails
 
 **CustomerService.UpdateAsync()**:
@@ -1579,11 +1613,12 @@ services.AddTransient<CustomerSelectionViewModel>();
 #### 5. Phase-specific Tests
 
 - Customer.Create() with valid direct fields → no Party created
-- Account auto-creation generates hierarchical code: "1131", "1132", "1133"...
+- Account auto-creation generates hierarchical code via `AccountCodeGeneratorService` (Phase 18: 1→11→1101→11010001)
 - Account name matches Customer.Name in Arabic
-- Account nature is Debit (Asset — AR)
-- Account allowTransactions = true (Level 4 detail)
-- Parent account lookup by code "1130" (NOT "1210")
+- Account nature is 1 (Asset — byte value, not enum class)
+- Account isLeaf = true (Level 4 detail — AllowTransactions is computed `=> IsLeaf`)
+- Account ColorCode auto-generated from nature (#2B579A for Asset)
+- Parent account lookup by code "1103" (NOT "1210")
 - Auto-creation is transactional — if customer fails, account rolls back
 - Balance computed as SUM(Debit - Credit) from JournalEntryLines
 - Default customer "عميل نقدي" seeded with direct fields (no Party)
@@ -1599,7 +1634,7 @@ services.AddTransient<CustomerSelectionViewModel>();
 |------|-----------|---------------|---------|
 | **RULE-001** | `decimal(18,2)` for ALL money | CreditLimit — `HasPrecision(18,2)` | ✅ |
 | **RULE-002** | `decimal(18,3)` for ALL quantities | No quantity fields in this phase | ✅ N/A |
-| **RULE-003** | Multi-table ops in transaction | Customer Create: Party removal + Account creation + Customer save in one transaction | ✅ |
+| **RULE-003** | Multi-table ops in transaction | Customer Create: Account creation + Customer save in one `ExecuteTransactionAsync` (Phase 28 aligned) | ✅ |
 | **RULE-006** | ALL services return `Result<T>` | CustomerService, CustomerReportService | ✅ |
 | **RULE-008** | ALL text columns `nvarchar` | Name, Phone, Email, Address, TaxNumber, Notes — all nvarchar | ✅ |
 | **RULE-016** | BaseEntity audit fields | Customer inherits BaseEntity | ✅ |
@@ -1661,8 +1696,8 @@ services.AddTransient<CustomerSelectionViewModel>();
 | **RULE-271** | ScreenWindow MinWidth=500, MinHeight=350 | Already set in ScreenWindow.xaml | ✅ N/A |
 | **RULE-272** | Dialog buttons: MinWidth (80-100), not fixed width | CustomerEditorView buttons acceptable | ✅ |
 | **RULE-273** | Remove hardcoded Height/Padding duplicates | All new/modified XAML uses styles only | ✅ |
-| **RULE-504** | Customer parent account code = "1130" (NOT "1210") | CustomerService.AutoCreateCustomerAccountAsync | ✅ |
-| **RULE-506** | Level 4 accounts must have allowTransactions=true | Account.Create in auto-creation | ✅ |
+| **RULE-504** | Customer parent account code = "1103" (NOT "1210") | CustomerService.AutoCreateCustomerAccountAsync | ✅ |
+| **RULE-506** | Level 4 accounts must have `isLeaf: true` (AllowTransactions computed => IsLeaf) | Auto-creation uses isLeaf: true | ✅ |
 | **RULE-426** | AccountId mandatory (non-nullable int FK) | Customer entity | ✅ |
 | **RULE-427** | CustomerGroup NOT in V1 | NO CustomerGroup entity/service/controller/UI | ✅ |
 | **RULE-428** | CustomerType REMOVED | Payment type per-invoice via SalesInvoice.PaymentType | ✅ |
@@ -1674,11 +1709,18 @@ services.AddTransient<CustomerSelectionViewModel>();
 | **RULE-434** | CustomerDto includes AccountId, AccountName | DTO has both | ✅ |
 | **RULE-435** | Create/Update requests NO AccountId | Auto-created by service | ✅ |
 | **RULE-436** | Desktop editor NO CustomerGroup/AccountId/Type UI | No such controls | ✅ |
-| **RULE-437** | Account auto-created under parent "1130" | Service creates Level-4 under AR | ✅ |
+| **RULE-437** | Account auto-created under parent "1103" | Service creates Level-4 under AR | ✅ |
 | **RULE-438** | Seeder NO CustomerGroup seeds | Only "عميل نقدي" with auto-account | ✅ |
 | **RULE-439** | Phone regex `^05\d{8}$` with Arabic error | FluentValidation | ✅ |
 | **RULE-440** | ModernComboBox (NOT ModernTextBox) on ComboBox | Style guide | ✅ |
-| **RULE-504** | Parent code is "1130" NOT "1210" | Auto-creation logic | ✅ |
+| **RULE-504** | Parent code is "1103" NOT "1210" | Auto-creation logic | ✅ |
+| **RULE-321** | Account.Level 1-10 with CHECK constraint | Customer auto-creates Level 4 | ✅ |
+| **RULE-322** | Account.Create() 13-param signature | Auto-creation uses correct signature | ✅ |
+| **RULE-327** | IsSystemAccount for L1-L2 only | Customer accounts are L4, isSystem=false | ✅ |
+| **RULE-328** | ColorCode auto-generated from Nature | Uses IAccountCodeGeneratorService.GetColorCode(), not hardcoded | ✅ |
+| **RULE-333** | AccountService.GetTreeAsync() recursive | Not directly used in Customer, but Account tree works | ✅ N/A |
+| **RULE-334** | CreateAsync validates parent/level | Auto-creation passes correct parent and level=4 | ✅ |
+| **RULE-353** | AccountCode via AccountCodeGeneratorService | Uses IAccountCodeGeneratorService, not manual code | ✅ |
 
 ---
 
@@ -1688,7 +1730,7 @@ services.AddTransient<CustomerSelectionViewModel>();
 |------|--------|------------|
 | **Party removal breaks Supplier/Employee** | **HIGH** — Customer migration removes PartyId FK but Supplier and Employee still reference Parties table | Keep Parties table and Party entity. Only remove Customer's FK. Do NOT DROP Parties table until all modules migrate. |
 | **AccountId FK references non-existent Account** | **MEDIUM** — migration may fail if Account FK references a table that hasn't been migrated yet | Ensure Phase 22 (Chart of Accounts) migration runs BEFORE Phase 23 migration. AccountId is mandatory — FK must exist. |
-| **Account auto-creation fails if parent "1130" missing** | **MEDIUM** — customer creation blocked if Phase 22 not complete | Return clear Arabic error: "الحساب الرئيسي 1130 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات." |
+| **Account auto-creation fails if parent "1103" missing** | **MEDIUM** — customer creation blocked if Phase 22 not complete | Return clear Arabic error: "الحساب الرئيسي 1103 (العملاء) غير موجود. تأكد من اكتمال مرحلة دليل الحسابات." |
 | **Existing production data with Party references** | **MEDIUM** — data migration needed to move contact fields from Parties to Customers | Write UPDATE SQL in migration: `UPDATE Customers SET Name = p.Name, ... FROM Parties p WHERE ...` |
 | **CreditLimit enforcement breaks existing sales** | **MEDIUM** — existing credit customers may have high balances | Add enforcement gently: warning first (not blocking), then blocking in next phase. Or check soft — RULE-506 states warning-only for below-cost, similar approach here. |
 | **CustomerListViewModel refactor breaks existing tests** | **MEDIUM** — changing async patterns changes test invocation | Update test files to use new command execution pattern. Run all tests before merging. |
@@ -1724,8 +1766,11 @@ services.AddTransient<CustomerSelectionViewModel>();
 | ❌ **OpeningBalance on Customer** — No OpeningBalance field | Handled via Journal Entry (Dr AR / Cr OpeningBalanceEquity) |
 | ❌ **CurrentBalance on Customer** — No CurrentBalance field | Balance tracked on linked Account via JournalEntryLines |
 | ❌ **CurrencyId on Customer** — No per-customer currency | Currency is per-transaction (invoice/payment), not per-customer |
-| ❌ **User-supplied AccountId** — AccountId is NEVER in Create/Update requests | Always auto-created by service under parent "1130" |
+| ❌ **User-supplied AccountId** — AccountId is NEVER in Create/Update requests | Always auto-created by service under parent "1103" |
 | ❌ **AccountId nullable** — AccountId is mandatory (non-nullable int FK) | Every customer needs an Account for balance tracking |
 | ❌ **CustomerGroup in Desktop navigation** — No "مجموعات العملاء" menu item | CustomerGroup is NOT in V1 |
 | ❌ **CustomerType in Desktop editor** — No radio buttons or dropdowns | Payment type is per-invoice, not per-customer |
-| ❌ **Hardcoded parent code 1210** — Parent account code is "1130" | RULE-504 explicitly mandates "1130" (Accounts Receivable/العملاء) |
+| ❌ **Hardcoded parent code 1210** — Parent account code is "1103" | RULE-504 explicitly mandates "1103" (Accounts Receivable/العملاء) |
+| ❌ **Hardcoded ColorCode on customer accounts** — ColorCode must be auto-generated from Nature via `IAccountCodeGeneratorService.GetColorCode()` | Phase 18 RULE-328: ColorCode is system-generated, NOT user/hardcoded |
+| ❌ **`allowTransactions` param on Account.Create()** — Phase 18 removed this param; use `isLeaf: true` instead | Phase 18 Task 1.2: AllowTransactions is a computed property `=> IsLeaf` |
+| ❌ **`AccountNature.Debit` enum** — Nature is a `byte` (1-5), not an enum class | Phase 18 Task 1.2: `nature` parameter is `byte` |

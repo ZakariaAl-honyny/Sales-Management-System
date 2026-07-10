@@ -43,4 +43,18 @@ public class InvoicePrintDto
     /// رسالة تذييل مخصصة من إعدادات الطباعة (بدلاً من الرسالة الثابتة)
     /// </summary>
     public string? FooterNote { get; set; }
+    public bool ShowBalanceOnPrint { get; set; } = true;
+    public bool PrintSignature { get; set; }
+    public bool ShowExpiryInInvoices { get; set; }
+    public string PaperSize { get; set; } = "A4";
+
+    /// <summary>
+    /// مسار صورة التوقيع من إعدادات المتجر — يُعرض كصورة في الفاتورة A4 بدلاً من خط النص
+    /// </summary>
+    public string? SignatureImagePath { get; set; }
+
+    // ─── Print Feature Flags ──────────────────────
+    public bool PrintBarcode { get; set; }
+    public bool PrintQRCode { get; set; }
+    public bool PrintCompanyAddress { get; set; } = true;
 }

@@ -15,9 +15,6 @@ public record SupplierPaymentChangedMessage(int PaymentId);
 public record StockChangedMessage(int ProductId, int WarehouseId);
 public record CashBoxChangedMessage(int CashBoxId);
 public record TaxChangedMessage(int TaxId);
-public record CurrencyChangedMessage(int CurrencyId);
-public record CurrencyRateChangedMessage(int CurrencyId);
-
 /// <summary>
 /// Published when store settings are updated. Carries no data payload (RULE-034).
 /// </summary>

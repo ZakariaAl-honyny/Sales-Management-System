@@ -18,12 +18,6 @@ public class CompanySettingsConfiguration : IEntityTypeConfiguration<CompanySett
         builder.Property(c => c.Address).HasMaxLength(300);
         builder.Property(c => c.TaxNumber).HasMaxLength(50);
         builder.Property(c => c.LogoPath).HasMaxLength(500);
-        builder.Property(c => c.DefaultCurrencyId).HasColumnType("smallint").IsRequired();
-
-        builder.HasOne<Currency>()
-            .WithMany()
-            .HasForeignKey(c => c.DefaultCurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
 
         // Schema has only CreatedAt/UpdatedAt (no CreatedByUserId/UpdatedByUserId)
         builder.Property(c => c.CreatedAt)

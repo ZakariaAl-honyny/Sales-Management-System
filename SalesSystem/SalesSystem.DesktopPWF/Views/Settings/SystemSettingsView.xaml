@@ -2,9 +2,10 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d"
-             FlowDirection="RightToLeft"
+              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+              xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
+              mc:Ignorable="d"
+              FlowDirection="RightToLeft"
              d:DesignHeight="700" d:DesignWidth="900"
              Background="{StaticResource BackgroundBrush}">
 
@@ -71,8 +72,19 @@
                                        ToolTip="عدد الأيام قبل النفاد التي يبدأ فيها النظام بعرض تحذيرات المخزون"/>
                             <TextBox Text="{Binding StockAlertDays, TargetNullValue=5}"
                                      Style="{StaticResource ModernTextBox}"
-                                     ToolTip="عدد الأيام للتحذير قبل نفاد المخزون — مثال: 5 أيام"/>
+                                     ToolTip="عدد الأيام للتحذير قبل نفاد المخزون — مثال: 5 أيام"
+                                     helpers:InputHelper.NumericOnly="True"/>
                         </StackPanel>
+
+                        <CheckBox Content="إلزامية رقم الدفعة عند الشراء"
+                                  IsChecked="{Binding RequireBatchOnPurchase}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إجبارية إدخال رقم الدفعة عند إنشاء فاتورة شراء"/>
+
+                        <CheckBox Content="إلزامية تاريخ الانتهاء عند الشراء"
+                                  IsChecked="{Binding RequireExpiryOnPurchase}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إجبارية إدخال تاريخ الانتهاء للمنتجات ذات الصلاحية"/>
                     </StackPanel>
                 </Border>
 
@@ -108,6 +120,11 @@
                                   Margin="0,0,0,6"
                                   ToolTip="السماح بالبيع بسعر أقل من التكلفة مع عرض تحذير — قد يؤدي إلى خسارة"/>
 
+                        <CheckBox Content="إخفاء الضريبة في فواتير البيع"
+                                  IsChecked="{Binding HideTaxInSales}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إخفاء خيار الضريبة عند إنشاء فاتورة بيع جديدة"/>
+
                         <StackPanel Margin="0,0,0,2">
                             <TextBlock Text="العميل الافتراضي للمبيعات النقدية" Style="{StaticResource LabelStyle}"
                                        ToolTip="رقم العميل الافتراضي الذي يتم استخدامه تلقائياً في فواتير البيع النقدي"/>
@@ -115,6 +132,11 @@
                                      Style="{StaticResource ModernTextBox}"
                                      ToolTip="أدخل رقم العميل الافتراضي — مثال: 1 للمبيعات النقدية"/>
                         </StackPanel>
+
+                        <CheckBox Content="طباعة تلقائية بعد الترحيل"
+                                  IsChecked="{Binding AutoPrintAfterPosting}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="طباعة الفاتورة تلقائياً بعد الترحيل"/>
                     </StackPanel>
                 </Border>
 
@@ -129,6 +151,11 @@
                                   IsChecked="{Binding PurchaseAutoPost}"
                                   Margin="0,0,0,6"
                                   ToolTip="عند حفظ فاتورة الشراء، يتم ترحيلها مباشرة بدون الحاجة لضغط زر الترحيل"/>
+
+                        <CheckBox Content="إخفاء الضريبة في فواتير الشراء"
+                                  IsChecked="{Binding HideTaxInPurchases}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إخفاء خيار الضريبة عند إنشاء فاتورة شراء جديدة"/>
 
                         <StackPanel Margin="0,0,0,2">
                             <TextBlock Text="المورد الافتراضي للمشتريات النقدية" Style="{StaticResource LabelStyle}"
@@ -147,24 +174,15 @@
                     <StackPanel>
                         <TextBlock Text="الباركود" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
 
-                        <CheckBox Content="تفعيل الباركود"
-                                  IsChecked="{Binding EnableBarcode}"
-                                  Margin="0,0,0,6"
-                                  ToolTip="تفعيل الباركود في النظام بالكامل — عند الإيقاف، يتم تعطيل ماسح الباركود"/>
-
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="نوع إدخال الباركود" Style="{StaticResource LabelStyle}"
-                                       ToolTip="اختيار طريقة إدخال الباركود: ماسح ضوئي أو كاميرا"/>
-                            <ComboBox ItemsSource="{Binding BarcodeInputTypes}"
-                                      SelectedItem="{Binding BarcodeInputType}"
-                                      Style="{StaticResource ModernComboBox}"
-                                      ToolTip="Scanner = ماسح ضوئي متصل بالجهاز، Camera = استخدام كاميرا الهاتف أو الويب"/>
-                        </StackPanel>
-
                         <CheckBox Content="توليد باركود تلقائي للمنتجات الجديدة"
                                   IsChecked="{Binding AutoGenerateBarcode}"
-                                  Margin="0,0,0,2"
+                                  Margin="0,0,0,6"
                                   ToolTip="عند إضافة منتج جديد بدون باركود، يقوم النظام بتوليد باركود فريد تلقائياً"/>
+
+                        <CheckBox Content="السماح بتكرار الباركود"
+                                  IsChecked="{Binding AllowDuplicateBarcode}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="السماح باستخدام نفس الباركود لمنتجات مختلفة"/>
                     </StackPanel>
                 </Border>
 
@@ -183,36 +201,127 @@
                 </Border>
 
                 <!-- ════════════════════════════════════════════ -->
-                <!-- Card 6: General (العامة) -->
+                <!-- Card 5: Print (الطباعة) -->
+                <!-- ════════════════════════════════════════════ -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
+                    <StackPanel>
+                        <TextBlock Text="الطباعة" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
+
+                        <CheckBox IsChecked="{Binding ShowLogo}" Content="إظهار الشعار في الفاتورة"
+                                  Margin="0,0,0,6"
+                                  ToolTip="عرض شعار المتجر على الفاتورة المطبوعة"/>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="ملاحظة أسفل الفاتورة" Style="{StaticResource LabelStyle}"
+                                       ToolTip="نص يظهر أسفل الفاتورة (مثال: شكراً لتعاملكم)"/>
+                            <TextBox Text="{Binding FooterNote, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="نص يظهر أسفل الفاتورة المطبوعة"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="حجم الورق" Style="{StaticResource LabelStyle}"
+                                       ToolTip="حجم ورق الطباعة"/>
+                            <ComboBox SelectedItem="{Binding PaperSize}"
+                                      Style="{StaticResource ModernComboBox}"
+                                      ToolTip="A4 = ورق عادي، Letter = ورق أمريكي، Thermal = رول حراري">
+                                <ComboBoxItem Content="A4"/>
+                                <ComboBoxItem Content="Letter"/>
+                                <ComboBoxItem Content="Thermal"/>
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="عدد النسخ" Style="{StaticResource LabelStyle}"
+                                       ToolTip="عدد النسخ المطبوعة لكل فاتورة"/>
+                            <TextBox Text="{Binding PrintCopies, TargetNullValue=1}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="عدد النسخ المطبوعة لكل فاتورة (1-10)"
+                                     helpers:InputHelper.NumericOnly="True"/>
+                        </StackPanel>
+
+                        <CheckBox IsChecked="{Binding ShowBalanceOnPrint}" Content="إظهار الرصيد على الفاتورة"
+                                  Margin="0,0,0,6"
+                                  ToolTip="عرض المبلغ المستحق على الفاتورة المطبوعة"/>
+
+                        <CheckBox IsChecked="{Binding PrintSignature}" Content="إظهار خط التوقيع"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار خانة التوقيع أسفل الفاتورة"/>
+
+                        <CheckBox IsChecked="{Binding PrintBarcode}" Content="طباعة الباركود على الفاتورة"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار الباركود أسفل كل منتج في الفاتورة المطبوعة"/>
+
+                        <CheckBox IsChecked="{Binding PrintQRCode}" Content="طباعة رمز QR على الفاتورة"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار رمز QR في أسفل الفاتورة المطبوعة"/>
+
+                        <CheckBox IsChecked="{Binding PrintCompanyAddress}" Content="طباعة عنوان الشركة"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار عنوان المتجر في رأس الفاتورة المطبوعة"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ════════════════════════════════════════════ -->
+                <!-- Card 7: General (العامة) -->
                 <!-- ════════════════════════════════════════════ -->
                 <Border Style="{StaticResource CardStyle}" Margin="0,0,0,8">
                     <StackPanel>
                         <TextBlock Text="العامة" FontSize="14" FontWeight="Bold" Foreground="#333" Margin="0,0,0,10"/>
 
-                        <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="الكسور العشرية" Style="{StaticResource LabelStyle}"
-                                       ToolTip="عدد الخانات العشرية المعروضة للأسعار والمبالغ في النظام"/>
-                            <ComboBox ItemsSource="{Binding DecimalPlacesOptions}"
-                                      SelectedItem="{Binding DecimalPlaces}"
-                                      Style="{StaticResource ModernComboBox}"
-                                      ToolTip="اختيار عدد الخانات العشرية للأسعار — مثال: 2 للريال السعودي"/>
-                        </StackPanel>
+                        <CheckBox Content="تفعيل المرفقات"
+                                  IsChecked="{Binding EnableAttachments}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="إظهار خيار إرفاق الملفات بالفواتير"/>
+
+                        <CheckBox Content="تفعيل التنبيهات"
+                                  IsChecked="{Binding EnableNotifications}"
+                                  Margin="0,0,0,6"
+                                  ToolTip="تشغيل أو إيقاف جميع التنبيهات"/>
+
+                        <CheckBox Content="السماح بالسداد من الصندوق للسالب"
+                                  IsChecked="{Binding AllowNegativeCash}"
+                                  Margin="0,0,0,10"
+                                  ToolTip="السماح بخروج الصندوق للسالب عند السداد"/>
+
+                        <!-- Invoice Defaults -->
+                        <TextBlock Text="القيم الافتراضية للفواتير" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"
+                                   ToolTip="القيم الافتراضية المستخدمة عند إنشاء فواتير جديدة"/>
 
                         <StackPanel Margin="0,0,0,6">
-                            <TextBlock Text="لغة النظام" Style="{StaticResource LabelStyle}"
-                                       ToolTip="اللغة الافتراضية للنظام — العربية أو الإنجليزية"/>
-                            <ComboBox ItemsSource="{Binding LanguageOptions}"
-                                      SelectedItem="{Binding Language}"
-                                      Style="{StaticResource ModernComboBox}"
-                                      ToolTip="ar = العربية، en = الإنجليزية"/>
-                        </StackPanel>
-
-                        <StackPanel Margin="0,0,0,2">
-                            <TextBlock Text="تنسيق التاريخ" Style="{StaticResource LabelStyle}"
-                                       ToolTip="تنسيق عرض التواريخ في جميع شاشات النظام"/>
-                            <TextBox Text="{Binding DateFormat}"
+                            <TextBlock Text="الضريبة الافتراضية للمبيعات %" Style="{StaticResource LabelStyle}"
+                                       ToolTip="نسبة الضريبة الافتراضية لفواتير البيع (0-100)"/>
+                            <TextBox Text="{Binding DefaultSalesTax, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource ModernTextBox}"
-                                     ToolTip="صيغة عرض التاريخ — مثال: dd/MM/yyyy لليوم/الشهر/السنة"/>
+                                     ToolTip="نسبة الضريبة الافتراضية لفواتير البيع — مثال: 15"
+                                     helpers:InputHelper.NumericOnly="True"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الضريبة الافتراضية للمشتريات %" Style="{StaticResource LabelStyle}"
+                                       ToolTip="نسبة الضريبة الافتراضية لفواتير الشراء (0-100)"/>
+                            <TextBox Text="{Binding DefaultPurchaseTax, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="نسبة الضريبة الافتراضية لفواتير الشراء — مثال: 15"
+                                     helpers:InputHelper.NumericOnly="True"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="الفرع الافتراضي" Style="{StaticResource LabelStyle}"
+                                       ToolTip="رقم الفرع الافتراضي عند إنشاء الفواتير"/>
+                            <TextBox Text="{Binding DefaultBranch, TargetNullValue=1}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="رقم الفرع الافتراضي — مثال: 1"
+                                     helpers:InputHelper.NumericOnly="True"/>
+                        </StackPanel>
+
+                        <StackPanel Margin="0,0,0,6">
+                            <TextBlock Text="المستودع الافتراضي" Style="{StaticResource LabelStyle}"
+                                       ToolTip="رقم المستودع الافتراضي عند إنشاء الفواتير"/>
+                            <TextBox Text="{Binding DefaultWarehouse, TargetNullValue=1}"
+                                     Style="{StaticResource ModernTextBox}"
+                                     ToolTip="رقم المستودع الافتراضي — مثال: 1"
+                                     helpers:InputHelper.NumericOnly="True"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

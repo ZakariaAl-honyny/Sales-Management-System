@@ -122,13 +122,13 @@ public class RolePermissionViewModel : AdminOnlyViewModel
                     CategoryName = group.Key,
                     Permissions = new ObservableCollection<PermissionCheckItem>()
                 };
-                foreach (var perm in group.OrderBy(p => p.DisplayNameAr))
+                foreach (var perm in group.OrderBy(p => p.DisplayName))
                 {
                     category.Permissions.Add(new PermissionCheckItem
                     {
                         Id = perm.Id,
-                        Name = perm.Name,
-                        DisplayNameAr = perm.DisplayNameAr,
+                        Name = perm.Code,
+                        DisplayNameAr = perm.DisplayName,
                         IsChecked = selectedIds.Contains(perm.Id)
                     });
                 }

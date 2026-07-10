@@ -17,6 +17,7 @@ public class PurchaseReturnLine : Entity
     public int ProductUnitId { get; private set; }
     public decimal Quantity { get; private set; }
     public decimal Amount { get; private set; }
+    public decimal? CostInBaseCurrency { get; private set; }
 
     // Navigation properties
     public virtual PurchaseReturn? PurchaseReturn { get; private set; }
@@ -51,6 +52,13 @@ public class PurchaseReturnLine : Entity
             Amount = amount
         };
     }
+
+    public void SetCostInBaseCurrency(decimal cost)
+    {
+        if (cost < 0)
+            throw new DomainException("التكلفة بالعملة الأساسية لا يمكن أن تكون سالبة.");
+        CostInBaseCurrency = cost;
+    }
 }
 
 /// <summary>
@@ -66,8 +74,13 @@ public class PurchaseReturn : DocumentEntity
     public int? PurchaseInvoiceId { get; private set; }
     public int SupplierId { get; private set; }
     public short WarehouseId { get; private set; }
-    public short CurrencyId { get; private set; }
+    public DiscountType DiscountType { get; private set; } = DiscountType.Amount;
+    public decimal? DiscountRate { get; private set; }
     public decimal TotalAmount { get; private set; }
+    /// <summary>
+    /// القيمة المكافئة بالعملة الأساسية (TotalAmount × ExchangeRate)
+    /// </summary>
+    public decimal? BaseNetTotal { get; private set; }
     public decimal ReturnedDiscountAmount { get; private set; }
     public decimal ReturnedTaxAmount { get; private set; }
     public decimal ReturnedChargeAmount { get; private set; }
@@ -79,8 +92,6 @@ public class PurchaseReturn : DocumentEntity
     public virtual PurchaseInvoice? PurchaseInvoice { get; private set; }
     public virtual Supplier? Supplier { get; private set; }
     public virtual Warehouse? Warehouse { get; private set; }
-    public virtual Currency? Currency { get; private set; }
-
     private readonly List<PurchaseReturnLine> _lines = new();
     public IReadOnlyCollection<PurchaseReturnLine> Lines => _lines.AsReadOnly();
 
@@ -90,10 +101,12 @@ public class PurchaseReturn : DocumentEntity
         int returnNo,
         int supplierId,
         short warehouseId,
-        short currencyId,
         DateOnly? returnDate = null,
         int? purchaseInvoiceId = null,
+        DiscountType discountType = DiscountType.Amount,
+        decimal? discountRate = null,
         string? notes = null,
+        decimal? baseNetTotal = null,
         int? createdByUserId = null)
     {
         if (returnNo <= 0)
@@ -102,8 +115,8 @@ public class PurchaseReturn : DocumentEntity
             throw new DomainException("المورد مطلوب.");
         if (warehouseId <= 0)
             throw new DomainException("المستودع مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("العملة مطلوبة.");
+        if (discountType == DiscountType.Percentage && (!discountRate.HasValue || discountRate < 0 || discountRate > 100))
+            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
 
         var pr = new PurchaseReturn
         {
@@ -111,9 +124,11 @@ public class PurchaseReturn : DocumentEntity
             PurchaseInvoiceId = purchaseInvoiceId,
             SupplierId = supplierId,
             WarehouseId = warehouseId,
-            CurrencyId = currencyId,
+            DiscountType = discountType,
+            DiscountRate = discountRate,
             ReturnDate = returnDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
             Notes = notes,
+            BaseNetTotal = baseNetTotal,
             Status = InvoiceStatus.Draft
         };
         pr.SetCreatedBy(createdByUserId);
@@ -147,6 +162,28 @@ public class PurchaseReturn : DocumentEntity
         ReturnedTaxAmount = taxPortion;
         ReturnedChargeAmount = chargesPortion;
         TaxId = taxId;
+    }
+
+    /// <summary>
+    /// Sets the base-currency equivalent of TotalAmount (TotalAmount × ExchangeRate).
+    /// </summary>
+    public void SetBaseNetTotal(decimal baseNetTotal)
+    {
+        if (baseNetTotal < 0)
+            throw new DomainException("القيمة بالعملة الأساسية لا يمكن أن تكون سالبة.");
+        BaseNetTotal = baseNetTotal;
+        UpdateTimestamp();
+    }
+
+    public void SetDiscount(DiscountType type, decimal? rate)
+    {
+        if (Status != InvoiceStatus.Draft)
+            throw new DomainException("لا يمكن تعديل الخصم بعد الترحيل.");
+        if (type == DiscountType.Percentage && (!rate.HasValue || rate < 0 || rate > 100))
+            throw new DomainException("نسبة الخصم يجب أن تكون بين 0 و 100.");
+        DiscountType = type;
+        DiscountRate = type == DiscountType.Percentage ? rate : null;
+        UpdateTimestamp();
     }
 
     public void Post()

@@ -116,7 +116,7 @@ public class AuthService : IAuthService
 
                 return Result<LoginResponse>.Success(new LoginResponse(
                     user.Id, user.UserName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
-                    token, expiresAt, MustChangePassword: true));
+                    token, expiresAt, MustChangePassword: true, user.PermissionsMask));
             }
 
             // 8. Generate JWT
@@ -137,7 +137,7 @@ public class AuthService : IAuthService
             // 10. Return success
             return Result<LoginResponse>.Success(new LoginResponse(
                 user.Id, user.UserName, (byte)(user.UserRoles.FirstOrDefault()?.RoleId ?? 0),
-                jwtToken, jwtExpiresAt, MustChangePassword: false));
+                jwtToken, jwtExpiresAt, MustChangePassword: false, user.PermissionsMask));
         }
         catch (Exception ex)
         {

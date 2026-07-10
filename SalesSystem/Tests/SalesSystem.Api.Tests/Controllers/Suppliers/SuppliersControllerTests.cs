@@ -100,7 +100,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenValidRequest_ReturnsOkWithUpdatedSupplier()
     {
-        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, true);
+        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, null, 0m, null, true);
         var updatedSupplier = CreateSupplierDto(1);
         SupplierServiceMock.Setup(x => x.UpdateAsync(1, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateSuccessResult(updatedSupplier));
@@ -113,7 +113,7 @@ public class SuppliersControllerTests : ControllerTestBase
     [Fact]
     public async Task Update_WhenSupplierNotFound_ReturnsBadRequest()
     {
-        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, true);
+        var request = new UpdateSupplierRequest("مورد محدث", null, null, null, null, null, 0m, null, true);
         SupplierServiceMock.Setup(x => x.UpdateAsync(999, request, It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(CreateFailureResult<SupplierDto>("المورد غير موجود"));
 
@@ -173,6 +173,8 @@ public class SuppliersControllerTests : ControllerTestBase
         Email: null,
         Address: null,
         TaxNumber: null,
+        Notes: null,
+        CreditLimit: 0m,
         IsActive: true,
         AccountId: 1,
         AccountName: null);

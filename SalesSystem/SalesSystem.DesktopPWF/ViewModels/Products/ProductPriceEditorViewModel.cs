@@ -13,27 +13,22 @@ namespace SalesSystem.DesktopPWF.ViewModels.Products;
 public class ProductPriceEditorViewModel : ViewModelBase
 {
     private readonly IProductPriceApiService _priceService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IDialogService _dialogService;
     private readonly IEventBus _eventBus;
     private readonly IToastNotificationService _toastService;
 
     private int? _priceId;
     private int _productUnitId;
-    private int _currencyId;
     private decimal _priceValue;
     private DateTime _effectiveFrom = DateTime.Today;
     private DateTime? _effectiveTo;
     private bool _hasEffectiveTo;
     private bool _isEditMode;
     private string? _errorMessage;
-    private ObservableCollection<CurrencyDto> _currencies = new();
-    private CurrencyDto? _selectedCurrency;
 
     public ProductPriceEditorViewModel()
         : this(
             App.GetService<IProductPriceApiService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IEventBus>(),
             App.GetService<IToastNotificationService>())
@@ -42,20 +37,17 @@ public class ProductPriceEditorViewModel : ViewModelBase
 
     public ProductPriceEditorViewModel(
         IProductPriceApiService priceService,
-        ICurrencyApiService currencyService,
         IDialogService dialogService,
         IEventBus eventBus,
         IToastNotificationService? toastService = null)
     {
         _priceService = priceService ?? throw new ArgumentNullException(nameof(priceService));
-        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
-        _ = LoadCurrenciesAsync();
     }
 
     /// <summary>
@@ -94,12 +86,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
     {
         get => _productUnitId;
         set => SetProperty(ref _productUnitId, value);
-    }
-
-    public int CurrencyId
-    {
-        get => _currencyId;
-        set => SetProperty(ref _currencyId, value);
     }
 
     public string? ProductUnitName { get; set; }
@@ -181,24 +167,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
         set => SetProperty(ref _errorMessage, value);
     }
 
-    public ObservableCollection<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
-    public CurrencyDto? SelectedCurrency
-    {
-        get => _selectedCurrency;
-        set
-        {
-            if (SetProperty(ref _selectedCurrency, value))
-            {
-                CurrencyId = value?.Id ?? 0;
-            }
-        }
-    }
-
     #endregion
 
     #region Commands
@@ -214,61 +182,16 @@ public class ProductPriceEditorViewModel : ViewModelBase
     {
         _priceId = existing.Id;
         _productUnitId = existing.ProductUnitId;
-        CurrencyId = existing.CurrencyId;
         PriceValue = existing.Price;
         _effectiveFrom = existing.EffectiveFrom;
         _effectiveTo = existing.EffectiveTo;
         _hasEffectiveTo = existing.EffectiveTo.HasValue;
         IsEditMode = true;
-
-        // Pre-select currency when loaded
-        if (Currencies.Any(c => c.Id == existing.CurrencyId))
-        {
-            SelectedCurrency = Currencies.FirstOrDefault(c => c.Id == existing.CurrencyId);
-        }
-    }
-
-    public async Task LoadCurrenciesAsync()
-    {
-        await ExecuteAsync(LoadCurrenciesOperationAsync);
-    }
-
-    private async Task LoadCurrenciesOperationAsync()
-    {
-        var result = await _currencyService.GetAllAsync();
-        if (result.IsSuccess && result.Value != null)
-        {
-            InvokeOnUIThread(() =>
-            {
-                Currencies.Clear();
-                foreach (var c in result.Value)
-                {
-                    Currencies.Add(c);
-                }
-
-                // Auto-select base currency if none selected
-                if (SelectedCurrency == null)
-                {
-                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-                    if (baseCurrency != null)
-                    {
-                        SelectedCurrency = baseCurrency;
-                    }
-                    else if (Currencies.Count > 0)
-                    {
-                        SelectedCurrency = Currencies[0];
-                    }
-                }
-            });
-        }
     }
 
     private async Task<bool> ValidateAsync()
     {
         ClearAllErrors();
-
-        if (CurrencyId <= 0)
-            AddError(nameof(CurrencyId), "يجب اختيار العملة");
 
         if (PriceValue < 0)
             AddError(nameof(PriceValue), "السعر لا يمكن أن يكون سالباً");
@@ -300,7 +223,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
     {
         var request = new CreateProductPriceRequest(
             ProductUnitId,
-            (short)CurrencyId,
             PriceValue,
             EffectiveFrom,
             HasEffectiveTo ? EffectiveTo : null);
@@ -357,7 +279,6 @@ public class ProductPriceEditorViewModel : ViewModelBase
         _priceId = null;
         IsEditMode = false;
         ErrorMessage = null;
-        Currencies.Clear();
         base.Cleanup();
     }
 

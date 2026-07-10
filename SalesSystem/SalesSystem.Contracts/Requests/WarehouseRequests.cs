@@ -5,7 +5,6 @@ namespace SalesSystem.Contracts.Requests;
 /// AccountId is auto-created by the service (not user-supplied).
 /// </summary>
 public record CreateWarehouseRequest(
-    short BranchId,
     string Name,
     string? Phone = null,
     string? Address = null,
@@ -15,7 +14,6 @@ public record CreateWarehouseRequest(
 /// Request to update an existing warehouse.
 /// </summary>
 public record UpdateWarehouseRequest(
-    short BranchId,
     string Name,
     string? Phone = null,
     string? Address = null,

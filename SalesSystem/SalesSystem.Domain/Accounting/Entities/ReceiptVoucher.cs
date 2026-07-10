@@ -26,12 +26,6 @@ public class ReceiptVoucher : DocumentEntity
     public DateTime VoucherDate { get; private set; }
 
     /// <summary>
-    /// FK to Currencies table.
-    /// </summary>
-    public short CurrencyId { get; private set; }
-    public Currency? Currency { get; private set; }
-
-    /// <summary>
     /// FK to CashBoxes table — the cash box receiving the funds.
     /// </summary>
     public int CashBoxId { get; private set; }
@@ -66,7 +60,6 @@ public class ReceiptVoucher : DocumentEntity
     public static ReceiptVoucher Create(
         int voucherNo,
         DateTime voucherDate,
-        short currencyId,
         int cashBoxId,
         int accountId,
         decimal totalAmount,
@@ -75,9 +68,6 @@ public class ReceiptVoucher : DocumentEntity
     {
         if (voucherNo <= 0)
             throw new DomainException("رقم سند القبض مطلوب");
-
-        if (currencyId <= 0)
-            throw new DomainException("عملة سند القبض مطلوبة");
 
         if (cashBoxId <= 0)
             throw new DomainException("الصندوق النقدي مطلوب");
@@ -92,7 +82,6 @@ public class ReceiptVoucher : DocumentEntity
         {
             VoucherNo = voucherNo,
             VoucherDate = voucherDate.Kind == DateTimeKind.Utc ? voucherDate : voucherDate.ToUniversalTime(),
-            CurrencyId = currencyId,
             CashBoxId = cashBoxId,
             AccountId = accountId,
             TotalAmount = totalAmount,

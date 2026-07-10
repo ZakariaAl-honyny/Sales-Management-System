@@ -26,6 +26,7 @@ public class ProductEditorViewModel : ViewModelBase
     private readonly IInventoryBatchApiService? _batchService;
     private readonly IScreenWindowService? _screenWindowService;
     private readonly IToastNotificationService? _toastService;
+    private readonly ISettingsApiService _settingsApi;
 
     private int _productId;
     private string _name = string.Empty;
@@ -37,6 +38,7 @@ public class ProductEditorViewModel : ViewModelBase
     private bool _trackExpiry;
     private string? _barcode;
     private string? _errorMessage;
+    private bool _autoGenerateBarcode = true;
 
     private ProductCategoryDto? _selectedCategory;
 
@@ -59,6 +61,7 @@ public class ProductEditorViewModel : ViewModelBase
         _batchService = App.GetService<IInventoryBatchApiService>();
         _screenWindowService = App.GetService<IScreenWindowService>();
         _toastService = App.GetService<IToastNotificationService>();
+        _settingsApi = App.GetService<ISettingsApiService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
@@ -73,7 +76,8 @@ public class ProductEditorViewModel : ViewModelBase
         IProductPriceApiService? priceService = null,
         IInventoryBatchApiService? batchService = null,
         IScreenWindowService? screenWindowService = null,
-        IToastNotificationService? toastService = null)
+        IToastNotificationService? toastService = null,
+        ISettingsApiService? settingsApi = null)
     {
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
         _categoryService = categoryService ?? throw new ArgumentNullException(nameof(categoryService));
@@ -83,6 +87,7 @@ public class ProductEditorViewModel : ViewModelBase
         _batchService = batchService ?? App.GetService<IInventoryBatchApiService>();
         _screenWindowService = screenWindowService ?? App.GetService<IScreenWindowService>();
         _toastService = toastService ?? App.GetService<IToastNotificationService>();
+        _settingsApi = settingsApi ?? App.GetService<ISettingsApiService>();
         SetDialogService(_dialogService);
 
         InitializeCommands();
@@ -98,7 +103,8 @@ public class ProductEditorViewModel : ViewModelBase
             priceService: App.GetService<IProductPriceApiService>(),
             batchService: App.GetService<IInventoryBatchApiService>(),
             screenWindowService: App.GetService<IScreenWindowService>(),
-            toastService: App.GetService<IToastNotificationService>())
+            toastService: App.GetService<IToastNotificationService>(),
+            settingsApi: App.GetService<ISettingsApiService>())
     {
         _productId = product.Id;
         _name = product.Name;
@@ -349,6 +355,13 @@ public class ProductEditorViewModel : ViewModelBase
                     }
                 });
             }
+
+            var settingsResult = await _settingsApi.GetAllSystemSettingsAsync();
+            if (settingsResult.IsSuccess && settingsResult.Value != null)
+            {
+                if (settingsResult.Value.TryGetValue("AutoGenerateBarcode", out var val))
+                    _autoGenerateBarcode = val.Equals("true", StringComparison.OrdinalIgnoreCase);
+            }
         }
         catch (Exception ex)
         {
@@ -377,6 +390,11 @@ public class ProductEditorViewModel : ViewModelBase
         }
 
         ErrorMessage = null;
+
+        if (!IsEditMode && _autoGenerateBarcode && string.IsNullOrWhiteSpace(Barcode))
+        {
+            Barcode = $"P{DateTime.UtcNow:yyyyMMddHHmmssfff}{Random.Shared.Next(100, 999)}";
+        }
 
         Result<ProductDto> result;
 

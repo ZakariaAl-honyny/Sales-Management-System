@@ -105,7 +105,7 @@ public static class PrintDtoExtensions
     {
         return new InvoicePrintDto
         {
-            InvoiceNumber = @return.ReturnNo,
+            InvoiceNumber = @return.ReturnNo.ToString(),
             InvoiceDate = @return.ReturnDate,
             TypeName = "مرتجع مبيعات",
             CashierName = string.Empty,

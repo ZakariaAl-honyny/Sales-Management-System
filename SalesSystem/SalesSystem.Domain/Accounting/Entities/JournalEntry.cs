@@ -37,13 +37,6 @@ public class JournalEntry : DocumentEntity
     public short FiscalYearId { get; private set; }
     public FiscalYear? FiscalYear { get; private set; }
 
-    /// <summary>FK to Currencies table (smallint). Required for multi-currency support.</summary>
-    public short CurrencyId { get; private set; }
-    public Currency? Currency { get; private set; }
-
-    /// <summary>Exchange rate to base currency. Precision (18,6).</summary>
-    public decimal ExchangeRate { get; private set; } = 1m;
-
     /// <summary>Optional attachment file path (nvarchar(500)).</summary>
     public string? AttachmentPath { get; private set; }
 
@@ -77,9 +70,7 @@ public class JournalEntry : DocumentEntity
         string description,
         JournalEntryType entryType,
         short fiscalYearId,
-        short currencyId,
         int createdBy,
-        decimal exchangeRate = 1m,
         string? referenceType = null,
         int? referenceId = null,
         string? referenceNumber = null,
@@ -103,12 +94,6 @@ public class JournalEntry : DocumentEntity
         if (fiscalYearId <= 0)
             throw new DomainException("السنة المالية مطلوبة");
 
-        if (currencyId <= 0)
-            throw new DomainException("عملة القيد المحاسبي مطلوبة");
-
-        if (exchangeRate <= 0)
-            throw new DomainException("سعر الصرف يجب أن يكون أكبر من صفر");
-
         if (createdBy <= 0)
             throw new DomainException("منشئ القيد المحاسبي مطلوب");
 
@@ -123,8 +108,6 @@ public class JournalEntry : DocumentEntity
             Description = description.Trim(),
             EntryType = entryType,
             FiscalYearId = fiscalYearId,
-            CurrencyId = currencyId,
-            ExchangeRate = exchangeRate,
             Status = JournalEntryStatus.Draft,
             ReferenceType = referenceType?.Trim(),
             ReferenceId = referenceId,
@@ -192,6 +175,8 @@ public class JournalEntry : DocumentEntity
 
         PostedAt = DateTime.UtcNow;
         Status = JournalEntryStatus.Posted;
+        ReviewedByUserId = postedByUserId;
+        ReviewedAt = DateTime.UtcNow;
         UpdateTimestamp();
     }
 

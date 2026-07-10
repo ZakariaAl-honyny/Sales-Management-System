@@ -8,6 +8,5 @@ namespace SalesSystem.Contracts.Requests;
 /// </summary>
 public record UpdateCashBoxRequest(
     [property: JsonPropertyName("name")] string Name,
-    [property: JsonPropertyName("branchId")] short BranchId,
     [property: JsonPropertyName("description")] string? Description = null
 );

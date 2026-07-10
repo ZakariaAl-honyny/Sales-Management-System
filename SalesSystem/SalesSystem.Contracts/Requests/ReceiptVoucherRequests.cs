@@ -5,7 +5,6 @@ namespace SalesSystem.Contracts.Requests;
 /// </summary>
 public record CreateReceiptVoucherRequest(
     DateTime VoucherDate,
-    short CurrencyId,
     int CashBoxId,
     int AccountId,
     decimal TotalAmount,

@@ -2,6 +2,7 @@ using SalesSystem.DesktopPWF.Messaging.Messages;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using System.Windows.Input;
 using SalesSystem.Contracts.Common;
+using SalesSystem.Contracts.DTOs;
 using SalesSystem.Contracts.Requests;
 using SalesSystem.Contracts.Responses;
 using SalesSystem.DesktopPWF.Services.Api;
@@ -28,7 +29,6 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
     private string? _customerName;
     private int _cashBoxId;
     private string? _cashBoxName;
-    private int _currencyId;
     private decimal _amount;
     private DateTime _receiptDate = DateTime.Today;
     private string _notes = string.Empty;
@@ -67,7 +67,6 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
         _customerName = receipt.CustomerName;
         _cashBoxId = receipt.CashBoxId;
         _cashBoxName = receipt.CashBoxName;
-        _currencyId = receipt.CurrencyId;
         _amount = receipt.Amount;
         _receiptDate = receipt.ReceiptDate;
         _notes = receipt.Notes ?? string.Empty;
@@ -130,21 +129,6 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
     {
         get => _cashBoxName;
         set => SetProperty(ref _cashBoxName, value);
-    }
-
-    public int CurrencyId
-    {
-        get => _currencyId;
-        set
-        {
-            if (SetProperty(ref _currencyId, value))
-            {
-                if (value <= 0)
-                    AddError(nameof(CurrencyId), "العملة مطلوبة");
-                else
-                    ClearErrors(nameof(CurrencyId));
-            }
-        }
     }
 
     public decimal Amount
@@ -225,8 +209,6 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
             AddError(nameof(CustomerId), "العميل مطلوب");
         if (CashBoxId <= 0)
             AddError(nameof(CashBoxId), "الصندوق مطلوب");
-        if (CurrencyId <= 0)
-            AddError(nameof(CurrencyId), "العملة مطلوبة");
         if (Amount <= 0)
             AddError(nameof(Amount), "المبلغ يجب أن يكون أكبر من صفر");
         if (RemainingToAllocate < 0)
@@ -296,24 +278,24 @@ public class CustomerReceiptEditorViewModel : ViewModelBase
 
         ErrorMessage = null;
 
-        var request = new CreateCustomerReceiptRequest(
-            CustomerId,
-            CashBoxId,
-            CurrencyId,
-            Amount,
-            string.IsNullOrWhiteSpace(Notes) ? null : Notes);
-
         Result<CustomerReceiptDto> result;
 
         if (IsEditMode && _receiptId.HasValue)
         {
-            // Receipts are created and then posted — no separate update API.
-            // For editing unsaved drafts, we'd need to cancel + recreate.
-            result = await _receiptService.CreateAsync(request);
+            var updateRequest = new UpdateCustomerReceiptRequest(
+                CashBoxId,
+                Amount,
+                string.IsNullOrWhiteSpace(Notes) ? null : Notes);
+            result = await _receiptService.UpdateAsync(_receiptId.Value, updateRequest);
         }
         else
         {
-            result = await _receiptService.CreateAsync(request);
+            var createRequest = new CreateCustomerReceiptRequest(
+                CustomerId,
+                CashBoxId,
+                Amount,
+                string.IsNullOrWhiteSpace(Notes) ? null : Notes);
+            result = await _receiptService.CreateAsync(createRequest);
         }
 
         if (result.IsSuccess && result.Value != null)

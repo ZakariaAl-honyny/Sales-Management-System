@@ -86,6 +86,26 @@ public class SalesInvoicesController : ControllerBase
     }
 
     /// <summary>
+    /// Creates and immediately posts a sales invoice in one atomic operation
+    /// </summary>
+    /// <param name="request">Sales invoice creation request</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Created and posted invoice</returns>
+    [HttpPost("create-and-post")]
+    [ProducesResponseType(typeof(SalesInvoiceDto), 201)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> CreateAndPost([FromBody] CreateSalesInvoiceRequest request, CancellationToken ct)
+    {
+        var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (!int.TryParse(userIdStr, out var userId)) return Unauthorized();
+
+        var result = await _salesService.CreateAndPostAsync(request, userId, ct);
+        return result.IsSuccess
+            ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
+            : BadRequest(new { error = result.Error });
+    }
+
+    /// <summary>
     /// Updates an existing sales invoice (draft only)
     /// </summary>
     /// <param name="id">Invoice ID</param>

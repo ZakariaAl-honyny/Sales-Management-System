@@ -31,7 +31,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private readonly IBarcodeInputService _barcodeService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IProductUnitApiService _unitService;
     private readonly IProductPriceApiService _priceService;
     private readonly IInventoryApiService? _inventoryService;
@@ -57,11 +56,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private byte _status = (byte)InvoiceStatus.Draft;
     public bool IsReadOnly { get; private set; }
 
-    // Currency fields
-    private int? _selectedCurrencyId;
-    private decimal? _exchangeRate;
-    private bool _isForeignCurrency;
-
     // Attachment fields
     private string? _attachmentPath;
     private string? _attachmentFileName;
@@ -72,7 +66,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     private ObservableCollection<SupplierDto> _suppliers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
     private ObservableCollection<ProductDto> _products = new();
-    private ObservableCollection<CurrencyDto> _currencies = new();
     private ObservableCollection<TaxDto> _taxes = new();
     private int? _taxId;
 
@@ -88,7 +81,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         IBarcodeInputService barcodeService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
-        ICurrencyApiService currencyService,
         IProductUnitApiService unitService,
         IProductPriceApiService priceService,
         IInventoryApiService? inventoryService = null,
@@ -108,7 +100,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         _barcodeService = barcodeService;
         _printApiService = printApiService;
         _toastService = toastService;
-        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
         _priceService = priceService ?? throw new ArgumentNullException(nameof(priceService));
         _inventoryService = inventoryService;
@@ -122,7 +113,8 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             InvoiceNo = 0; // 0 = auto-generate via DocumentSequenceService (thread-safe)
         }
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
+        SaveDraftCommand = new AsyncRelayCommand(SaveDraftAsync);
+        SaveAndPostCommand = new AsyncRelayCommand(SaveAndPostAsync);
         PostCommand = new AsyncRelayCommand(PostAsync);
         CancelCommand = new RelayCommand(Cancel);
         AddLineCommand = new RelayCommand(AddLine);
@@ -190,7 +182,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             App.GetService<IBarcodeInputService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IProductUnitApiService>(),
             App.GetService<IProductPriceApiService>(),
             App.GetService<IInventoryApiService>(),
@@ -372,7 +363,18 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     public int DiscountTypeIndex
     {
         get => _discountTypeIndex;
-        set => SetProperty(ref _discountTypeIndex, value);
+        set
+        {
+            if (SetProperty(ref _discountTypeIndex, value))
+            {
+                if (_selectedDiscountType != (byte)value)
+                {
+                    _selectedDiscountType = (byte)value;
+                    OnPropertyChanged(nameof(SelectedDiscountType));
+                    RecalculateTotals();
+                }
+            }
+        }
     }
 
     private int? _otherChargesAccountId;
@@ -466,6 +468,11 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedDiscountType, value))
             {
+                if (_discountTypeIndex != (int)value)
+                {
+                    _discountTypeIndex = (int)value;
+                    OnPropertyChanged(nameof(DiscountTypeIndex));
+                }
                 RecalculateTotals();
             }
         }
@@ -484,41 +491,15 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         }
     }
 
-    // Currency properties
-    public ObservableCollection<CurrencyDto> Currencies
+    // Hide tax setting
+    private bool _hideTaxInPurchases;
+    public bool HideTaxInPurchases
     {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
+        get => _hideTaxInPurchases;
+        set { if (SetProperty(ref _hideTaxInPurchases, value)) OnPropertyChanged(nameof(IsTaxSectionVisible)); }
     }
 
-    public int? SelectedCurrencyId
-    {
-        get => _selectedCurrencyId;
-        set
-        {
-            if (SetProperty(ref _selectedCurrencyId, value))
-            {
-                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
-                OnPropertyChanged(nameof(IsForeignCurrency));
-            }
-        }
-    }
-
-    public decimal? ExchangeRate
-    {
-        get => _exchangeRate;
-        set
-        {
-            if (SetProperty(ref _exchangeRate, value))
-                RecalculateTotals();
-        }
-    }
-
-    public bool IsForeignCurrency
-    {
-        get => _isForeignCurrency;
-        set => SetProperty(ref _isForeignCurrency, value);
-    }
+    public bool IsTaxSectionVisible => !_hideTaxInPurchases;
 
     // Tax properties
     public ObservableCollection<TaxDto> Taxes
@@ -573,7 +554,8 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    public ICommand SaveCommand { get; }
+    public ICommand SaveDraftCommand { get; }
+    public ICommand SaveAndPostCommand { get; }
     public ICommand PostCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand AddLineCommand { get; }
@@ -638,17 +620,17 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 }
             }
 
-            var currenciesResult = await _currencyService.GetAllAsync();
-            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
+            var systemSettingsResult = await _settingsService.GetAllSystemSettingsAsync();
+            if (systemSettingsResult.IsSuccess && systemSettingsResult.Value != null)
             {
-                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
-                if (!_isEditMode)
+                if (systemSettingsResult.Value.TryGetValue("HideTaxInPurchases", out var hideTaxValue)
+                    && bool.TryParse(hideTaxValue, out var hideTax))
                 {
-                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-                    if (baseCurrency != null)
-                        SelectedCurrencyId = baseCurrency.Id;
+                    HideTaxInPurchases = hideTax;
                 }
             }
+
+
 
             // Load taxes
             if (_taxService != null)
@@ -679,14 +661,12 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 InvoiceDate = invoice.InvoiceDate.ToDateTime(TimeOnly.MinValue);
                 SelectedPaymentType = (byte)invoice.PaymentType;
                 InvoiceDiscount = invoice.DiscountAmount;
+                SelectedDiscountType = invoice.DiscountType;
+                DiscountRate = invoice.DiscountRate;
                 OtherCharges = invoice.OtherCharges;
                 PaidAmount = invoice.PaidAmount;
                 Notes = invoice.Notes;
                 Status = invoice.Status;
-
-                // Restore currency
-                SelectedCurrencyId = invoice.CurrencyId;
-                ExchangeRate = invoice.ExchangeRate;
 
                 TaxId = invoice.TaxId;
 
@@ -734,7 +714,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         });
     }
 
-    private async Task SaveAsync()
+    private async Task SaveDraftAsync()
     {
         if (!await ValidateInvoice()) return;
 
@@ -759,7 +739,7 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                 _invoiceId = result.Value.Id;
                 _status = result.Value.Status;
                 _isEditMode = true;
-                
+
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
@@ -781,13 +761,84 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
                     }
                 }
 
-                await _dialogService.ShowInfoAsync("نجاح", "✅ تم حفظ فاتورة الشراء بنجاح. يمكنك الآن الترحيل النهائي للمخزون.");
+                await _dialogService.ShowInfoAsync("نجاح", "✅ تم حفظ المسودة بنجاح. يمكنك الآن الترحيل النهائي للمخزون.");
                 _eventBus.Publish(new PurchaseInvoiceChangedMessage(_invoiceId.Value));
                 UpdateCommandStates();
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الفاتورة", "PurchaseInvoiceEditorViewModel.SaveAsync", "[PurchaseInvoiceEditorViewModel.SaveAsync] Failed to save purchase invoice.");
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المسودة", "PurchaseInvoiceEditorViewModel.SaveDraftAsync", "[PurchaseInvoiceEditorViewModel.SaveDraftAsync] Failed to save purchase invoice draft.");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ المسودة", ErrorMessage!);
+            }
+        });
+    }
+
+    private async Task SaveAndPostAsync()
+    {
+        if (!await ValidateInvoice()) return;
+
+        await ExecuteAsync(async () =>
+        {
+            ErrorMessage = null;
+            var request = BuildRequest();
+
+            Result<PurchaseInvoiceDto> saveResult;
+            if (_isEditMode)
+            {
+                var updateRequest = BuildUpdateRequest();
+                saveResult = await _invoiceService.UpdateAsync(_invoiceId!.Value, updateRequest);
+            }
+            else
+            {
+                saveResult = await _invoiceService.CreateAsync(request);
+            }
+
+            if (saveResult.IsSuccess && saveResult.Value != null)
+            {
+                _invoiceId = saveResult.Value.Id;
+                _status = saveResult.Value.Status;
+                _isEditMode = true;
+
+                OnPropertyChanged(nameof(Status));
+                OnPropertyChanged(nameof(IsEditMode));
+                OnPropertyChanged(nameof(IsReadOnly));
+
+                // Upload attachment if there is pending attachment data
+                if (!string.IsNullOrEmpty(_attachmentBase64) && _invoiceId.HasValue)
+                {
+                    var uploadResult = await _invoiceService.UploadAttachmentAsync(
+                        _invoiceId.Value, _attachmentBase64, _attachmentFileName ?? "attachment.jpg");
+                    if (uploadResult.IsSuccess)
+                    {
+                        _attachmentPath = uploadResult.Value;
+                        OnPropertyChanged(nameof(AttachmentPath));
+                    }
+                    else
+                    {
+                        Serilog.Log.Warning("Failed to upload attachment for invoice {InvoiceId}: {Error}",
+                            _invoiceId.Value, uploadResult.Error);
+                    }
+                }
+
+                // Now post the invoice
+                var postResult = await _invoiceService.PostAsync(_invoiceId.Value);
+                if (postResult.IsSuccess)
+                {
+                    _eventBus.Publish(new PurchaseInvoiceChangedMessage(_invoiceId.Value));
+                    await _dialogService.ShowSuccessAsync("نجاح", "✅ تم حفظ وترحيل فاتورة الشراء بنجاح.");
+                    RequestClose();
+                }
+                else
+                {
+                    ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "PurchaseInvoiceEditorViewModel.SaveAndPostAsync",
+                        $"[PurchaseInvoiceEditorViewModel.SaveAndPostAsync] Failed to post purchase invoice ID {_invoiceId} after save.");
+                    await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
+                }
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(saveResult.Error ?? "فشل في حفظ الفاتورة", "PurchaseInvoiceEditorViewModel.SaveAndPostAsync",
+                    "[PurchaseInvoiceEditorViewModel.SaveAndPostAsync] Failed to save purchase invoice before posting.");
                 await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         });
@@ -795,11 +846,11 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
 
     private async Task PostAsync()
     {
-        // First save if new
+        // Must have a saved invoice to post
         if (!_isEditMode || _invoiceId == null)
         {
-            await SaveAsync();
-            if (_invoiceId == null) return;
+            await _dialogService.ShowWarningAsync("ترحيل فاتورة الشراء", "يجب حفظ الفاتورة أولاً قبل الترحيل.\nاستخدم زر 'حفظ وترحيل' للحفظ والترحيل مرة واحدة.");
+            return;
         }
 
         if (!await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم إضافة الكميات إلى المخزون.")) return;
@@ -964,15 +1015,16 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             SelectedWarehouseId,
             SelectedSupplierId ?? 0,
             InvoiceDate,
-            (PaymentType)SelectedPaymentType,
+            (PaymentType?)SelectedPaymentType,
             InvoiceDiscount,
+            (DiscountType?)SelectedDiscountType,
+            DiscountRate,
             TaxAmount,
             OtherCharges,
             PaidAmount,
-            (short?)SelectedCurrencyId,
-            ExchangeRate,
             Notes,
             TaxId,
+            !string.IsNullOrEmpty(AttachmentPath) ? AttachmentPath : null,
             items);
     }
 
@@ -994,13 +1046,14 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
             InvoiceDate,
             (PaymentType)SelectedPaymentType,
             InvoiceDiscount,
+            (DiscountType?)SelectedDiscountType,
+            DiscountRate,
             TaxAmount,
             OtherCharges,
             PaidAmount,
-            (short?)SelectedCurrencyId,
-            ExchangeRate,
             Notes,
             TaxId,
+            !string.IsNullOrEmpty(AttachmentPath) ? AttachmentPath : null,
             items);
     }
 
@@ -1291,11 +1344,6 @@ public class PurchaseInvoiceEditorViewModel : ViewModelBase
         HasAttachment = false;
     }
 
-    private int GetBaseCurrencyId()
-    {
-        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-        return baseCurrency?.Id ?? 0;
-    }
     #endregion
 }
 

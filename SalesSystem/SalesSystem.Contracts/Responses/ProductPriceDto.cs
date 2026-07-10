@@ -7,9 +7,6 @@ public record ProductPriceDto(
     int Id,
     int ProductUnitId,
     string? ProductUnitName,
-    int CurrencyId,
-    string? CurrencyCode,
-    string? CurrencyName,
     decimal Price,
     DateTime EffectiveFrom,
     DateTime? EffectiveTo)

@@ -7,4 +7,8 @@ public record InvoiceItemPrintDto(
     decimal UnitPrice,
     decimal Discount,
     decimal Total
-);
+)
+{
+    public DateTime? ExpiryDate { get; init; }
+    public string? Barcode { get; init; }
+}

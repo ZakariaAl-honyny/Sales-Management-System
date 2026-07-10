@@ -25,7 +25,6 @@ using SalesSystem.DesktopPWF.ViewModels.Updates;
 using SalesSystem.DesktopPWF.ViewModels.Warehouses;
 using SalesSystem.DesktopPWF.ViewModels.CashBoxes;
 using SalesSystem.DesktopPWF.ViewModels.Taxes;
-using SalesSystem.DesktopPWF.ViewModels.Currencies;
 using SalesSystem.DesktopPWF.ViewModels.Reports;
 using SalesSystem.DesktopPWF.ViewModels.CustomerReceipt;
 using SalesSystem.DesktopPWF.ViewModels.InventoryCount;
@@ -34,9 +33,6 @@ using SalesSystem.DesktopPWF.ViewModels.Notifications;
 using SalesSystem.DesktopPWF.ViewModels.Attachments;
 using SalesSystem.DesktopPWF.ViewModels.Accounts;
 using SalesSystem.DesktopPWF.ViewModels.Accounting;
-using SalesSystem.DesktopPWF.ViewModels.Branch;
-using SalesSystem.DesktopPWF.ViewModels.Department;
-using SalesSystem.DesktopPWF.ViewModels.Employee;
 using SalesSystem.DesktopPWF.ViewModels.Bank;
 using SalesSystem.DesktopPWF.ViewModels.Expense;
 using SalesSystem.DesktopPWF.ViewModels.JournalEntries;
@@ -44,7 +40,6 @@ using SalesSystem.DesktopPWF.ViewModels.Audit;
 using SalesSystem.DesktopPWF.ViewModels.Permissions;
 using SalesSystem.DesktopPWF.Views.Accounts;
 using SalesSystem.DesktopPWF.Views.Products;
-using SalesSystem.DesktopPWF.Views.Currencies;
 using SalesSystem.DesktopPWF.Views.Updates;
 using SalesSystem.DesktopPWF.Services.App.Toast;
 using SalesSystem.DesktopPWF.Services.Export;
@@ -226,11 +221,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ICashBoxApiService, CashBoxApiService>();
         services.AddSingleton<IFinancialReportApiService, FinancialReportApiService>();
         services.AddSingleton<ITaxesApiService, TaxesApiService>();
-        services.AddSingleton<ICurrencyApiService, CurrencyApiService>();
-
         // New Entity API Services (v4.7+)
-        services.AddSingleton<IBranchApiService, BranchApiService>();
-        services.AddSingleton<IDepartmentApiService, DepartmentApiService>();
         services.AddSingleton<IBankApiService, BankApiService>();
         services.AddSingleton<IProductCategoryApiService, ProductCategoryApiService>();
         services.AddSingleton<INotificationApiService, NotificationApiService>();
@@ -242,9 +233,6 @@ public partial class App : System.Windows.Application
 
         // Account API Service
         services.AddSingleton<IAccountApiService, AccountApiService>();
-
-        // Employee API Service
-        services.AddSingleton<IEmployeeApiService, EmployeeApiService>();
 
         // Expense API Service
         services.AddSingleton<IExpenseApiService, ExpenseApiService>();
@@ -344,7 +332,6 @@ public partial class App : System.Windows.Application
         services.AddTransient<UnitEditorViewModel>();
         services.AddTransient<ReportsViewModel>();
         services.AddTransient<SettingsViewModel>();
-        services.AddTransient<CostingMethodSettingsViewModel>();
         services.AddTransient<SystemSettingsViewModel>();
         services.AddTransient<BackupViewModel>();
         services.AddTransient<ProductUnitEditorViewModel>();
@@ -353,12 +340,6 @@ public partial class App : System.Windows.Application
         // Tax ViewModels
         services.AddTransient<TaxesListViewModel>();
         services.AddTransient<TaxEditorViewModel>();
-
-        // Currency ViewModels
-        services.AddTransient<CurrenciesListViewModel>();
-        services.AddTransient<CurrencyEditorViewModel>();
-        services.AddTransient<CurrencyRatesViewModel>();
-        services.AddTransient<CurrencyRatesView>();
 
         // Account ViewModels
         services.AddTransient<AccountsListViewModel>();
@@ -462,13 +443,7 @@ public partial class App : System.Windows.Application
         services.AddTransient<ProductCategoriesListView>();
         services.AddTransient<ProductCategoryEditorView>();
 
-        // New Module ViewModels (Branch, Department, Employee, Bank, Expense)
-        services.AddTransient<BranchListViewModel>();
-        services.AddTransient<BranchEditorViewModel>();
-        services.AddTransient<DepartmentListViewModel>();
-        services.AddTransient<DepartmentEditorViewModel>();
-        services.AddTransient<EmployeeListViewModel>();
-        services.AddTransient<EmployeeEditorViewModel>();
+        // New Module ViewModels (Bank, Expense)
         services.AddTransient<BankListViewModel>();
         services.AddTransient<BankEditorViewModel>();
         services.AddTransient<ExpenseListViewModel>();
@@ -538,8 +513,8 @@ public partial class App : System.Windows.Application
         var errorMessage = $"[UI THREAD EXCEPTION] Location: {e.Exception.Source} -> {e.Exception.TargetSite}. Context: WPF Dispatcher Unhandled Exception.";
         Log.Error(e.Exception, errorMessage);
 
-        new Views.Dialogs.FallbackErrorDialog(
-            "حدث خطأ غير متوقع في التطبيق. تم تسجيل التفاصيل في ملف السجلات.")
+        var userMessage = $"حدث خطأ غير متوقع في التطبيق.\n{e.Exception.GetType().Name}: {e.Exception.Message}";
+        new Views.Dialogs.FallbackErrorDialog(userMessage)
             .ShowDialog();
 
         e.Handled = true;
@@ -551,6 +526,12 @@ public partial class App : System.Windows.Application
         {
             var errorMessage = $"[FATAL DOMAIN EXCEPTION] Location: {ex.Source} -> {ex.TargetSite}. Context: AppDomain Unhandled Exception. IsTerminating: {e.IsTerminating}";
             Log.Fatal(ex, errorMessage);
+            try
+            {
+                Dispatcher.Invoke(() => new Views.Dialogs.FallbackErrorDialog(
+                    $"حدث خطأ جسيم في التطبيق وسيتم إغلاقه.\n{ex.GetType().Name}: {ex.Message}").ShowDialog());
+            }
+            catch { }
         }
     }
 

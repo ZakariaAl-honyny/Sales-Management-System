@@ -23,6 +23,10 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
         builder.Property(pi => pi.InvoiceDate).HasColumnType("date");
         builder.Property(pi => pi.PaymentType).HasConversion<byte>();
         builder.Property(pi => pi.Status).HasConversion<byte>();
+        builder.Property(pi => pi.DiscountType).HasConversion<byte>().HasDefaultValue(SalesSystem.Domain.Enums.DiscountType.Amount);
+        builder.Property(pi => pi.DiscountRate).HasPrecision(18, 2);
+        builder.Property(pi => pi.CostInBaseCurrency).HasPrecision(18, 2);
+        builder.Property(pi => pi.AttachmentPath).HasMaxLength(255);
 
         builder.HasOne(pi => pi.Supplier)
             .WithMany()
@@ -39,14 +43,7 @@ public class PurchaseInvoiceConfiguration : IEntityTypeConfiguration<PurchaseInv
             .HasForeignKey(pi => pi.TaxId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(pi => pi.Currency)
-            .WithMany()
-            .HasForeignKey(pi => pi.CurrencyId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.Property(pi => pi.CurrencyId).HasColumnType("smallint");
-
-        builder.Property(pi => pi.ExchangeRate).HasPrecision(18, 6).IsRequired(false);
+        builder.Property(pi => pi.BaseNetTotal).HasPrecision(18, 2).IsRequired(false);
 
         builder.HasOne(pi => pi.CashBox)
             .WithMany()
@@ -75,6 +72,11 @@ public class PurchaseInvoiceLineConfiguration : IEntityTypeConfiguration<Purchas
         builder.Property(pii => pii.LandedUnitCost).HasPrecision(18, 2);
         builder.Property(pii => pii.LineTotal).HasPrecision(18, 2);
         builder.Property(pii => pii.ProductUnitId).IsRequired();
+        builder.Property(pii => pii.DiscountType).HasConversion<byte>().HasDefaultValue(SalesSystem.Domain.Enums.DiscountType.Amount);
+        builder.Property(pii => pii.DiscountRate).HasPrecision(18, 2);
+        builder.Property(pii => pii.DiscountAmount).HasPrecision(18, 2).HasDefaultValue(0);
+        builder.Property(pii => pii.CostInBaseCurrency).HasPrecision(18, 2);
+        builder.Property(pii => pii.AdditionalFeesAmount).HasPrecision(18, 2).HasDefaultValue(0);
 
         builder.HasOne(pii => pii.Product)
             .WithMany()

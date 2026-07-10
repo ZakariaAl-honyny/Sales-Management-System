@@ -26,9 +26,6 @@ public class SystemAccountMappingConfiguration : IEntityTypeConfiguration<System
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // BranchId (smallint, nullable) — branch-specific override
-        builder.Property(x => x.BranchId)
-            .IsRequired(false)
-            .HasColumnType("smallint");
+
     }
 }

@@ -36,6 +36,7 @@
     <SolidColorBrush x:Key="ErrorLightBrush" Color="#FEE2E2"/>
     <SolidColorBrush x:Key="ErrorTextBrush" Color="#991B1B"/>
     <SolidColorBrush x:Key="InfoLightBrush" Color="#DBEAFE"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="#3B82F6"/>
     <SolidColorBrush x:Key="InfoTextBrush" Color="#1E40AF"/>
     <SolidColorBrush x:Key="WarningLightBrush" Color="#FEF3C7"/>
     <SolidColorBrush x:Key="WarningTextBrush" Color="#92400E"/>

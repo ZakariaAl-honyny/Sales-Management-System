@@ -10,6 +10,7 @@ using SalesSystem.Contracts.Requests;
 using SalesSystem.Domain.Accounting.Enums;
 using SalesSystem.Domain.Enums;
 using SalesSystem.Domain.Entities;
+using DomainDiscountType = SalesSystem.Domain.Enums.DiscountType;
 using SalesSystem.Domain.Exceptions;
 
 namespace SalesSystem.Application.Services;
@@ -115,6 +116,14 @@ public class SalesService : ISalesService
         {
             try
             {
+                // ── AllowDrafts setting gate ─────────────────────
+                var allowDrafts = await _systemSettingsRepo.GetBoolAsync("AllowDrafts", true, ct);
+                if (!allowDrafts)
+                {
+                    _logger.LogInformation("Draft invoices disabled via AllowDrafts setting");
+                    return Result<SalesInvoiceDto>.Failure("السماح بالمسودات معطّل — يرجى الترحيل مباشرة");
+                }
+
                 // Resolve InvoiceNo INSIDE transaction — prevents TOCTOU race (RULE-384 fix)
                 int invoiceNo;
                 if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
@@ -132,10 +141,27 @@ public class SalesService : ISalesService
                     invoiceNo = seqResult.Value;
                 }
 
+                // Auto-assign default cash customer if none specified
+                var customerId = request.CustomerId;
+                if (customerId <= 0 && (PaymentType)request.PaymentType == PaymentType.Cash)
+                {
+                    customerId = await _systemSettingsRepo.GetIntAsync("DefaultCashCustomerId", 1, ct);
+                    _logger.LogInformation("Auto-assigned DefaultCashCustomerId={CustomerId} for cash sale", customerId);
+                }
+
+                // Apply DefaultWarehouse fallback when WarehouseId is not provided
+                var warehouseId = request.WarehouseId;
+                if (warehouseId <= 0)
+                {
+                    var defaultWarehouse = await _systemSettingsRepo.GetStringAsync("DefaultWarehouse", "1", ct) ?? "1";
+                    warehouseId = short.Parse(defaultWarehouse);
+                    _logger.LogInformation("Applied DefaultWarehouse fallback: WarehouseId={WarehouseId}", warehouseId);
+                }
+
                 var invoice = SalesInvoice.Create(
-                    (short)request.WarehouseId,
+                    (short)warehouseId,
                     invoiceNo,
-                    request.CustomerId,
+                    customerId,
                     request.InvoiceDate,
                     (PaymentType)request.PaymentType,
                     request.DiscountAmount,
@@ -143,8 +169,8 @@ public class SalesService : ISalesService
                     notes: request.Notes,
                     cashBoxId: request.CashBoxId,
                     taxId: (short?)request.TaxId,
-                    currencyId: request.CurrencyId ?? 0,
-                    exchangeRate: request.ExchangeRate,
+                    discountType: (Domain.Enums.DiscountType)request.DiscountType,
+                    discountRate: request.DiscountRate,
                     createdByUserId: userId
                 );
                 foreach (var item in request.Items)
@@ -153,7 +179,9 @@ public class SalesService : ISalesService
                         item.ProductId,
                         item.ProductUnitId,
                         item.Quantity,
-                        item.UnitPrice
+                        item.UnitPrice,
+                        (Domain.Enums.DiscountType)item.DiscountType,
+                        item.DiscountRate
                     );
                     invoice.AddItem(invoiceItem);
                 }
@@ -165,12 +193,11 @@ public class SalesService : ISalesService
                 var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
                 if (preventBelowRetailPrice)
                 {
-                    var effectiveCurrencyId = request.CurrencyId ?? (await GetBaseCurrencyIdAsync(ct));
                     foreach (var item in request.Items)
                     {
                         if (item.ProductUnitId <= 0) continue;
                         var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
-                            item.ProductUnitId, effectiveCurrencyId, ct);
+                            item.ProductUnitId, ct);
                         if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
                         {
                             _logger.LogWarning(
@@ -187,6 +214,17 @@ public class SalesService : ISalesService
 
                 _logger.LogInformation("Sales Invoice created as Draft: ID {Id} by User {UserId}", invoice.Id, userId);
 
+                // Auto-post if setting is enabled
+                var autoPost = await _systemSettingsRepo.GetBoolAsync("AutoPostInvoices", true, ct);
+                if (autoPost)
+                {
+                    _logger.LogInformation("Auto-posting sales invoice {Id} via AutoPostInvoices setting", invoice.Id);
+                    var postResult = await PostAsync(invoice.Id, userId, ct);
+                    if (postResult.IsSuccess)
+                        return postResult;
+                    _logger.LogWarning("Auto-post failed for invoice {Id}: {Error} — returning draft", invoice.Id, postResult.Error);
+                }
+
                 return await GetByIdAsync(invoice.Id, ct);
             }
             catch (DomainException ex)
@@ -200,6 +238,92 @@ public class SalesService : ISalesService
                 return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء حفظ مسودة الفاتورة");
             }
         }, ct);
+    }
+
+    public async Task<Result<SalesInvoiceDto>> CreateAndPostAsync(CreateSalesInvoiceRequest request, int userId, CancellationToken ct)
+    {
+        try
+        {
+            // ─── Step 1: Create as Draft (inline, single SaveChanges) ─────
+            int invoiceNo;
+            if (request.InvoiceNo.HasValue && request.InvoiceNo.Value > 0)
+            {
+                var existing = await _uow.SalesInvoices.AnyAsync(i => i.InvoiceNo == request.InvoiceNo.Value, ct);
+                if (existing)
+                    return Result<SalesInvoiceDto>.Failure("رقم الفاتورة موجود بالفعل");
+                invoiceNo = request.InvoiceNo.Value;
+            }
+            else
+            {
+                var seqResult = await _documentSequenceService.GetNextIntAsync("SalesInvoice", ct);
+                if (!seqResult.IsSuccess)
+                    return Result<SalesInvoiceDto>.Failure("فشل في توليد رقم الفاتورة");
+                invoiceNo = seqResult.Value;
+            }
+
+            var customerId = request.CustomerId;
+            if (customerId <= 0 && (PaymentType)request.PaymentType == PaymentType.Cash)
+                customerId = await _systemSettingsRepo.GetIntAsync("DefaultCashCustomerId", 1, ct);
+
+            // Apply DefaultWarehouse fallback when WarehouseId is not provided
+            var warehouseId = request.WarehouseId;
+            if (warehouseId <= 0)
+            {
+                var defaultWarehouse = await _systemSettingsRepo.GetStringAsync("DefaultWarehouse", "1", ct) ?? "1";
+                warehouseId = short.Parse(defaultWarehouse);
+                _logger.LogInformation("Applied DefaultWarehouse fallback: WarehouseId={WarehouseId}", warehouseId);
+            }
+
+            var invoice = SalesInvoice.Create(
+                (short)warehouseId, invoiceNo, customerId,
+                request.InvoiceDate, (PaymentType)request.PaymentType,
+                request.DiscountAmount, otherCharges: request.OtherCharges,
+                notes: request.Notes, cashBoxId: request.CashBoxId,
+                taxId: (short?)request.TaxId,
+                discountType: (Domain.Enums.DiscountType)request.DiscountType, discountRate: request.DiscountRate,
+                createdByUserId: userId);
+
+            foreach (var item in request.Items)
+            {
+                var invoiceItem = SalesInvoiceLine.Create(
+                    item.ProductId, item.ProductUnitId, item.Quantity, item.UnitPrice,
+                    (Domain.Enums.DiscountType)item.DiscountType, item.DiscountRate);
+                invoice.AddItem(invoiceItem);
+            }
+
+            invoice.SetTaxAmount(request.TaxAmount);
+            invoice.SetPaidAmount(request.PaidAmount);
+
+            // Price enforcement
+            var preventBelowRetail = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
+            if (preventBelowRetail)
+            {
+                foreach (var item in request.Items)
+                {
+                    if (item.ProductUnitId <= 0) continue;
+                    var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(item.ProductUnitId, ct);
+                    if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
+                        return Result<SalesInvoiceDto>.Failure($"سعر البيع أقل من السعر الرسمي للمنتج (معرف المنتج: {item.ProductId})");
+                }
+            }
+
+            await _uow.SalesInvoices.AddAsync(invoice, ct);
+            await _uow.SaveChangesAsync(ct);
+
+            // ─── Step 2: Post immediately (has its own ExecuteTransactionAsync) ─────
+            var postResult = await PostAsync(invoice.Id, userId, ct);
+            return postResult;
+        }
+        catch (DomainException ex)
+        {
+            _logger.LogWarning(ex, "Validation error creating and posting sales invoice");
+            return Result<SalesInvoiceDto>.Failure(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating and posting sales invoice");
+            return Result<SalesInvoiceDto>.Failure("حدث خطأ أثناء إنشاء وترحيل الفاتورة");
+        }
     }
 
     public async Task<Result<SalesInvoiceDto>> UpdateAsync(int id, UpdateSalesInvoiceRequest request, int userId, CancellationToken ct)
@@ -222,7 +346,8 @@ public class SalesService : ISalesService
                     return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
             }
 
-            invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount);
+            invoice.UpdateTotals(request.DiscountAmount, request.TaxAmount, request.OtherCharges,
+                (Domain.Enums.DiscountType)request.DiscountType, request.DiscountRate);
             invoice.SetPaidAmount(request.PaidAmount);
 
             // Re-create items (simplest way for draft)
@@ -234,7 +359,9 @@ public class SalesService : ISalesService
                     item.ProductId,
                     item.ProductUnitId,
                     item.Quantity,
-                    item.UnitPrice
+                    item.UnitPrice,
+                    (Domain.Enums.DiscountType)item.DiscountType,
+                    item.DiscountRate
                 );
                 invoice.AddItem(invoiceItem);
             }
@@ -292,13 +419,12 @@ public class SalesService : ISalesService
         var preventBelowRetailPrice = await _systemSettingsRepo.GetBoolAsync("PreventBelowRetailPrice", false, ct);
         var allowBelowCostSale = await _systemSettingsRepo.GetBoolAsync("AllowBelowCostSale", true, ct);
 
-        if (preventBelowRetailPrice)
-        {
-            var effectiveCurrencyId = await GetCurrencyIdAsync(invoice, ct);
-            foreach (var item in invoice.Items)
-            {
-                var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
-                    item.ProductUnitId, effectiveCurrencyId, ct);
+                if (preventBelowRetailPrice)
+                {
+                    foreach (var item in invoice.Items)
+                    {
+                        var priceResult = await _productPriceService.GetEffectivePriceForInvoiceAsync(
+                            item.ProductUnitId, ct);
                 if (priceResult.IsSuccess && priceResult.Value != null && item.UnitPrice < priceResult.Value.Price)
                 {
                     var productName = item.Product?.Name ?? $"معرف {item.ProductId}";
@@ -370,27 +496,8 @@ public class SalesService : ISalesService
                     }
                 }
 
-                // 3a. Create InventoryTransaction audit trail for stock decrease
-                var invTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
-                if (invTxSeq.IsSuccess)
-                {
-                    var invTx = InventoryTransaction.Create(
-                        invTxSeq.Value.ToString("D6"),
-                        InventoryTransactionType.Sale,
-                        (short)invoice.WarehouseId,
-                        InventoryReferenceType.SalesInvoice,
-                        invoice.Id,
-                        $"بيع - فاتورة رقم {invoice.InvoiceNo}",
-                        userId);
-                    foreach (var item in invoice.Items)
-                    {
-                        invTx.AddLine(InventoryTransactionLine.Create(
-                            invTx.Id, item.ProductUnitId, item.Quantity, item.UnitPrice, null, null, (short)invoice.WarehouseId));
-                    }
-                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
-                }
-
-                // 4. FIFO/FEFO Batch Allocation — deduct from specific batches
+                // 3a. FIFO/FEFO Batch Allocation — deduct from specific batches (BEFORE InventoryTransaction)
+                var fifoAllocationsPerItem = new Dictionary<int, List<InventoryBatchAllocation>>();
                 foreach (var item in invoice.Items)
                 {
                     var fifoResult = await _fifoAllocationService.DeductFromBatchesAsync(
@@ -407,6 +514,35 @@ public class SalesService : ISalesService
                             invoice.Id, item.ProductId, fifoResult.Error);
                         return Result<SalesInvoiceDto>.Failure(fifoResult.Error!);
                     }
+
+                    fifoAllocationsPerItem[item.Id] = fifoResult.Value!;
+                }
+
+                // 3b. Create InventoryTransaction audit trail for stock decrease (with batch allocation info in BatchNo)
+                var invTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
+                if (invTxSeq.IsSuccess)
+                {
+                    var invTx = InventoryTransaction.Create(
+                        invTxSeq.Value.ToString("D6"),
+                        InventoryTransactionType.Sale,
+                        (short)invoice.WarehouseId,
+                        InventoryReferenceType.SalesInvoice,
+                        invoice.Id,
+                        $"بيع - فاتورة رقم {invoice.InvoiceNo}",
+                        userId);
+                    foreach (var item in invoice.Items)
+                    {
+                        // Encode FIFO batch allocations as "batchId:qty" pairs in BatchNo — enables restoration on cancel
+                        string? batchNo = null;
+                        if (fifoAllocationsPerItem.TryGetValue(item.Id, out var allocations) && allocations.Count > 0)
+                        {
+                            batchNo = string.Join(",", allocations.Select(a => $"{a.BatchId}:{a.Quantity}"));
+                        }
+
+                        invTx.AddLine(InventoryTransactionLine.Create(
+                            invTx.Id, item.ProductUnitId, item.Quantity, item.UnitPrice, batchNo, null, (short)invoice.WarehouseId));
+                    }
+                    await _uow.InventoryTransactions.AddAsync(invTx, ct);
                 }
 
                 // 5. Update Customer Balance
@@ -419,15 +555,20 @@ public class SalesService : ISalesService
                         return Result<SalesInvoiceDto>.Failure("العميل غير موجود");
                     }
 
-                    // Credit limit enforcement — soft check only (balance tracked on linked Account via journal entries)
-                    if (customer.CreditLimit > 0 && invoice.RemainingAmount > 0)
+                    // ── Credit Limit Alert setting gate ──────────────────
+                    var creditLimitAlert = await _systemSettingsRepo.GetBoolAsync("CreditLimitAlert", true, ct);
+                    if (creditLimitAlert)
                     {
-                        if (!customer.CheckCreditLimit(invoice.RemainingAmount))
+                        // Credit limit enforcement — soft check only (balance tracked on linked Account via journal entries)
+                        if (customer.CreditLimit > 0 && invoice.RemainingAmount > 0)
                         {
-                            _logger.LogWarning(
-                                "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Remaining: {Remaining}",
-                                customer.Id, customer.CreditLimit, invoice.RemainingAmount);
-                            return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
+                            if (!customer.CheckCreditLimit(invoice.RemainingAmount))
+                            {
+                                _logger.LogWarning(
+                                    "Customer {CustomerId} credit limit exceeded. Limit: {Limit}, Remaining: {Remaining}",
+                                    customer.Id, customer.CreditLimit, invoice.RemainingAmount);
+                                return Result<SalesInvoiceDto>.Failure("تجاوز الحد الائتماني للعميل");
+                            }
                         }
                     }
 
@@ -438,11 +579,9 @@ public class SalesService : ISalesService
                 // 6. Record payment voucher (سند صرف) if payment is linked to a cash box
                 if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                 {
-                    var paymentCurrencyId = await GetCurrencyIdAsync(invoice, ct);
                     var paymentAccountId = await GetCashAccountIdAsync(ct);
                     var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                         invoice.CashBoxId.Value,
-                        paymentCurrencyId,
                         invoice.PaidAmount,
                         paymentAccountId,
                         notes: null,
@@ -459,7 +598,14 @@ public class SalesService : ISalesService
 
                 await _uow.SaveChangesAsync(ct);
 
-                // 7. Create journal entry for sales posting (revenue + COGS)
+                // 7. Auto-print intent logging (actual print triggered from Desktop via API)
+                var autoPrint = await _systemSettingsRepo.GetBoolAsync("AutoPrintAfterPosting", false, ct);
+                if (autoPrint)
+                {
+                    _logger.LogInformation("AutoPrintAfterPosting enabled for sales invoice {InvoiceId}", invoice.Id);
+                }
+
+                // 8. Create journal entry for sales posting (revenue + COGS)
                 var totalCost = 0m;
                 var distinctProductIds = invoice.Items
                     .Select(item => item.ProductId)
@@ -579,7 +725,47 @@ public class SalesService : ISalesService
                         }
                     }
 
-                    // 3a. Create InventoryTransaction audit trail for stock reversal (cancellation)
+                    // 3a. Restore FIFO batch quantities — read original InventoryTransaction to get batch allocations
+                    var originalInvTx = await _uow.InventoryTransactions.FirstOrDefaultAsync(
+                        t => t.ReferenceType == InventoryReferenceType.SalesInvoice
+                             && t.ReferenceId == id,
+                        ct);
+
+                    if (originalInvTx != null)
+                    {
+                        foreach (var line in originalInvTx.Lines)
+                        {
+                            if (string.IsNullOrWhiteSpace(line.BatchNo))
+                                continue;
+
+                            // Parse "batchId:qty" pairs stored during PostAsync
+                            var pairs = line.BatchNo.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                            foreach (var pair in pairs)
+                            {
+                                var parts = pair.Split(':');
+                                if (parts.Length == 2
+                                    && int.TryParse(parts[0], out var batchId)
+                                    && decimal.TryParse(parts[1], out var batchQty)
+                                    && batchQty > 0)
+                                {
+                                    var batch = await _uow.InventoryBatches.GetByIdAsync(batchId, ct);
+                                    if (batch != null)
+                                    {
+                                        batch.IncreaseRemaining(batchQty);
+                                        _logger.LogInformation(
+                                            "FIFO batch restored: Batch {BatchId} +{Quantity} for cancelled sales invoice {InvoiceId}",
+                                            batchId, batchQty, id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Original InventoryTransaction not found for sales invoice {Id} — batch restoration skipped", id);
+                    }
+
+                    // 3b. Create InventoryTransaction audit trail for stock reversal (cancellation)
                     var cancelInvTxSeq = await _documentSequenceService.GetNextIntAsync("InventoryTransaction", ct);
                     if (cancelInvTxSeq.IsSuccess)
                     {
@@ -602,11 +788,9 @@ public class SalesService : ISalesService
                     // Create offsetting payment voucher if invoice had cash box
                     if (invoice.CashBoxId.HasValue && invoice.PaidAmount > 0)
                     {
-                        var reversalCurrencyId = await GetCurrencyIdAsync(invoice, ct);
                         var reversalAccountId = await GetCashAccountIdAsync(ct);
                         var cashResult = await _cashBoxService.RecordInvoicePaymentAsync(
                             invoice.CashBoxId.Value,
-                            reversalCurrencyId,
                             invoice.PaidAmount,
                             reversalAccountId,
                             notes: "إلغاء فاتورة - مردود مدفوعات",
@@ -655,20 +839,6 @@ public class SalesService : ISalesService
     }
 
     /// <summary>
-    /// Gets the currency ID for the payment voucher: uses the invoice's own currency if set,
-    /// otherwise falls back to the system's base currency.
-    /// </summary>
-    private async Task<short> GetCurrencyIdAsync(SalesInvoice invoice, CancellationToken ct)
-    {
-        if (invoice.CurrencyId > 0)
-            return invoice.CurrencyId;
-
-        var currencies = await _uow.Currencies.ToListAsync(ct);
-        var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency);
-        return (short)(baseCurrency?.Id ?? 1);
-    }
-
-    /// <summary>
     /// Gets the default cash account ID from SystemAccountMappings for payment voucher recording.
     /// Falls back to 1 if no mapping is configured.
     /// </summary>
@@ -677,16 +847,6 @@ public class SalesService : ISalesService
         var mapping = await _uow.SystemAccountMappings.FirstOrDefaultAsync(
             m => m.MappingKey == nameof(SystemAccountKey.DefaultCash), ct);
         return mapping?.AccountId ?? 1;
-    }
-
-    /// <summary>
-    /// Gets the system's base currency ID for price lookups when invoice has no explicit currency.
-    /// </summary>
-    private async Task<short> GetBaseCurrencyIdAsync(CancellationToken ct)
-    {
-        var currencies = await _uow.Currencies.ToListAsync(ct);
-        var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency);
-        return (short)(baseCurrency?.Id ?? 1);
     }
 
     private static SalesInvoiceDto MapToDto(SalesInvoice i)
@@ -702,18 +862,19 @@ public class SalesService : ISalesService
             (byte)i.PaymentType,
             i.SubTotal,
             i.DiscountAmount,
+            (byte)i.DiscountType,
+            i.DiscountRate,
             i.TaxAmount,
             i.OtherCharges,
             i.NetTotal,
             i.PaidAmount,
             i.RemainingAmount,
+            i.CostInBaseCurrency,
             i.Notes,
             (byte)i.Status,
             i.TaxId,
             i.Tax?.Name,
             (decimal?)i.Tax?.Rate,
-            i.CurrencyId,
-            i.ExchangeRate,
             i.CashBoxId,
             i.CashBox?.Name,
             i.Items.Select(it => new SalesInvoiceLineDto(
@@ -723,7 +884,13 @@ public class SalesService : ISalesService
                 it.Quantity,
                 it.UnitPrice,
                 it.LineTotal,
-                it.ProductUnitId
+                it.ProductUnitId,
+                (byte)it.DiscountType,
+                it.DiscountRate,
+                it.DiscountAmount,
+                it.CostInBaseCurrency,
+                it.UnitCost,
+                it.ProfitAmount
             )).ToList()
         );
     }

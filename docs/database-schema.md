@@ -1,7 +1,7 @@
-# Database Schema Design
+﻿# Database Schema Design
 # Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 65 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
+# 66 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 
@@ -131,57 +131,13 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.5 Departments
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | **smallint** PK | |
-| `Name` | nvarchar(100) not null | |
-| `Description` | nvarchar(300) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 1.6 Employees
+### 1.5 Users
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `Name` | nvarchar(200) not null | |
-| `Phone` | nvarchar(20) null | |
-| `Email` | nvarchar(100) null | |
-| `Address` | nvarchar(500) null | |
-| `DepartmentId` | smallint null FK → Departments(Id) | |
-| `AccountId` | int null FK → Accounts(Id) | optional, auto-created when needed |
-| `EmployeeNo` | int not null | |
-| `HireDate` | date not null | |
-| `Salary` | decimal(18,2) not null default 0 | |
-| `Notes` | nvarchar(1000) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 1.7 Roles
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | **smallint** PK | |
-| `Name` | nvarchar(100) not null | |
-| `Description` | nvarchar(300) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 1.8 Users
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `EmployeeId` | int null FK → Employees(Id) | links user to employee record |
 | `UserName` | nvarchar(50) not null | unique |
 | `PasswordHash` | nvarchar(256) not null | |
+| `PermissionsMask` | bigint not null default 0 | **Active permission system** — bitwise flags. `-1` = Super Admin (all 64 bits = 1, bypasses all checks). `0` = no permissions. |
 | `MustChangePassword` | bit not null default 0 | |
 | `LoginAttempts` | smallint not null default 0 | |
 | `IsLocked` | bit not null default 0 | |
@@ -193,43 +149,39 @@ Default schema: **`dbo`**
 | `UpdatedAt` | datetime2 null | |
 | **Index** | `UNIQUE(UserName)` | |
 
-### 1.9 UserRoles
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `UserId` | int not null FK → Users(Id) | |
-| `RoleId` | smallint not null FK → Roles(Id) | |
-| **UK** | `UNIQUE(UserId, RoleId)` | |
+> **Permission Check**: `(User.PermissionsMask & requiredPermission) == requiredPermission`. Super Admin: `PermissionsMask = -1`.
+> **Role Assignment**: When admin assigns a role to a user → `User.PermissionsMask = Role.PermissionsMask`. The user's mask can be further customized after role assignment.
 
-### 1.10 Permissions
+### 1.6 Roles
 | Column | Type | Notes |
 |--------|------|-------|
-| `Id` | int PK | |
-| `Code` | nvarchar(100) not null | unique |
-| `DisplayName` | nvarchar(150) not null | |
-| `Category` | nvarchar(100) not null | |
+| `Id` | **smallint** PK | |
+| `Name` | nvarchar(100) not null | unique |
+| `PermissionsMask` | bigint not null default 0 | sum of permission bit flags for this role |
+| `IsSystem` | bit not null default 0 | system roles (9 default) protected from deletion/rename |
 | `IsActive` | bit not null default 1 | |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 1.11 RolePermissions
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `RoleId` | smallint not null FK → Roles(Id) | |
-| `PermissionId` | int not null FK → Permissions(Id) | |
-| **UK** | `UNIQUE(RoleId, PermissionId)` | |
+**Seeded Default Roles** (`IsSystem = 1`):
 
-### 1.12 UserBranches
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `UserId` | int not null FK → Users(Id) | |
-| `BranchId` | smallint not null FK → Branches(Id) | |
+| Id | Name (Arabic) | PermissionsMask |
+|----|---|-|
+| 1 | مدير النظام | `-1` (Super Admin — all permissions) |
+| 2 | مدير | Sum of all except System/Users management |
+| 3 | محاسب | Accounting + Reports + View permissions |
+| 4 | أمين صندوق | CashBox + ReceiptVoucher + PaymentVoucher |
+| 5 | كاشير | Sales.Create + Sales.Post + Customer.View |
+| 6 | مشرف مخازن | Inventory.* + Product.View |
+| 7 | مندوب مبيعات | Sales.* + Customer.* + Product.View |
+| 8 | مراقب | *.View + Reports.View + AuditLog.View only |
 
-### 1.13 UserSessions
+> **Custom Roles**: Admin can add new roles beyond the 8 defaults. `IsSystem = 0` roles can be edited/deleted. Role is just a named template — assigning it copies `PermissionsMask` to the user. No join table needed.
+
+
+### 1.7 UserSessions
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -249,28 +201,12 @@ Default schema: **`dbo`**
 
 ---
 
-## Module 2: Organization, Currencies & Settings (التنظيم، العملات والإعدادات)
+## Module 2: Organization, Currencies & Settings (التنظيم والإعدادات)
 
-### 2.1 Branches
+### 2.1 Warehouses
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | **smallint** PK | |
-| `Name` | nvarchar(150) not null | unique |
-| `Phone` | nvarchar(30) null | |
-| `Address` | nvarchar(300) null | |
-| `ManagerName` | nvarchar(150) null | |
-| `Notes` | nvarchar(500) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 2.2 Warehouses
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | **smallint** PK | |
-| `BranchId` | smallint not null FK → Branches(Id) | |
 | `Name` | nvarchar(150) not null | |
 | `Phone` | nvarchar(30) null | |
 | `Address` | nvarchar(300) null | |
@@ -281,38 +217,8 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.3 Currencies
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | **smallint** PK | |
-| `Name` | nvarchar(100) not null | unique filtered `[IsActive]=1` |
-| `Code` | char(3) not null | ISO 4217 — unique filtered `[IsActive]=1` |
-| `FractionName` | nvarchar(50) not null | e.g., "Halala", "Cent" |
-| `Symbol` | nvarchar(20) null | |
-| `DecimalPlaces` | tinyint not null default 2 | |
-| `IsBaseCurrency` | bit not null default 0 | unique filtered `IsBaseCurrency=1 AND IsActive=1` |
-| `IsSystem` | bit not null default 0 | system currencies protected from deletion |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
 
-### 2.4 CurrencyRates
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
-| `RateToBase` | decimal(18,2) not null | CHK `> 0` |
-| `EffectiveFrom` | datetime2 not null | |
-| `EffectiveTo` | datetime2 null | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-| **Index** | `(CurrencyId, EffectiveFrom)` | for rate lookup by date |
-
-### 2.5 Taxes
+### 2.2 Taxes
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | **smallint** PK | |
@@ -327,7 +233,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.6 CompanySettings
+### 2.3 CompanySettings
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | tinyint PK default 1 | singleton row |
@@ -337,11 +243,10 @@ Default schema: **`dbo`**
 | `Address` | nvarchar(300) null | |
 | `TaxNumber` | nvarchar(50) null | |
 | `LogoPath` | nvarchar(500) null | |
-| `DefaultCurrencyId` | smallint not null FK → Currencies(Id) | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.7 SystemSettings
+### 2.4 SystemSettings
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -356,7 +261,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.8 DocumentSequences
+### 2.5 DocumentSequences
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -367,7 +272,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.9 FiscalYears
+### 2.6 FiscalYears
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -380,7 +285,7 @@ Default schema: **`dbo`**
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
 
-### 2.10 Notifications
+### 2.7 Notifications
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -397,7 +302,7 @@ Default schema: **`dbo`**
 | `UpdatedAt` | datetime2 null | |
 | **Indexes** | `(UserId, IsRead, CreatedAt DESC)` | for unread notification queries |
 
-### 2.11 Attachments
+### 2.8 Attachments
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -477,7 +382,6 @@ Default schema: **`dbo`**
 |--------|------|-------|
 | `Id` | int PK | |
 | `ProductUnitId` | int not null FK → ProductUnits(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `Price` | decimal(18,2) not null | CHK `>= 0` |
 | `EffectiveFrom` | date not null | |
 | `EffectiveTo` | date null | |
@@ -554,7 +458,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 |--------|------|-------|
 | `Id` | int PK | |
 | `AccountId` | int not null FK → Accounts(Id) | balance lives on Account, NOT CashBox |
-| `BranchId` | smallint not null FK → Branches(Id) | |
 | `Name` | nvarchar(150) not null | |
 | `Description` | nvarchar(300) null | |
 | `IsActive` | bit not null default 1 | |
@@ -618,7 +521,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `Id` | int PK | |
 | `VoucherNo` | int not null | unique |
 | `VoucherDate` | date not null | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `CashBoxId` | int not null FK → CashBoxes(Id) | |
 | `AccountId` | int not null FK → Accounts(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
@@ -637,7 +539,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `Id` | int PK | |
 | `VoucherNo` | int not null | unique |
 | `VoucherDate` | date not null | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `CashBoxId` | int not null FK → CashBoxes(Id) | |
 | `AccountId` | int not null FK → Accounts(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
@@ -658,7 +559,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `ExpenseDate` | date not null | |
 | `ExpenseAccountId` | int not null FK → Accounts(Id) | |
 | `CashBoxId` | int not null FK → CashBoxes(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `Amount` | decimal(18,2) not null | |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
@@ -669,13 +569,12 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `PostedAt` | datetime2 null | set when Status=2 |
 | `CancelledAt` | datetime2 null | set when Status=3 |
 
-### 4.10 SystemAccountMappings
+### 4.10 SystemAccountMappings (NEW: Accounting Defaults)
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
 | `MappingKey` | nvarchar(100) not null | e.g., "SalesRevenue", "COGS" |
 | `AccountId` | int not null FK → Accounts(Id) | |
-| `BranchId` | smallint null FK → Branches(Id) | branch-specific override |
 | `CreatedByUserId` | int null FK | |
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
@@ -861,12 +760,14 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `InvoiceDate` | date not null | |
 | `CustomerId` | int not null FK → Customers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `PaymentType` | tinyint not null | 1=Cash, 2=Credit, 3=Mixed |
 | `CashBoxId` | int null FK → CashBoxes(Id) | |
 | `TaxId` | smallint null FK → Taxes(Id) | |
 | `SubTotal` | decimal(18,2) not null | |
 | `DiscountAmount` | decimal(18,2) not null default 0 | |
+| `DiscountType` | tinyint not null default 0 | 0=Amount, 1=Percentage |
+| `DiscountRate` | decimal(5,2) null | percentage rate when DiscountType=1 |
+| `CostInBaseCurrency` | decimal(18,2) null | total cost in base currency for profit calculation |
 | `TaxAmount` | decimal(18,2) not null default 0 | |
 | `OtherCharges` | decimal(18,2) not null default 0 | |
 | `NetTotal` | decimal(18,2) not null | SubTotal - Discount + Tax + OtherCharges |
@@ -891,8 +792,14 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `ProductUnitId` | int not null FK → ProductUnits(Id) | |
 | `Quantity` | decimal(18,3) not null | |
 | `UnitPrice` | decimal(18,2) not null | |
-| `LineTotal` | decimal(18,2) not null | Quantity x UnitPrice |
-| **Notes** | NO DiscountAmount per line (header only). NO Cost field (sourced from InventoryBatches at posting). | |
+| `DiscountType` | tinyint not null default 0 | 0=Amount, 1=Percentage per line |
+| `DiscountRate` | decimal(5,2) null | percentage rate when line DiscountType=1 |
+| `DiscountAmount` | decimal(18,2) not null default 0 | line-level discount |
+| `UnitCost` | decimal(18,2) not null default 0 | average cost at time of sale |
+| `CostInBaseCurrency` | decimal(18,2) null | cost converted to base currency |
+| `ProfitAmount` | decimal(18,2) not null default 0 | LineTotal - (CostInBaseCurrency × Quantity) |
+| `LineTotal` | decimal(18,2) not null | (Quantity × UnitPrice) - DiscountAmount |
+| **Notes** | Line-level DiscountType/DiscountAmount supported. CostInBaseCurrency populated at posting from FIFO batches. | |
 
 ### 6.3 SalesReturns
 | Column | Type | Notes |
@@ -903,11 +810,12 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `SalesInvoiceId` | int not null FK → SalesInvoices(Id) | |
 | `CustomerId` | int not null FK → Customers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
 | `ReturnedDiscountAmount` | decimal(18,2) not null default 0 | proportional discount from original invoice |
 | `ReturnedTaxAmount` | decimal(18,2) not null default 0 | proportional tax from original invoice |
 | `ReturnedChargeAmount` | decimal(18,2) not null default 0 | proportional other charges from original invoice |
+| `RefundAmount` | decimal(18,2) not null default 0 | amount refunded to customer |
+| `ReturnReason` | nvarchar(500) null | optional reason for return |
 | `TaxId` | smallint null FK → Taxes(Id) | tax rate used from original invoice |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
@@ -926,6 +834,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `SalesInvoiceLineId` | int not null FK → SalesInvoiceLines(Id) | links to original line |
 | `Quantity` | decimal(18,3) not null | |
 | `Amount` | decimal(18,2) not null | |
+| `CostInBaseCurrency` | decimal(18,2) null | cost of returned goods in base currency |
 
 ### 6.5 CustomerReceipts (سندات قبض)
 | Column | Type | Notes |
@@ -935,7 +844,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `ReceiptDate` | date not null | |
 | `CustomerId` | int not null FK → Customers(Id) | |
 | `CashBoxId` | int not null FK → CashBoxes(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `PaymentMethod` | tinyint not null default 1 | 1=Cash, 2=Cheque, 3=BankTransfer, 4=CreditCard |
 | `Amount` | decimal(18,2) not null | |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
@@ -964,8 +873,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `ValidUntil` | date null | optional expiry date |
 | `CustomerId` | int not null FK → Customers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
-| `ExchangeRate` | decimal(18,6) null | |
 | `PaymentType` | tinyint not null | 1=Cash, 2=Credit |
 | `SubTotal` | decimal(18,2) not null | SUM(LineTotal) |
 | `DiscountAmount` | decimal(18,2) not null | header-level discount |
@@ -1001,6 +908,10 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 - SalesQuotationItems DO support per-line DiscountAmount (unlike SalesInvoiceLines which only have header discount)
 - SalesReturnLines link to SalesInvoiceLineId (not ProductId directly)
 
+**Multi-Currency Design Notes:**
+- Journal entries (Debit/Credit) are ALWAYS recorded in base currency
+- Exchange rate is FROZEN after document posting — cannot be changed
+
 ---
 
 ## Module 7: Purchases (المشتريات)
@@ -1013,12 +924,13 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `InvoiceDate` | date not null | |
 | `SupplierId` | int not null FK → Suppliers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `PaymentType` | tinyint not null | 1=Cash, 2=Credit, 3=Mixed |
 | `CashBoxId` | int null FK → CashBoxes(Id) | |
 | `TaxId` | smallint null FK → Taxes(Id) | |
 | `SubTotal` | decimal(18,2) not null | |
 | `DiscountAmount` | decimal(18,2) not null default 0 | |
+| `DiscountType` | tinyint not null default 0 | 0=Amount, 1=Percentage |
+| `DiscountRate` | decimal(5,2) null | percentage rate when DiscountType=1 |
 | `TaxAmount` | decimal(18,2) not null default 0 | |
 | `OtherCharges` | decimal(18,2) not null default 0 | additional costs (transport, customs) |
 | `NetTotal` | decimal(18,2) not null | SubTotal - Discount + Tax + OtherCharges |
@@ -1054,7 +966,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `PurchaseInvoiceId` | int null FK → PurchaseInvoices(Id) | null for standalone returns (RULE-487) |
 | `SupplierId` | int not null FK → Suppliers(Id) | |
 | `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `TotalAmount` | decimal(18,2) not null | |
 | `ReturnedDiscountAmount` | decimal(18,2) not null default 0 | proportional discount from original invoice |
 | `ReturnedTaxAmount` | decimal(18,2) not null default 0 | proportional tax from original invoice |
@@ -1086,7 +997,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `PaymentDate` | date not null | |
 | `SupplierId` | int not null FK → Suppliers(Id) | |
 | `CashBoxId` | int not null FK → CashBoxes(Id) | |
-| `CurrencyId` | smallint not null FK → Currencies(Id) | |
 | `Amount` | decimal(18,2) not null | |
 | `Notes` | nvarchar(500) null | |
 | `Status` | tinyint not null | 1=Draft, 2=Posted, 3=Cancelled |
@@ -1147,7 +1057,6 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 
 | Enum | Values |
 |------|--------|
-| `UserStatus` | Active=1, Inactive=2, Locked=3 |
 | `InvoiceStatus` | Draft=1, Posted=2, Cancelled=3 |
 | `PaymentType` | Cash=1, Credit=2, Mixed=3 |
 | `AccountNature` | Asset=1, Liability=2, Equity=3, Revenue=4, Expense=5 |
@@ -1156,6 +1065,8 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `InventoryTransactionType` | Purchase=1, PurchaseReturn=2, Sale=3, SaleReturn=4, TransferOut=5, TransferIn=6, Count=7, Adjustment=8, Damage=9, OpeningBalance=10, InternalIssue=11, InternalReceipt=12 |
 | `InventoryReferenceType` | PurchaseInvoice=1, SalesInvoice=2, PurchaseReturn=3, SalesReturn=4, Transfer=5, Count=6, Adjustment=7 |
 | `AdjustmentType` | Opening=1, Increase=2, Shortage=3, Damage=4 |
+| `DiscountType` | Amount=0, Percentage=1 |
+| `PaymentMethod` | Cash=1, Cheque=2, BankTransfer=3, CreditCard=4 |
 | `SettingType` | String=1, Integer=2, Decimal=3, Boolean=4 |
 | `NotificationType` | LowStock=1, ExpirySoon=2, CreditLimitExceeded=3, System=4, Reminder=5 |
 | `LogLevel` | Info=1, Warning=2, Error=3, Critical=4 |
@@ -1166,15 +1077,15 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 
 | Module | Table Count | Tables |
 |--------|------------|--------|
-| 1. Core & Security | 13 | Customers, CustomerContacts, Suppliers, SupplierContacts, Departments, Employees, Roles, Users, UserRoles, Permissions, RolePermissions, UserBranches, UserSessions |
-| 2. Organization, Currencies & Settings | 11 | Branches, Warehouses, Currencies, CurrencyRates, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments |
+| 1. Core & Security | 11 | Customers, CustomerContacts, Suppliers, SupplierContacts, Roles, Users, UserRoles, Permissions, RolePermissions, UserSessions, UserPermissions |
+| 2. Organization & Settings | 8 | Warehouses, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments |
 | 3. Products | 5 | ProductCategories, Products, Units, ProductUnits, ProductPrices |
 | 4. Accounting | 10 | AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings |
 | 5. Inventory | 10 | WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, InventoryCounts, InventoryCountLines, InventoryAdjustments, InventoryAdjustmentLines, WarehouseTransfers, WarehouseTransferLines |
 | 6. Sales | 8 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications, SalesQuotations, SalesQuotationItems |
 | 7. Purchases | 6 | PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications |
 | 8. Infrastructure & Support | 2 | AuditLogs, SystemLogs |
-| **Total** | **65** | |
+| **Total** | **66** | |
 
 ---
 
@@ -1182,7 +1093,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 
 ## Sales Invoice
 ```
-LineTotal = Quantity x UnitPrice
+LineTotal = (Quantity × UnitPrice) - DiscountAmount
 SubTotal  = SUM(LineTotal)
 NetTotal  = SubTotal - DiscountAmount + TaxAmount + OtherCharges
 RemainingAmount = NetTotal - PaidAmount
@@ -1229,3 +1140,6 @@ Per Entry: SUM(Debit) = SUM(Credit)
 - **ALL foreign keys**: `DeleteBehavior.Restrict` — NO cascade delete anywhere
 - **Self-referencing FKs**: Accounts.ParentId
 - **Soft-delete reference safety**: Filtered unique indexes include `AND [IsActive] = 1`
+
+
+

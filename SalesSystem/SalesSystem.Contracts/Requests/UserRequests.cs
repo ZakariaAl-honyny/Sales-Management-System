@@ -6,7 +6,8 @@ public record CreateUserRequest(
     string UserName,
     byte Role,
     string? Password = null,
-    int? DefaultCashBoxId = null);
+    int? DefaultCashBoxId = null,
+    List<int>? RoleIds = null);
 
 public record UpdateUserRequest(
     byte Role,

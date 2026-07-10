@@ -44,7 +44,6 @@ public class ReceiptVoucherService : IReceiptVoucherService
             var voucher = ReceiptVoucher.Create(
                 voucherNo,
                 request.VoucherDate,
-                request.CurrencyId,
                 request.CashBoxId,
                 request.AccountId,
                 request.TotalAmount,
@@ -58,7 +57,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
                 voucher.VoucherNo, voucher.Id, userId);
 
             var created = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == voucher.Id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == voucher.Id, ct, "CashBox", "Account");
             return Result<ReceiptVoucherDto>.Success(MapToDto(created!));
         }
         catch (DomainException ex)
@@ -78,7 +77,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
         try
         {
             var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -114,7 +113,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
                 page,
                 pageSize,
                 ct,
-                includePaths: new[] { "Currency", "CashBox", "Account" });
+                includePaths: new[] { "CashBox", "Account" });
 
             var dtos = items.Select(MapToDto).ToList();
             var result = PagedResult<ReceiptVoucherDto>.Create(dtos, totalCount, page, pageSize);
@@ -133,7 +132,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
         try
         {
             var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -147,7 +146,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
             _logger.LogInformation("ReceiptVoucher {Id} updated by User {UserId}", id, userId);
 
             var updated = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             return Result<ReceiptVoucherDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -191,7 +190,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
         try
         {
             var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -233,7 +232,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
                 _logger.LogInformation("ReceiptVoucher {Id} posted by User {UserId}", id, userId);
 
                 var posted = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                    v => v.Id == id, ct, "CashBox", "Account");
                 return Result<ReceiptVoucherDto>.Success(MapToDto(posted!));
             }, ct);
         }
@@ -254,7 +253,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
         try
         {
             var voucher = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<ReceiptVoucherDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -301,7 +300,7 @@ public class ReceiptVoucherService : IReceiptVoucherService
                 _logger.LogInformation("ReceiptVoucher {Id} cancelled by User {UserId}", id, userId);
 
                 var cancelled = await _uow.ReceiptVouchers.FirstOrDefaultAsync(
-                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                    v => v.Id == id, ct, "CashBox", "Account");
                 return Result<ReceiptVoucherDto>.Success(MapToDto(cancelled!));
             }, ct);
         }
@@ -331,9 +330,6 @@ public class ReceiptVoucherService : IReceiptVoucherService
             voucher.Id,
             voucher.VoucherNo,
             voucher.VoucherDate,
-            voucher.CurrencyId,
-            voucher.Currency?.Name,
-            voucher.Currency?.Code,
             voucher.CashBoxId,
             voucher.CashBox?.Name,
             voucher.AccountId,

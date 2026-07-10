@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:helpers="clr-namespace:SalesSystem.DesktopPWF.Helpers"
         mc:Ignorable="d"
         Background="{StaticResource BackgroundBrush}"
         FlowDirection="RightToLeft">
@@ -69,9 +70,23 @@
                               ToolTip="اختر العملة — هذا الحقل إلزامي"
                               Style="{StaticResource ModernComboBox}"/>
 
+                    <!-- Exchange Rate (Visible only for foreign currencies) -->
+                    <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"
+                               Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBox Text="{Binding ExchangeRate, UpdateSourceTrigger=PropertyChanged}"
+                             helpers:InputHelper.NumericOnly="True"
+                             Style="{StaticResource ModernTextBox}"
+                             Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                             ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية — يمكن تعديله"/>
+                    <TextBlock Text="{Binding CurrentExchangeRateInfo, StringFormat='السعر الحالي: {0}'}"
+                               FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
+                               Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                               ToolTip="سعر الصرف الحالي من قاعدة البيانات — للمعلومات فقط"/>
+
                     <!-- Amount -->
                     <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
-                    <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, StringFormat=N2, ValidatesOnNotifyDataErrors=True}"
+                    <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnNotifyDataErrors=True}"
+                             helpers:InputHelper.NumericOnly="True"
                              ToolTip="أدخل مبلغ المصروف — يجب أن يكون أكبر من صفر"
                              Style="{StaticResource ModernTextBox}"/>
 

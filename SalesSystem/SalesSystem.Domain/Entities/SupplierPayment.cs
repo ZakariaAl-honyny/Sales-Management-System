@@ -19,8 +19,14 @@ public class SupplierPayment : DocumentEntity
     public DateOnly PaymentDate { get; private set; }
     public int SupplierId { get; private set; }
     public int? CashBoxId { get; private set; }
-    public short CurrencyId { get; private set; }
+
     public decimal Amount { get; private set; }
+
+    /// <summary>
+    /// The payment amount converted to the base currency using the exchange rate.
+    /// Null when no exchange rate is specified (same as Amount).
+    /// </summary>
+    public decimal? BaseNetTotal { get; private set; }
 
     /// <summary>
     /// Payment method: Cash, BankTransfer, or CreditCard.
@@ -38,8 +44,6 @@ public class SupplierPayment : DocumentEntity
     // Navigation properties
     public virtual Supplier? Supplier { get; private set; }
     public virtual CashBox? CashBox { get; private set; }
-    public virtual Currency? Currency { get; private set; }
-
     private readonly List<SupplierPaymentApplication> _applications = new();
     public IReadOnlyCollection<SupplierPaymentApplication> Applications => _applications.AsReadOnly();
 
@@ -48,21 +52,19 @@ public class SupplierPayment : DocumentEntity
     public static SupplierPayment Create(
         int paymentNo,
         int supplierId,
-        short currencyId,
         decimal amount,
         PaymentMethod paymentMethod,
         string? referenceNo = null,
         string? notes = null,
         int? cashBoxId = null,
         int? createdByUserId = null,
-        DateOnly? paymentDate = null)
+        DateOnly? paymentDate = null,
+        decimal? baseNetTotal = null)
     {
         if (paymentNo <= 0)
             throw new DomainException("رقم السداد مطلوب.");
         if (supplierId <= 0)
             throw new DomainException("المورد مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("العملة مطلوبة.");
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
 
@@ -71,8 +73,8 @@ public class SupplierPayment : DocumentEntity
             PaymentNo = paymentNo,
             SupplierId = supplierId,
             CashBoxId = cashBoxId,
-            CurrencyId = currencyId,
             Amount = amount,
+            BaseNetTotal = baseNetTotal,
             PaymentMethod = paymentMethod,
             ReferenceNo = referenceNo,
             Notes = notes,
@@ -106,6 +108,7 @@ public class SupplierPayment : DocumentEntity
         PaymentMethod paymentMethod,
         DateOnly? paymentDate,
         string? notes,
+        decimal? baseNetTotal = null,
         int? updatedByUserId = null)
     {
         if (Status != InvoiceStatus.Draft)
@@ -114,6 +117,7 @@ public class SupplierPayment : DocumentEntity
         if (amount <= 0)
             throw new DomainException("المبلغ يجب أن يكون أكبر من الصفر.");
         Amount = amount;
+        BaseNetTotal = baseNetTotal;
         PaymentMethod = paymentMethod;
         if (paymentDate.HasValue)
             PaymentDate = paymentDate.Value;

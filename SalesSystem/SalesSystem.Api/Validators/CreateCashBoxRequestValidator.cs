@@ -11,9 +11,6 @@ public class CreateCashBoxRequestValidator : AbstractValidator<CreateCashBoxRequ
             .NotEmpty().WithMessage("اسم الخزنة مطلوب")
             .MaximumLength(150).WithMessage("اسم الخزنة لا يمكن أن يتجاوز 150 حرف");
 
-        RuleFor(x => x.BranchId)
-            .GreaterThan((short)0).WithMessage("الفرع مطلوب");
-
         RuleFor(x => x.Description)
             .MaximumLength(300).When(x => x.Description != null)
             .WithMessage("الوصف لا يمكن أن يتجاوز 300 حرف");

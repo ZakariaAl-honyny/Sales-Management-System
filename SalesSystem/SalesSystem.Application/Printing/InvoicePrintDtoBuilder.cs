@@ -49,7 +49,10 @@ public class InvoicePrintDtoBuilder
                 item.UnitPrice,
                 0m,
                 item.LineTotal
-            )).ToList(),
+            )
+            {
+                Barcode = item.Product?.Barcode
+            }).ToList(),
             SubTotal = invoice.SubTotal,
             DiscountAmount = invoice.DiscountAmount,
             OtherCharges = invoice.OtherCharges,
@@ -102,7 +105,10 @@ public class InvoicePrintDtoBuilder
                 item.UnitPrice,
                 0m,
                 item.LineTotal
-            )).ToList(),
+            )
+            {
+                Barcode = item.Product?.Barcode
+            }).ToList(),
             SubTotal = invoice.SubTotal,
             DiscountAmount = invoice.DiscountAmount,
             OtherCharges = invoice.OtherCharges,

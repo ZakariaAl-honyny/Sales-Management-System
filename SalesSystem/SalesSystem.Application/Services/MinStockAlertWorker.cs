@@ -1,15 +1,20 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Domain.Enums;
 
 namespace SalesSystem.Application.Services;
 
 /// <summary>
 /// Background service that periodically checks warehouse stock levels
-/// and logs warnings for products that have fallen below their reorder level.
-/// The check interval is configurable via the SystemSetting "StockAlertIntervalMinutes"
-/// (default: 360 minutes = 6 hours). The alert is gated by the "LowStockAlert" setting.
+/// and logs warnings for products whose stock will be exhausted within
+/// <c>StockAlertDays</c> (default 5) based on average daily sales over
+/// the last 30 days. Products without recent sales fall back to the
+/// <c>Product.ReorderLevel</c> threshold. Gated by the "LowStockAlert"
+/// setting; polling interval controlled by "StockAlertIntervalMinutes"
+/// (default 360 minutes = 6 hours).
 /// </summary>
 public sealed class MinStockAlertWorker : BackgroundService
 {
@@ -32,7 +37,6 @@ public sealed class MinStockAlertWorker : BackgroundService
         {
             try
             {
-                // Read the configured interval (default 6 hours) at the start of each cycle
                 var intervalMinutes = await GetIntervalMinutesAsync(stoppingToken);
                 _logger.LogDebug("MinStockAlertWorker will check again in {Interval} minutes", intervalMinutes);
 
@@ -64,10 +68,6 @@ public sealed class MinStockAlertWorker : BackgroundService
         _logger.LogInformation("MinStockAlertWorker stopped");
     }
 
-    /// <summary>
-    /// Reads the "LowStockAlert" enable flag and "StockAlertIntervalMinutes" from SystemSettings.
-    /// Default interval is 360 minutes (6 hours) if not configured.
-    /// </summary>
     private async Task<int> GetIntervalMinutesAsync(CancellationToken ct)
     {
         try
@@ -86,17 +86,77 @@ public sealed class MinStockAlertWorker : BackgroundService
             _logger.LogWarning(ex, "Failed to read StockAlertIntervalMinutes setting, using default 360");
         }
 
-        return 360; // default 6 hours
+        return 360;
+    }
+
+    private async Task<int> GetStockAlertDaysAsync(CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            var setting = await uow.SystemSettings.FirstOrDefaultAsync(
+                s => s.SettingKey == "StockAlertDays", ct);
+
+            if (setting != null && int.TryParse(setting.SettingValue, out var parsed) && parsed > 0)
+                return parsed;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read StockAlertDays setting, using default 5");
+        }
+
+        return 5;
+    }
+
+    /// <summary>
+    /// Computes average daily sales quantity per product from posted sales invoices
+    /// over the last 30 days. Returns a dictionary keyed by ProductId.
+    /// </summary>
+    private async Task<Dictionary<int, decimal>> ComputeDailySalesRatesAsync(
+        IUnitOfWork uow, CancellationToken ct)
+    {
+        var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+
+        var salesData = await uow.SalesInvoiceLines.Query()
+            .Where(l => l.SalesInvoice != null
+                     && l.SalesInvoice.Status == InvoiceStatus.Posted
+                     && l.SalesInvoice.InvoiceDate >= thirtyDaysAgo)
+            .GroupBy(l => l.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                TotalQty = g.Sum(l => l.Quantity)
+            })
+            .ToListAsync(ct);
+
+        return salesData.ToDictionary(
+            x => x.ProductId,
+            x => x.TotalQty / 30m);
     }
 
     /// <summary>
     /// Performs the low-stock check across all warehouses. Skips if LowStockAlert is disabled.
-    /// Logs warnings for every product whose warehouse stock quantity is at or below its reorder level.
+    /// Alerts when a product's stock will be exhausted within StockAlertDays based on average
+    /// daily sales, or when stock is at/below Product.ReorderLevel (fallback for products with
+    /// no recent sales history).
     /// </summary>
     private async Task CheckLowStockAsync(CancellationToken ct)
     {
         using var scope = _scopeFactory.CreateScope();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        // Master gate: skip ALL notifications if EnableNotifications is disabled
+        var notificationsEnabledSetting = await uow.SystemSettings.FirstOrDefaultAsync(
+            s => s.SettingKey == "EnableNotifications", ct);
+        if (notificationsEnabledSetting != null &&
+            bool.TryParse(notificationsEnabledSetting.SettingValue, out var notificationsEnabled) &&
+            !notificationsEnabled)
+        {
+            _logger.LogDebug("MinStockAlertWorker: EnableNotifications is disabled, skipping check");
+            return;
+        }
 
         // Gate: skip if LowStockAlert is disabled
         var alertEnabledSetting = await uow.SystemSettings.FirstOrDefaultAsync(
@@ -110,18 +170,53 @@ public sealed class MinStockAlertWorker : BackgroundService
             return;
         }
 
-        _logger.LogInformation("MinStockAlertWorker: Checking low stock levels across all warehouses...");
+        var stockAlertDays = await GetStockAlertDaysAsync(ct);
+        var dailySalesRates = await ComputeDailySalesRatesAsync(uow, ct);
 
-        // Query all WarehouseStocks where quantity is at or below reorder level
-        // Include Product and Warehouse navigations for detailed logging
-        // ReorderLevel was removed from WarehouseStock in Phase 25.
-        // Use a default low-stock threshold (e.g., <= 0) or read from SystemSetting.
-        // For now, alert on any stock at or below zero quantity.
-        var lowStockItems = await uow.WarehouseStocks.ToListAsync(
-            ws => ws.Quantity <= 0,
+        _logger.LogInformation(
+            "MinStockAlertWorker: Checking stock levels (alert threshold: {Days} days)...",
+            stockAlertDays);
+
+        // Fetch all warehouse stocks with Product and Warehouse navigation properties
+        var allStocks = await uow.WarehouseStocks.ToListAsync(
+            null,
             queryConfig: q => q.OrderBy(ws => ws.ProductId).ThenBy(ws => ws.WarehouseId),
             ct: ct,
             includePaths: new[] { "Product", "Warehouse" });
+
+        var lowStockItems = new List<(string ProductName, int ProductId, string WarehouseName,
+            short WarehouseId, decimal Quantity, string Reason)>();
+
+        foreach (var item in allStocks)
+        {
+            var productName = item.Product?.Name ?? $"(Id={item.ProductId})";
+            var warehouseName = item.Warehouse?.Name ?? $"(Id={item.WarehouseId})";
+            var reorderLevel = item.Product?.ReorderLevel ?? 0m;
+
+            if (item.Quantity <= 0)
+            {
+                lowStockItems.Add((productName, item.ProductId, warehouseName,
+                    item.WarehouseId, item.Quantity, "out of stock"));
+                continue;
+            }
+
+            if (dailySalesRates.TryGetValue(item.ProductId, out var dailyRate) && dailyRate > 0)
+            {
+                var daysRemaining = item.Quantity / dailyRate;
+                if (daysRemaining <= stockAlertDays)
+                {
+                    lowStockItems.Add((productName, item.ProductId, warehouseName,
+                        item.WarehouseId, item.Quantity,
+                        $"~{daysRemaining:F1} days remaining (daily avg: {dailyRate:N3})"));
+                }
+            }
+            else if (reorderLevel > 0 && item.Quantity <= reorderLevel)
+            {
+                lowStockItems.Add((productName, item.ProductId, warehouseName,
+                    item.WarehouseId, item.Quantity,
+                    $"at/below reorder level ({reorderLevel:N3}), no recent sales data"));
+            }
+        }
 
         if (lowStockItems.Count == 0)
         {
@@ -130,26 +225,22 @@ public sealed class MinStockAlertWorker : BackgroundService
         }
 
         _logger.LogWarning(
-            "MinStockAlertWorker: Found {Count} low stock item(s)",
-            lowStockItems.Count);
+            "MinStockAlertWorker: Found {Count} low stock item(s) (threshold: {Days} days)",
+            lowStockItems.Count, stockAlertDays);
 
         foreach (var item in lowStockItems)
         {
-            var productName = item.Product?.Name ?? $"(Id={item.ProductId})";
-            var warehouseName = item.Warehouse?.Name ?? $"(Id={item.WarehouseId})";
-
             _logger.LogWarning(
                 "Low stock alert: Product \"{ProductName}\" (ID {ProductId}) " +
                 "in Warehouse \"{WarehouseName}\" (ID {WarehouseId}) — " +
-                "Current Qty: {Quantity:N3} (at or below zero)",
-                productName, item.ProductId,
-                warehouseName, item.WarehouseId,
-                item.Quantity);
+                "Current Qty: {Quantity:N3} — {Reason}",
+                item.ProductName, item.ProductId,
+                item.WarehouseName, item.WarehouseId,
+                item.Quantity, item.Reason);
         }
 
-        // Also log a summary with total counts
         _logger.LogWarning(
-            "MinStockAlertWorker: Summary — {Count} products below reorder level across all warehouses",
+            "MinStockAlertWorker: Summary — {Count} products with low/zero stock across all warehouses",
             lowStockItems.Count);
     }
 }

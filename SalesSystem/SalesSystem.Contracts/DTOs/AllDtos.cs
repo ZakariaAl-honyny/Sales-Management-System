@@ -14,7 +14,7 @@ public record AuditLogDto(long Id, int? UserId, string? UserName, string Action,
     string? EntityType, int? EntityId, string? OldValues, string? NewValues,
     string? ChangedColumns, string? IpAddress, DateTime Timestamp);
 
-public record RoleDto(int Id, string Name, string? Description, bool IsActive);
+public record RoleDto(int Id, string Name, string? Description, bool IsActive, long PermissionsMask = 0);
 
 public record UserSessionDto(
     long Id,
@@ -32,9 +32,8 @@ public record UserSessionDto(
 }
 
 public record UserRoleDto(int UserId, int RoleId, string? RoleName);
-public record UserBranchDto(int UserId, short BranchId, string? BranchName);
 
-public record PermissionDto(int Id, string Name, string DisplayNameAr, string? Category, bool IsActive);
+public record PermissionDto(int Id, string Code, string DisplayName, string? Category, bool IsActive);
 
 public record RolePermissionDto(byte Role, List<int> PermissionIds);
 
@@ -65,8 +64,6 @@ public record ProductDto(
 
 public record WarehouseDto(
     short Id,
-    short BranchId,
-    string? BranchName,
     string Name,
     string? Phone,
     string? Address,
@@ -83,11 +80,14 @@ public record WarehouseStockDto(
     decimal AvgCost);
 
 public record SupplierDto(int Id, string Name, string? Phone, string? Email, string? Address,
-    string? TaxNumber, bool IsActive,
-    int AccountId, string? AccountName = null, int? CategoryId = null);
+    string? TaxNumber, string? Notes, decimal CreditLimit, bool IsActive,
+    int AccountId, string? AccountName = null, int? CategoryId = null)
+{
+    public bool HasCreditLimit => CreditLimit > 0;
+}
 public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address,
     string? TaxNumber, decimal CreditLimit, bool IsActive,
-    int AccountId, string? AccountName = null, int? CategoryId = null)
+    int AccountId, string? AccountName = null, int? CategoryId = null, string? Notes = null)
 {
     public bool HasCreditLimit => CreditLimit > 0;
 }
@@ -104,18 +104,19 @@ public record SalesInvoiceDto(
     byte PaymentType,
     decimal SubTotal,
     decimal DiscountAmount,
+    byte DiscountType,
+    decimal? DiscountRate,
     decimal TaxAmount,
     decimal OtherCharges,
     decimal NetTotal,
     decimal PaidAmount,
     decimal RemainingAmount,
+    decimal? CostInBaseCurrency,
     string? Notes,
     byte Status,
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     int? CashBoxId,
     string? CashBoxName,
     IReadOnlyList<SalesInvoiceLineDto> Items)
@@ -141,7 +142,13 @@ public record SalesInvoiceLineDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal LineTotal,
-    int ProductUnitId);
+    int ProductUnitId,
+    byte DiscountType = 0,
+    decimal? DiscountRate = null,
+    decimal DiscountAmount = 0,
+    decimal? CostInBaseCurrency = null,
+    decimal UnitCost = 0,
+    decimal ProfitAmount = 0);
 
 public record PurchaseInvoiceDto(
     int Id,
@@ -154,6 +161,9 @@ public record PurchaseInvoiceDto(
     byte PaymentType,
     decimal SubTotal,
     decimal DiscountAmount,
+    byte DiscountType,
+    decimal? DiscountRate,
+    decimal? CostInBaseCurrency,
     decimal TaxAmount,
     decimal OtherCharges,
     decimal NetTotal,
@@ -161,12 +171,11 @@ public record PurchaseInvoiceDto(
     decimal RemainingAmount,
     string? Notes,
     string? SupplierInvoiceNo,
+    string? AttachmentPath,
     byte Status,
     int? TaxId,
     string? TaxName,
     decimal? TaxRate,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     int? CashBoxId,
     IReadOnlyList<PurchaseInvoiceLineDto> Items)
 {
@@ -193,14 +202,19 @@ public record PurchaseInvoiceLineDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitPrice,
     decimal LineTotal,
-    decimal LandedUnitCost);
+    decimal LandedUnitCost,
+    byte DiscountType,
+    decimal? DiscountRate,
+    decimal DiscountAmount,
+    decimal? CostInBaseCurrency,
+    decimal AdditionalFeesAmount);
 
 public record SalesReturnDto(
     int Id,
-    string ReturnNo,
+    int ReturnNo,
     int WarehouseId,
     string WarehouseName,
-    int? CustomerId,
+    int CustomerId,
     string CustomerName,
     int? SalesInvoiceId,
     DateTime ReturnDate,
@@ -212,9 +226,8 @@ public record SalesReturnDto(
     decimal ReturnedTaxAmount,
     decimal ReturnedChargeAmount,
     short? TaxId,
-    int? CurrencyId,
-    decimal? ExchangeRate,
     string? Notes,
+    string? ReturnReason,
     byte Status,
     int? CashBoxId,
     string? CashBoxName,
@@ -235,7 +248,8 @@ public record SalesReturnItemDto(int Id, int ProductId, int ProductUnitId, strin
     decimal UnitPrice,
     decimal DiscountAmount,
     decimal LineTotal,
-    byte Mode);
+    byte Mode,
+    decimal? CostInBaseCurrency = null);
 
 public record PurchaseReturnDto(
     int Id,
@@ -253,8 +267,8 @@ public record PurchaseReturnDto(
     decimal ReturnedTaxAmount,
     decimal ReturnedChargeAmount,
     short? TaxId,
-    int? CurrencyId,
-    decimal? ExchangeRate,
+    byte DiscountType,
+    decimal? DiscountRate,
     string? Notes,
     byte Status, IReadOnlyList<PurchaseReturnItemDto> Items)
 {
@@ -273,7 +287,8 @@ public record PurchaseReturnItemDto(int Id, int ProductId, string ProductName,
     decimal Quantity,
     decimal UnitCost,
     decimal LineTotal,
-    int? PurchaseInvoiceLineId);
+    int? PurchaseInvoiceLineId,
+    decimal? CostInBaseCurrency);
 
 // ═══════════════════════════════════════════════════════════════
 // New Inventory Module DTOs (v4.10+)
@@ -360,8 +375,6 @@ public record SupplierPaymentDto(
     string SupplierName,
     decimal Amount,
     byte PaymentMethod,
-    int? CurrencyId,
-    decimal? ExchangeRate,
     DateOnly PaymentDate,
     int? PurchaseInvoiceId,
     string? Notes)
@@ -390,7 +403,10 @@ public record PrintSettingsDto(
     bool ShowBalanceOnPrint,
     bool PrintSignature,
     bool ShowLogo = true,
-    string FooterNote = "");
+    string FooterNote = "",
+    bool PrintBarcode = false,
+    bool PrintQRCode = false,
+    bool PrintCompanyAddress = true);
 
 public record StoreSettingsDto(
     int Id,
@@ -399,15 +415,12 @@ public record StoreSettingsDto(
     string? Address,
     string? LogoPath,
     string? Email,
-    string CurrencyCode,
     decimal DefaultTaxRate, // DEPRECATED
     bool IsTaxEnabled,      // DEPRECATED
     string? TaxNumber,
     bool EnableStockAlerts,
     bool AllowNegativeStock,
-    bool AutoUpdatePrices,
     string InvoicePrefix,    // DEPRECATED
-    int CostingMethod = 1,
     string? BackupPath = null,
     string? BackupScheduleTime = "02:00",
     int BackupRetentionDays = 30,
@@ -577,17 +590,6 @@ public record VatReportDto(
     decimal TaxAmount);
 
 public record TaxDto(int Id, string Name, string Code, decimal Rate, byte TaxType, bool IsDefault, bool IsActive);
-
-public record CurrencyDto(
-    short Id,
-    string Name,
-    string Code,
-    string? Symbol,
-    bool IsBaseCurrency,
-    string FractionName,
-    byte DecimalPlaces,
-    bool IsSystem,
-    bool IsActive);
 
 // ─── System Log DTO ────────────────────────────────
 public record SystemLogDto(
@@ -761,6 +763,8 @@ public record JournalEntryDetailDto(
 public record JournalEntryLineDetailDto(
     int Id,
     int AccountId,
+    string? AccountName,
+    string? AccountCode,
     decimal Debit,
     decimal Credit,
     string? Description
@@ -851,9 +855,7 @@ public record CompanySettingsDto(
     string? Email,
     string? Address,
     string? TaxNumber,
-    string? LogoPath,
-    short DefaultCurrencyId,
-    string? CurrencyName
+    string? LogoPath
 );
 
 // ═══════════════════════════════════════════════════════
@@ -963,8 +965,6 @@ public record SalesQuotationDto(
     string? CustomerName,
     int WarehouseId,
     string? WarehouseName,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     DateTime QuotationDate,
     DateTime ValidUntil,
     byte Status,

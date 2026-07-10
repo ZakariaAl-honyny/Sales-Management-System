@@ -18,8 +18,8 @@ public class ProductCategoryApiService : ApiServiceBase, IProductCategoryApiServ
 
     public async Task<Result<List<ProductCategoryDto>>> GetAllAsync(bool includeInactive = false)
     {
-        return await ExecutePagedAsync<ProductCategoryDto>(
-            () => _httpClient.GetAsync($"api/v1/product-categories?includeInactive={includeInactive.ToString().ToLower()}&pageSize=1000"),
+        return await ExecuteAsync<List<ProductCategoryDto>>(
+            () => _httpClient.GetAsync($"api/v1/product-categories?includeInactive={includeInactive.ToString().ToLower()}"),
             "ProductCategoryApiService.GetAllAsync");
     }
 

@@ -35,6 +35,10 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         builder.Property(s => s.Notes)
             .HasMaxLength(1000);
 
+        builder.Property(s => s.CreditLimit)
+            .HasPrecision(18, 2)
+            .HasDefaultValue(0m);
+
         // FK to Account
         builder.HasOne(s => s.Account)
             .WithMany()

@@ -20,7 +20,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
     private readonly ICustomerApiService _customerService;
     private readonly IWarehouseApiService _warehouseService;
     private readonly IProductApiService _productService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IProductUnitApiService _unitService;
     private readonly IDialogService _dialogService;
     private readonly IToastNotificationService _toastService;
@@ -31,9 +30,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
     private DateTime _validUntil = DateTime.Today.AddDays(7);
     private int? _selectedCustomerId;
     private int? _selectedWarehouseId;
-    private int? _selectedCurrencyId;
-    private decimal? _exchangeRate;
-    private bool _isForeignCurrency;
     private decimal _discountAmount;
     private decimal _taxAmount;
     private string? _notes;
@@ -46,7 +42,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
     private ObservableCollection<QuotationLineItem> _items = new();
     private ObservableCollection<CustomerDto> _customers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
-    private ObservableCollection<CurrencyDto> _currencies = new();
 
     // Parameterless constructor for designer / direct instantiation
     public SalesQuotationEditorViewModel()
@@ -56,7 +51,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
             App.GetService<ICustomerApiService>(),
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IProductUnitApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IToastNotificationService>())
@@ -71,7 +65,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
             App.GetService<ICustomerApiService>(),
             App.GetService<IWarehouseApiService>(),
             App.GetService<IProductApiService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IProductUnitApiService>(),
             App.GetService<IDialogService>(),
             App.GetService<IToastNotificationService>(),
@@ -86,7 +79,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
         ICustomerApiService customerService,
         IWarehouseApiService warehouseService,
         IProductApiService productService,
-        ICurrencyApiService currencyService,
         IProductUnitApiService unitService,
         IDialogService dialogService,
         IToastNotificationService toastService,
@@ -98,7 +90,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
         _customerService = customerService ?? throw new ArgumentNullException(nameof(customerService));
         _warehouseService = warehouseService ?? throw new ArgumentNullException(nameof(warehouseService));
         _productService = productService ?? throw new ArgumentNullException(nameof(productService));
-        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
         _dialogService = dialogService ?? throw new ArgumentNullException(nameof(dialogService));
         SetDialogService(dialogService);
@@ -157,30 +148,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
     {
         get => _selectedWarehouseId;
         set => SetProperty(ref _selectedWarehouseId, value);
-    }
-
-    public int? SelectedCurrencyId
-    {
-        get => _selectedCurrencyId;
-        set
-        {
-            if (SetProperty(ref _selectedCurrencyId, value))
-            {
-                IsForeignCurrency = value.HasValue && value.Value > 0;
-            }
-        }
-    }
-
-    public decimal? ExchangeRate
-    {
-        get => _exchangeRate;
-        set => SetProperty(ref _exchangeRate, value);
-    }
-
-    public bool IsForeignCurrency
-    {
-        get => _isForeignCurrency;
-        set => SetProperty(ref _isForeignCurrency, value);
     }
 
     public decimal DiscountAmount
@@ -249,12 +216,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
         set => SetProperty(ref _warehouses, value);
     }
 
-    public ObservableCollection<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
     // Computed totals
     private decimal _subTotal;
     public decimal SubTotal
@@ -307,15 +268,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
                 });
             }
 
-            var currenciesResult = await _currencyService.GetAllAsync();
-            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
-            {
-                InvokeOnUIThread(() =>
-                {
-                    Currencies.Clear();
-                    foreach (var c in currenciesResult.Value) Currencies.Add(c);
-                });
-            }
         });
     }
 
@@ -337,9 +289,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
                     ValidUntil = q.ValidUntil;
                     SelectedCustomerId = q.CustomerId;
                     SelectedWarehouseId = q.WarehouseId;
-                    SelectedCurrencyId = q.CurrencyId;
-                    ExchangeRate = q.ExchangeRate;
-                    IsForeignCurrency = q.CurrencyId.HasValue && q.CurrencyId.Value > 0;
                     DiscountAmount = q.DiscountAmount;
                     TaxAmount = q.TaxAmount;
                     Notes = q.Notes;
@@ -462,9 +411,8 @@ public class SalesQuotationEditorViewModel : ViewModelBase
                 Notes: i.Notes
             )).ToList();
 
-            // Map currency and warehouse to short
+            // Map warehouse to short
             short warehouseId = SelectedWarehouseId.HasValue ? (short)SelectedWarehouseId.Value : (short)0;
-            short currencyId = IsForeignCurrency && SelectedCurrencyId.HasValue ? (short)SelectedCurrencyId.Value : (short)0;
 
             if (_isEditMode && _quotationId.HasValue)
             {
@@ -473,8 +421,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
                     ValidUntil: ValidUntil == default ? null : ValidUntil,
                     CustomerId: SelectedCustomerId!.Value,
                     WarehouseId: warehouseId,
-                    CurrencyId: currencyId,
-                    ExchangeRate: ExchangeRate,
                     PaymentType: 1, // Default Cash
                     DiscountAmount: DiscountAmount,
                     TaxAmount: TaxAmount,
@@ -504,8 +450,6 @@ public class SalesQuotationEditorViewModel : ViewModelBase
                     ValidUntil: ValidUntil == default ? null : ValidUntil,
                     CustomerId: SelectedCustomerId!.Value,
                     WarehouseId: warehouseId,
-                    CurrencyId: currencyId,
-                    ExchangeRate: ExchangeRate,
                     PaymentType: 1, // Default Cash
                     DiscountAmount: DiscountAmount,
                     TaxAmount: TaxAmount,

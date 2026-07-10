@@ -49,7 +49,6 @@ public class WarehouseService : IWarehouseService
     public async Task<Result<WarehouseDto>> CreateAsync(CreateWarehouseRequest request, CancellationToken ct)
     {
         var warehouse = Warehouse.Create(
-            request.BranchId,
             request.Name,
             request.Phone,
             request.Address,
@@ -70,7 +69,6 @@ public class WarehouseService : IWarehouseService
             return Result<WarehouseDto>.Failure("المخزن غير موجود", ErrorCodes.NotFound);
 
         warehouse.Update(
-            request.BranchId,
             request.Name,
             request.Phone,
             request.Address,
@@ -134,8 +132,6 @@ public class WarehouseService : IWarehouseService
     {
         return new WarehouseDto(
             w.Id,
-            w.BranchId,
-            w.Branch?.Name,
             w.Name,
             w.Phone,
             w.Address,

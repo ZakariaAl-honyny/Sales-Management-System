@@ -321,6 +321,7 @@ public class CustomerListViewModel : ViewModelBase
             Email: SelectedCustomer.Email,
             Address: SelectedCustomer.Address,
             TaxNumber: SelectedCustomer.TaxNumber,
+            Notes: SelectedCustomer.Notes,
             CreditLimit: SelectedCustomer.CreditLimit,
             IsActive: true
         );

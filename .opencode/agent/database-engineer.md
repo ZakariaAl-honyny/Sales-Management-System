@@ -94,7 +94,7 @@ builder.HasOne(x => x.Category).WithMany().OnDelete(DeleteBehavior.Restrict);
   - NO configuration for OpeningBalance/CurrentBalance — they don't exist
 - `CashTransaction` entity: Uses `RunningBalance` (decimal(18,2)) instead of `BalanceBefore`/`BalanceAfter`
 - `CashTransaction.Create()` is PUBLIC (not internal) — callable from service layer
-- CashBox auto-creates Level-4 sub-account under parent "1110 — النقدية" when AccountId is null
+- CashBox auto-creates Level-4 sub-account under parent "1101 — النقدية صناديق" when AccountId is null
   - AccountCode auto-increments: 1111, 1112, 1113...
 
 ### Products Entity — No TaxId, Barcode Present (v4.10.6)
@@ -757,7 +757,7 @@ When writing or reviewing code in ANY layer, check these:
 
 When you encounter any code related to these areas, apply fixes automatically:
 
-1. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1110 — النقدية"
+1. Missing `AccountId` FK on CashBox → Add it and auto-create account under "1101 — النقدية صناديق"
 2. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 3. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record
 4. Missing `AccountId` FK on Customer/Supplier → Add it (mandatory, auto-created by service)

@@ -29,7 +29,7 @@ public class SalesQuotationService : ISalesQuotationService
     public async Task<Result<SalesQuotationDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-            q => q.Id == id, ct, "Customer", "Warehouse", "Currency", "Items.Product", "Items.ProductUnit.Unit");
+            q => q.Id == id, ct, "Customer", "Warehouse", "Items.Product", "Items.ProductUnit.Unit");
 
         if (quotation == null)
             return Result<SalesQuotationDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
@@ -99,10 +99,8 @@ public class SalesQuotationService : ISalesQuotationService
                     quotationNo,
                     request.CustomerId,
                     request.WarehouseId,
-                    request.CurrencyId,
                     request.QuotationDate,
                     request.ValidUntil,
-                    request.ExchangeRate,
                     (PaymentType)request.PaymentType,
                     request.DiscountAmount,
                     request.TaxAmount,
@@ -146,7 +144,7 @@ public class SalesQuotationService : ISalesQuotationService
     public async Task<Result<SalesQuotationDto>> UpdateAsync(int id, UpdateSalesQuotationRequest request, int userId, CancellationToken ct)
     {
         var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-            q => q.Id == id, ct, "Items", "Customer", "Warehouse", "Currency");
+            q => q.Id == id, ct, "Items", "Customer", "Warehouse");
 
         if (quotation == null)
             return Result<SalesQuotationDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
@@ -198,7 +196,7 @@ public class SalesQuotationService : ISalesQuotationService
     public async Task<Result<SalesQuotationDto>> SendAsync(int id, int userId, CancellationToken ct)
     {
         var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-            q => q.Id == id, ct, "Items", "Customer", "Warehouse", "Currency");
+            q => q.Id == id, ct, "Items", "Customer", "Warehouse");
 
         if (quotation == null)
             return Result<SalesQuotationDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
@@ -222,7 +220,7 @@ public class SalesQuotationService : ISalesQuotationService
     public async Task<Result<SalesQuotationDto>> AcceptAsync(int id, int userId, CancellationToken ct)
     {
         var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-            q => q.Id == id, ct, "Items", "Customer", "Warehouse", "Currency");
+            q => q.Id == id, ct, "Items", "Customer", "Warehouse");
 
         if (quotation == null)
             return Result<SalesQuotationDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
@@ -246,7 +244,7 @@ public class SalesQuotationService : ISalesQuotationService
     public async Task<Result<SalesQuotationDto>> RejectAsync(int id, string? reason, int userId, CancellationToken ct)
     {
         var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-            q => q.Id == id, ct, "Items", "Customer", "Warehouse", "Currency");
+            q => q.Id == id, ct, "Items", "Customer", "Warehouse");
 
         if (quotation == null)
             return Result<SalesQuotationDto>.Failure("عرض السعر غير موجود", ErrorCodes.NotFound);
@@ -275,7 +273,7 @@ public class SalesQuotationService : ISalesQuotationService
             try
             {
                 var quotation = await _uow.SalesQuotations.FirstOrDefaultAsync(
-                    q => q.Id == id, ct, "Items", "Customer", "Warehouse", "Currency",
+                    q => q.Id == id, ct, "Items", "Customer", "Warehouse",
                     "Items.Product", "Items.ProductUnit.Unit");
 
                 if (quotation == null)
@@ -288,7 +286,7 @@ public class SalesQuotationService : ISalesQuotationService
                 var invoiceNo = seqResult.Value;
 
                 // Create a draft SalesInvoice from the quotation data
-                    var invoice = SalesInvoice.Create(
+                var invoice = SalesInvoice.Create(
                     quotation.WarehouseId,
                     invoiceNo,
                     quotation.CustomerId,
@@ -296,8 +294,6 @@ public class SalesQuotationService : ISalesQuotationService
                     paymentType: quotation.PaymentType,
                     discountAmount: quotation.DiscountAmount,
                     notes: $"عرض سعر رقم {quotation.QuotationNo} - {quotation.Notes}",
-                    currencyId: quotation.CurrencyId,
-                    exchangeRate: quotation.ExchangeRate,
                     createdByUserId: userId
                 );
 
@@ -371,7 +367,6 @@ public class SalesQuotationService : ISalesQuotationService
     {
         var customerName = q.Customer?.Name ?? "غير معروف";
         var warehouseName = q.Warehouse?.Name ?? "غير معروف";
-        var currencyShort = q.CurrencyId > 0 ? q.CurrencyId : (short?)null;
 
         return new SalesQuotationDto(
             q.Id,
@@ -380,8 +375,6 @@ public class SalesQuotationService : ISalesQuotationService
             customerName,
             q.WarehouseId,
             warehouseName,
-            currencyShort,
-            q.ExchangeRate,
             q.QuotationDate,
             q.ValidUntil ?? default,
             (byte)q.Status,

@@ -276,9 +276,9 @@ public class CustomerReceiptListViewModel : ViewModelBase
             return;
         }
 
-        if (SelectedReceipt.Status != 1) // Draft only
+        if (SelectedReceipt.Status == 3) // Already cancelled
         {
-            await _dialogService.ShowWarningAsync("تنبيه", "لا يمكن إلغاء السند إلا في حالة مسودة");
+            await _dialogService.ShowWarningAsync("تنبيه", "السند ملغي بالفعل");
             return;
         }
 

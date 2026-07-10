@@ -48,7 +48,6 @@ public class SupplierPaymentService : ISupplierPaymentService
             var payment = SupplierPayment.Create(
                 paymentNo: paymentNo,
                 supplierId: request.SupplierId,
-                currencyId: request.CurrencyId,
                 amount: request.Amount,
                 paymentMethod: (PaymentMethod)request.PaymentMethod,
                 referenceNo: null,
@@ -123,7 +122,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier");
+                p => p.Id == id, ct, "Supplier", "Supplier.Account");
             if (payment == null)
                 return Result<SupplierPaymentDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -141,7 +140,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier");
+                p => p.Id == id, ct, "Supplier", "Supplier.Account");
             if (payment == null)
                 return Result<SupplierPaymentDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -242,7 +241,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier");
+                p => p.Id == id, ct, "Supplier", "Supplier.Account");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -281,7 +280,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier");
+                p => p.Id == id, ct, "Supplier", "Supplier.Account");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -323,7 +322,7 @@ public class SupplierPaymentService : ISupplierPaymentService
         try
         {
             var payment = await _uow.SupplierPayments.FirstOrDefaultAsync(
-                p => p.Id == id, ct, "Supplier");
+                p => p.Id == id, ct, "Supplier", "Supplier.Account");
             if (payment == null)
                 return Result.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -369,8 +368,6 @@ public class SupplierPaymentService : ISupplierPaymentService
             supplier?.Name ?? string.Empty,
             payment.Amount,
             (byte)payment.PaymentMethod,
-            (int?)payment.CurrencyId,
-            null,  // ExchangeRate not on SupplierPayment entity
             payment.PaymentDate,
             null,  // PurchaseInvoiceId not on SupplierPayment entity
             payment.Notes);

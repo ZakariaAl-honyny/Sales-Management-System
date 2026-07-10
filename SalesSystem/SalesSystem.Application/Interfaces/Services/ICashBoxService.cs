@@ -15,6 +15,8 @@ public interface ICashBoxService
     Task<Result<CashBoxDto>> CreateAsync(CreateCashBoxRequest request, int userId, CancellationToken ct = default);
     Task<Result<CashBoxDto>> UpdateAsync(int id, UpdateCashBoxRequest request, int userId, CancellationToken ct = default);
     Task<Result> DeactivateAsync(int id, CancellationToken ct = default);
+    Task<Result> PermanentDeleteAsync(int id, CancellationToken ct = default);
+    Task<Result> RestoreAsync(int id, CancellationToken ct = default);
 
     // Receipt Vouchers (سندات قبض)
     Task<Result<ReceiptVoucherDto>> CreateReceiptVoucherAsync(CreateReceiptVoucherRequest request, int userId, CancellationToken ct = default);
@@ -32,6 +34,6 @@ public interface ICashBoxService
     Task<Result> TransferAsync(CashTransferRequest request, int userId, CancellationToken ct = default);
 
     // Invoice payment recording (called by payment services)
-    Task<Result<ReceiptVoucherDto>> RecordInvoiceReceiptAsync(int cashBoxId, short currencyId, decimal amount, int accountId, string? notes = null, int? referenceId = null, string? referenceType = null, int userId = 0, CancellationToken ct = default);
-    Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(int cashBoxId, short currencyId, decimal amount, int accountId, string? notes = null, int userId = 0, CancellationToken ct = default);
+    Task<Result<ReceiptVoucherDto>> RecordInvoiceReceiptAsync(int cashBoxId, decimal amount, int accountId, string? notes = null, int? referenceId = null, string? referenceType = null, int userId = 0, CancellationToken ct = default);
+    Task<Result<PaymentVoucherDto>> RecordInvoicePaymentAsync(int cashBoxId, decimal amount, int accountId, string? notes = null, int userId = 0, CancellationToken ct = default);
 }

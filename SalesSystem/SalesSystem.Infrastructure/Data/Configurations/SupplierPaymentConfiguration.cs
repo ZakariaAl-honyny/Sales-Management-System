@@ -31,9 +31,6 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
         builder.Property(x => x.CashBoxId)
             .IsRequired(false);
 
-        builder.Property(x => x.CurrencyId)
-            .IsRequired();
-
         builder.Property(x => x.ReferenceNo)
             .HasMaxLength(100)
             .IsRequired(false);
@@ -54,11 +51,6 @@ public class SupplierPaymentConfiguration : IEntityTypeConfiguration<SupplierPay
         builder.HasOne(x => x.CashBox)
             .WithMany()
             .HasForeignKey(x => x.CashBoxId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        builder.HasOne(x => x.Currency)
-            .WithMany()
-            .HasForeignKey(x => x.CurrencyId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => x.PaymentNo)

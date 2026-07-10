@@ -11,9 +11,6 @@ public class UpdateCompanySettingsRequestValidator : AbstractValidator<UpdateCom
             .NotEmpty().WithMessage("اسم الشركة مطلوب")
             .MaximumLength(200).WithMessage("اسم الشركة لا يمكن أن يتجاوز 200 حرف");
 
-        RuleFor(x => x.DefaultCurrencyId)
-            .Must(id => id > 0).WithMessage("العملة الافتراضية مطلوبة");
-
         RuleFor(x => x.Phone)
             .MaximumLength(30).When(x => x.Phone != null)
             .WithMessage("رقم الهاتف لا يمكن أن يتجاوز 30 حرفاً");

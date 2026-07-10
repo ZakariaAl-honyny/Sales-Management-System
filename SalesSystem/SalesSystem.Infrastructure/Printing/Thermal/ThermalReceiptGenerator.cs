@@ -30,6 +30,11 @@ public class ThermalReceiptGenerator
         commands.Add(EscPos.SetBold(true));
         commands.Add(EscPos.SetFontSize(2));
 
+        // NOTE: ESC/POS raw text printing cannot render bitmap logos.
+        // Logo rendering requires printer-specific GS v 0 commands which are not universally supported.
+        // When ShowLogo is enabled, the store name is printed as prominent text instead.
+        // For logo printing, consider using the A4 print mode or a dedicated POS graphic driver.
+
         var storeName = TruncateCenter(data.StoreName, LineWidth);
         commands.Add(PrintLine(storeName));
 
@@ -83,6 +88,14 @@ public class ThermalReceiptGenerator
             if (item.Discount > 0)
                 commands.Add(PrintLine(
                     FormatTwoColumns("  خصم:", $"-{item.Discount:N2}")));
+
+            if (data.ShowExpiryInInvoices && item.ExpiryDate.HasValue)
+                commands.Add(PrintLine(
+                    FormatTwoColumns("  انتهاء:", item.ExpiryDate.Value.ToString("dd/MM/yyyy"))));
+
+            if (data.PrintBarcode && !string.IsNullOrWhiteSpace(item.Barcode))
+                commands.Add(PrintLine(
+                    FormatTwoColumns("  باركود:", item.Barcode)));
         }
 
         commands.Add(PrintLine(new string(DoubleSeparator, LineWidth)));
@@ -107,11 +120,14 @@ public class ThermalReceiptGenerator
         commands.Add(EscPos.SetFontSize(1));
         commands.Add(EscPos.SetBold(false));
 
-        commands.Add(PrintLine(
-            FormatTwoColumns("المدفوع:", $"{data.AmountPaid:N2}")));
-        if (data.ChangeAmount > 0)
+        if (data.ShowBalanceOnPrint)
+        {
             commands.Add(PrintLine(
-                FormatTwoColumns("الباقي:", $"{data.ChangeAmount:N2}")));
+                FormatTwoColumns("المدفوع:", $"{data.AmountPaid:N2}")));
+            if (data.ChangeAmount > 0)
+                commands.Add(PrintLine(
+                    FormatTwoColumns("الباقي:", $"{data.ChangeAmount:N2}")));
+        }
 
         commands.Add(PrintLine(new string(DoubleSeparator, LineWidth)));
 
@@ -122,7 +138,14 @@ public class ThermalReceiptGenerator
             : data.FooterNote;
         commands.Add(PrintLine(footerText));
         commands.Add(PrintLine(string.Empty));
-        commands.Add(PrintLine(string.Empty));
+
+        // ─── Signature ─────────────────────────
+        if (data.PrintSignature)
+        {
+            commands.Add(PrintLine(string.Empty));
+            commands.Add(PrintLine("التوقيع: _______________"));
+            commands.Add(PrintLine(string.Empty));
+        }
 
         // ─── Cut paper ─────────────────────────
         commands.Add(EscPos.CutPaper());

@@ -25,6 +25,7 @@ public class SupplierEditorViewModel : ViewModelBase
     private string _address = string.Empty;
     private string _taxNumber = string.Empty;
     private string _notes = string.Empty;
+    private decimal _creditLimit;
     private bool _isActive = true;
     private bool _isEditMode;
     private string? _errorMessage;
@@ -61,6 +62,8 @@ public class SupplierEditorViewModel : ViewModelBase
         _email = supplier.Email ?? string.Empty;
         _address = supplier.Address ?? string.Empty;
         _taxNumber = supplier.TaxNumber ?? string.Empty;
+        _notes = supplier.Notes ?? string.Empty;
+        _creditLimit = supplier.CreditLimit;
         _isActive = supplier.IsActive;
         _isEditMode = true;
     }
@@ -119,6 +122,12 @@ public class SupplierEditorViewModel : ViewModelBase
         set => SetProperty(ref _notes, value);
     }
 
+    public decimal CreditLimit
+    {
+        get => _creditLimit;
+        set => SetProperty(ref _creditLimit, value);
+    }
+
     public bool IsActive
     {
         get => _isActive;
@@ -169,7 +178,10 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
                 string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
-                IsActive);
+                string.IsNullOrWhiteSpace(Notes) ? null : Notes,
+                CreditLimit,
+                CategoryId: null,
+                IsActive: IsActive);
 
             result = await _supplierService.UpdateAsync(_supplierId, updateRequest);
         }
@@ -180,7 +192,9 @@ public class SupplierEditorViewModel : ViewModelBase
                 string.IsNullOrWhiteSpace(Phone) ? null : Phone,
                 string.IsNullOrWhiteSpace(Email) ? null : Email,
                 string.IsNullOrWhiteSpace(Address) ? null : Address,
-                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber);
+                string.IsNullOrWhiteSpace(TaxNumber) ? null : TaxNumber,
+                string.IsNullOrWhiteSpace(Notes) ? null : Notes,
+                CreditLimit);
 
             result = await _supplierService.CreateAsync(createRequest);
         }

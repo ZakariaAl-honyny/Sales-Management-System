@@ -37,6 +37,13 @@ public class CustomerReceiptApiService : ApiServiceBase, ICustomerReceiptApiServ
             "CustomerReceiptApiService.CreateAsync");
     }
 
+    public async Task<Result<CustomerReceiptDto>> UpdateAsync(int id, UpdateCustomerReceiptRequest request)
+    {
+        return await ExecuteAsync<CustomerReceiptDto>(
+            () => _httpClient.PutAsJsonAsync($"api/v1/customer-receipts/{id}", request),
+            "CustomerReceiptApiService.UpdateAsync");
+    }
+
     public async Task<Result<CustomerReceiptDto>> PostAsync(int id)
     {
         return await ExecuteAsync<CustomerReceiptDto>(

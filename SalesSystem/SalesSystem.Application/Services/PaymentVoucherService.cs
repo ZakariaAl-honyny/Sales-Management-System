@@ -44,7 +44,6 @@ public class PaymentVoucherService : IPaymentVoucherService
             var voucher = PaymentVoucher.Create(
                 voucherNo,
                 request.VoucherDate,
-                request.CurrencyId,
                 request.CashBoxId,
                 request.AccountId,
                 request.TotalAmount,
@@ -58,7 +57,7 @@ public class PaymentVoucherService : IPaymentVoucherService
                 voucher.VoucherNo, voucher.Id, userId);
 
             var created = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == voucher.Id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == voucher.Id, ct, "CashBox", "Account");
             return Result<PaymentVoucherDto>.Success(MapToDto(created!));
         }
         catch (DomainException ex)
@@ -78,7 +77,7 @@ public class PaymentVoucherService : IPaymentVoucherService
         try
         {
             var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<PaymentVoucherDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -114,7 +113,7 @@ public class PaymentVoucherService : IPaymentVoucherService
                 page,
                 pageSize,
                 ct,
-                includePaths: new[] { "Currency", "CashBox", "Account" });
+                includePaths: new[] { "CashBox", "Account" });
 
             var dtos = items.Select(MapToDto).ToList();
             var result = PagedResult<PaymentVoucherDto>.Create(dtos, totalCount, page, pageSize);
@@ -133,7 +132,7 @@ public class PaymentVoucherService : IPaymentVoucherService
         try
         {
             var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<PaymentVoucherDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -147,7 +146,7 @@ public class PaymentVoucherService : IPaymentVoucherService
             _logger.LogInformation("PaymentVoucher {Id} updated by User {UserId}", id, userId);
 
             var updated = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             return Result<PaymentVoucherDto>.Success(MapToDto(updated!));
         }
         catch (DomainException ex)
@@ -191,7 +190,7 @@ public class PaymentVoucherService : IPaymentVoucherService
         try
         {
             var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<PaymentVoucherDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -233,7 +232,7 @@ public class PaymentVoucherService : IPaymentVoucherService
                 _logger.LogInformation("PaymentVoucher {Id} posted by User {UserId}", id, userId);
 
                 var posted = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                    v => v.Id == id, ct, "CashBox", "Account");
                 return Result<PaymentVoucherDto>.Success(MapToDto(posted!));
             }, ct);
         }
@@ -254,7 +253,7 @@ public class PaymentVoucherService : IPaymentVoucherService
         try
         {
             var voucher = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                v => v.Id == id, ct, "CashBox", "Account");
             if (voucher == null)
                 return Result<PaymentVoucherDto>.Failure("سند الصرف غير موجود", ErrorCodes.NotFound);
 
@@ -301,7 +300,7 @@ public class PaymentVoucherService : IPaymentVoucherService
                 _logger.LogInformation("PaymentVoucher {Id} cancelled by User {UserId}", id, userId);
 
                 var cancelled = await _uow.PaymentVouchers.FirstOrDefaultAsync(
-                    v => v.Id == id, ct, "Currency", "CashBox", "Account");
+                    v => v.Id == id, ct, "CashBox", "Account");
                 return Result<PaymentVoucherDto>.Success(MapToDto(cancelled!));
             }, ct);
         }
@@ -331,9 +330,6 @@ public class PaymentVoucherService : IPaymentVoucherService
             voucher.Id,
             voucher.VoucherNo,
             voucher.VoucherDate,
-            voucher.CurrencyId,
-            voucher.Currency?.Name,
-            voucher.Currency?.Code,
             voucher.CashBoxId,
             voucher.CashBox?.Name,
             voucher.AccountId,

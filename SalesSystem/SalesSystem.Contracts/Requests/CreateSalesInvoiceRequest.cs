@@ -14,13 +14,15 @@ public record CreateSalesInvoiceRequest(
     decimal OtherCharges,
     decimal PaidAmount,
     string? Notes,
-    short? CurrencyId,
-    decimal? ExchangeRate,
     int? TaxId,
-    List<CreateSalesInvoiceLineRequest> Items);
+    List<CreateSalesInvoiceLineRequest> Items,
+    DiscountType DiscountType = DiscountType.Amount,
+    decimal? DiscountRate = null);
 
 public record CreateSalesInvoiceLineRequest(
     int ProductId,
     decimal Quantity,
     decimal UnitPrice,
-    int ProductUnitId);
+    int ProductUnitId,
+    DiscountType DiscountType = DiscountType.Amount,
+    decimal? DiscountRate = null);

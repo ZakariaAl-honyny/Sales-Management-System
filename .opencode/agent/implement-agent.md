@@ -412,7 +412,7 @@ Services that create BOTH an Account AND an entity MUST wrap both writes in `Exe
 return await _uow.ExecuteTransactionAsync<Result<CustomerDto>>(async () =>
 {
     // Step 1: Auto-create GL Account
-    var parentAccount = await _uow.Accounts.GetByCodeAsync("1130", ct);
+    var parentAccount = await _uow.Accounts.GetByCodeAsync("1103", ct);
     var account = Account.Create(...);
     await _uow.Accounts.AddAsync(account, ct);
 
@@ -426,10 +426,10 @@ return await _uow.ExecuteTransactionAsync<Result<CustomerDto>>(async () =>
 }, ct);
 
 // Services that MUST use this pattern:
-// - CustomerService.CreateAsync (Account under "1130 — العملاء")
+// - CustomerService.CreateAsync (Account under "1103 — العملاء")
 // - SupplierService.CreateAsync (Account under "1320 — الموردون")
-// - CashBoxService.CreateAsync (Account under "1110 — النقدية")
-// - BankService.CreateAsync (Account under "1120 — البنوك")
+// - CashBoxService.CreateAsync (Account under "1101 — النقدية صناديق")
+// - BankService.CreateAsync (Account under "1102 — البنوك")
 // - SalesService.CreateAsync (multi-table: Invoice + Lines + Stock)
 // - ProductService.CreateAsync (3 tables: Products + ProductUnits + ProductPrices)
 
@@ -2748,11 +2748,11 @@ public class CashTransaction : BaseEntity
 ```
 
 ### CashBox Service Pattern — Auto-Account Creation
-When `AccountId` is null in `CashBoxService.CreateAsync()`, auto-create a Level-4 detail account under parent `"1110 — النقدية"`:
+When `AccountId` is null in `CashBoxService.CreateAsync()`, auto-create a Level-4 detail account under parent `"1101 — النقدية صناديق"`:
 ```csharp
-var parentAccount = await _uow.Accounts.GetByCodeAsync("1110", ct);
+var parentAccount = await _uow.Accounts.GetByCodeAsync("1101", ct);
 var maxCode = await _uow.Accounts.GetMaxChildCodeAsync(parentAccount.Id, ct);
-var newCode = (int.Parse(maxCode ?? "1110") + 1).ToString();
+var newCode = (int.Parse(maxCode ?? "1101") + 1).ToString();
 var account = Account.Create(newCode, $"صندوق {box.Name}", $"Cash Box {box.Name}",
     AccountType.Asset, 4, parentAccount!.Id, false);
 await _uow.Accounts.AddAsync(account, ct);
@@ -2775,7 +2775,7 @@ When you encounter any code related to these areas, apply fixes automatically:
 3. CashTransaction.Create() internal → CHANGE to public
 4. Deposit()/Withdraw() methods on CashBox → REMOVE (service creates CashTransaction directly)
 5. Client-side balance validation in CashTransfer → REMOVE (server validates via Account)
-6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1110 — النقدية"
+6. Missing `AccountId` FK on CashBox → Add it and link to default cash account under "1101 — النقدية صناديق"
 7. Missing `AccountId` FK on Warehouse → Add it and link to inventory account
 8. Missing `PartyId` FK on Customer/Supplier → Add it and create Party record (shared contact data)
 9. Missing `CurrencyId` on financial entities → Add multi-currency support (NOT on Customer/Supplier)

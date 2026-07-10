@@ -90,12 +90,13 @@
 
                         <!-- Amount -->
                         <TextBlock Text="المبلغ *" Style="{StaticResource LabelStyle}"/>
-                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True, StringFormat=N2}"
+                        <TextBox Text="{Binding Amount, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}"
                                  Style="{StaticResource ModernTextBox}"
                                  Tag="أدخل المبلغ المدفوع"
                                  IsReadOnly="{Binding IsReadOnly}"
                                  FontWeight="Bold"
                                  Foreground="{StaticResource PrimaryBrush}"
+                                 helpers:InputHelper.NumericOnly="True"
                                  AutomationProperties.AutomationId="TxtPaymentAmount"
                                  ToolTip="أدخل المبلغ الذي سيدفع للمورد — يجب أن يكون أكبر من صفر"/>
                         <Border Height="8"/>
@@ -111,6 +112,27 @@
                                  IsReadOnly="{Binding IsReadOnly}"
                                  AutomationProperties.AutomationId="TxtPaymentNotes"
                                  ToolTip="ملاحظات إضافية حول سند الدفع (اختياري)"/>
+
+                        <!-- Currency -->
+                        <TextBlock Text="العملة *" Style="{StaticResource LabelStyle}" Margin="0,8,0,0"/>
+                        <ComboBox ItemsSource="{Binding Currencies}"
+                                  SelectedValue="{Binding SelectedCurrencyId, ValidatesOnDataErrors=True}"
+                                  SelectedValuePath="Id"
+                                  DisplayMemberPath="Name"
+                                  Style="{StaticResource ModernComboBox}"
+                                  ToolTip="اختر عملة الدفع — إذا كانت غير العملة الأساسية سيظهر حقل سعر الصرف"/>
+
+                        <!-- Exchange Rate (Visible only for foreign currencies) -->
+                        <TextBox Text="{Binding ExchangeRate, UpdateSourceTrigger=PropertyChanged}"
+                                 helpers:InputHelper.NumericOnly="True"
+                                 Style="{StaticResource ModernTextBox}"
+                                 Margin="0,4,0,0"
+                                 Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                                 ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية — يمكن تعديله"/>
+                        <TextBlock Text="{Binding CurrentExchangeRateInfo, StringFormat='السعر الحالي: {0}'}"
+                                   FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                   Visibility="{Binding IsForeignCurrency, Converter={StaticResource BoolToVisibility}}"
+                                   ToolTip="سعر الصرف الحالي من قاعدة البيانات — للمعلومات فقط"/>
                     </StackPanel>
                 </Border>
 

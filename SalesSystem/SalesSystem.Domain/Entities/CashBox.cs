@@ -8,7 +8,7 @@ namespace SalesSystem.Domain.Entities;
 /// Represents a cash register location. Balance is tracked on the linked Account
 /// in the Chart of Accounts. This entity is a lightweight register identifier
 /// with metadata for operational use.
-/// Schema: §4.3 CashBoxes — Id, AccountId (int not null FK), BranchId (smallint not null FK),
+/// Schema: §4.3 CashBoxes — Id, AccountId (int not null FK),
 /// Name, Description (nullable), IsActive, CreatedByUserId, UpdatedByUserId, CreatedAt, UpdatedAt.
 /// </summary>
 public class CashBox : ActivatableEntity
@@ -23,11 +23,6 @@ public class CashBox : ActivatableEntity
     public Account? Account { get; private set; }
 
     /// <summary>
-    /// FK to Branches table (required).
-    /// </summary>
-    public short BranchId { get; private set; }
-
-    /// <summary>
     /// Optional description or notes about this cash box.
     /// </summary>
     public string? Description { get; private set; }
@@ -35,12 +30,11 @@ public class CashBox : ActivatableEntity
     private CashBox() { } // EF Core
 
     /// <summary>
-    /// Creates a new cash box with the specified name, branch, and account.
+    /// Creates a new cash box with the specified name, account, and currency.
     /// AccountId is required — the service layer resolves auto-creation before calling this factory.
     /// </summary>
     public static CashBox Create(
         string name,
-        short branchId,
         int accountId,
         string? description = null,
         int? createdByUserId = null)
@@ -48,16 +42,12 @@ public class CashBox : ActivatableEntity
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الصندوق مطلوب");
 
-        if (branchId <= 0)
-            throw new DomainException("الفرع مطلوب");
-
         if (accountId <= 0)
             throw new DomainException("الحساب المحاسبي مطلوب");
 
         var box = new CashBox
         {
             Name = name.Trim(),
-            BranchId = branchId,
             AccountId = accountId,
             Description = description?.Trim(),
         };
@@ -72,17 +62,12 @@ public class CashBox : ActivatableEntity
     /// </summary>
     public void Update(
         string name,
-        short branchId,
         string? description = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الصندوق مطلوب");
 
-        if (branchId <= 0)
-            throw new DomainException("الفرع مطلوب");
-
         Name = name.Trim();
-        BranchId = branchId;
         Description = description?.Trim();
         UpdateTimestamp();
     }

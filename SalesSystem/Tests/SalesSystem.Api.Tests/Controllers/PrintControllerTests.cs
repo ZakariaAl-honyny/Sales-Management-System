@@ -337,7 +337,7 @@ public class PrintControllerTests
         var settings = new StoreSettingsDto(Id: 0, StoreName: "متجر الاختبار", Phone: "0111111111",
             Address: "الرياض", LogoPath: null, Email: null, CurrencyCode: "YER",
             DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
-            EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV");
+            EnableStockAlerts: false, AllowNegativeStock: false, InvoicePrefix: "INV");
         _printDataServiceMock
             .Setup(x => x.GetStoreSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<StoreSettingsDto>.Success(settings));
@@ -411,7 +411,7 @@ public class PrintControllerTests
                     Id: 0, StoreName: "متجري", Phone: null, Address: null,
                     LogoPath: null, Email: null, CurrencyCode: "YER",
                     DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
-                    EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
+                    EnableStockAlerts: false, AllowNegativeStock: false, InvoicePrefix: "INV")));
             _printDataServiceMock
                 .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(Result<PrintSettingsDto>.Success(printSettings));
@@ -444,7 +444,7 @@ public class PrintControllerTests
                 Id: 0, StoreName: "متجري", Phone: null, Address: null,
                 LogoPath: null, Email: null, CurrencyCode: "YER",
                 DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
-                EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
+                EnableStockAlerts: false, AllowNegativeStock: false, InvoicePrefix: "INV")));
         _printDataServiceMock
             .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<PrintSettingsDto>.Success(new PrintSettingsDto(
@@ -480,7 +480,7 @@ public class PrintControllerTests
                 Id: 0, StoreName: "متجري", Phone: null, Address: null,
                 LogoPath: null, Email: null, CurrencyCode: "YER",
                 DefaultTaxRate: 0, IsTaxEnabled: false, TaxNumber: null,
-                EnableStockAlerts: false, AllowNegativeStock: false, AutoUpdatePrices: false, InvoicePrefix: "INV")));
+                EnableStockAlerts: false, AllowNegativeStock: false, InvoicePrefix: "INV")));
         _printDataServiceMock
             .Setup(x => x.GetPrintSettingsAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<PrintSettingsDto>.Success(printSettings));

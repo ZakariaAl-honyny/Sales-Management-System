@@ -3,13 +3,15 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SalesSystem.Application.Interfaces.Services;
-using SalesSystem.Contracts.DTOs;
+using SalesSystem.Application.Services;
+using SalesSystem.Contracts.Common;
 
 namespace SalesSystem.Api.Controllers;
 
 /// <summary>
-/// Controller for managing permissions and role-permission assignments.
-/// Access restricted to Admin role only (Policy: AdminOnly).
+/// Controller for bitmask-based permission management.
+/// Permissions are stored as a BIGINT bitmask on both User and Role entities.
+/// Super Admin = PermissionsMask == -1 (all bits set — bypasses all checks).
 /// </summary>
 [ApiController]
 [Route("api/v1/permissions")]
@@ -24,60 +26,54 @@ public class PermissionsController : ControllerBase
     }
 
     /// <summary>
-    /// Returns all active permissions, ordered by Category then Name.
+    /// Returns all known permission code strings.
+    /// These are the canonical codes used in the bitmask mapping.
     /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns list of all active permissions.</returns>
     [HttpGet]
-    [ProducesResponseType(typeof(IReadOnlyList<PermissionDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
+    public IActionResult GetAll()
     {
-        var result = await _permissionService.GetAllAsync(ct);
-        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+        var codes = PermissionService.AllPermissionCodes.OrderBy(x => x).ToList();
+        return Ok(codes);
     }
 
     /// <summary>
-    /// Returns a dictionary mapping each Role to the list of assigned permission IDs.
+    /// Returns a dictionary mapping each role ID to its PermissionsMask value.
     /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns role-permission mappings.</returns>
     [HttpGet("roles")]
-    [ProducesResponseType(typeof(Dictionary<byte, List<int>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(Dictionary<short, long>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> GetRolePermissions(CancellationToken ct)
+    public async Task<IActionResult> GetRoleMasks(CancellationToken ct)
     {
-        var result = await _permissionService.GetRolePermissionsAsync(ct);
+        var result = await _permissionService.GetAllRoleMasksAsync(ct);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 
     /// <summary>
-    /// Updates the permission set for a given role.
-    /// Replaces all existing role permissions with the new set.
+    /// Sets the PermissionsMask for a given role.
+    /// The mask is a bitwise-OR of permission bit values.
+    /// Use -1 for Super Admin (all permissions).
+    /// Use 0 for no permissions.
     /// </summary>
-    /// <param name="role">The role ID (1=Admin, 2=Manager, 3=Cashier).</param>
-    /// <param name="permissionIds">List of permission IDs to assign to the role.</param>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns success message.</returns>
+    /// <param name="role">The role ID (short).</param>
+    /// <param name="request">The mask value to set.</param>
     [HttpPut("roles/{role}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> UpdateRolePermissions(int role, [FromBody] List<int> permissionIds, CancellationToken ct)
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SetRoleMask(short role, [FromBody] SetRoleMaskRequest request, CancellationToken ct)
     {
-        if (role < 1 || role > 5)
-            return BadRequest(new { error = "رقم الصلاحية غير صحيح" });
-
-        var result = await _permissionService.UpdateRolePermissionsAsync((byte)role, permissionIds, ct);
+        var result = await _permissionService.SetRolePermissionsMaskAsync(role, request.Mask, ct);
         if (result.IsSuccess)
-            return Ok(new { message = "تم تحديث الصلاحيات بنجاح" });
+            return Ok(new { message = "تم تعيين صلاحيات الدور بنجاح" });
+        if (result.ErrorCode == ErrorCodes.NotFound)
+            return NotFound(new { error = result.Error });
         return BadRequest(new { error = result.Error });
     }
 
     /// <summary>
-    /// Gets the list of permission names for the current user based on their role.
+    /// Gets the list of permission code strings for the current user.
     /// </summary>
-    /// <param name="ct">Cancellation token.</param>
-    /// <returns>Returns list of permission names for the current user.</returns>
     [HttpGet("my")]
     [Authorize]
     [ProducesResponseType(typeof(List<string>), StatusCodes.Status200OK)]
@@ -92,3 +88,8 @@ public class PermissionsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
     }
 }
+
+/// <summary>
+/// Request model for setting a role's permissions mask.
+/// </summary>
+public record SetRoleMaskRequest(long Mask);

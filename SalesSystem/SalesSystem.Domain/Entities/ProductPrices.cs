@@ -16,11 +16,6 @@ public class ProductPrice : AuditableEntity
     public int ProductUnitId { get; private set; }
 
     /// <summary>
-    /// FK to Currency (smallint).
-    /// </summary>
-    public short CurrencyId { get; private set; }
-
-    /// <summary>
     /// The actual price amount. decimal(18,2).
     /// </summary>
     public decimal Price { get; private set; }
@@ -38,7 +33,6 @@ public class ProductPrice : AuditableEntity
     // ─── Navigation Properties ──────────────────────────
 
     public ProductUnit ProductUnit { get; private set; } = null!;
-    public Currency Currency { get; private set; } = null!;
 
     private ProductPrice() { } // EF Core
 
@@ -49,7 +43,6 @@ public class ProductPrice : AuditableEntity
     /// </summary>
     public static ProductPrice Create(
         int productUnitId,
-        short currencyId,
         decimal price,
         DateTime effectiveFrom,
         DateTime? effectiveTo = null,
@@ -57,8 +50,6 @@ public class ProductPrice : AuditableEntity
     {
         if (productUnitId <= 0)
             throw new DomainException("معرف وحدة المنتج مطلوب.");
-        if (currencyId <= 0)
-            throw new DomainException("معرف العملة مطلوب.");
         if (price < 0)
             throw new DomainException("السعر لا يمكن أن يكون سالباً.");
         if (effectiveFrom == default)
@@ -69,7 +60,6 @@ public class ProductPrice : AuditableEntity
         var productPrice = new ProductPrice
         {
             ProductUnitId = productUnitId,
-            CurrencyId = currencyId,
             Price = Math.Round(price, 2),
             EffectiveFrom = effectiveFrom,
             EffectiveTo = effectiveTo,

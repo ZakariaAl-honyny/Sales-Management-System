@@ -33,7 +33,7 @@ public class CustomerReceiptService : ICustomerReceiptService
     {
         try
         {
-            var receipts = await _uow.CustomerReceipts.ToListAsync(ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
+            var receipts = await _uow.CustomerReceipts.ToListAsync(ct, "Customer", "CashBox", "Applications");
             var dtos = receipts.Select(MapToDto).ToList();
             return Result<List<CustomerReceiptDto>>.Success(dtos);
         }
@@ -49,7 +49,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
+                r => r.Id == id, ct, "Customer", "Customer.Account", "CashBox", "Applications");
             if (receipt == null)
                 return Result<CustomerReceiptDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -76,8 +76,8 @@ public class CustomerReceiptService : ICustomerReceiptService
                 DateTime.UtcNow,
                 request.CustomerId,
                 request.CashBoxId,
-                (short)request.CurrencyId,
                 request.Amount,
+                paymentMethod: (PaymentMethod)request.PaymentMethod,
                 notes: request.Notes,
                 createdByUserId: userId);
 
@@ -105,7 +105,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
+                r => r.Id == id, ct, "Customer", "Customer.Account", "CashBox", "Applications");
             if (receipt == null)
                 return Result<CustomerReceiptDto>.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -121,11 +121,11 @@ public class CustomerReceiptService : ICustomerReceiptService
             }
 
             receipt.Update(
-                cashBoxId: request.CashBoxId,
-                currencyId: (short)request.CurrencyId,
-                amount: request.Amount,
-                notes: request.Notes,
-                updatedByUserId: userId);
+                request.CashBoxId,
+                request.Amount,
+                request.Notes,
+                (PaymentMethod)request.PaymentMethod,
+                userId);
 
             await _uow.SaveChangesAsync(ct);
 
@@ -149,7 +149,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Applications", "Customer", "Customer");
+                r => r.Id == id, ct, "Applications", "Customer", "Customer.Account");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -187,7 +187,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer");
+                r => r.Id == id, ct, "Customer", "Customer.Account");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -252,7 +252,7 @@ public class CustomerReceiptService : ICustomerReceiptService
 
             // Reload with full includes for the response
             var updatedReceipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == receiptId, ct, "Customer", "Customer", "CashBox", "Currency", "Applications");
+                r => r.Id == receiptId, ct, "Customer", "Customer.Account", "CashBox", "Applications");
             return Result<CustomerReceiptDto>.Success(MapToDto(updatedReceipt!));
         }
         catch (DomainException ex)
@@ -272,7 +272,7 @@ public class CustomerReceiptService : ICustomerReceiptService
         try
         {
             var receipt = await _uow.CustomerReceipts.FirstOrDefaultAsync(
-                r => r.Id == id, ct, "Customer", "Customer");
+                r => r.Id == id, ct, "Customer", "Customer.Account");
             if (receipt == null)
                 return Result.Failure("سند القبض غير موجود", ErrorCodes.NotFound);
 
@@ -324,13 +324,13 @@ public class CustomerReceiptService : ICustomerReceiptService
             receipt.Customer?.Name,
             receipt.CashBoxId,
             receipt.CashBox?.Name,
-            receipt.CurrencyId,
-            receipt.Currency?.Name,
             receipt.Amount,
+            (byte)receipt.PaymentMethod,
+            GetPaymentMethodName(receipt.PaymentMethod),
             receipt.Notes,
             (byte)receipt.Status,
             GetStatusName(receipt.Status),
-            null, // CustomerReceipt is AuditableEntity — no PostedAt field
+            receipt.PostedAt,
             receipt.Applications?.Select(a => new CustomerReceiptApplicationDto(
                 a.Id,
                 a.CustomerReceiptId,
@@ -342,6 +342,15 @@ public class CustomerReceiptService : ICustomerReceiptService
             false // DocumentEntity — no IsActive
         );
     }
+
+    private static string? GetPaymentMethodName(PaymentMethod method) => method switch
+    {
+        PaymentMethod.Cash => "نقدي",
+        PaymentMethod.Cheque => "شيك",
+        PaymentMethod.BankTransfer => "تحويل بنكي",
+        PaymentMethod.CreditCard => "بطاقة ائتمان",
+        _ => null
+    };
 
     private static string? GetStatusName(InvoiceStatus status) => status switch
     {

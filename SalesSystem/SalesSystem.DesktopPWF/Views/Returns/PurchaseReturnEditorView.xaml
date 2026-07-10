@@ -33,7 +33,6 @@
     </Window.Resources>
 
     <Window.InputBindings>
-        <KeyBinding Key="F3" Command="{Binding SearchProductCommand}"/>
     </Window.InputBindings>
 
     <Grid>
@@ -105,7 +104,7 @@
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <TextBox Text="{Binding ReturnQuantity, UpdateSourceTrigger=PropertyChanged}"
-                                                     Style="{StaticResource ValidationTextBoxStyle}"
+                                                     helpers:InputHelper.NumericOnly="True" Style="{StaticResource ValidationTextBoxStyle}"
                                                      Padding="8,4"
                                                      FontWeight="Bold"
                                                      HorizontalContentAlignment="Center"
@@ -172,7 +171,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                                 <ToggleButton Grid.Column="1"
-                                              IsChecked="{Binding IsStandaloneMode}"
+                                              IsChecked="{Binding IsStandaloneMode, Mode=OneWay}"
                                               Command="{Binding ToggleStandaloneModeCommand}"
                                               Content="تبديل"
                                               FontSize="12" Padding="8,4"/>
@@ -254,11 +253,14 @@
 
                             <!-- Exchange Rate -->
                             <TextBlock Text="سعر الصرف" Style="{StaticResource LabelStyle}"/>
-                            <TextBox Text="{Binding ExchangeRate, StringFormat=N4, UpdateSourceTrigger=PropertyChanged}"
-                                     Style="{StaticResource ModernTextBox}"
-                                     Margin="0,0,0,8"
-                                     ToolTip="سعر صرف العملة مقابل العملة الأساسية"
+                            <TextBox Text="{Binding ExchangeRate, UpdateSourceTrigger=PropertyChanged}"
+                                     helpers:InputHelper.NumericOnly="True" Style="{StaticResource ModernTextBox}"
+                                     Margin="0,0,0,4"
+                                     ToolTip="سعر صرف العملة مقابل العملة الأساسية — يمكن تعديله"
                                      IsReadOnly="{Binding IsBaseCurrency}"/>
+                            <TextBlock Text="{Binding CurrentExchangeRateInfo, StringFormat='السعر الحالي: {0}'}"
+                                       FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8"
+                                       ToolTip="سعر الصرف الحالي من قاعدة البيانات — للمعلومات فقط"/>
 
                             <!-- Discount Type -->
                             <TextBlock Text="نوع الخصم" Style="{StaticResource LabelStyle}"/>
@@ -272,8 +274,8 @@
                             <!-- Discount Rate (visible when percentage) -->
                             <StackPanel Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="نسبة الخصم" Style="{StaticResource LabelStyle}"/>
-                                <TextBox Text="{Binding DiscountRate, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource ModernTextBox}"
+                                <TextBox Text="{Binding DiscountRate, UpdateSourceTrigger=PropertyChanged}"
+                                         helpers:InputHelper.NumericOnly="True" Style="{StaticResource ModernTextBox}"
                                          Margin="0,0,0,8"
                                          ToolTip="نسبة الخصم (مثلاً 10 = 10%)"/>
                             </StackPanel>
@@ -334,8 +336,8 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="سعر الصرف:" VerticalAlignment="Center" Margin="0,0,6,0" FontSize="11"/>
-                                <TextBox Grid.Column="1" Text="{Binding ExchangeRate, StringFormat=N2}"
-                                         Style="{StaticResource ModernTextBox}"
+                                <TextBox Grid.Column="1" Text="{Binding ExchangeRate}"
+                                         helpers:InputHelper.NumericOnly="True" Style="{StaticResource ModernTextBox}"
                                          ToolTip="سعر صرف العملة المختارة مقابل العملة الأساسية"/>
                             </Grid>
 
@@ -343,25 +345,18 @@
                                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                                 <StackPanel>
                                     <TextBlock Text="نوع الخصم" FontWeight="SemiBold" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                                    <RadioButton Content="مبلغ" IsChecked="{Binding IsAmountDiscount}" GroupName="ReturnDiscountType"
+                                    <RadioButton Content="مبلغ" IsChecked="{Binding IsAmountDiscount, Mode=OneWay}" GroupName="ReturnDiscountType"
                                                  Margin="0,0,0,2" FontSize="11" ToolTip="خصم بقيمة مالية ثابتة"/>
-                                    <RadioButton Content="نسبة %" IsChecked="{Binding IsPercentageDiscount}" GroupName="ReturnDiscountType"
+                                    <RadioButton Content="نسبة %" IsChecked="{Binding IsPercentageDiscount, Mode=OneWay}" GroupName="ReturnDiscountType"
                                                  FontSize="11" ToolTip="خصم بنسبة مئوية من إجمالي المرتجع"/>
                                 </StackPanel>
                             </Border>
 
                             <Grid Margin="0,0,0,4"
-                                  Visibility="{Binding IsPercentageDiscount, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="نسبة الخصم (%)" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding DiscountRate, StringFormat=N2}"
-                                         Width="80" HorizontalAlignment="Right" TextAlignment="Center"
-                                         ToolTip="نسبة الخصم من إجمالي المرتجع"/>
-                            </Grid>
-                            <Grid Margin="0,0,0,4"
                                   Visibility="{Binding IsAmountDiscount, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="قيمة الخصم" Style="{StaticResource LabelStyle}" VerticalAlignment="Center"/>
-                                <TextBox Text="{Binding DiscountAmount, StringFormat=N2}"
-                                         Width="100" HorizontalAlignment="Right" TextAlignment="Left"
+                                <TextBox Text="{Binding DiscountRate, UpdateSourceTrigger=PropertyChanged}"
+                                         helpers:InputHelper.NumericOnly="True" Width="100" HorizontalAlignment="Right" TextAlignment="Left"
                                          ToolTip="قيمة الخصم على المرتجع"/>
                             </Grid>
                         </StackPanel>

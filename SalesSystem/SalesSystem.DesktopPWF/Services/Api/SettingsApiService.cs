@@ -72,20 +72,6 @@ public class SettingsApiService : ApiServiceBase, ISettingsApiService
             "SettingsApiService.UpdatePrintSettingsAsync");
     }
 
-    public async Task<Result<int>> GetCostingMethodAsync(CancellationToken ct = default)
-    {
-        return await ExecuteAsync<int>(
-            () => _httpClient.GetAsync("api/v1/settings/costing-method", ct),
-            "SettingsApiService.GetCostingMethodAsync");
-    }
-
-    public async Task<Result> SetCostingMethodAsync(UpdateCostingMethodRequest request, CancellationToken ct = default)
-    {
-        return await ExecuteCommandAsync(
-            () => _httpClient.PutAsJsonAsync("api/v1/settings/costing-method", request, ct),
-            "SettingsApiService.SetCostingMethodAsync");
-    }
-
     public async Task<Result<Dictionary<string, string>>> GetAllSystemSettingsAsync(CancellationToken ct = default)
     {
         return await ExecuteAsync<Dictionary<string, string>>(

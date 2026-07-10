@@ -52,8 +52,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Main", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Secondary", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "Main", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, Name: "Secondary", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -104,7 +104,7 @@ public class WarehouseListViewModelTests : IDisposable
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
             .ReturnsAsync(Result<List<WarehouseDto>>.Success(new List<WarehouseDto>
             {
-                new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Test", Phone: null, Address: null, Notes: null, IsActive: true)
+                new(Id: (short)1, Name: "Test", Phone: null, Address: null, Notes: null, IsActive: true)
             }));
 
         await _viewModel.LoadWarehousesAsync();
@@ -119,7 +119,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenConfirmed_CallsApiService()
     {
-        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "DeleteMe", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, Name: "DeleteMe", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -151,7 +151,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenDeleteFails_SetsErrorMessage()
     {
-        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "FailMe", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, Name: "FailMe", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -177,7 +177,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public async Task DeleteCommand_WhenWarehouseSelected_PublishesEvent()
     {
-        var warehouseToDelete = new WarehouseDto(Id: (short)5, BranchId: (short)1, BranchName: null, Name: "EventTest", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouseToDelete = new WarehouseDto(Id: (short)5, Name: "EventTest", Phone: null, Address: null, Notes: null, IsActive: true);
 
         _mockWarehouseService
             .Setup(s => s.GetAllAsync(It.IsAny<bool>()))
@@ -211,9 +211,9 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)3, BranchId: (short)1, BranchName: null, Name: "Gamma", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)3, Name: "Gamma", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -244,8 +244,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -273,8 +273,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "Alpha", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, Name: "Beta", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -325,7 +325,7 @@ public class WarehouseListViewModelTests : IDisposable
         var propertyChangedEvents = new List<string>();
         _viewModel.PropertyChanged += (s, e) => propertyChangedEvents.Add(e.PropertyName ?? string.Empty);
 
-        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Warehouse1", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouse = new WarehouseDto(Id: (short)1, Name: "Warehouse1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
 
         propertyChangedEvents.Should().Contain("SelectedWarehouse");
@@ -357,7 +357,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void DeleteCommand_AlwaysEnabled_WhenActiveWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouse = new WarehouseDto(Id: (short)1, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.DeleteCommand.CanExecute(null).Should().BeTrue();
     }
@@ -373,7 +373,7 @@ public class WarehouseListViewModelTests : IDisposable
     [Fact]
     public void EditCommand_AlwaysEnabled_WhenWarehouseSelected()
     {
-        var warehouse = new WarehouseDto(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
+        var warehouse = new WarehouseDto(Id: (short)1, Name: "W1", Phone: null, Address: null, Notes: null, IsActive: true);
         _viewModel.SelectedWarehouse = warehouse;
         _viewModel.EditCommand.CanExecute(null).Should().BeTrue();
     }
@@ -425,7 +425,7 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "RefreshTest", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "RefreshTest", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService
@@ -447,8 +447,8 @@ public class WarehouseListViewModelTests : IDisposable
     {
         var warehouses = new List<WarehouseDto>
         {
-            new(Id: (short)1, BranchId: (short)1, BranchName: null, Name: "Alpha Base", Phone: null, Address: null, Notes: null, IsActive: true),
-            new(Id: (short)2, BranchId: (short)1, BranchName: null, Name: "Beta Main", Phone: null, Address: null, Notes: null, IsActive: true)
+            new(Id: (short)1, Name: "Alpha Base", Phone: null, Address: null, Notes: null, IsActive: true),
+            new(Id: (short)2, Name: "Beta Main", Phone: null, Address: null, Notes: null, IsActive: true)
         };
 
         _mockWarehouseService

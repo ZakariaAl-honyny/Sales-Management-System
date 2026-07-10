@@ -4,70 +4,66 @@
 
 Currently, NO business operation creates journal entries automatically. This phase integrates double-entry accounting into all financial operations by introducing a dedicated `AccountingIntegrationService` that is called from within existing service transactions.
 
----
-
 ## 1. Schema Additions
 
-### 1.1 New Account: Opening Balance Equity
+### 1.1 Opening Balance Equity Account (Already Seeded)
+
+The **Opening Balance Equity** account already exists in the seeded Chart of Accounts (Phase 18):
 
 | Field | Value |
 |-------|-------|
-| `AccountCode` | `1422` |
-| `NameAr` | `أرصدة افتتاحية` |
-| `NameEn` | `Opening Balance Equity` |
+| `AccountCode` | `32020001` |
+| `NameAr` | `رصيد افتتاحي` |
+| `NameEn` | `Opening Balance Equity Detail` |
 | `AccountType` | `Equity (3)` |
-| `Level` | `3` |
-| `ParentAccountId` | Under `1420` (الأرباح والخسائر / Profit & Loss) |
-| `AllowTransactions` | `true` |
-| `IsSystemAccount` | `false` |
-| `Description` | `رصيد افتتاحي للعملاء والموردين — يتم إقفاله بعد تسوية الأرصدة الافتتاحية` |
-| `Explanation` | `حساب مؤقت يستخدم لتسجيل الأرصدة الافتتاحية للعملاء والموردين عند بدء استخدام النظام. يقفل بعد تسوية جميع الأرصدة الافتتاحية مع رأس المال.` |
+| `Level` | `4` |
+| `ParentAccountId` | Under `3202` (الأرصدة الافتتاحية / Opening Balance Equity — a Level 3 account under 32 — الأرباح والخسائر) |
+| `AllowTransactions` | `true` (Level 4 leaf) |
+| `IsSystemAccount` | `true` (protected) |
+| `Description` | `حساب مؤقت يستخدم لترحيل الأرصدة الافتتاحية عند بدء استخدام النظام المحاسبي.` |
 | `ColorCode` | `#4CAF50` (Equity green) |
 
-**Seeder note:** This account is NOT a system account. It is user-visible and can be modified. It will be seeded alongside other Level-3 accounts in `AccountingSeeder` (inserted after account `1421`).
+The corresponding `SystemAccountKey.OpeningBalanceEquity` mapping is already seeded in the `SystemAccountMapping` table, pointing to account `32020001`.
 
-### 1.2 New SystemAccountMappings Fields
+### 1.2 SystemAccountMapping (Key-Value Store — Already Implemented)
 
-Add the following field to `SystemAccountMappings`:
-
-| Field | Type | Maps To | Purpose |
-|-------|------|---------|---------|
-| `OpeningBalanceEquityAccountId` | `int` | `1422` (أرصدة افتتاحية) | Used for customer/supplier opening balance entries |
+The `SystemAccountMapping` entity (singular) uses a key-value pattern with `MappingKey` (string, from `SystemAccountKey` enum) and `AccountId` (FK to `Account`). This replaces the old fixed-column `SystemAccountMappings` design. All 21 mappings are seeded in `AccountingSeeder.cs`.
 
 > See `docs/AGENTS.md` for domain entity patterns (private set, Guard Clauses, domain methods) and `docs/AGENTS.md` §2.16 for EF Core Fluent API conventions.
 
-### 1.3 New JournalEntryType Enum Values
+### 1.3 JournalEntryType Enum — No New Values Needed
 
-> See `Domain/Enums/` for enum definitions and `docs/AGENTS.md` §3 for canonical enum values.
-
-These new types enable traceability — payment journal entries are identifiable by type in reports and account ledgers.
+The `JournalEntryType` enum in `Domain/Accounting/Enums/` already has values sufficient for all Phase 24 operations. No new enum values are needed beyond what Phase 18 seeded.
 
 ### 1.4 Summary of Schema Changes
 
 | Change | File | Type |
 |--------|------|------|
-| New account `1422` (أرصدة افتتاحية) | `AccountingSeeder.cs` | Seeder data |
-| Field `OpeningBalanceEquityAccountId` | `SystemAccountMappings.cs` | Entity + Config |
-| Nav property `OpeningBalanceEquityAccount` | `SystemAccountMappings.cs` | Navigation |
-| Enum values `CustomerReceipt=10`, `SupplierPayment=11` | `JournalEntryType.cs` | Enum |
-| CreateAccountRequest DTO unchanged | — | — |
-| UpdateAccountRequest DTO unchanged | — | — |
+| Account `32020001` (رصيد افتتاحي) | `AccountingSeeder.cs` | Already seeded |
+| `SystemAccountMapping` table with 21 keys | `SystemAccountMapping.cs` + seeder | Already seeded |
+| `SystemAccountKey.OpeningBalanceEquity` mapping | `SystemAccountMapping.cs` | Already seeded |
+| `IAccountingIntegrationService` interface | `Interfaces/Services/IAccountingIntegrationService.cs` | NEW |
+| `AccountingIntegrationService` implementation | `Application/Accounting/Services/` | NEW |
 
 ---
 
 ## 2. Service Layer: `AccountingIntegrationService`
 
-All accounting entry creation is centralized into a single **dedicated service** to avoid duplicating account-resolution logic across five business services.
+All accounting entry creation is centralized into a single **dedicated service** to avoid duplicating account-resolution logic across business services.
 
 > See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
 
-> See `docs/AGENTS.md` for service layer patterns and DI conventions.
+The `AccountingIntegrationService` uses `ISystemAccountService.GetMappingAsync(SystemAccountKey key, ...)` to resolve account IDs dynamically at runtime via the `SystemAccountMapping` key-value table. It does NOT use hardcoded properties like `Mappings.DefaultCashAccountId`.
 
-> See `docs/AGENTS.md` for DI registration patterns.
+**Key lookup pattern:**
+```csharp
+// Fetch required accounts in parallel
+var dictResult = await GetAccountIdDictionaryAsync(null, requiredKeys, ct);
+var m = dictResult.Value!;
+// Use: m[SystemAccountKey.DefaultCash], m[SystemAccountKey.SalesRevenue], etc.
+```
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
-
-The `CreateAndPostEntryAsync` will call `entry.ValidateAndPost(userId)` before saving.
+**Per-entity account routing:** For customer and supplier journal entries, the service uses `Customer.AccountId` / `Supplier.AccountId` (the linked Chart of Accounts account) with fallback to `SystemAccountKey.AccountsReceivable` / `SystemAccountKey.AccountsPayable` system mappings.
 
 **Fiscal year guard requirement (RULE-281):** Before creating ANY journal entry, the service MUST check `_uow.FiscalYearClosures.AnyAsync(fyc => fyc.FiscalYear == transactionDate.Year)`. Return `Result<int>.Failure("السنة المالية {year} مغلقة — لا يمكن إضافة قيود محاسبية")` if closed.
 
@@ -77,41 +73,37 @@ The `CreateAndPostEntryAsync` will call `entry.ValidateAndPost(userId)` before s
 
 For each operation below, the entry is created **inside the same transaction** as the business operation.
 
-### 3.0 Determining Cash/AR Account by PaymentType
+### 3.0 Account Resolution — Cash/AR/AP by PaymentType
 
-All invoice and payment entries use this resolution logic:
-
-| PaymentType | Debit/Credit Account | Condition |
-|------------|---------------------|-----------|
-| `Cash (1)` | `Mappings.DefaultCashAccountId` (1111) | Full amount |
-| `Credit (2)` | `Mappings.AccountsReceivableAccountId` (1131) or `Mappings.AccountsPayableAccountId` (1321) | Full amount |
-| `Mixed (3)` | Split: `DefaultCashAccountId` for `PaidAmount`, `AR/AP` for `DueAmount` | Partial |
+All invoice and payment entries resolve debit/credit accounts using this logic:
 
 **For Sales (Revenue side):**
-- Cash: Dr `DefaultCashAccountId` for `PaidAmount`
-- Credit: Dr `AccountsReceivableAccountId` for `DueAmount`
-- Mixed: Dr `DefaultCashAccountId` for `PaidAmount` + Dr `AccountsReceivableAccountId` for `DueAmount`
+| PaymentType | Debit Account | Credit Side |
+|------------|---------------|-------------|
+| `Cash (1)` | `SystemAccountKey.DefaultCash` (11010001 — الصندوق) | Full amount |
+| `Credit (2)` | `Customer.AccountId` (per-entity, fallback `SystemAccountKey.AccountsReceivable` = 11030001) | Full amount |
+| `Mixed (3)` | Split: `DefaultCash` for `PaidAmount` + Customer account for `RemainingAmount` | Partial |
 
 **For Purchases (Cost side):**
-- Cash: Cr `DefaultCashAccountId` for `PaidAmount`
-- Credit: Cr `AccountsPayableAccountId` for `DueAmount`
-- Mixed: Cr `DefaultCashAccountId` for `PaidAmount` + Cr `AccountsPayableAccountId` for `DueAmount`
-
----
+| PaymentType | Credit Account | Debit Side |
+|------------|----------------|-------------|
+| `Cash (1)` | `SystemAccountKey.DefaultCash` (11010001 — الصندوق) | Full amount |
+| `Credit (2)` | `Supplier.AccountId` (per-entity, fallback `SystemAccountKey.AccountsPayable` = 21010001) | Full amount |
+| `Mixed (3)` | Split: `DefaultCash` for `PaidAmount` + Supplier account for `RemainingAmount` | Partial |
 
 ### 3.1 Customer OpeningBalance
 
 **Trigger:** Inside `CustomerService.CreateAsync()` when `openingBalance > 0`  
-**Timing:** AFTER customer is saved to DB (has an ID), inside wrap in `ExecuteTransactionAsync`  
+**Timing:** AFTER customer is saved to DB (has an ID), inside `ExecuteTransactionAsync`  
 **Condition:** Only if `OpeningBalance > 0` — otherwise no entry  
-**Reference:** `ReferenceType = "Customer"`, `ReferenceId = customer.Id`, `ReferenceNumber = customer.Name`
+**Reference:** `ReferenceType = "Customer"`, `ReferenceId = customer.Id`, `ReferenceNumber = customerId.ToString()`
 
 #### Journal Entry
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | `Mappings.AccountsReceivableAccountId` (1131 — العميل النقدي) | `OpeningBalance` | — | `رصيد افتتاحي للعميل: {customerName}` |
-| 2 | `Mappings.OpeningBalanceEquityAccountId` (1422 — أرصدة افتتاحية) | — | `OpeningBalance` | `رصيد افتتاحي للعميل: {customerName}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | Customer's `AccountId` | 11030001 | العميل النقدي | `OpeningBalance` | — | `رصيد افتتاحي للعميل: {customerName}` |
+| 2 | `SystemAccountKey.OpeningBalanceEquity` | 32020001 | رصيد افتتاحي | — | `OpeningBalance` | `رصيد افتتاحي للعميل: {customerName}` |
 
 - **EntryType:** `JournalEntryType.OpeningBalance (9)`
 - **Balance check:** Dr = Cr = OpeningBalance ✓
@@ -124,10 +116,9 @@ All invoice and payment entries use this resolution logic:
 2. SaveChangesAsync → customer gets ID
 3. IF openingBalance > 0:
      a. Call AccountingIntegrationService.CreateCustomerOpeningEntryAsync()
-        - This loads SystemAccountMappings
-        - Generates JE number
-        - Creates journal entry
-        - Saves journal entry + lines
+        - Resolves OpeningBalanceEquity mapping (32020001)
+        - Uses Customer.AccountId (per-entity account routing)
+        - Creates and posts journal entry
 4. Return success
 ```
 
@@ -140,14 +131,14 @@ All invoice and payment entries use this resolution logic:
 **Trigger:** Inside `SupplierService.CreateAsync()` when `openingBalance > 0`  
 **Timing:** AFTER supplier is saved to DB (has an ID), in same `ExecuteTransactionAsync`  
 **Condition:** Only if `OpeningBalance > 0`  
-**Reference:** `ReferenceType = "Supplier"`, `ReferenceId = supplier.Id`, `ReferenceNumber = supplier.Name`
+**Reference:** `ReferenceType = "Supplier"`, `ReferenceId = supplier.Id`, `ReferenceNumber = supplier.Id.ToString()`
 
 #### Journal Entry
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | `Mappings.OpeningBalanceEquityAccountId` (1422) | `OpeningBalance` | — | `رصيد افتتاحي للمورد: {supplierName}` |
-| 2 | `Mappings.AccountsPayableAccountId` (1321 — المورد النقدي) | — | `OpeningBalance` | `رصيد افتتاحي للمورد: {supplierName}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `SystemAccountKey.OpeningBalanceEquity` | 32020001 | رصيد افتتاحي | `OpeningBalance` | — | `رصيد افتتاحي للمورد: {supplierName}` |
+| 2 | Supplier's `AccountId` | 21010001 | المورد النقدي | — | `OpeningBalance` | `رصيد افتتاحي للمورد: {supplierName}` |
 
 - **EntryType:** `JournalEntryType.OpeningBalance (9)`
 
@@ -163,42 +154,41 @@ All invoice and payment entries use this resolution logic:
 
 | Value | Source | Formula |
 |-------|--------|---------|
-| `NetRevenue` | `invoice.SubTotal - invoice.DiscountAmount` | Already computed on invoice |
+| `NetRevenue` | `invoice.SubTotal - invoice.DiscountAmount` | Already computed on invoice (MUST validate: `DiscountAmount <= SubTotal`) |
 | `TaxAmount` | `invoice.TaxAmount` | Already computed |
-| `TotalAmount` | `invoice.TotalAmount` | `NetRevenue + TaxAmount` |
+| `TotalAmount` | `invoice.NetTotal` | `NetRevenue + TaxAmount + OtherCharges` |
 | `PaidAmount` | `invoice.PaidAmount` | Cash portion |
-| `DueAmount` | `invoice.DueAmount` | Credit portion |
-| `COGS` | **Computed at time of post** | See below |
+| `RemainingAmount` | `invoice.RemainingAmount` | Credit portion |
+| `OtherCharges` | `invoice.OtherCharges` | Delivery / service fees |
+| `COGS` | Passed as `totalCost` parameter | Computed by caller from line items |
 
-**COGS = Σ(for each item: `retailQty` × `productUnit.PurchaseCost`)**
+**NetRevenue MUST NOT be clamped to zero:** If `DiscountAmount > SubTotal`, return `Result.Failure("لا يمكن أن يكون الخصم أكبر من إجمالي الفاتورة")` — never clamp to zero (RULE-379).
 
-Where `retailQty = item.Product.GetRetailQuantityEquivalent(item.Quantity, item.Mode)`  
-and `productUnit` = `item.Product.GetBaseUnit()` (base unit holds the current weighted average cost).
-
-**Important:** The `PurchaseCost` on the base `ProductUnit` is the current weighted average cost at the time of sale (updated by `UpdateProductPricingService` during purchase posting).
+**DeliveryChargesRevenue (41020003)** is a SEPARATE revenue account from SalesRevenue (41010001). OtherCharges are credited to `DeliveryChargesRevenue`, NOT to SalesRevenue (RULE-493).
 
 #### 3.3.2 Account Resolution for Cash/AR (Revenue Side)
 
-Use the `SystemAccountMappings.GetPaymentAccountId()` method extended for Mixed:
+Use `GetCustomerAccountId(invoice, dict)` helper which uses `invoice.Customer?.AccountId` with fallback to `SystemAccountKey.AccountsReceivable`.
 
-> See `SalesSystem.Application/` for service implementation patterns.
+#### 3.3.3 Journal Entry — Compound Entry
 
-#### 3.3.3 Journal Entry — Single Compound Entry (5 lines)
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1a | `DefaultCash` (if `PaidAmount > 0`) | 11010001 | الصندوق | `PaidAmount` | — | `الجزء النقدي من فاتورة البيع` |
+| 1b | Customer's `AccountId` (if `RemainingAmount > 0`) | 11030001 | العميل النقدي | `RemainingAmount` | — | `الجزء الآجل من فاتورة البيع` |
+| 2 | `SalesRevenue` | 41010001 | إيرادات المبيعات | — | `NetRevenue` | `إيراد المبيعات (صافي بعد الخصم)` |
+| 3 | `DeliveryChargesRevenue` (if `OtherCharges > 0`) | 41020003 | إيرادات التوصيل | — | `OtherCharges` | `إيرادات التوصيل ورسوم الخدمة` |
+| 4 | `VatOutput` (if `TaxAmount > 0`) | 21020001 | ضريبة المبيعات (خرج) | — | `TaxAmount` | `ضريبة المخرجات` |
+| 5 | `CostOfGoodsSold` (if `totalCost > 0`) | 51010001 | تكلفة البضاعة المباعة | `totalCost` | — | `تكلفة البضاعة المباعة` |
+| 6 | `Inventory` (if `totalCost > 0`) | 11040001 | بضاعة أول المدة | — | `totalCost` | `تخفيض المخزون` |
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | Cash Account (1111) — if `PaidAmount > 0` | `PaidAmount` | — | `سداد نقدي — فاتورة مبيعات رقم {invoiceNo}` |
-| 2 | AR Account (1131) — if `DueAmount > 0` | `DueAmount` | — | `رصيد آجل — فاتورة مبيعات رقم {invoiceNo}` |
-| 3 | Sales Revenue (1521) | — | `NetRevenue` | `إيراد مبيعات — فاتورة رقم {invoiceNo}` |
-| 4 | VAT Output (1331) — if `TaxAmount > 0` | — | `TaxAmount` | `ضريبة مبيعات — فاتورة رقم {invoiceNo}` |
-| 5 | COGS (1621) | `COGS` | — | `تكلفة البضاعة المباعة — فاتورة رقم {invoiceNo}` |
-| 6 | Inventory (1141) | — | `COGS` | `تخفيض المخزون — فاتورة رقم {invoiceNo}` |
-
+- **Sales Revenue is a SINGLE account** (41010001 — إيرادات المبيعات), NOT split into Cash Sales and Credit Sales. The PaymentType distinction is captured on the debit side (Cash Account vs Customer Account).
+- **DeliveryChargesRevenue** is a SEPARATE account (41020003 — إيرادات التوصيل) — credited independently from SalesRevenue.
 - **EntryType:** `JournalEntryType.Sales (1)`
 - **Balance check:**
-  - Debits: `PaidAmount + DueAmount + COGS` = `TotalAmount + COGS`
-  - Credits: `NetRevenue + TaxAmount + COGS` = `(SubTotal - Discount) + TaxAmount + COGS` = `TotalAmount + COGS` ✓
-- **Missing lines:** If `PaidAmount == 0`, skip line 1. If `DueAmount == 0`, skip line 2. If `TaxAmount == 0`, skip line 4.
+  - Debits: `PaidAmount + RemainingAmount + totalCost` = `TotalAmount + totalCost`
+  - Credits: `NetRevenue + OtherCharges + TaxAmount + totalCost` = `(SubTotal - Discount) + OtherCharges + TaxAmount + totalCost` = `TotalAmount + totalCost` ✓
+- **Missing lines:** Lines 1a/1b are exclusive (cash OR credit OR both for mixed). Lines 3/4 skipped if zero. Lines 5/6 skipped if `totalCost` is 0.
 
 #### 3.3.4 Order inside SalesService.PostAsync()
 
@@ -207,15 +197,15 @@ Existing operations (in order):
 1. invoice.Post()
 2. SaveChangesAsync
 3. Deduct Stock (foreach item)
-4. Update Customer Balance (if DueAmount > 0)
+4. Update Customer Balance (if RemainingAmount > 0)
 5. Record Cash Transaction (if CashBoxId.HasValue)
 --- NEW: Accounting Integration ---
-6. Calculate COGS from current PurchaseCost per item
-7. Call AccountingIntegrationService.CreateSalesInvoiceEntryAsync(invoice, userId)
-   - Loads mappings + accounts
-   - Generates JE number
-   - Creates 5- or 6-line journal entry
-   - Saves journal entry + lines
+6. Calculate COGS = Σ(item retail quantity × unit cost)
+7. Call AccountingIntegrationService.CreateSalesPostEntryAsync(invoice, userId, totalCost)
+   - Resolves all system account mappings via GetAccountIdDictionaryAsync
+   - Uses per-entity Customer.AccountId for AR side
+   - Validates discount ≤ subtotal
+   - Creates + posts compound journal entry
    - Fails → rollback entire transaction
 --- End New ---
 8. SaveChangesAsync
@@ -224,11 +214,11 @@ Existing operations (in order):
 
 ---
 
-### 3.4 Sales Invoice Cancel
+### 3.4 Sales Invoice Cancel (Full Reversal)
 
 **Trigger:** Inside `SalesService.CancelAsync()` AFTER stock and balance have been reversed  
 **Timing:** Inside the existing transaction, before `CommitAsync()`  
-**Reference:** `ReferenceType = "SalesInvoiceCancel"`, `ReferenceId = invoice.Id`, `ReferenceNumber = invoice.InvoiceNo.ToString()`
+**Reference:** `ReferenceType = "SalesInvoice"`, `ReferenceId = invoice.Id`, `ReferenceNumber = $"{invoice.InvoiceNo}-REV"`
 
 **Condition:** Only if invoice was `Status == Posted` before this cancel call. If the invoice was still `Draft`, no journal entry was created, so no reversal is needed.
 
@@ -236,19 +226,19 @@ Existing operations (in order):
 
 Reverses ALL lines from the Post entry (debit ↔ credit swap):
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | Cash Account (1111) — if original `PaidAmount > 0` | — | `PaidAmount` | `عكس سداد نقدي — إلغاء فاتورة رقم {invoiceNo}` |
-| 2 | AR Account (1131) — if original `DueAmount > 0` | — | `DueAmount` | `عكس رصيد آجل — إلغاء فاتورة رقم {invoiceNo}` |
-| 3 | Sales Returns (1631) | `NetRevenue` | — | `مردود مبيعات — إلغاء فاتورة رقم {invoiceNo}` |
-| 4 | VAT Output (1331) — if original `TaxAmount > 0` | `TaxAmount` | — | `عكس ضريبة مبيعات — فاتورة رقم {invoiceNo}` |
-| 5 | COGS (1621) | — | `COGS` | `عكس تكلفة البضاعة المباعة — إلغاء فاتورة رقم {invoiceNo}` |
-| 6 | Inventory (1141) | `COGS` | — | `إعادة المخزون — إلغاء فاتورة رقم {invoiceNo}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `SalesRevenue` | 41010001 | إيرادات المبيعات | `NetRevenue` | — | `عكس إيراد المبيعات` |
+| 2 | `DeliveryChargesRevenue` (if original `OtherCharges > 0`) | 41020003 | إيرادات التوصيل | `OtherCharges` | — | `عكس إيرادات التوصيل ورسوم الخدمة` |
+| 3 | `VatOutput` (if original `TaxAmount > 0`) | 21020001 | ضريبة المبيعات (خرج) | `TaxAmount` | — | `عكس ضريبة المخرجات` |
+| 4a | `DefaultCash` (if original cash) | 11010001 | الصندوق | — | `PaidAmount` | `عكس الجزء النقدي من فاتورة البيع` |
+| 4b | Customer's `AccountId` (if original credit) | 11030001 | العميل النقدي | — | `RemainingAmount` | `عكس الجزء الآجل من فاتورة البيع` |
+| 5 | `Inventory` (COGS reversal — queries original entry) | 11040001 | بضاعة أول المدة | `cogsAmount` | — | `عكس تكلفة البضاعة المباعة — إعادة المخزون` |
+| 6 | `CostOfGoodsSold` (COGS reversal) | 51010001 | تكلفة البضاعة المباعة | — | `cogsAmount` | `عكس تكلفة البضاعة المباعة` |
 
+- **COGS reversal queries the original journal entry** to find the exact COGS amount — the `ReverseSalesPostEntryAsync()` method looks up the original entry by `ReferenceType="SalesInvoice"` + `ReferenceId=invoice.Id` + `EntryType=Sales`, then queries `JournalEntryLines` for lines with `AccountId == COGS account && Debit > 0`.
+- **Fallback:** If original entry not found, COGS reversal is skipped with a warning log. Revenue-side reversal still applies.
 - **EntryType:** `JournalEntryType.SalesReturn (2)`
-- **Balance check:**
-  - Debits: `NetRevenue + TaxAmount + COGS` = `TotalAmount + COGS`
-  - Credits: `PaidAmount + DueAmount + COGS` = `TotalAmount + COGS` ✓
 
 #### 3.4.2 Order inside SalesService.CancelAsync()
 
@@ -256,15 +246,16 @@ Reverses ALL lines from the Post entry (debit ↔ credit swap):
 Existing operations (in order):
 1. IF Status == Posted:
    a. Reverse Stock (foreach item)
-   b. Reverse Customer Balance (if DueAmount > 0)
+   b. Reverse Customer Balance (if RemainingAmount > 0)
    c. Create offsetting cash transaction (if CashBoxId)
 --- NEW: Accounting Integration ---
 2. IF Status == Posted:
-   a. Calculate COGS (same as post — reuse the same method)
-   b. Call AccountingIntegrationService.ReverseSalesInvoiceEntryAsync(invoice, userId)
-   c. Fails → rollback entire transaction
+   a. Call AccountingIntegrationService.ReverseSalesPostEntryAsync(invoice, userId)
+   b. Queries original entry for COGS lines
+   c. Creates reversal entry with Dr↔Cr swapped
+   d. Fails → rollback entire transaction
 --- End New ---
-3. invoice.SetPaidAmount(0)  // Zero out
+3. invoice.SetPaidAmount(0)
 4. invoice.Cancel()
 5. SaveChangesAsync
 6. CommitAsync
@@ -285,31 +276,31 @@ IF Status == Draft (no journal entry to reverse):
 
 | Value | Source | Formula |
 |-------|--------|---------|
-| `NetPurchaseCost` | `invoice.SubTotal - invoice.DiscountAmount` | Net cost of goods |
+| `NetInventoryCost` | `invoice.SubTotal - invoice.DiscountAmount + invoice.OtherCharges` | Landed cost (includes OtherCharges) |
 | `TaxAmount` | `invoice.TaxAmount` | VAT input |
-| `TotalAmount` | `invoice.TotalAmount` | `NetPurchaseCost + TaxAmount` |
+| `TotalAmount` | `invoice.NetTotal` | `NetInventoryCost + TaxAmount` |
 | `PaidAmount` | `invoice.PaidAmount` | Cash paid |
-| `DueAmount` | `invoice.DueAmount` | Amount owed to supplier |
+| `RemainingAmount` | `invoice.RemainingAmount` | Amount owed to supplier |
+
+**Note:** `NetInventoryCost` includes `OtherCharges` (landed cost distribution) — this matches the `AllocateAdditionalCharges()` behavior.
 
 #### 3.5.2 Account Resolution
 
-For purchases, the payment goes to either Cash or AP:
-
-> See `SalesSystem.Application/` for service implementation patterns.
+Use `GetSupplierAccountId(invoice, dict)` helper which uses `invoice.Supplier?.AccountId` with fallback to `SystemAccountKey.AccountsPayable`.
 
 #### 3.5.3 Journal Entry
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | Inventory (1141) | `NetPurchaseCost` | — | `تكلفة المشتريات — فاتورة رقم {invoiceNo}` |
-| 2 | VAT Input (1332) — if `TaxAmount > 0` | `TaxAmount` | — | `ضريبة مشتريات — فاتورة رقم {invoiceNo}` |
-| 3 | Cash Account (1111) — if `PaidAmount > 0` | — | `PaidAmount` | `دفع نقدي — فاتورة مشتريات رقم {invoiceNo}` |
-| 4 | AP Account (1321) — if `DueAmount > 0` | — | `DueAmount` | `رصيد دائن — فاتورة مشتريات رقم {invoiceNo}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `Inventory` | 11040001 | بضاعة أول المدة | `NetInventoryCost` | — | `تكلفة المشتريات (صافي بعد الخصم)` |
+| 2 | `VatInput` (if `TaxAmount > 0`) | 21020002 | ضريبة المشتريات (دخل) | `TaxAmount` | — | `ضريبة المدخلات` |
+| 3a | `DefaultCash` (if `PaidAmount > 0`) | 11010001 | الصندوق | — | `PaidAmount` | `الجزء النقدي من فاتورة الشراء` |
+| 3b | Supplier's `AccountId` (if `RemainingAmount > 0`) | 21010001 | المورد النقدي | — | `RemainingAmount` | `الجزء الآجل من فاتورة الشراء` |
 
 - **EntryType:** `JournalEntryType.Purchase (3)`
 - **Balance check:**
-  - Debits: `NetPurchaseCost + TaxAmount` = `TotalAmount`
-  - Credits: `PaidAmount + DueAmount` = `TotalAmount` ✓
+  - Debits: `NetInventoryCost + TaxAmount` = `TotalAmount`
+  - Credits: `PaidAmount + RemainingAmount` = `TotalAmount` ✓
 
 #### 3.5.4 Order inside PurchaseService.PostAsync()
 
@@ -320,14 +311,15 @@ Existing operations (in order):
 3. AutoUpdatePrices (if enabled)
 4. Increase Stock (foreach item)
 5. Update Pricing/Costing (foreach item)
-6. Update Supplier Balance (if DueAmount > 0)
+6. Update Supplier Balance (if RemainingAmount > 0)
 7. Record Cash Transaction (if CashBoxId.HasValue)
 --- NEW: Accounting Integration ---
-8. Call AccountingIntegrationService.CreatePurchaseInvoiceEntryAsync(invoice, userId)
-   - Loads mappings + accounts
-   - Generates JE number
-   - Creates 3- or 4-line journal entry
-   - Saves journal entry + lines
+8. Call AccountingIntegrationService.CreatePurchasePostEntryAsync(invoice, userId)
+   - Resolves all system account mappings
+   - Uses per-entity Supplier.AccountId for AP side
+   - Validates discount ≤ subtotal
+   - Includes OtherCharges in NetInventoryCost (landed cost)
+   - Creates + posts journal entry
    - Fails → rollback entire transaction
 --- End New ---
 9. SaveChangesAsync
@@ -340,23 +332,24 @@ Existing operations (in order):
 
 **Trigger:** Inside `PurchaseService.CancelAsync()` AFTER stock and balance have been reversed  
 **Timing:** Inside the existing transaction, before `CommitAsync()`  
-**Reference:** `ReferenceType = "PurchaseInvoiceCancel"`, `ReferenceId = invoice.Id`, `ReferenceNumber = invoice.InvoiceNo.ToString()`
+**Reference:** `ReferenceType = "PurchaseInvoice"`, `ReferenceId = invoice.Id`, `ReferenceNumber = $"{invoice.InvoiceNo}-REV"`
 
 **Condition:** Only if invoice was `Status == Posted`.
 
 #### 3.6.1 Journal Entry — Full Reversal
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | Inventory (1141) | — | `NetPurchaseCost` | `عكس تكلفة المشتريات — إلغاء فاتورة رقم {invoiceNo}` |
-| 2 | VAT Input (1332) — if original `TaxAmount > 0` | — | `TaxAmount` | `عكس ضريبة مشتريات — إلغاء فاتورة رقم {invoiceNo}` |
-| 3 | Cash Account (1111) — if original `PaidAmount > 0` | `PaidAmount` | — | `عكس دفع نقدي — إلغاء فاتورة رقم {invoiceNo}` |
-| 4 | AP Account (1321) — if original `DueAmount > 0` | `DueAmount` | — | `عكس رصيد دائن — إلغاء فاتورة رقم {invoiceNo}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `PurchaseReturns` | 51020002 | مردودات مشتريات | — | `NetInventoryCost` | `عكس تكلفة المشتريات - مردودات مشتريات` |
+| 2 | `VatInput` (if original `TaxAmount > 0`) | 21020002 | ضريبة المشتريات (دخل) | — | `TaxAmount` | `عكس ضريبة المدخلات` |
+| 3a | `DefaultCash` (if original cash) | 11010001 | الصندوق | `PaidAmount` | — | `عكس الجزء النقدي من فاتورة الشراء` |
+| 3b | Supplier's `AccountId` (if original credit) | 21010001 | المورد النقدي | `RemainingAmount` | — | `عكس الجزء الآجل من فاتورة الشراء` |
 
+- **Note:** Purchase return reversal credits `PurchaseReturns` account (51020002 — مردودات مشتريات), NOT `Inventory` account directly. The `PurchaseReturnAccountId` from system mappings is used (RULE-458).
 - **EntryType:** `JournalEntryType.PurchaseReturn (4)`
 - **Balance check:**
-  - Debits: `PaidAmount + DueAmount` = `TotalAmount`
-  - Credits: `NetPurchaseCost + TaxAmount` = `TotalAmount` ✓
+  - Debits: `PaidAmount + RemainingAmount` = `TotalAmount`
+  - Credits: `NetInventoryCost + TaxAmount` = `TotalAmount` ✓
 
 #### 3.6.2 Order inside PurchaseService.CancelAsync()
 
@@ -364,12 +357,13 @@ Existing operations (in order):
 Existing operations (in order):
 1. IF Status == Posted:
    a. Reverse Stock (foreach item)
-   b. Reverse Supplier Balance (if DueAmount > 0)
+   b. Reverse Supplier Balance (if RemainingAmount > 0)
    c. Reverse Cash Transaction (if CashBoxId)
 --- NEW: Accounting Integration ---
 2. IF Status == Posted:
-   a. Call AccountingIntegrationService.ReversePurchaseInvoiceEntryAsync(invoice, userId)
-   b. Fails → rollback entire transaction
+   a. Call AccountingIntegrationService.ReversePurchasePostEntryAsync(invoice, userId)
+   b. Creates reversal entry crediting PurchaseReturns (not Inventory directly)
+   c. Fails → rollback entire transaction
 --- End New ---
 3. invoice.SetPaidAmount(0)
 4. invoice.Cancel()
@@ -379,60 +373,69 @@ Existing operations (in order):
 
 ---
 
-### 3.7 Customer Payment
+### 3.7 Customer Payment (Receipt)
 
-**Trigger:** Inside `PaymentService.CreateCustomerPaymentAsync()` AFTER customer balance is decreased  
+**Trigger:** Inside `CustomerReceiptService.CreateAsync()` / `PostAsync()` AFTER customer balance is decreased  
 **Timing:** Inside the existing transaction, before `CommitAsync()`  
-**Reference:** `ReferenceType = "CustomerPayment"`, `ReferenceId = payment.Id`, `ReferenceNumber = payment.PaymentNo`
+**Reference:** `ReferenceType = "CustomerReceipt"`, `ReferenceId = receipt.Id`, `ReferenceNumber = receipt.Id.ToString()`
 
 #### 3.7.1 Journal Entry
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | `Mappings.DefaultCashAccountId` (1111) | `payment.Amount` | — | `تحصيل من العميل {customerName} — سند رقم {paymentNo}` |
-| 2 | `Mappings.AccountsReceivableAccountId` (1131) | — | `payment.Amount` | `تحصيل من العميل {customerName} — سند رقم {paymentNo}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `DefaultCash` | 11010001 | الصندوق | `receipt.Amount` | — | `سند قبض من العميل: {customerName}` |
+| 2 | Customer's `AccountId` (fallback `AccountsReceivable`) | 11030001 | العميل النقدي | — | `receipt.Amount` | `سند قبض من العميل: {customerName}` |
 
 - **EntryType:** `JournalEntryType.CustomerReceipt (10)`
 - **Balance check:** Dr = Cr = Amount ✓
+- **Per-entity routing:** Uses `receipt.Customer?.AccountId` with fallback to `SystemAccountKey.AccountsReceivable`.
 
-#### 3.7.2 Order inside PaymentService.CreateCustomerPaymentAsync()
+#### 3.7.2 Order inside CustomerReceiptService.CreateAsync()
 
 ```
 Existing operations (in order):
-1. Create CustomerPayment entity
-2. AddAsync(payment)
+1. Create CustomerReceipt entity
+2. AddAsync(receipt)
 3. customer.DecreaseBalance(amount)
 --- NEW: Accounting Integration ---
-4. Call AccountingIntegrationService.CreateCustomerPaymentEntryAsync(payment, userId)
+4. Call AccountingIntegrationService.CreateCustomerPaymentEntryAsync(receipt, customerName, userId)
+   - Resolves DefaultCash and AccountsReceivable mappings
+   - Uses per-entity Customer.AccountId for AR credit
+   - Creates + posts journal entry
    - Fails → rollback entire transaction
 --- End New ---
 5. SaveChangesAsync
 6. CommitAsync
 ```
 
-#### 3.7.3 Edge Cases
+#### 3.7.3 Reverse (Delete/Cancel)
 
-- **PaymentMethod** (if needed for payment clearing): The current `PaymentMethod` field is a `byte` that can map to `Cash=1`, `Bank=2`, etc. However, the accounting for customer receipt always reduces AR regardless of payment method — the debit to Cash vs Bank depends on how the money was received. For Phase 24, use `DefaultCashAccountId` as the default debit account for all customer payments. A future enhancement can resolve to Bank if `PaymentMethod == 2`.
+When a posted customer receipt is deleted or cancelled, call:
+```csharp
+ReverseCustomerPaymentEntryAsync(receiptId, amount, customerName, customerAccountId, reversedByUserId, ct)
+```
+Creates reversal: Dr Customer Account / Cr Cash.
 
 ---
 
 ### 3.8 Supplier Payment
 
-**Trigger:** Inside `PaymentService.CreateSupplierPaymentAsync()` AFTER supplier balance is decreased  
+**Trigger:** Inside `SupplierPaymentService.CreateAsync()` / `PostAsync()` AFTER supplier balance is decreased  
 **Timing:** Inside the existing transaction, before `CommitAsync()`  
-**Reference:** `ReferenceType = "SupplierPayment"`, `ReferenceId = payment.Id`, `ReferenceNumber = payment.PaymentNo`
+**Reference:** `ReferenceType = "SupplierPayment"`, `ReferenceId = payment.Id`, `ReferenceNumber = payment.Id.ToString()`
 
 #### 3.8.1 Journal Entry
 
-| # | Account | Debit | Credit | Description |
-|---|---------|-------|--------|-------------|
-| 1 | `Mappings.AccountsPayableAccountId` (1321) | `payment.Amount` | — | `دفع للمورد {supplierName} — سند رقم {paymentNo}` |
-| 2 | `Mappings.DefaultCashAccountId` (1111) | — | `payment.Amount` | `دفع للمورد {supplierName} — سند رقم {paymentNo}` |
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | Supplier's `AccountId` (fallback `AccountsPayable`) | 21010001 | المورد النقدي | `payment.Amount` | — | `سند دفع للمورد: {supplierName}` |
+| 2 | `DefaultCash` | 11010001 | الصندوق | — | `payment.Amount` | `سند دفع للمورد: {supplierName}` |
 
 - **EntryType:** `JournalEntryType.SupplierPayment (11)`
 - **Balance check:** Dr = Cr = Amount ✓
+- **Per-entity routing:** Uses `payment.Supplier?.AccountId` with fallback to `SystemAccountKey.AccountsPayable`.
 
-#### 3.8.2 Order inside PaymentService.CreateSupplierPaymentAsync()
+#### 3.8.2 Order inside SupplierPaymentService.CreateAsync()
 
 ```
 Existing operations (in order):
@@ -440,12 +443,101 @@ Existing operations (in order):
 2. AddAsync(payment)
 3. supplier.DecreaseBalance(amount)
 --- NEW: Accounting Integration ---
-4. Call AccountingIntegrationService.CreateSupplierPaymentEntryAsync(payment, userId)
+4. Call AccountingIntegrationService.CreateSupplierPaymentEntryAsync(payment, supplierName, userId)
+   - Resolves DefaultCash and AccountsPayable mappings
+   - Uses per-entity Supplier.AccountId for AP debit
+   - Creates + posts journal entry
    - Fails → rollback entire transaction
 --- End New ---
 5. SaveChangesAsync
 6. CommitAsync
 ```
+
+#### 3.8.3 Reverse (Delete/Cancel)
+
+When a posted supplier payment is deleted or cancelled, call:
+```csharp
+ReverseSupplierPaymentEntryAsync(paymentId, amount, supplierName, supplierAccountId, reversedByUserId, ct)
+```
+Creates reversal: Dr Cash / Cr Supplier Account.
+
+---
+
+### 3.9 Sales Return (Standalone — Partial Return)
+
+**Trigger:** Inside `SalesReturnService.PostAsync()`  
+**Timing:** Inside the existing transaction, before `CommitAsync()`  
+**Reference:** `ReferenceType = "SalesReturn"`, `ReferenceId = salesReturn.Id`, `ReferenceNumber = salesReturn.ReturnNo.ToString()`
+
+#### 3.9.1 Journal Entry
+
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `SalesReturns` | 51020001 | مردودات مبيعات | `TotalAmount` | — | `مردود مبيعات — إلغاء الإيراد` |
+| 2 | Customer's `AccountId` | 11030001 | العميل النقدي | — | `TotalAmount` | `مردود مبيعات — تخفيض ذمّة العميل` |
+| 3 | `Inventory` (if `totalCost > 0`) | 11040001 | بضاعة أول المدة | `totalCost` | — | `مردود مبيعات — إعادة المخزون` |
+| 4 | `CostOfGoodsSold` (if `totalCost > 0`) | 51010001 | تكلفة البضاعة المباعة | — | `totalCost` | `مردود مبيعات — عكس التكلفة` |
+
+- **EntryType:** `JournalEntryType.SalesReturn (2)`
+- **Per-entity routing:** Uses `salesReturn.Customer?.AccountId` with fallback to `SystemAccountKey.AccountsReceivable`.
+- **Reverse method:** `ReverseSalesReturnEntryAsync()` swaps Dr↔Cr to restore original state.
+
+---
+
+### 3.10 Purchase Return (Standalone — Partial Return)
+
+**Trigger:** Inside `PurchaseReturnService.PostAsync()`  
+**Timing:** Inside the existing transaction, before `CommitAsync()`  
+**Reference:** `ReferenceType = "PurchaseReturn"`, `ReferenceId = purchaseReturn.Id`, `ReferenceNumber = purchaseReturn.ReturnNo.ToString()`
+
+#### 3.10.1 Journal Entry
+
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | Supplier's `AccountId` (fallback `AccountsPayable`) | 21010001 | المورد النقدي | `TotalAmount` | — | `مردود مشتريات — تخفيض ذمّة المورد` |
+| 2 | `PurchaseReturns` | 51020002 | مردودات مشتريات | — | `TotalAmount` | `مردود مشتريات` |
+
+- **EntryType:** `JournalEntryType.PurchaseReturn (4)`
+- **Per-entity routing:** Uses `purchaseReturn.Supplier?.AccountId` with fallback to `SystemAccountKey.AccountsPayable`.
+- **Reverse method:** `ReversePurchaseReturnEntryAsync()` swaps Dr↔Cr.
+
+---
+
+### 3.11 Expense Entry
+
+**Trigger:** Inside `ExpenseService.PostAsync()`  
+**Timing:** Inside the existing transaction, before `CommitAsync()`  
+**Reference:** `ReferenceType = "Expense"`, `ReferenceId = expense.Id`, `ReferenceNumber = expense.ExpenseNo.ToString()`
+
+#### 3.11.1 Journal Entry
+
+| # | Account | Account Code | Name | Debit | Credit | Description |
+|---|---------|-------------|------|-------|--------|-------------|
+| 1 | `expense.ExpenseAccountId` (per-entity expense account) | 52010001 | مصروفات عمومية | `expense.Amount` | — | `مصروف: {notes}` |
+| 2 | `cashBox.AccountId` (from linked CashBox) | 11010001 | الصندوق | — | `expense.Amount` | `خروج نقدي من الصندوق` |
+
+- **EntryType:** `JournalEntryType.Manual (8)` — expenses are treated as manual entries.
+- **Note:** The debit account comes from `Expense.ExpenseAccountId` (the specific expense account selected when creating the expense), not from SystemAccountMappings.
+- **Credit account** comes from `CashBox.AccountId` (the Account linked to the CashBox used for payment).
+- **Reverse method:** `ReverseExpenseEntryAsync()` swaps Dr↔Cr: Dr CashBox Account / Cr Expense Account.
+
+---
+
+### 3.12 Inventory Opening Entry (Product Opening Stock)
+
+**Trigger:** Inside `ProductService.CreateAsync()` when opening stock is provided  
+**Timing:** Inside `ExecuteTransactionAsync`, after product + stock creation  
+**Condition:** Only if `totalOpeningValue > 0`  
+**Reference:** `ReferenceType = "Product"`, `ReferenceId = product.Id`
+
+#### 3.12.1 Journal Entry
+
+| # | Account Key | Account Code | Name | Debit | Credit | Description |
+|---|-------------|-------------|------|-------|--------|-------------|
+| 1 | `Inventory` | 11040001 | بضاعة أول المدة | `totalOpeningValue` | — | `رصيد افتتاحي للمخزون: {productName}` |
+| 2 | `OpeningBalanceEquity` | 32020001 | رصيد افتتاحي | — | `totalOpeningValue` | `رصيد افتتاحي للمخزون: {productName}` |
+
+- **EntryType:** `JournalEntryType.OpeningBalance (9)`
 
 ---
 
@@ -455,81 +547,79 @@ Existing operations (in order):
 
 | File | Purpose |
 |------|---------|
-| `Application/Interfaces/Services/IAccountingIntegrationService.cs` | Interface with 8 methods |
+| `Application/Interfaces/Services/IAccountingIntegrationService.cs` | Interface with 17 methods |
 | `Application/Accounting/Services/AccountingIntegrationService.cs` | Implementation class |
 
 ### 4.2 Files to Modify
 
 | File | Change |
 |------|--------|
-| `Domain/Accounting/Entities/SystemAccountMappings.cs` | Add `OpeningBalanceEquityAccountId` field + nav property |
-| `Domain/Accounting/Enums/JournalEntryType.cs` | Add `CustomerReceipt=10`, `SupplierPayment=11` |
-| `Infrastructure/Data/Configurations/SystemAccountMappingsConfiguration.cs` | Add property mapping + FK |
-| `Infrastructure/Data/Seeders/AccountingSeeder.cs` | Add account `1422`, update SystemAccountMappings seed |
-| `Application/Services/CustomerService.cs` | Inject `IAccountingIntegrationService`; call after create if OB > 0 |
-| `Application/Services/SupplierService.cs` | Same pattern |
-| `Application/Services/SalesService.cs` | Inject `IAccountingIntegrationService`; call in PostAsync + CancelAsync |
-| `Application/Services/PurchaseService.cs` | Same pattern |
-| `Application/Services/PaymentService.cs` | Inject `IAccountingIntegrationService`; call in both payment methods |
+| `Application/Services/CustomerService.cs` | Inject `IAccountingIntegrationService`; call `CreateCustomerOpeningEntryAsync` after create if OB > 0 |
+| `Application/Services/SupplierService.cs` | Same pattern for supplier opening balance |
+| `Application/Services/SalesService.cs` | Inject; call `CreateSalesPostEntryAsync` in PostAsync + `ReverseSalesPostEntryAsync` in CancelAsync |
+| `Application/Services/PurchaseService.cs` | Inject; call `CreatePurchasePostEntryAsync` in PostAsync + `ReversePurchasePostEntryAsync` in CancelAsync |
+| `Application/Services/CustomerReceiptService.cs` | Inject; call `CreateCustomerPaymentEntryAsync` on create/post + `ReverseCustomerPaymentEntryAsync` on delete/cancel |
+| `Application/Services/SupplierPaymentService.cs` | Inject; call `CreateSupplierPaymentEntryAsync` on create/post + `ReverseSupplierPaymentEntryAsync` on delete/cancel |
+| `Application/Services/SalesReturnService.cs` | Inject; call `CreateSalesReturnEntryAsync` on Post + `ReverseSalesReturnEntryAsync` on Cancel |
+| `Application/Services/PurchaseReturnService.cs` | Inject; call `CreatePurchaseReturnEntryAsync` on Post + `ReversePurchaseReturnEntryAsync` on Cancel |
+| `Application/Services/ExpenseService.cs` | Inject; call `CreateExpenseEntryAsync` on Post + `ReverseExpenseEntryAsync` on Cancel |
+| `Application/Services/ProductService.cs` | Inject; call `CreateProductOpeningEntryAsync` when opening stock > 0 |
+| `Api/Program.cs` | Register `IAccountingIntegrationService` → `AccountingIntegrationService` in DI |
 
 ### 4.3 Transaction Safety Requirements (RULE-275/276)
 
 - ALL calls to `AccountingIntegrationService` MUST happen **inside an existing `ExecuteTransactionAsync` delegate**
-- The existing services (`SalesService`, `PurchaseService`, `PaymentService`) already use `BeginTransactionAsync` + `ExecuteAsync` — these need to be migrated to `ExecuteTransactionAsync` where journal entries are added
+- The existing services (`SalesService`, `PurchaseService`) already use `BeginTransactionAsync` — these MUST be migrated to `ExecuteTransactionAsync` where journal entries are added
 - For `CustomerService.CreateAsync()` and `SupplierService.CreateAsync()` — currently use bare `SaveChangesAsync`; these MUST be wrapped in `ExecuteTransactionAsync` when opening balance > 0
 - If the journal entry creation fails (returns `Result.Failure`), the entire transaction MUST roll back
 
 ### 4.4 COGS Calculation at Time of Sale
 
-The `AccountingIntegrationService` needs a private helper to calculate COGS:
+The `AccountingIntegrationService` receives `totalCost` as a parameter from the caller. The caller (`SalesService.PostAsync()`) computes it as:
 
-> See `SalesSystem.Application/` for service implementation patterns.
+```
+totalCost = Σ(item retail quantity × product unit cost at time of sale)
+```
 
-**Important caveat:** The `item.Product` navigation property must be eagerly loaded for COGS calculation. In `SalesService.PostAsync()`, line 221 shows `"Items.Product"` is already included in the query — so `item.Product` is available.
+For reversal, the COGS amount is **queried from the original journal entry** (looking up lines with `AccountId == CostOfGoodsSold && Debit > 0`), not recalculated from current product costs. This ensures exact-match reversal.
 
 ### 4.5 Fiscal Year Guard
 
-> See `docs/CONSTITUTION.md` for the Result<T> pattern and `docs/AGENTS.md` for service layer patterns.
+Before creating ANY journal entry, the service MUST check `_uow.FiscalYearClosures.AnyAsync(fyc => fyc.FiscalYear == transactionDate.Year)`. Return `Result<int>.Failure("السنة المالية {year} مغلقة — لا يمكن إضافة قيود محاسبية")` if closed.
 
-This applies to ALL 8 methods.
+This applies to ALL 17 methods.
 
 ### 4.6 Number Generation
 
-Each journal entry uses `_numberGenerator.GenerateAsync(ct)` which generates `JE-{yyyyMMdd}-{NNNN}` format. The number is assigned before creating the `JournalEntry` domain entity.
+Each journal entry uses `_journalEntryService.CreateJournalEntryAsync(request, userId, ct)` which internally generates an entry number via `JournalEntryNumberGenerator` in `JE-{yyyyMMdd}-{NNNN}` format. The number is assigned before creating the `JournalEntry` domain entity.
 
 ---
 
-## 5. COGS Detail — Why and How
+## 5. Account Code Reference — SystemAccountMappings (Already Seeded)
 
-### 5.1 Why COGS Matters
-
-Currently when a sales invoice is posted, stock is deducted but no accounting entry recognizes the cost of goods sold. This means:
-
-- **Inventory asset account** is never credited → inventory value in the balance sheet does not decrease
-- **COGS expense account** is never debited → profit is overstated on the income statement
-- The business cannot run a proper income statement or balance sheet
-
-**Without COGS entry:** Revenue is recognized but the associated cost is not — gross profit is inflated.
-
-### 5.2 How COGS is Captured
-
-The `ProductUnit.PurchaseCost` field holds the current weighted average cost per base unit (updated by `UpdateProductPricingService` after each purchase). At sale time:
-
-```
-LineCOGS = retailQuantity × baseUnit.PurchaseCost
-TotalCOGS = Σ(LineCOGS across all items)
-```
-
-The retail quantity is obtained via `item.Product.GetRetailQuantityEquivalent(item.Quantity, item.Mode)` — this ensures wholesale quantities are converted to base units before multiplying by the base unit cost.
-
-### 5.3 COGS for Cancel/Reverse
-
-On cancellation, the SAME COGS amount from the original post is used for reversal. Since we don't store COGS on the invoice entity, the `AccountingIntegrationService.ReverseSalesInvoiceEntryAsync()` must recalculate it using the same formula (product cost at reversal time).
-
-**Risk:** If product costs have changed between post and cancel, the COGS reversal amount may differ. This is acceptable because:
-1. Cancellations are typically near-term (same day/week)
-2. The cost at reversal represents the current inventory valuation
-3. Small discrepancies (± a few SAR) are immaterial
+| SystemAccountKey | Enum Value | Account Code | Account Name (Ar) |
+|-----------------|------------|-------------|-------------------|
+| DefaultCash | 1 | 11010001 | الصندوق |
+| DefaultBank | 2 | 11020001 | البنك الأهلي |
+| AccountsReceivable | 3 | 11030001 | العميل النقدي |
+| AccountsPayable | 4 | 21010001 | المورد النقدي |
+| Inventory | 5 | 11040001 | بضاعة أول المدة |
+| CostOfGoodsSold | 6 | 51010001 | تكلفة البضاعة المباعة |
+| SalesRevenue | 7 | 41010001 | إيرادات المبيعات |
+| SalesReturns | 8 | 51020001 | مردودات مبيعات |
+| PurchaseReturns | 9 | 51020002 | مردودات مشتريات |
+| VatOutput | 10 | 21020001 | ضريبة المبيعات (خرج) |
+| VatInput | 11 | 21020002 | ضريبة المشتريات (دخل) |
+| Capital | 12 | 31010001 | رأس المال |
+| OpeningBalanceEquity | 13 | 32020001 | رصيد افتتاحي |
+| RetainedEarnings | 14 | 32010001 | أرباح مدورة |
+| UndistributedProfits | 15 | 32030001 | أرباح غير موزعة |
+| InventoryShortage | 16 | 52020002 | عجز مخزون |
+| InventorySurplus | 17 | 52020003 | زيادة مخزون |
+| GeneralExpense | 18 | 52010001 | مصروفات عمومية |
+| SpoilageLoss | 19 | 52020001 | هالك المخزون |
+| EmployeeCustody | 20 | 11070001 | عهدة الموظفين |
+| DeliveryChargesRevenue | 21 | 41020003 | إيرادات التوصيل |
 
 ---
 
@@ -537,21 +627,28 @@ On cancellation, the SAME COGS amount from the original post is used for reversa
 
 | Test Case | Expected JE Lines | Validation |
 |-----------|------------------|------------|
-| **Customer Create (OB > 0)** | Dr AR, Cr OB Equity | Balance zero |
+| **Customer Create (OB > 0)** | Dr AR (Customer.AccountId), Cr OB Equity (32020001) | Balance zero |
 | **Customer Create (OB = 0)** | No entry | — |
-| **Supplier Create (OB > 0)** | Dr OB Equity, Cr AP | Balance zero |
-| **Sales Post (Cash, no tax)** | Dr Cash, Cr Revenue, Dr COGS, Cr Inventory | 4 lines balanced |
-| **Sales Post (Credit, with tax)** | Dr AR, Cr Revenue, Cr VAT, Dr COGS, Cr Inventory | 5 lines balanced |
-| **Sales Post (Mixed)** | Dr Cash + Dr AR, Cr Revenue + Cr VAT + Dr COGS - Cr Inventory | 6 lines balanced |
-| **Sales Cancel (Posted)** | Full reversal | Mirrors post |
+| **Supplier Create (OB > 0)** | Dr OB Equity (32020001), Cr AP (Supplier.AccountId) | Balance zero |
+| **Product Create (OB > 0)** | Dr Inventory (11040001), Cr OB Equity (32020001) | Balance zero |
+| **Sales Post (Cash, no tax)** | Dr Cash (11010001), Cr SalesRevenue (41010001), Dr COGS (51010001), Cr Inventory (11040001) | 4 lines balanced |
+| **Sales Post (Credit, with tax, delivery)** | Dr AR (Customer.AccountId), Cr SalesRevenue + Cr DeliveryChargesRevenue + Cr VatOutput, Dr COGS, Cr Inventory | 6 lines balanced |
+| **Sales Post (Mixed)** | Dr Cash + Dr AR, Cr SalesRevenue + Cr VatOutput + Dr COGS - Cr Inventory | 6 lines balanced |
+| **Sales Cancel (Posted)** | Full reversal — queries original COGS lines | Mirrors post |
 | **Sales Cancel (Draft)** | No entry | — |
-| **Purchase Post (Cash)** | Dr Inventory, Cr Cash | 2 lines |
-| **Purchase Post (Credit, with tax)** | Dr Inv + Dr VAT Input, Cr AP | 3 lines |
-| **Purchase Cancel (Posted)** | Full reversal | Mirrors post |
-| **Customer Payment** | Dr Cash, Cr AR | 2 lines |
-| **Supplier Payment** | Dr AP, Cr Cash | 2 lines |
-| **Fiscal Year Closed** | All 8 methods return `Result.Failure` with Arabic message | Blocked |
-| **SystemAccountMappings not found** | All methods return `Result.Failure` | Graceful error |
+| **Purchase Post (Cash, no tax)** | Dr Inventory (11040001), Cr Cash (11010001) | 2 lines |
+| **Purchase Post (Credit, with tax)** | Dr Inventory + Dr VatInput (21020002), Cr AP (Supplier.AccountId) | 3 lines |
+| **Purchase Post (with OtherCharges)** | Dr Inventory (incl. landed cost) + Dr VatInput, Cr Cash/AP | Landed cost included |
+| **Purchase Cancel (Posted)** | Cr PurchaseReturns (51020002), Cr VatInput, Dr Cash/AP | Mirrors post |
+| **Customer Payment** | Dr Cash (11010001), Cr AR (Customer.AccountId) | 2 lines |
+| **Supplier Payment** | Dr AP (Supplier.AccountId), Cr Cash (11010001) | 2 lines |
+| **Sales Return** | Dr SalesReturns (51020001), Cr AR + Dr Inventory, Cr COGS | 4 lines |
+| **Purchase Return** | Dr AP, Cr PurchaseReturns (51020002) | 2 lines |
+| **Expense Post** | Dr ExpenseAccount, Cr CashBox.Account | 2 lines |
+| **Expense Cancel** | Dr CashBox.Account, Cr ExpenseAccount | 2 lines reversal |
+| **Fiscal Year Closed** | All 17 methods return `Result.Failure` with Arabic message | Blocked |
+| **SystemAccountMapping not found** | All methods return `Result.Failure` | Graceful error |
+| **NetRevenue negative (Discount > SubTotal)** | `Result.Failure` returned — never clamp to zero | RULE-379 |
 
 ---
 
@@ -559,19 +656,17 @@ On cancellation, the SAME COGS amount from the original post is used for reversa
 
 ### 7.1 Database Migration
 
-No new tables are created. Only:
-- New seed account `1422` (idempotent — skipped if accounts already seeded)
-- New `OpeningBalanceEquityAccountId` column on `SystemAccountMappings` table
-
-> See `docs/database-schema.md` for the canonical table definitions and `Infrastructure/Data/Seeders/AccountingSeeder.cs` for seed patterns.
+No new tables or columns are needed. All Chart of Accounts and SystemAccountMappings are already seeded from Phase 18.
 
 ### 7.2 Rollback
 
 If the accounting integration causes issues:
 1. Remove the `IAccountingIntegrationService` injection from each business service
 2. Comment out the integration calls (4-5 lines per method)
-3. The system continues to work without journal entries (as it currently does)
-4. No data loss — existing data integrity is preserved
+3. Remove DI registration from `Program.cs`
+4. The system continues to work without journal entries (as it currently does)
+5. No data loss — existing data integrity is preserved
+6. The `SystemAccountMapping` table and seeded accounts remain but are unused
 
 ---
 
@@ -579,16 +674,60 @@ If the accounting integration causes issues:
 
 | # | File | Type | Description |
 |---|------|------|-------------|
-| 1 | `JournalEntryType.cs` | Enum | Add `CustomerReceipt=10, SupplierPayment=11` |
-| 2 | `SystemAccountMappings.cs` | Entity | Add `OpeningBalanceEquityAccountId` field + nav |
-| 3 | `SystemAccountMappingsConfiguration.cs` | Config | Map new field + FK with Restrict |
-| 4 | `AccountingSeeder.cs` | Seeder | Add account `1422` + update mappings seed |
-| 5 | `IAccountingIntegrationService.cs` | NEW | Interface with 8 methods |
-| 6 | `AccountingIntegrationService.cs` | NEW | Implementation class |
-| 7 | `CustomerService.cs` | Modify | Inject + call after create |
-| 8 | `SupplierService.cs` | Modify | Inject + call after create |
-| 9 | `SalesService.cs` | Modify | Inject + call in Post/Cancel |
-| 10 | `PurchaseService.cs` | Modify | Inject + call in Post/Cancel |
-| 11 | `PaymentService.cs` | Modify | Inject + call in both payment creates |
+| 1 | `IAccountingIntegrationService.cs` | NEW | Interface with 17 methods |
+| 2 | `AccountingIntegrationService.cs` | NEW | Implementation class |
+| 3 | `CustomerService.cs` | Modify | Inject + call opening entry after create |
+| 4 | `SupplierService.cs` | Modify | Inject + call opening entry after create |
+| 5 | `SalesService.cs` | Modify | Inject + call in Post/Cancel (with COGS) |
+| 6 | `PurchaseService.cs` | Modify | Inject + call in Post/Cancel (with landed cost) |
+| 7 | `CustomerReceiptService.cs` | Modify | Inject + call in Create/Delete |
+| 8 | `SupplierPaymentService.cs` | Modify | Inject + call in Create/Delete |
+| 9 | `SalesReturnService.cs` | Modify | Inject + call in Post/Cancel |
+| 10 | `PurchaseReturnService.cs` | Modify | Inject + call in Post/Cancel |
+| 11 | `ExpenseService.cs` | Modify | Inject + call in Post/Cancel |
+| 12 | `ProductService.cs` | Modify | Inject + call for opening stock |
+| 13 | `Api/Program.cs` | Modify | Register `IAccountingIntegrationService` DI |
+| 14 | `SystemAccountMapping.cs` | Entity | Already exists from Phase 18 |
+| 15 | `AccountingSeeder.cs` | Seeder | Already seeded 81 accounts + 21 mappings from Phase 18 |
 
-**Total: 11 files affected (2 new, 9 modified)**
+**Total: 15 files (2 new, 13 modified)**
+
+### IAccountingIntegrationService Interface (17 Methods)
+
+```csharp
+public interface IAccountingIntegrationService
+{
+    // Opening entries
+    Task<Result<int>> CreateCustomerOpeningEntryAsync(...);
+    Task<Result<int>> CreateSupplierOpeningEntryAsync(...);
+    Task<Result<int>> CreateProductOpeningEntryAsync(...);
+
+    // Sales invoice
+    Task<Result<int>> CreateSalesPostEntryAsync(SalesInvoice invoice, int userId, decimal totalCost, CancellationToken ct);
+    Task<Result<int>> ReverseSalesPostEntryAsync(SalesInvoice invoice, int userId, CancellationToken ct);
+
+    // Purchase invoice
+    Task<Result<int>> CreatePurchasePostEntryAsync(PurchaseInvoice invoice, int userId, CancellationToken ct);
+    Task<Result<int>> ReversePurchasePostEntryAsync(PurchaseInvoice invoice, int userId, CancellationToken ct);
+
+    // Customer payment (receipt)
+    Task<Result<int>> CreateCustomerPaymentEntryAsync(...);
+    Task<Result<int>> ReverseCustomerPaymentEntryAsync(...);
+
+    // Supplier payment
+    Task<Result<int>> CreateSupplierPaymentEntryAsync(...);
+    Task<Result<int>> ReverseSupplierPaymentEntryAsync(...);
+
+    // Sales return
+    Task<Result<int>> CreateSalesReturnEntryAsync(SalesReturn salesReturn, decimal totalCost, int userId, CancellationToken ct);
+    Task<Result<int>> ReverseSalesReturnEntryAsync(SalesReturn salesReturn, decimal totalCost, int userId, CancellationToken ct);
+
+    // Purchase return
+    Task<Result<int>> CreatePurchaseReturnEntryAsync(PurchaseReturn purchaseReturn, int userId, CancellationToken ct);
+    Task<Result<int>> ReversePurchaseReturnEntryAsync(PurchaseReturn purchaseReturn, int userId, CancellationToken ct);
+
+    // Expense
+    Task<Result<int>> CreateExpenseEntryAsync(Expense expense, int userId, CancellationToken ct);
+    Task<Result<int>> ReverseExpenseEntryAsync(Expense expense, int userId, CancellationToken ct);
+}
+```

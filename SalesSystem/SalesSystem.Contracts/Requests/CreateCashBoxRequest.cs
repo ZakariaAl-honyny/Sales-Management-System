@@ -10,6 +10,5 @@ namespace SalesSystem.Contracts.Requests;
 public record CreateCashBoxRequest(
     [property: JsonPropertyName("name")] string Name,
     [property: JsonPropertyName("accountId")] int? AccountId,
-    [property: JsonPropertyName("branchId")] short BranchId,
     [property: JsonPropertyName("description")] string? Description = null
 );

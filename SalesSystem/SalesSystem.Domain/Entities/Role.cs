@@ -9,9 +9,8 @@ namespace SalesSystem.Domain.Entities;
 /// Roles are assigned to users via the UserRole join table.
 /// Permissions are granted to roles via the RolePermission join table.
 ///
-/// NOTE: Spec suggests SMALLINT Id, but our BaseEntity convention uses int.
-///       The seed data will populate roles with Id values 1–5 matching
-///       the legacy UserRole enum (Admin=1, Manager=2, Cashier=3, Observer=4, BranchManager=5).
+/// 9 system roles seeded: Admin(1), Manager(2), Accountant(3), Treasurer(4),
+/// Cashier(5), WarehouseSupervisor(6), SalesEmployee(7), Observer(8), BranchManager(9).
 /// </summary>
 public class Role : ActivatableEntity
 {
@@ -22,6 +21,13 @@ public class Role : ActivatableEntity
 
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
+
+    /// <summary>
+    /// Bitmask of all permissions granted to this role.
+    /// Derived from the RolePermission join table values; used for fast lookups.
+    /// 0 = no permissions, -1 = all permissions (super admin).
+    /// </summary>
+    public long PermissionsMask { get; private set; }
 
     // ─── Navigation ─────────────────────────────────
     private readonly List<UserRole> _userRoles = new();
@@ -35,7 +41,8 @@ public class Role : ActivatableEntity
     /// <summary>
     /// Creates a new role.
     /// </summary>
-    public static Role Create(string name, string? description = null, int? createdByUserId = null)
+    public static Role Create(string name, string? description = null,
+        long permissionsMask = 0, int? createdByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الدور مطلوب.");
@@ -43,7 +50,8 @@ public class Role : ActivatableEntity
         var role = new Role
         {
             Name = name.Trim(),
-            Description = description?.Trim()
+            Description = description?.Trim(),
+            PermissionsMask = permissionsMask
         };
         role.SetCreatedBy(createdByUserId);
         return role;
@@ -52,20 +60,33 @@ public class Role : ActivatableEntity
     /// <summary>
     /// Updates the role's name and description.
     /// </summary>
-    public void Update(string name, string? description = null, int? updatedByUserId = null)
+    public void Update(string name, string? description = null,
+        long? permissionsMask = null, int? updatedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("اسم الدور مطلوب.");
         Name = name.Trim();
         Description = description?.Trim();
+        if (permissionsMask.HasValue)
+            PermissionsMask = permissionsMask.Value;
         SetUpdatedBy(updatedByUserId);
+        UpdateTimestamp();
+    }
+
+    /// <summary>
+    /// Sets the permissions bitmask for this role.
+    /// Use -1 to grant all permissions (super admin).
+    /// </summary>
+    public void SetPermissionsMask(long mask)
+    {
+        PermissionsMask = mask;
         UpdateTimestamp();
     }
 
     public override void MarkAsDeleted()
     {
-        // Cannot delete system roles (Id 1–5)
-        if (Id <= 5)
+        // Cannot delete system roles (Id 1–9)
+        if (Id <= 9)
             throw new DomainException("لا يمكن حذف دور نظام — الدور محمي.");
         base.MarkAsDeleted();
     }

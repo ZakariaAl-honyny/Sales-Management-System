@@ -1,4 +1,5 @@
 using FluentValidation;
+using SalesSystem.Contracts.Enums;
 using SalesSystem.Contracts.Requests;
 
 namespace SalesSystem.Api.Validators.Returns;
@@ -55,17 +56,17 @@ public class CreatePurchaseReturnValidator : AbstractValidator<CreatePurchaseRet
             .LessThanOrEqualTo(DateTime.UtcNow).When(x => x.ReturnDate.HasValue)
             .WithMessage("تاريخ المرتجع لا يمكن أن يكون في المستقبل");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan(0).When(x => x.CurrencyId.HasValue)
-            .WithMessage("العملة غير صحيحة");
+        RuleFor(x => x.DiscountType)
+            .IsInEnum().When(x => x.DiscountType.HasValue)
+            .WithMessage("نوع الخصم غير صحيح");
 
-        RuleFor(x => x.ExchangeRate)
-            .GreaterThan(0).When(x => x.ExchangeRate.HasValue)
-            .WithMessage("سعر الصرف يجب أن يكون أكبر من صفر");
+        RuleFor(x => x.DiscountRate)
+            .GreaterThan(0).When(x => x.DiscountType.HasValue && x.DiscountType.Value == DiscountType.Percentage)
+            .WithMessage("نسبة الخصم يجب أن تكون أكبر من صفر");
 
-        RuleFor(x => x.ExchangeRate)
-            .NotNull().When(x => x.CurrencyId.HasValue)
-            .WithMessage("يجب تحديد سعر الصرف عند اختيار عملة أجنبية");
+        RuleFor(x => x.DiscountRate)
+            .LessThanOrEqualTo(100).When(x => x.DiscountType.HasValue && x.DiscountType.Value == DiscountType.Percentage)
+            .WithMessage("نسبة الخصم يجب أن تكون أقل من أو تساوي 100");
 
         RuleFor(x => x.Notes)
             .MaximumLength(500).When(x => x.Notes != null)

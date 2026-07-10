@@ -5,7 +5,6 @@ namespace SalesSystem.Contracts.Requests;
 /// </summary>
 public record CreatePaymentVoucherRequest(
     DateTime VoucherDate,
-    short CurrencyId,
     int CashBoxId,
     int AccountId,
     decimal TotalAmount,

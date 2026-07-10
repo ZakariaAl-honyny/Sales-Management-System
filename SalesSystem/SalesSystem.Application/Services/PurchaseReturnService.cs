@@ -46,7 +46,7 @@ public class PurchaseReturnService : IPurchaseReturnService
     public async Task<Result<PurchaseReturnDto>> GetByIdAsync(int id, CancellationToken ct)
     {
         var pr = await _uow.PurchaseReturns.FirstOrDefaultAsync(
-            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit", "Currency");
+            r => r.Id == id, ct, "Supplier", "Warehouse", "Items.Product", "Items.ProductUnit");
 
         if (pr == null)
             return Result<PurchaseReturnDto>.Failure("مرتجع المشتريات غير موجود", ErrorCodes.NotFound);
@@ -113,13 +113,14 @@ public class PurchaseReturnService : IPurchaseReturnService
                     returnNoResult.Value,
                     request.SupplierId,
                     (short)request.WarehouseId,
-                    (short)(request.CurrencyId ?? 1),
                     request.ReturnDate.HasValue
                         ? DateOnly.FromDateTime(request.ReturnDate.Value)
                         : DateOnly.FromDateTime(DateTime.UtcNow),
                     request.PurchaseInvoiceId,
-                    request.Notes,
-                    userId);
+                    discountType: Domain.Enums.DiscountType.Amount,
+                    discountRate: null,
+                    notes: request.Notes,
+                    createdByUserId: userId);
 
                 foreach (var item in request.Items)
                 {
@@ -435,8 +436,8 @@ public class PurchaseReturnService : IPurchaseReturnService
             r.ReturnedTaxAmount,
             r.ReturnedChargeAmount,
             r.TaxId,
-            r.CurrencyId,
-            null, // ExchangeRate removed
+            (byte)r.DiscountType,
+            r.DiscountRate,
             r.Notes,
             (byte)r.Status,
             r.Lines.Select(it => new PurchaseReturnItemDto(
@@ -448,7 +449,8 @@ public class PurchaseReturnService : IPurchaseReturnService
                 it.Quantity,
                 it.Amount,
                 it.Amount,
-                it.PurchaseInvoiceLineId
+                it.PurchaseInvoiceLineId,
+                it.CostInBaseCurrency
             )).ToList()
         );
     }

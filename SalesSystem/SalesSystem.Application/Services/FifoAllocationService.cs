@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Domain.Entities;
@@ -20,11 +21,13 @@ public class FifoAllocationService : IFifoAllocationService
 {
     private readonly IUnitOfWork _uow;
     private readonly ILogger<FifoAllocationService> _logger;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
 
-    public FifoAllocationService(IUnitOfWork uow, ILogger<FifoAllocationService> logger)
+    public FifoAllocationService(IUnitOfWork uow, ILogger<FifoAllocationService> logger, ISystemSettingsRepository systemSettingsRepo)
     {
         _uow = uow;
         _logger = logger;
+        _systemSettingsRepo = systemSettingsRepo;
     }
 
     // ─── Add Purchase Batches ──────────────────────────────────────────
@@ -116,11 +119,12 @@ public class FifoAllocationService : IFifoAllocationService
                 return Result<List<InventoryBatchAllocation>>.Failure(
                     "لا توجد دفعات متاحة في المخزون", ErrorCodes.InsufficientStock);
 
-            // Determine strategy: FEFO if ANY batch has an expiry date, otherwise FIFO
-            var hasExpiryBatches = batches.Any(b => b.ExpiryDate.HasValue);
+            // Determine strategy: FEFO only if EnableFefo setting is true AND any batch has an expiry date
+            var enableFefo = await _systemSettingsRepo.GetBoolAsync("EnableFefo", false, ct);
+            var useFefo = enableFefo && batches.Any(b => b.ExpiryDate.HasValue);
 
             List<InventoryBatch> sortedBatches;
-            if (hasExpiryBatches)
+            if (useFefo)
             {
                 // FEFO: sort by ExpiryDate ascending
                 sortedBatches = batches

@@ -77,6 +77,8 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
+            Notes: null,
+            CreditLimit: 0m,
             IsActive: true,
             AccountId: 1);
 
@@ -119,6 +121,8 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: "test@example.com",
             Address: "العنوان",
             TaxNumber: null,
+            Notes: null,
+            CreditLimit: 0m,
             IsActive: false,
             AccountId: 1);
 
@@ -430,6 +434,8 @@ public class SupplierEditorViewModelTests : IDisposable
             Email: null,
             Address: null,
             TaxNumber: null,
+            Notes: null,
+            CreditLimit: 0m,
             IsActive: true,
             AccountId: 1);
     }

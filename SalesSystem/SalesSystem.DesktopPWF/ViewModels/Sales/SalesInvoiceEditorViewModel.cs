@@ -35,7 +35,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private readonly ICashBoxApiService _cashBoxService;
     private readonly IPrintApiService _printApiService;
     private readonly IToastNotificationService _toastService;
-    private readonly ICurrencyApiService _currencyService;
     private readonly IProductCategoryApiService _productCategoryService;
     private readonly IProductUnitApiService _unitService;
     private readonly IProductPriceApiService _priceService;
@@ -50,6 +49,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private DateTime _invoiceDate = DateTime.Today;
     private byte _paymentType = (byte)PaymentType.Cash;
     private decimal _invoiceDiscount;
+    private byte _invoiceDiscountType = (byte)DiscountType.Amount;
+    private decimal? _invoiceDiscountRate;
     private decimal _taxRate = 15;
     private bool _isTaxInclusive;
     private decimal _paidAmount;
@@ -59,15 +60,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     private bool _isEditMode;
     private string? _errorMessage;
     private bool _allowNegativeStock;
+    private bool _showProfitInInvoice = true;
+    private bool _hideTaxInSales;
     private byte _status = (byte)InvoiceStatus.Draft;
     public bool IsReadOnly { get; private set; }
 
-    // Currency fields
-    private int? _selectedCurrencyId;
-    private decimal? _exchangeRate;
-    private bool _isForeignCurrency;
-
-    private ObservableCollection<CurrencyDto> _currencies = new();
     private ObservableCollection<InvoiceLineViewModel> _items = new();
     private ObservableCollection<CustomerDto> _customers = new();
     private ObservableCollection<WarehouseDto> _warehouses = new();
@@ -107,7 +104,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         ICashBoxApiService cashBoxService,
         IPrintApiService printApiService,
         IToastNotificationService toastService,
-        ICurrencyApiService currencyService,
         IProductCategoryApiService productCategoryService,
         IProductUnitApiService unitService,
         IProductPriceApiService priceService,
@@ -129,7 +125,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         _cashBoxService = cashBoxService;
         _printApiService = printApiService;
         _toastService = toastService;
-        _currencyService = currencyService ?? throw new ArgumentNullException(nameof(currencyService));
         _productCategoryService = productCategoryService ?? throw new ArgumentNullException(nameof(productCategoryService));
         _unitService = unitService ?? throw new ArgumentNullException(nameof(unitService));
         _priceService = priceService ?? throw new ArgumentNullException(nameof(priceService));
@@ -143,8 +138,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         }
         IsReadOnly = isReadOnly;
 
-        SaveCommand = new AsyncRelayCommand(SaveAsync);
-        PostCommand = new AsyncRelayCommand(PostAsync);
+        SaveDraftCommand = new AsyncRelayCommand(SaveDraftAsync);
+        SaveAndPostCommand = new AsyncRelayCommand(SaveAndPostAsync);
         CancelCommand = new RelayCommand(Cancel);
         AddLineCommand = new RelayCommand(AddLine);
         RemoveLineCommand = new RelayCommand(RemoveLine, CanRemoveLine);
@@ -246,7 +241,7 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(PaidAmount));
                 _paymentType = (byte)PaymentType.Cash;
                 OnPropertyChanged(nameof(PaymentType));
-                await PostAsync();
+                await SaveAndPostAsync();
             }
         };
 
@@ -258,13 +253,13 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 OnPropertyChanged(nameof(PaidAmount));
                 _paymentType = (byte)PaymentType.Credit;
                 OnPropertyChanged(nameof(PaymentType));
-                await PostAsync();
+                await SaveAndPostAsync();
             }
         };
 
         TouchPosCartVM.OnDraftSave = async () =>
         {
-            await SaveAsync();
+            await SaveDraftAsync();
         };
 
         // SaleModeOptions removed per analysis — per-unit pricing replaces جملة/تجزئة
@@ -315,6 +310,22 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             {
                 _allowNegativeStock = settingsResult.Value.AllowNegativeStock;
             }
+
+            var systemSettingsResult = await _settingsService.GetAllSystemSettingsAsync();
+            if (systemSettingsResult?.IsSuccess == true && systemSettingsResult.Value != null)
+            {
+                if (systemSettingsResult.Value.TryGetValue("ShowProfitInInvoice", out var profitVal)
+                    && bool.TryParse(profitVal, out var showProfit))
+                {
+                    ShowProfitInInvoice = showProfit;
+                }
+
+                if (systemSettingsResult.Value.TryGetValue("HideTaxInSales", out var taxVal)
+                    && bool.TryParse(taxVal, out var hideTax))
+                {
+                    HideTaxInSales = hideTax;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -357,7 +368,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             App.GetService<ICashBoxApiService>(),
             App.GetService<IPrintApiService>(),
             App.GetService<IToastNotificationService>(),
-            App.GetService<ICurrencyApiService>(),
             App.GetService<IProductCategoryApiService>(),
             App.GetService<IProductUnitApiService>(),
             App.GetService<IProductPriceApiService>(),
@@ -377,6 +387,26 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     }
 
     public bool IsEditMode => _isEditMode;
+
+    public bool ShowProfitInInvoice
+    {
+        get => _showProfitInInvoice;
+        set => SetProperty(ref _showProfitInInvoice, value);
+    }
+
+    public bool HideTaxInSales
+    {
+        get => _hideTaxInSales;
+        set
+        {
+            if (SetProperty(ref _hideTaxInSales, value))
+            {
+                OnPropertyChanged(nameof(IsTaxSectionVisible));
+            }
+        }
+    }
+
+    public bool IsTaxSectionVisible => !HideTaxInSales;
 
     public ObservableCollection<CustomerDto> Customers
     {
@@ -482,6 +512,33 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             }
         }
     }
+
+    public byte InvoiceDiscountType
+    {
+        get => _invoiceDiscountType;
+        set
+        {
+            if (SetProperty(ref _invoiceDiscountType, value))
+            {
+                RecalculateTotals();
+                OnPropertyChanged(nameof(IsPercentageDiscount));
+            }
+        }
+    }
+
+    public decimal? InvoiceDiscountRate
+    {
+        get => _invoiceDiscountRate;
+        set
+        {
+            if (SetProperty(ref _invoiceDiscountRate, value))
+            {
+                RecalculateTotals();
+            }
+        }
+    }
+
+    public bool IsPercentageDiscount => InvoiceDiscountType == (byte)DiscountType.Percentage;
 
     public decimal TaxRate
     {
@@ -637,42 +694,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     // SaleModeOptions removed — pricing is per-unit, no جملة/تجزئة concept
     // public List<EnumDisplayItem> SaleModeOptions { get; }
 
-    // Currency properties
-    public ObservableCollection<CurrencyDto> Currencies
-    {
-        get => _currencies;
-        set => SetProperty(ref _currencies, value);
-    }
-
-    public int? SelectedCurrencyId
-    {
-        get => _selectedCurrencyId;
-        set
-        {
-            if (SetProperty(ref _selectedCurrencyId, value))
-            {
-                IsForeignCurrency = value.HasValue && value.Value != GetBaseCurrencyId();
-                OnPropertyChanged(nameof(IsForeignCurrency));
-            }
-        }
-    }
-
-    public decimal? ExchangeRate
-    {
-        get => _exchangeRate;
-        set
-        {
-            if (SetProperty(ref _exchangeRate, value))
-                RecalculateTotals();
-        }
-    }
-
-    public bool IsForeignCurrency
-    {
-        get => _isForeignCurrency;
-        set => SetProperty(ref _isForeignCurrency, value);
-    }
-
     // Tax properties
     public ObservableCollection<TaxDto> Taxes
     {
@@ -701,8 +722,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    public ICommand SaveCommand { get; }
-    public ICommand PostCommand { get; }
+    public ICommand SaveDraftCommand { get; }
+    public ICommand SaveAndPostCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand AddLineCommand { get; }
     public ICommand RemoveLineCommand { get; }
@@ -771,18 +792,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 }
             }
 
-            var currenciesResult = await _currencyService.GetAllAsync();
-            if (currenciesResult.IsSuccess && currenciesResult.Value != null)
-            {
-                Currencies = new ObservableCollection<CurrencyDto>(currenciesResult.Value);
-                if (!_isEditMode)
-                {
-                    var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-                    if (baseCurrency != null)
-                        SelectedCurrencyId = baseCurrency.Id;
-                }
-            }
-
             // Load taxes
             if (_taxService != null)
             {
@@ -812,6 +821,8 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 InvoiceDate = invoice.InvoiceDate;
                 SelectedPaymentType = (byte)invoice.PaymentType;
                 InvoiceDiscount = invoice.DiscountAmount;
+                InvoiceDiscountType = invoice.DiscountType;
+                InvoiceDiscountRate = invoice.DiscountRate;
                 PaidAmount = invoice.PaidAmount;
                 Notes = invoice.Notes;
                 Status = invoice.Status;
@@ -841,6 +852,11 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                             lineVm.SelectedProductUnit = savedUnit;
                     }
 
+                    // Restore line-level discount
+                    lineVm.DiscountType = item.DiscountType;
+                    lineVm.DiscountRate = item.DiscountRate;
+                    lineVm.DiscountAmount = item.DiscountAmount;
+
                     lineVm.PropertyChanged += (s, e) =>
                     {
                         if (e.PropertyName is nameof(InvoiceLineViewModel.LineTotal)
@@ -854,10 +870,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
 
                 // Restore tax
                 TaxId = invoice.TaxId;
-
-                // Restore currency
-                SelectedCurrencyId = invoice.CurrencyId;
-                ExchangeRate = invoice.ExchangeRate;
 
                 OtherCharges = invoice.OtherCharges;
 
@@ -882,22 +894,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         });
     }
 
-    private async Task SaveAsync()
+    private async Task SaveDraftAsync()
     {
         if (!await ValidateInvoice()) return;
-
-        // --- Stock validation before saving (warning only) ---
-        if (!_allowNegativeStock && _selectedWarehouseId > 0 && Items.Count > 0)
-        {
-            var stockIssues = await ValidateStockBeforePostAsync();
-            if (stockIssues.Count > 0)
-            {
-                var message = "تنبيه: بعض المنتجات ليس لديها مخزون كافٍ:\n\n";
-                message += string.Join("\n", stockIssues.Select(s => s.Description));
-                message += "\n\nيمكنك حفظ الفاتورة كمسودة ولكن قد لا تتمكن من ترحيلها.";
-                await _dialogService.ShowWarningAsync("المخزون غير كافٍ", message);
-            }
-        }
 
         await ExecuteAsync(async () =>
         {
@@ -919,31 +918,26 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 _invoiceId = result.Value.Id;
                 _status = result.Value.Status;
                 _isEditMode = true;
-                
+
                 OnPropertyChanged(nameof(Status));
                 OnPropertyChanged(nameof(IsEditMode));
                 OnPropertyChanged(nameof(IsReadOnly));
-                
-                await _dialogService.ShowSuccessAsync("نجاح", "✅ تم حفظ الفاتورة بنجاح. يمكنك الآن الترحيل النهائي إذا أردت.");
+
+                await _dialogService.ShowInfoAsync("نجاح", "✅ تم حفظ المسودة بنجاح. يمكنك الآن الترحيل النهائي للمخزون.");
                 _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
                 UpdateCommandStates();
             }
             else
             {
-                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ الفاتورة", "SalesInvoiceEditorViewModel.SaveAsync", "[SalesInvoiceEditorViewModel.SaveAsync] Failed to save sales invoice.");
-                await _dialogService.ShowErrorAsync("خطأ في حفظ الفاتورة", ErrorMessage!);
+                ErrorMessage = HandleFailure(result.Error ?? "فشل في حفظ المسودة", "SalesInvoiceEditorViewModel.SaveDraftAsync", "[SalesInvoiceEditorViewModel.SaveDraftAsync] Failed to save sales invoice draft.");
+                await _dialogService.ShowErrorAsync("خطأ في حفظ المسودة", ErrorMessage!);
             }
         });
     }
 
-    private async Task PostAsync()
+    private async Task SaveAndPostAsync()
     {
-        // First save if new
-        if (!_isEditMode || _invoiceId == null)
-        {
-            await SaveAsync();
-            if (_invoiceId == null) return;
-        }
+        if (!await ValidateInvoice()) return;
 
         // --- Stock validation before posting ---
         if (!_allowNegativeStock)
@@ -969,25 +963,56 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             }
         }
 
-        if (!await _dialogService.ShowConfirmationAsync("تأكيد الترحيل", "هل أنت متأكد من ترحيل هذه الفاتورة؟\nسيتم خصم الكميات من المخزون.")) return;
+        if (!await _dialogService.ShowConfirmationAsync("تأكيد الحفظ والترحيل", "هل أنت متأكد من حفظ وترحيل هذه الفاتورة؟\nسيتم تحديث المخزون والتكلفة ورصيد العميل.")) return;
 
         await ExecuteAsync(async () =>
         {
             ErrorMessage = null;
-            var postResult = await _invoiceService.PostAsync(_invoiceId!.Value);
-            if (postResult.IsSuccess)
+            var request = BuildRequest();
+
+            Result<SalesInvoiceDto> saveResult;
+            if (_isEditMode)
             {
-                await _dialogService.ShowSuccessAsync("نجاح", "تم ترحيل الفاتورة بنجاح");
-                _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
-                RequestClose();
+                var updateRequest = BuildUpdateRequest();
+                saveResult = await _invoiceService.UpdateAsync(_invoiceId!.Value, updateRequest);
             }
             else
             {
-                ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceEditorViewModel.PostAsync", $"[SalesInvoiceEditorViewModel.PostAsync] Failed to post/confirm sales invoice ID {_invoiceId}.");
-                await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
+                saveResult = await _invoiceService.CreateAsync(request);
+            }
+
+            if (saveResult.IsSuccess && saveResult.Value != null)
+            {
+                _invoiceId = saveResult.Value.Id;
+                _status = saveResult.Value.Status;
+                _isEditMode = true;
+
+                OnPropertyChanged(nameof(Status));
+                OnPropertyChanged(nameof(IsEditMode));
+                OnPropertyChanged(nameof(IsReadOnly));
+
+                // Now post the invoice
+                var postResult = await _invoiceService.PostAsync(_invoiceId.Value);
+                if (postResult.IsSuccess)
+                {
+                    _eventBus.Publish(new SaleInvoiceChangedMessage(_invoiceId.Value));
+                    await _dialogService.ShowSuccessAsync("نجاح", "✅ تم حفظ وترحيل فاتورة البيع بنجاح.");
+                    RequestClose();
+                }
+                else
+                {
+                    ErrorMessage = HandleFailure(postResult.Error ?? "فشل في ترحيل الفاتورة", "SalesInvoiceEditorViewModel.SaveAndPostAsync",
+                        $"[SalesInvoiceEditorViewModel.SaveAndPostAsync] Failed to post sales invoice ID {_invoiceId} after save.");
+                    await _dialogService.ShowErrorAsync("خطأ في الترحيل", ErrorMessage!);
+                }
+            }
+            else
+            {
+                ErrorMessage = HandleFailure(saveResult.Error ?? "فشل في حفظ الفاتورة", "SalesInvoiceEditorViewModel.SaveAndPostAsync",
+                    "[SalesInvoiceEditorViewModel.SaveAndPostAsync] Failed to save sales invoice before posting.");
+                await _dialogService.ShowErrorAsync("خطأ في الحفظ", ErrorMessage!);
             }
         });
-        UpdateCommandStates();
     }
 
     private async Task DeleteAsync()
@@ -1183,7 +1208,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 i.SelectedProduct!.Id,
                 i.Quantity,
                 i.UnitPrice,
-                i.ProductUnitId ?? 0))
+                i.ProductUnitId ?? 0,
+                (DiscountType)i.DiscountType,
+                i.DiscountRate))
             .ToList();
 
         return new CreateSalesInvoiceRequest(
@@ -1198,10 +1225,10 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             OtherCharges,
             PaidAmount,
             Notes,
-            (short?)SelectedCurrencyId,
-            ExchangeRate,
             TaxId,
-            items);
+            items,
+            (DiscountType)InvoiceDiscountType,
+            InvoiceDiscountRate);
     }
 
     private UpdateSalesInvoiceRequest BuildUpdateRequest()
@@ -1212,7 +1239,9 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
                 i.SelectedProduct!.Id,
                 i.Quantity,
                 i.UnitPrice,
-                i.ProductUnitId ?? 0))
+                i.ProductUnitId ?? 0,
+                (DiscountType)i.DiscountType,
+                i.DiscountRate))
             .ToList();
 
         return new UpdateSalesInvoiceRequest(
@@ -1226,15 +1255,21 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
             PaidAmount,
             SelectedCashBox?.Id,
             Notes,
-            (short?)SelectedCurrencyId,
-            ExchangeRate,
             TaxId,
-            items);
+            items,
+            (DiscountType)InvoiceDiscountType,
+            InvoiceDiscountRate);
     }
 
     private void RecalculateTotals()
     {
         SubTotal = Items.Sum(i => i.LineTotal);
+
+        // Compute discount based on type
+        if (InvoiceDiscountType == (byte)DiscountType.Percentage && InvoiceDiscountRate.HasValue && InvoiceDiscountRate.Value > 0)
+        {
+            InvoiceDiscount = SubTotal * InvoiceDiscountRate.Value / 100m;
+        }
 
         decimal netAmount = SubTotal - InvoiceDiscount;
 
@@ -1666,12 +1701,6 @@ public class SalesInvoiceEditorViewModel : ViewModelBase
         }
     }
 
-    private int GetBaseCurrencyId()
-    {
-        var baseCurrency = Currencies.FirstOrDefault(c => c.IsBaseCurrency);
-        return baseCurrency?.Id ?? 0;
-    }
-
     #endregion
 }
 
@@ -1682,6 +1711,8 @@ public class InvoiceLineViewModel : ViewModelBase
     private decimal _quantity = 1;
     private decimal _unitPrice;
     private decimal _discountAmount;
+    private byte _discountType;          // DiscountType enum (0=Amount, 1=Percentage)
+    private decimal? _discountRate;      // Rate used when DiscountType is Percentage
     private decimal _lineTotalInput;  // Editable gross total (Qty × Price), before discount
     private FlexibleInputCalculator.CalculationField? _lastModifiedField;
     private bool _isRecalculating;
@@ -1916,6 +1947,24 @@ public class InvoiceLineViewModel : ViewModelBase
                 OnPropertyChanged(nameof(Profit));
             }
         }
+    }
+
+    /// <summary>
+    /// نوع الخصم على البند: 0 = مبلغ, 1 = نسبة مئوية
+    /// </summary>
+    public byte DiscountType
+    {
+        get => _discountType;
+        set => SetProperty(ref _discountType, value);
+    }
+
+    /// <summary>
+    /// نسبة الخصم على البند (تُستخدم عندما DiscountType = Percentage)
+    /// </summary>
+    public decimal? DiscountRate
+    {
+        get => _discountRate;
+        set => SetProperty(ref _discountRate, value);
     }
 
     public decimal LineTotal => (Quantity * UnitPrice) - DiscountAmount;

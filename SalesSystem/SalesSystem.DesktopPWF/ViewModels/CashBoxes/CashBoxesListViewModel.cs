@@ -225,7 +225,6 @@ public class CashBoxesListViewModel : ViewModelBase, IDisposable
             SelectedCashBox.Name,
             SelectedCashBox.AccountId,
             SelectedCashBox.AccountName,
-            SelectedCashBox.BranchId,
             SelectedCashBox.Description);
         _screenWindowService.OpenScreen(editorVm, new ScreenWindowOptions
         {

@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging;
 using SalesSystem.Application.Interfaces;
+using SalesSystem.Application.Interfaces.Repositories;
 using SalesSystem.Application.Interfaces.Services;
 using SalesSystem.Contracts.Common;
 using SalesSystem.Contracts.DTOs;
@@ -22,13 +23,16 @@ namespace SalesSystem.Application.Services;
 public class ProductService : IProductService
 {
     private readonly IUnitOfWork _uow;
+    private readonly ISystemSettingsRepository _systemSettingsRepo;
     private readonly ILogger<ProductService> _logger;
 
     public ProductService(
         IUnitOfWork uow,
+        ISystemSettingsRepository systemSettingsRepo,
         ILogger<ProductService> logger)
     {
         _uow = uow;
+        _systemSettingsRepo = systemSettingsRepo;
         _logger = logger;
     }
 
@@ -67,6 +71,16 @@ public class ProductService : IProductService
     {
         try
         {
+            // ── AllowDuplicateBarcode check ──────────────────────────────────
+            var allowDuplicate = await _systemSettingsRepo.GetBoolAsync("AllowDuplicateBarcode", false, ct);
+            if (!allowDuplicate && !string.IsNullOrWhiteSpace(request.Barcode))
+            {
+                var existing = await _uow.Products.FirstOrDefaultAsync(
+                    p => p.Barcode != null && p.Barcode == request.Barcode.Trim(), ct);
+                if (existing != null)
+                    return Result<ProductDto>.Failure("الباركود موجود مسبقاً لمنتج آخر");
+            }
+
             // ─── Create product entity ────────────────────────────────────
             var product = Product.Create(
                 name: request.Name,
@@ -109,6 +123,16 @@ public class ProductService : IProductService
             var product = await _uow.Products.FirstOrDefaultIgnoreFiltersAsync(p => p.Id == id, ct);
             if (product == null)
                 return Result<ProductDto>.Failure("المنتج غير موجود", ErrorCodes.NotFound);
+
+            // ── AllowDuplicateBarcode check ──────────────────────────────────
+            var allowDuplicate = await _systemSettingsRepo.GetBoolAsync("AllowDuplicateBarcode", false, ct);
+            if (!allowDuplicate && !string.IsNullOrWhiteSpace(request.Barcode))
+            {
+                var existing = await _uow.Products.FirstOrDefaultAsync(
+                    p => p.Barcode != null && p.Barcode == request.Barcode.Trim() && p.Id != id, ct);
+                if (existing != null)
+                    return Result<ProductDto>.Failure("الباركود موجود مسبقاً لمنتج آخر");
+            }
 
             product.Update(
                 name: request.Name,

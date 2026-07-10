@@ -10,9 +10,6 @@ public class CreatePaymentVoucherRequestValidator : AbstractValidator<CreatePaym
         RuleFor(x => x.VoucherDate)
             .NotEmpty().WithMessage("تاريخ سند الصرف مطلوب");
 
-        RuleFor(x => x.CurrencyId)
-            .GreaterThan((short)0).WithMessage("عملة سند الصرف مطلوبة");
-
         RuleFor(x => x.CashBoxId)
             .GreaterThan(0).WithMessage("الصندوق النقدي مطلوب");
 
