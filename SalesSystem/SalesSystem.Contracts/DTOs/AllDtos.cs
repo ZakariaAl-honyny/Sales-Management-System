@@ -958,49 +958,5 @@ public record AccountBalanceReportDto(
     decimal CreditBalance,
     decimal NetBalance);
 
-public record SalesQuotationDto(
-    int Id,
-    int QuotationNo,
-    int CustomerId,
-    string? CustomerName,
-    int WarehouseId,
-    string? WarehouseName,
-    DateTime QuotationDate,
-    DateTime ValidUntil,
-    byte Status,
-    decimal SubTotal,
-    decimal DiscountAmount,
-    decimal TaxAmount,
-    decimal TotalAmount,
-    string? Notes,
-    string? TermsAndConditions,
-    string? CreatedByUserName,
-    DateTime CreatedAt,
-    bool IsActive,
-    List<SalesQuotationItemDto>? Items = null)
-{
-    public string StatusDisplay => Status switch
-    {
-        1 => "مسودة",
-        2 => "مرسلة",
-        3 => "مقبولة",
-        4 => "محولة لفاتورة",
-        5 => "مرفوضة",
-        _ => "غير معروف"
-    };
-}
 
-public record SalesQuotationItemDto(
-    int Id,
-    int QuotationId,
-    int ProductId,
-    string? ProductName,
-    int ProductUnitId,
-    string? UnitName,
-    decimal Quantity,
-    decimal UnitPrice,
-    decimal DiscountAmount,
-    decimal TaxAmount,
-    decimal LineTotal,
-    string? Notes);
 

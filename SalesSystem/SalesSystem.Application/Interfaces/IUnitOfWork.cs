@@ -63,10 +63,6 @@ public interface IUnitOfWork
     IGenericRepository<CustomerContact> CustomerContacts { get; }
     IGenericRepository<SupplierContact> SupplierContacts { get; }
 
-    // === Sales Quotation Module ===
-    IGenericRepository<SalesQuotation> SalesQuotations { get; }
-    IGenericRepository<SalesQuotationItem> SalesQuotationItems { get; }
-
     // === New Inventory Module (v4.10+) ===
     IGenericRepository<InventoryTransaction> InventoryTransactions { get; }
     IGenericRepository<InventoryTransactionLine> InventoryTransactionLines { get; }

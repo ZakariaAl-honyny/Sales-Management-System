@@ -1,7 +1,7 @@
 ﻿# Database Schema Design
 # Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 66 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
+# 64 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 
@@ -864,53 +864,9 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `AppliedAmount` | decimal(18,2) not null | |
 | **Notes** | Optional — only created when user explicitly distributes payment to specific invoices | |
 
-### 6.7 SalesQuotations
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `QuotationNo` | int not null | user-facing number, UNIQUE |
-| `QuotationDate` | date not null | |
-| `ValidUntil` | date null | optional expiry date |
-| `CustomerId` | int not null FK → Customers(Id) | |
-| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
-| `PaymentType` | tinyint not null | 1=Cash, 2=Credit |
-| `SubTotal` | decimal(18,2) not null | SUM(LineTotal) |
-| `DiscountAmount` | decimal(18,2) not null | header-level discount |
-| `TaxAmount` | decimal(18,2) not null | |
-| `TotalAmount` | decimal(18,2) not null | SubTotal - Discount + Tax |
-| `Notes` | nvarchar(500) null | |
-| `TermsAndConditions` | nvarchar(2000) null | |
-| `Status` | tinyint not null | 1=Draft, 2=Sent, 3=Accepted, 4=Converted, 5=Rejected |
-| `ConvertedToInvoiceId` | int null FK → SalesInvoices(Id) | set when converted to invoice |
-| `RejectionReason` | nvarchar(1000) null | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-| **UK** | `UNIQUE(QuotationNo)` | |
-
-### 6.8 SalesQuotationItems
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `SalesQuotationId` | int not null FK → SalesQuotations(Id) | |
-| `ProductId` | int not null FK → Products(Id) | |
-| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
-| `Quantity` | decimal(18,3) not null | |
-| `UnitPrice` | decimal(18,2) not null | |
-| `DiscountAmount` | decimal(18,2) not null default 0 | line-level discount |
-| `LineTotal` | decimal(18,2) not null | (Qty × UnitPrice) − Discount |
-| `Notes` | nvarchar(500) null | |
-
 **Design Notes:**
 - NO CustomerPayments table (replaced by CustomerReceipts)
-- SalesQuotations ARE full V1 citizens — 5-state lifecycle, full stack (Domain/EF/Service/Controller/Desktop), no stock/accounting impact until converted
-- SalesQuotationItems DO support per-line DiscountAmount (unlike SalesInvoiceLines which only have header discount)
 - SalesReturnLines link to SalesInvoiceLineId (not ProductId directly)
-
-**Multi-Currency Design Notes:**
-- Journal entries (Debit/Credit) are ALWAYS recorded in base currency
-- Exchange rate is FROZEN after document posting — cannot be changed
 
 ---
 
@@ -1082,10 +1038,10 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | 3. Products | 5 | ProductCategories, Products, Units, ProductUnits, ProductPrices |
 | 4. Accounting | 10 | AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings |
 | 5. Inventory | 10 | WarehouseStocks, InventoryBatches, InventoryTransactions, InventoryTransactionLines, InventoryCounts, InventoryCountLines, InventoryAdjustments, InventoryAdjustmentLines, WarehouseTransfers, WarehouseTransferLines |
-| 6. Sales | 8 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications, SalesQuotations, SalesQuotationItems |
+| 6. Sales | 6 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications |
 | 7. Purchases | 6 | PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications |
 | 8. Infrastructure & Support | 2 | AuditLogs, SystemLogs |
-| **Total** | **66** | |
+| **Total** | **64** | |
 
 ---
 

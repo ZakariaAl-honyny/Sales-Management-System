@@ -100,8 +100,6 @@ public class MainViewModel : ViewModelBase
         });
         NavigateToSalesInvoicesCommand = new RelayCommand(() => NavigateTo<SalesInvoiceListViewModel>());
         NavigateToSalesReturnsCommand = new RelayCommand(() => NavigateTo<SalesReturnListViewModel>());
-        NavigateToSalesQuotationsCommand = new RelayCommand(() => NavigateTo<SalesQuotationListViewModel>());
-
         // Purchases section
         NavigateToPurchasesCommand = new RelayCommand(() => NavigateTo<PurchaseInvoiceListViewModel>());
         NavigateToPurchaseOrdersCommand = new RelayCommand(async () =>
@@ -341,9 +339,6 @@ public class MainViewModel : ViewModelBase
 
     /// <summary>نقل إلى مرتجعات المبيعات</summary>
     public ICommand NavigateToSalesReturnsCommand { get; }
-
-    /// <summary>نقل إلى عروض السعر — عرض وإدارة عروض الأسعار للعملاء</summary>
-    public ICommand NavigateToSalesQuotationsCommand { get; }
 
     // ═══════════════════════════════════════════════════════════════
     // Purchases Section Commands
@@ -717,7 +712,6 @@ public class MainViewModel : ViewModelBase
             // ════ Sales ════
             "Sales"            => _sessionService.CanAccess(Permission.SalesInvoice),
             "SalesReturns"     => _sessionService.CanAccess(Permission.SalesReturn),
-            "SalesQuotations"  => _sessionService.CanAccess(Permission.SalesInvoice),
             "Pos"              => _sessionService.CanAccess(Permission.SalesInvoice),
             "Customers"        => _sessionService.CanAccess(Permission.CustomerView),
             "CustomerPayments" => _sessionService.CanAccess(Permission.CustomerView),
@@ -813,7 +807,6 @@ public class MainViewModel : ViewModelBase
             nameof(TouchPosViewModel)              => "Pos",
             nameof(SalesInvoiceListViewModel)       => "Sales",
             nameof(SalesReturnListViewModel)        => "SalesReturns",
-            nameof(SalesQuotationListViewModel)     => "SalesQuotations",
             nameof(PurchaseInvoiceListViewModel)    => "Purchases",
             // PurchaseOrderListViewModel removed — V1-deferred
             nameof(PurchaseReturnListViewModel)     => "PurchaseReturns",

@@ -34,11 +34,6 @@ public interface IPrintDataService
     Task<Result<InvoicePrintDto>> GetPurchaseReturnPrintDataAsync(int returnId, CancellationToken ct = default);
 
     /// <summary>
-    /// Gets sales quotation print data including store info.
-    /// </summary>
-    Task<Result<InvoicePrintDto>> GetSalesQuotationPrintDataAsync(int quotationId, CancellationToken ct = default);
-
-    /// <summary>
     /// Gets the store settings for print header info.
     /// </summary>
     Task<Result<StoreSettingsDto>> GetStoreSettingsAsync(CancellationToken ct = default);

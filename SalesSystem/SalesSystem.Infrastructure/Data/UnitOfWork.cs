@@ -73,10 +73,6 @@ public class UnitOfWork : IUnitOfWork
     private IGenericRepository<CustomerContact>? _customerContacts;
     private IGenericRepository<SupplierContact>? _supplierContacts;
 
-    // === Sales Quotation Module ===
-    private IGenericRepository<SalesQuotation>? _salesQuotations;
-    private IGenericRepository<SalesQuotationItem>? _salesQuotationItems;
-
     // === New Inventory Module (v4.10+) ===
     private IGenericRepository<InventoryTransaction>? _inventoryTransactions;
     private IGenericRepository<InventoryTransactionLine>? _inventoryTransactionLines;
@@ -143,10 +139,6 @@ public class UnitOfWork : IUnitOfWork
     // Customer/Supplier Contact repositories
     public IGenericRepository<CustomerContact> CustomerContacts => _customerContacts ??= new GenericRepository<CustomerContact>(_context);
     public IGenericRepository<SupplierContact> SupplierContacts => _supplierContacts ??= new GenericRepository<SupplierContact>(_context);
-
-    // === Sales Quotation Module ===
-    public IGenericRepository<SalesQuotation> SalesQuotations => _salesQuotations ??= new GenericRepository<SalesQuotation>(_context);
-    public IGenericRepository<SalesQuotationItem> SalesQuotationItems => _salesQuotationItems ??= new GenericRepository<SalesQuotationItem>(_context);
 
     // === New Inventory Module (v4.10+) ===
     public IGenericRepository<InventoryTransaction> InventoryTransactions => _inventoryTransactions ??= new GenericRepository<InventoryTransaction>(_context);

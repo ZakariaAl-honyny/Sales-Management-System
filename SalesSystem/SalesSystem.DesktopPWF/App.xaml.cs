@@ -205,7 +205,6 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IPurchaseInvoiceApiService, PurchaseInvoiceApiService>();
         services.AddSingleton<ISalesReturnApiService, SalesReturnApiService>();
         services.AddSingleton<IPurchaseReturnApiService, PurchaseReturnApiService>();
-        services.AddSingleton<ISalesQuotationApiService, SalesQuotationApiService>();
         services.AddSingleton<IWarehouseTransferApiService, WarehouseTransferApiService>();
         services.AddSingleton<ISupplierPaymentApiService, SupplierPaymentApiService>();
         services.AddSingleton<IUserApiService, UserApiService>();
@@ -322,8 +321,6 @@ public partial class App : System.Windows.Application
         services.AddTransient<SupplierPaymentEditorViewModel>();
         services.AddTransient<SalesReturnListViewModel>();
         services.AddTransient<SalesReturnEditorViewModel>();
-        services.AddTransient<SalesQuotationListViewModel>();
-        services.AddTransient<SalesQuotationEditorViewModel>();
         services.AddTransient<PurchaseReturnListViewModel>();
         services.AddTransient<PurchaseReturnEditorViewModel>();
         services.AddTransient<WarehouseTransfersListViewModel>();

@@ -141,32 +141,6 @@ public class PrintDataService : IPrintDataService
         return Result<InvoicePrintDto>.Success(dto);
     }
 
-    public async Task<Result<InvoicePrintDto>> GetSalesQuotationPrintDataAsync(int quotationId, CancellationToken ct = default)
-    {
-        var quotation = await _uow.SalesQuotations.Query()
-            .Include(q => q.Customer)
-            .Include(q => q.Items).ThenInclude(i => i.Product)
-            .Include(q => q.Items).ThenInclude(i => i.ProductUnit).ThenInclude(pu => pu.Unit)
-            .FirstOrDefaultAsync(q => q.Id == quotationId, ct);
-
-        if (quotation == null)
-            return Result<InvoicePrintDto>.Failure("عرض السعر غير موجود");
-
-        var (storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, footerNote, showBalanceOnPrint, printSignature, showExpiryInInvoices, paperSize, signaturePath, printBarcode, printQRCode, printCompanyAddress) = await LoadAllStoreInfoAsync(ct);
-        var dto = await _builder.BuildFromSalesQuotationAsync(quotation, storeName, storePhone, storeAddress, storeTaxNumber, logoBytes, taxRate, ct);
-        if (!string.IsNullOrWhiteSpace(footerNote))
-            dto.FooterNote = footerNote;
-        dto.ShowBalanceOnPrint = showBalanceOnPrint;
-        dto.PrintSignature = printSignature;
-        dto.ShowExpiryInInvoices = showExpiryInInvoices;
-        dto.PaperSize = paperSize;
-        dto.SignatureImagePath = string.IsNullOrWhiteSpace(signaturePath) ? null : signaturePath;
-        dto.PrintBarcode = printBarcode;
-        dto.PrintQRCode = printQRCode;
-        dto.PrintCompanyAddress = printCompanyAddress;
-        return Result<InvoicePrintDto>.Success(dto);
-    }
-
     /// <summary>
     /// Loads store info PLUS FooterNote from print settings.
     /// Returns 15-tuple: name, phone, address, taxNumber, logoBytes, taxRate, footerNote,

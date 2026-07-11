@@ -216,9 +216,6 @@ builder.Services.AddScoped<IReceiptVoucherService, ReceiptVoucherService>();
 builder.Services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
 builder.Services.AddScoped<IWarehouseTransferService, WarehouseTransferService>();
 
-// ─── Sales Quotation Service ────────────────────────────
-builder.Services.AddScoped<ISalesQuotationService, SalesQuotationService>();
-
 builder.Services.AddSingleton(jwtSettings);
 
 // ============================================

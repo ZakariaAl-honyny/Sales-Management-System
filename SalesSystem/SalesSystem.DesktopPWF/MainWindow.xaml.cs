@@ -118,7 +118,6 @@ public partial class MainWindow : Window
     private async void PurchaseOrdersMenuItem_Click(object sender, RoutedEventArgs e) =>
         await _dialogService.ShowInfoAsync("غير متاح", "شاشة أوامر الشراء غير متاحة في هذه النسخة");
     private void SalesReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesReturnListViewModel>();
-    private void SalesQuotationsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<SalesQuotationListViewModel>();
     private void PurchaseReturnsMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<PurchaseReturnListViewModel>();
     private void WarehousesMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseListViewModel>();
     private void WarehouseTransfersMenuItem_Click(object sender, RoutedEventArgs e) => _mainViewModel.NavigateTo<WarehouseTransfersListViewModel>();
