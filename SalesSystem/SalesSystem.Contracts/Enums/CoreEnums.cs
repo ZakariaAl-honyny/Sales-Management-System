@@ -27,6 +27,19 @@ public enum QuotationStatus : byte { Draft = 1, Sent = 2, Accepted = 3, Converte
 /// <summary>
 /// أنواع معاملات الخزينة النقدية (للتوافق مع التقارير المالية القديمة — سيتم استبدالها بـ ReceiptVoucher/PaymentVoucher)
 /// </summary>
+public enum UserRole : byte
+{
+    Admin = 1,
+    Manager = 2,
+    Accountant = 3,
+    Treasurer = 4,
+    Cashier = 5,
+    WarehouseSupervisor = 6,
+    SalesEmployee = 7,
+    Observer = 8,
+    BranchManager = 9
+}
+
 public enum CashTransactionType : byte
 {
     OpeningBalance = 1,

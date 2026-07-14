@@ -60,6 +60,14 @@ public record ProductDto(
     public bool IsOutOfStock => CurrentStock <= 0;
     public bool IsLowStock => CurrentStock > 0 && CurrentStock <= ReorderLevel;
     public string StockStatusLabel => IsOutOfStock ? "نفذ" : IsLowStock ? "محدود" : "";
+
+    // Backward-compatible properties
+    public string? Code => Barcode;
+    public decimal SalePrice => 0m;
+    public decimal PurchasePrice => 0m;
+    public int UnitId => 0;
+    public string? UnitName => null;
+    public decimal MinStock => ReorderLevel;
 }
 
 public record WarehouseDto(
@@ -68,7 +76,13 @@ public record WarehouseDto(
     string? Phone,
     string? Address,
     string? Notes,
-    bool IsActive);
+    bool IsActive)
+{
+    // Backward-compatible properties
+    public bool IsDefault => false;
+    public string? Location => Address;
+    public string Code => Id.ToString();
+}
 
 public record WarehouseStockDto(
     int WarehouseId,
@@ -84,12 +98,20 @@ public record SupplierDto(int Id, string Name, string? Phone, string? Email, str
     int AccountId, string? AccountName = null, int? CategoryId = null)
 {
     public bool HasCreditLimit => CreditLimit > 0;
+
+    // Backward-compatible properties
+    public string Code => Id.ToString();
+    public decimal CurrentBalance => 0m;
 }
 public record CustomerDto(int Id, string Name, string? Phone, string? Email, string? Address,
     string? TaxNumber, decimal CreditLimit, bool IsActive,
-    int AccountId, string? AccountName = null, int? CategoryId = null, string? Notes = null)
+    int AccountId, string? AccountName = null, int? CategoryId = null, string? Notes = null,
+    decimal CurrentBalance = 0)
 {
     public bool HasCreditLimit => CreditLimit > 0;
+
+    // Backward-compatible properties
+    public string Code => Id.ToString();
 }
 
 
@@ -136,6 +158,9 @@ public record SalesInvoiceDto(
         3 => "ملغي",
         _ => "غير معروف"
     };
+
+    public decimal TotalAmount => NetTotal;
+    public decimal DueAmount => RemainingAmount;
 }
 
 public record SalesInvoiceLineDto(int Id, int ProductId, string ProductName,
@@ -148,7 +173,11 @@ public record SalesInvoiceLineDto(int Id, int ProductId, string ProductName,
     decimal DiscountAmount = 0,
     decimal? CostInBaseCurrency = null,
     decimal UnitCost = 0,
-    decimal ProfitAmount = 0);
+    decimal ProfitAmount = 0)
+{
+    // Backward-compatible properties
+    public string? ProductCode => null;
+}
 
 public record PurchaseInvoiceDto(
     int Id,
@@ -194,6 +223,9 @@ public record PurchaseInvoiceDto(
         3 => "ملغي",
         _ => "غير معروف"
     };
+
+    public decimal TotalAmount => NetTotal;
+    public decimal DueAmount => RemainingAmount;
 }
 
 public record PurchaseInvoiceLineDto(int Id, int ProductId, string ProductName,
@@ -207,7 +239,12 @@ public record PurchaseInvoiceLineDto(int Id, int ProductId, string ProductName,
     decimal? DiscountRate,
     decimal DiscountAmount,
     decimal? CostInBaseCurrency,
-    decimal AdditionalFeesAmount);
+    decimal AdditionalFeesAmount)
+{
+    // Backward-compatible properties
+    public string? ProductCode => null;
+    public decimal UnitCost => LandedUnitCost;
+}
 
 public record SalesReturnDto(
     int Id,
@@ -452,7 +489,11 @@ public record SalesReportDto(
     decimal TotalAmount,
     decimal PaidAmount,
     decimal DueAmount
-);
+)
+{
+    // Backward-compatible properties
+    public int InvoiceNo => Id;
+}
 
 public record PurchaseReportDto(
     DateTime InvoiceDate,
@@ -464,7 +505,11 @@ public record PurchaseReportDto(
     decimal TotalAmount,
     decimal PaidAmount,
     decimal DueAmount
-);
+)
+{
+    // Backward-compatible properties
+    public int InvoiceNo => Id;
+}
 
 public record StockReportDto(
     int ProductId,
@@ -476,7 +521,11 @@ public record StockReportDto(
     decimal ReorderLevel,
     decimal PurchasePrice,
     decimal TotalValue
-);
+)
+{
+    // Backward-compatible properties
+    public string? ProductCode => null;
+}
 
 public record CustomerFinancialBalanceDto(
     int CustomerId,
@@ -498,7 +547,11 @@ public record SupplierBalanceReportDto(
     decimal TotalPayments,
     decimal TotalDebit,
     decimal CurrentBalance
-);
+)
+{
+    // Backward-compatible properties
+    public string SupplierCode => SupplierId.ToString();
+}
 
 public record ProductMovementReportDto(
     DateTime Date,
@@ -560,7 +613,14 @@ public record LowStockReportDto(
     string  WholesaleUnitName,
     string  RetailUnitName,
     decimal ConversionFactor
-);
+)
+{
+    // Backward-compatible properties
+    public string? ProductCode => null;
+    public string UnitName => RetailUnitName;
+    public decimal Quantity => CurrentRetailQty;
+    public decimal ReorderLevel => ReorderLevelRetailQty;
+}
 
 // Financial Reports DTOs
 public record IncomeStatementDto(
@@ -809,7 +869,15 @@ public record CustomerBalanceReportDto(
     decimal CurrentBalance,
     decimal CreditLimit,
     string BalanceStatus
-);
+)
+{
+    // Backward-compatible properties
+    public string CustomerCode => Id.ToString();
+    public string CustomerName => Name;
+    public decimal OpeningBalance => 0m;
+    public decimal TotalSales => 0m;
+    public decimal TotalPayments => 0m;
+}
 
 public record CustomerAgingReportDto(
     int Id,
@@ -958,5 +1026,24 @@ public record AccountBalanceReportDto(
     decimal CreditBalance,
     decimal NetBalance);
 
-
+public record PersonDto(
+    int Id,
+    string FirstName,
+    string SecondName,
+    string? ThirdName,
+    string LastName,
+    string NationalNo,
+    byte Gender,
+    DateTime DateOfBirth,
+    string? Phone,
+    string? Address,
+    string? Email,
+    string? ImagePath,
+    int NationalityCountryId,
+    string? CountryName,
+    bool IsActive)
+{
+    public string FullName => $"{FirstName} {SecondName} {ThirdName ?? ""} {LastName}".Trim();
+    public string GenderDisplay => Gender == 1 ? "ذكر" : "أنثى";
+}
 

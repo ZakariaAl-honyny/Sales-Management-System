@@ -1,7 +1,7 @@
-﻿# Database Schema Design
+# Database Schema Design
 # Sales Management System — V1 Final (Module-by-Module Organization)
 # Platform: SQL Server 2019+
-# 64 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
+# 58 Tables | decimal-only financials | nvarchar text | Soft delete | All FK Restrict
 
 ---
 
@@ -69,7 +69,8 @@ Default schema: **`dbo`**
 | `Address` | nvarchar(500) null | |
 | `TaxNumber` | nvarchar(30) null | |
 | `Notes` | nvarchar(1000) null | |
-| `AccountId` | int not null FK → Accounts(Id) | every customer = an account |
+| `AccountId` | int not null FK → Accounts(Id) | links to accounting tree |
+| `CurrentBalance` | decimal(18,2) not null default 0 | operating balance (رصيد تشغيلي) |
 | `CategoryId` | int null FK → AccountCategories(Id) | |
 | `CreditLimit` | decimal(18,2) not null default 0 | |
 | `IsActive` | bit not null default 1 | |
@@ -79,23 +80,7 @@ Default schema: **`dbo`**
 | `UpdatedAt` | datetime2 null | |
 | **Indexes** | `AccountId`, `CategoryId`, `Name`, `Phone` | |
 
-### 1.2 CustomerContacts
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `CustomerId` | int not null FK → Customers(Id) | |
-| `Name` | nvarchar(150) not null | |
-| `Phone` | nvarchar(30) null | |
-| `Email` | nvarchar(100) null | |
-| `Position` | nvarchar(100) null | |
-| `Notes` | nvarchar(300) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 1.3 Suppliers
+### 1.2 Suppliers
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -105,7 +90,8 @@ Default schema: **`dbo`**
 | `Address` | nvarchar(500) null | |
 | `TaxNumber` | nvarchar(30) null | |
 | `Notes` | nvarchar(1000) null | |
-| `AccountId` | int not null FK → Accounts(Id) | every supplier = an account |
+| `AccountId` | int not null FK → Accounts(Id) | link to accounting; balance maintained in Accounting module |
+| `CurrentBalance` | decimal(18,2) not null default 0 | operating balance |
 | `CategoryId` | int null FK → AccountCategories(Id) | |
 | `CreditLimit` | decimal(18,2) not null default 0 | |
 | `IsActive` | bit not null default 1 | |
@@ -115,23 +101,7 @@ Default schema: **`dbo`**
 | `UpdatedAt` | datetime2 null | |
 | **Indexes** | `AccountId`, `CategoryId`, `Name`, `Phone` | |
 
-### 1.4 SupplierContacts
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | int PK | |
-| `SupplierId` | int not null FK → Suppliers(Id) | |
-| `Name` | nvarchar(150) not null | |
-| `Phone` | nvarchar(30) null | |
-| `Email` | nvarchar(100) null | |
-| `Position` | nvarchar(100) null | |
-| `Notes` | nvarchar(300) null | |
-| `IsActive` | bit not null default 1 | |
-| `CreatedByUserId` | int null FK | |
-| `UpdatedByUserId` | int null FK | |
-| `CreatedAt` | datetime2 not null | |
-| `UpdatedAt` | datetime2 null | |
-
-### 1.5 Users
+### 1.3 Users
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -152,7 +122,7 @@ Default schema: **`dbo`**
 > **Permission Check**: `(User.PermissionsMask & requiredPermission) == requiredPermission`. Super Admin: `PermissionsMask = -1`.
 > **Role Assignment**: When admin assigns a role to a user → `User.PermissionsMask = Role.PermissionsMask`. The user's mask can be further customized after role assignment.
 
-### 1.6 Roles
+### 1.4 Roles
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | **smallint** PK | |
@@ -181,7 +151,7 @@ Default schema: **`dbo`**
 > **Custom Roles**: Admin can add new roles beyond the 8 defaults. `IsSystem = 0` roles can be edited/deleted. Role is just a named template — assigning it copies `PermissionsMask` to the user. No join table needed.
 
 
-### 1.7 UserSessions
+### 1.5 UserSessions
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
@@ -201,7 +171,7 @@ Default schema: **`dbo`**
 
 ---
 
-## Module 2: Organization, Currencies & Settings (التنظيم والإعدادات)
+## Module 2: Organization & Settings (التنظيم والإعدادات)
 
 ### 2.1 Warehouses
 | Column | Type | Notes |
@@ -397,7 +367,7 @@ Default schema: **`dbo`**
 - Tax is on **invoice level** (`SalesInvoices.TaxId`, `PurchaseInvoices.TaxId`) — NOT on Products (per analysis: same product may be exempt or taxable depending on invoice context)
 - Opening stock is a **separate inventory transaction** (InventoryAdjustment + InventoryBatches + WarehouseStocks + JournalEntry) — NOT columns on Products
 - Product creation = Products + ProductUnits + ProductPrices only (3 tables, atomic via `ExecuteTransactionAsync`)
-- Pricing is per `ProductUnit` × `CurrencyId` with effective date ranges
+- Pricing is per `ProductUnit` with effective date ranges (V2 adds multi-currency via CurrencyId)
 - Units are decoupled from products via the `ProductUnits` junction table
 
 ---
@@ -457,7 +427,8 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `AccountId` | int not null FK → Accounts(Id) | balance lives on Account, NOT CashBox |
+| `AccountId` | int not null FK → Accounts(Id) | link to accounting; balance maintained in Accounting module |
+| `CurrentBalance` | decimal(18,2) not null default 0 | operating balance |
 | `Name` | nvarchar(150) not null | |
 | `Description` | nvarchar(300) null | |
 | `IsActive` | bit not null default 1 | |
@@ -465,13 +436,14 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | `UpdatedByUserId` | int null FK | |
 | `CreatedAt` | datetime2 not null | |
 | `UpdatedAt` | datetime2 null | |
-| **Notes** | NO OpeningBalance, NO CurrentBalance | balance tracked on linked Account |
+| **Notes** | Operating balance on entity, accounting balance on linked Account | |
 
 ### 4.4 Banks
 | Column | Type | Notes |
 |--------|------|-------|
 | `Id` | int PK | |
-| `AccountId` | int not null FK → Accounts(Id) | |
+| `AccountId` | int not null FK → Accounts(Id) | links to accounting tree |
+| `CurrentBalance` | decimal(18,2) not null default 0 | operating balance (رصيد تشغيلي) |
 | `Name` | nvarchar(150) not null | |
 | `AccountNumber` | nvarchar(100) null | |
 | `IBAN` | nvarchar(100) null | |
@@ -1033,7 +1005,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 
 | Module | Table Count | Tables |
 |--------|------------|--------|
-| 1. Core & Security | 11 | Customers, CustomerContacts, Suppliers, SupplierContacts, Roles, Users, UserRoles, Permissions, RolePermissions, UserSessions, UserPermissions |
+| 1. Core & Security | 9 | Customers, Suppliers, Roles, Users, UserRoles, Permissions, RolePermissions, UserSessions, UserPermissions |
 | 2. Organization & Settings | 8 | Warehouses, Taxes, CompanySettings, SystemSettings, DocumentSequences, FiscalYears, Notifications, Attachments |
 | 3. Products | 5 | ProductCategories, Products, Units, ProductUnits, ProductPrices |
 | 4. Accounting | 10 | AccountCategories, Accounts, CashBoxes, Banks, JournalEntries, JournalEntryLines, ReceiptVouchers, PaymentVouchers, Expenses, SystemAccountMappings |
@@ -1041,7 +1013,7 @@ This scheme allows up to 9,999 detail accounts per sub-category (e.g., 9,999 cus
 | 6. Sales | 6 | SalesInvoices, SalesInvoiceLines, SalesReturns, SalesReturnLines, CustomerReceipts, CustomerReceiptApplications |
 | 7. Purchases | 6 | PurchaseInvoices, PurchaseInvoiceLines, PurchaseReturns, PurchaseReturnLines, SupplierPayments, SupplierPaymentApplications |
 | 8. Infrastructure & Support | 2 | AuditLogs, SystemLogs |
-| **Total** | **64** | |
+| **Total** | **58** | |
 
 ---
 
@@ -1097,5 +1069,218 @@ Per Entry: SUM(Debit) = SUM(Credit)
 - **Self-referencing FKs**: Accounts.ParentId
 - **Soft-delete reference safety**: Filtered unique indexes include `AND [IsActive] = 1`
 
+---
 
+# 9) V2 Deferred Entities (متأخر إلى الإصدار 2)
+
+The following entities are **NOT in V1**. They are deferred to V2 for scope management. V1 codebase contains NO entity definitions, EF configurations, services, controllers, or Desktop UI for these tables.
+
+---
+
+## V2.1 Branches (الفروع)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | smallint PK | |
+| `Name` | nvarchar(150) not null | |
+| `Code` | nvarchar(20) not null | unique |
+| `Address` | nvarchar(500) null | |
+| `Phone` | nvarchar(30) null | |
+| `ManagerName` | nvarchar(150) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: Multi-branch support. V1 is single-branch. V2 adds branch-level reporting, stock segregation, and user-branch assignment.
+
+---
+
+## V2.2 Departments (الأقسام)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | smallint PK | |
+| `Name` | nvarchar(150) not null | |
+| `Description` | nvarchar(300) null | |
+| `BranchId` | smallint null FK → Branches(Id) | null = company-wide |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: Organizational structure. Groups employees by function (Sales, Warehouse, Accounting, HR).
+
+---
+
+## V2.3 Employees (الموظفون)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `Name` | nvarchar(200) not null | |
+| `EmployeeCode` | nvarchar(30) not null | unique |
+| `Phone` | nvarchar(20) null | |
+| `Email` | nvarchar(100) null | |
+| `NationalId` | nvarchar(20) null | national ID / iqama |
+| `Position` | nvarchar(100) null | job title |
+| `DepartmentId` | smallint null FK → Departments(Id) | |
+| `BranchId` | smallint null FK → Branches(Id) | |
+| `HireDate` | date null | |
+| `AccountId` | int null FK → Accounts(Id) | for salary advances / custody |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: HR module. Tracks employees, department/branch assignment, and links to accounting for salary advances (custody accounts under `1170`).
+
+---
+
+## V2.4 Currencies (العملات)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | smallint PK | |
+| `Code` | char(3) not null | ISO 4217 (e.g., "SAR", "USD", "YER") |
+| `NameAr` | nvarchar(100) not null | Arabic name |
+| `NameEn` | nvarchar(100) not null | English name |
+| `Symbol` | nvarchar(10) null | e.g., "﷼", "$" |
+| `FractionName` | nvarchar(50) null | e.g., "فلس" for YER, "Cent" for USD |
+| `DecimalPlaces` | tinyint not null default 2 | display precision |
+| `IsBaseCurrency` | bit not null default 0 | unique filtered `[IsBaseCurrency]=1 AND [IsActive]=1` |
+| `IsSystem` | bit not null default 0 | system currencies (SAR, USD) protected from deletion |
+| `ExchangeRate` | decimal(18,6) not null default 1 | rate to base currency (base = 1.0) |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: Multi-currency support. V1 is single-currency (SAR). V2 adds currency conversion, multi-currency invoices, and exchange rate management.
+
+**V2 entities that reference CurrencyId**:
+- `SalesInvoices.CurrencyId` (FK) + `ExchangeRate`
+- `PurchaseInvoices.CurrencyId` (FK) + `ExchangeRate`
+- `CustomerReceipts.CurrencyId` (FK) + `ExchangeRate`
+- `SupplierPayments.CurrencyId` (FK) + `ExchangeRate`
+- `ProductPrices.CurrencyId` (FK) — multi-currency pricing
+
+---
+
+## V2.5 CurrencyRates ( Historical Exchange Rates)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CurrencyId` | smallint not null FK → Currencies(Id) | |
+| `RateToBase` | decimal(18,6) not null | rate at date |
+| `EffectiveDate` | date not null | |
+| `CreatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+
+**Purpose**: Exchange rate history. V2 records daily rates for audit trail. V1 uses fixed rate from SystemSettings.
+
+---
+
+## V2.6 CustomerContacts (جهات اتصال العملاء)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Position` | nvarchar(100) null | job title / role at customer |
+| `Notes` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: Multiple contacts per customer (e.g., purchasing manager, accounts payable, warehouse receiver). V1 has single Phone/Email on Customer.
+
+---
+
+## V2.7 SupplierContacts (جهات اتصال الموردين)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SupplierId` | int not null FK → Suppliers(Id) | |
+| `Name` | nvarchar(150) not null | |
+| `Phone` | nvarchar(30) null | |
+| `Email` | nvarchar(100) null | |
+| `Position` | nvarchar(100) null | job title / role at supplier |
+| `Notes` | nvarchar(300) null | |
+| `IsActive` | bit not null default 1 | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+
+**Purpose**: Multiple contacts per supplier. V1 has single Phone/Email on Supplier.
+
+---
+
+## V2.8 SalesQuotations (عروض الأسعار)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `QuotationNo` | int not null | user-facing number, UNIQUE |
+| `QuotationDate` | date not null | |
+| `ValidUntil` | date null | optional expiry date |
+| `CustomerId` | int not null FK → Customers(Id) | |
+| `WarehouseId` | smallint not null FK → Warehouses(Id) | |
+| `PaymentType` | tinyint not null | 1=Cash, 2=Credit |
+| `SubTotal` | decimal(18,2) not null | SUM(LineTotal) |
+| `DiscountAmount` | decimal(18,2) not null | header-level discount |
+| `TaxAmount` | decimal(18,2) not null | |
+| `TotalAmount` | decimal(18,2) not null | SubTotal - Discount + Tax |
+| `Notes` | nvarchar(500) null | |
+| `TermsAndConditions` | nvarchar(2000) null | |
+| `Status` | tinyint not null | 1=Draft, 2=Sent, 3=Accepted, 4=Converted, 5=Rejected |
+| `ConvertedToInvoiceId` | int null FK → SalesInvoices(Id) | set when converted |
+| `RejectionReason` | nvarchar(1000) null | |
+| `CreatedByUserId` | int null FK | |
+| `UpdatedByUserId` | int null FK | |
+| `CreatedAt` | datetime2 not null | |
+| `UpdatedAt` | datetime2 null | |
+| **UK** | `UNIQUE(QuotationNo)` | |
+
+---
+
+## V2.9 SalesQuotationItems (بنود عروض الأسعار)
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | int PK | |
+| `SalesQuotationId` | int not null FK → SalesQuotations(Id) | |
+| `ProductId` | int not null FK → Products(Id) | |
+| `ProductUnitId` | int not null FK → ProductUnits(Id) | |
+| `Quantity` | decimal(18,3) not null | |
+| `UnitPrice` | decimal(18,2) not null | |
+| `DiscountAmount` | decimal(18,2) not null default 0 | line-level discount |
+| `LineTotal` | decimal(18,2) not null | (Qty × UnitPrice) − Discount |
+| `Notes` | nvarchar(500) null | |
+
+**Design Notes:**
+- NO stock or accounting impact until quotation is converted to SalesInvoice
+- QuotationItems DO support per-line DiscountAmount (unlike SalesInvoiceLines which only have header discount in V1)
+- 5-state lifecycle: Draft → Sent → Accepted → Converted / Rejected
+
+---
+
+**V2 Scope Summary**:
+
+| Entity | V2 Purpose | V1 Impact |
+|--------|-----------|-----------|
+| Branches | Multi-branch operations | V1 is single-branch |
+| Departments | Organizational structure | Not needed in V1 |
+| Employees | HR + custody accounts | Deferred to V2 |
+| Currencies | Multi-currency invoices | V1 uses single currency (SAR) |
+| CurrencyRates | Exchange rate history | V1 uses fixed rate |
+| CustomerContacts | Multiple contacts per customer | V1 has single contact fields |
+| SupplierContacts | Multiple contacts per supplier | V1 has single contact fields |
+| SalesQuotations | Quotation → Invoice conversion | Deferred to V2 |
+| SalesQuotationItems | Quotation line items | Deferred to V2 |
+
+**Total V1 Tables: 58 | Total V2 Tables: 9 | Combined: 67**
 

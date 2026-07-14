@@ -201,9 +201,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -222,12 +219,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.Property<byte>("EntryType")
                         .HasColumnType("tinyint");
-
-                    b.Property<decimal>("ExchangeRate")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)")
-                        .HasDefaultValue(1m);
 
                     b.Property<short>("FiscalYearId")
                         .HasColumnType("smallint");
@@ -274,8 +265,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("EntryDate");
 
@@ -369,9 +358,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -405,8 +391,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("AccountId");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("VoucherNo")
                         .IsUnique();
@@ -437,9 +421,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -473,8 +454,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("AccountId");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("VoucherNo")
                         .IsUnique();
@@ -681,9 +660,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<string>("IBAN")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -706,64 +682,7 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.HasIndex("CurrencyId");
-
                     b.ToTable("Banks", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Branch", b =>
-                {
-                    b.Property<short>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<short>("Id"));
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(true);
-
-                    b.Property<string>("ManagerName")
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("nvarchar(150)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasFilter("[IsActive] = 1");
-
-                    b.ToTable("Branches", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
@@ -777,17 +696,11 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int>("AccountId")
                         .HasColumnType("int");
 
-                    b.Property<short>("BranchId")
-                        .HasColumnType("smallint");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
-
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
 
                     b.Property<string>("Description")
                         .HasMaxLength(300)
@@ -811,8 +724,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasIndex("AccountId");
 
-                    b.HasIndex("CurrencyId");
-
                     b.ToTable("CashBoxes", (string)null);
                 });
 
@@ -835,9 +746,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
-                    b.Property<short>("DefaultCurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<string>("Email")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
@@ -859,132 +767,7 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DefaultCurrencyId");
-
                     b.ToTable("CompanySettings", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Currency", b =>
-                {
-                    b.Property<short>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<short>("Id"));
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasColumnType("char(3)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<byte>("DecimalPlaces")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("tinyint")
-                        .HasDefaultValue((byte)2);
-
-                    b.Property<string>("FractionName")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsBaseCurrency")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<bool>("IsSystem")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Symbol")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique()
-                        .HasFilter("[IsActive] = 1");
-
-                    b.HasIndex("IsBaseCurrency")
-                        .IsUnique()
-                        .HasFilter("[IsBaseCurrency] = 1 AND [IsActive] = 1");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasFilter("[IsActive] = 1");
-
-                    b.ToTable("Currencies", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.CurrencyRate", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
-                    b.Property<DateTime>("EffectiveFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("EffectiveTo")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal>("RateToBase")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EffectiveFrom")
-                        .HasDatabaseName("IX_CurrencyRates_EffectiveFrom");
-
-                    b.HasIndex("CurrencyId", "EffectiveFrom")
-                        .IsDescending(false, true)
-                        .HasDatabaseName("IX_CurrencyRates_CurrencyId_EffectiveFrom");
-
-                    b.ToTable("CurrencyRates", null, t =>
-                        {
-                            t.HasCheckConstraint("CHK_CurrencyRates_EffectiveRange", "[EffectiveTo] IS NULL OR [EffectiveTo] > [EffectiveFrom]");
-
-                            t.HasCheckConstraint("CHK_CurrencyRates_RateToBase", "[RateToBase] > 0");
-                        });
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Customer", b =>
@@ -1133,7 +916,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal?>("BaseNetTotal")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("CancelledAt")
@@ -1148,15 +930,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -1188,8 +963,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("CustomerId")
                         .HasDatabaseName("IX_CustomerReceipts_CustomerId");
@@ -1226,43 +999,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasIndex("SalesInvoiceId");
 
                     b.ToTable("CustomerReceiptApplications", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Department", b =>
-                {
-                    b.Property<short>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("smallint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<short>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Departments", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.DocumentSequence", b =>
@@ -1304,89 +1040,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("DocumentSequences", (string)null);
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Employee", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("AccountId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Address")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<short?>("DepartmentId")
-                        .HasColumnType("smallint");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("EmployeeNo")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("HireDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal>("Salary")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId")
-                        .HasDatabaseName("IX_Employees_AccountId");
-
-                    b.HasIndex("DepartmentId")
-                        .HasDatabaseName("IX_Employees_DepartmentId");
-
-                    b.HasIndex("EmployeeNo")
-                        .IsUnique()
-                        .HasDatabaseName("IX_Employees_EmployeeNo");
-
-                    b.HasIndex("Name")
-                        .HasDatabaseName("IX_Employees_Name");
-
-                    b.HasIndex("Phone")
-                        .HasDatabaseName("IX_Employees_Phone");
-
-                    b.ToTable("Employees", (string)null);
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.Expense", b =>
                 {
                     b.Property<int>("Id")
@@ -1400,7 +1053,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal?>("BaseNetTotal")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("CancelledAt")
@@ -1414,13 +1066,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
-
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<int>("ExpenseAccountId")
                         .HasColumnType("int");
@@ -1450,8 +1095,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("ExpenseAccountId")
                         .HasDatabaseName("IX_Expenses_ExpenseAccountId");
@@ -2103,9 +1746,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<DateTime>("EffectiveFrom")
                         .HasColumnType("date")
                         .HasComment("تاريخ بدء السريان");
@@ -2130,11 +1770,9 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CurrencyId");
-
-                    b.HasIndex("ProductUnitId", "CurrencyId", "EffectiveFrom")
+                    b.HasIndex("ProductUnitId", "EffectiveFrom")
                         .IsUnique()
-                        .HasDatabaseName("IX_ProductPrices_ProductUnit_Currency_Date");
+                        .HasDatabaseName("IX_ProductPrices_ProductUnit_Date");
 
                     b.ToTable("ProductPrices", null, t =>
                         {
@@ -2222,9 +1860,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -2237,10 +1872,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint")
                         .HasDefaultValue((byte)0);
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateOnly>("InvoiceDate")
                         .HasColumnType("date");
@@ -2307,8 +1938,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("InvoiceNo")
                         .IsUnique();
@@ -2415,9 +2044,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<decimal?>("DiscountRate")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -2426,12 +2052,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint")
                         .HasDefaultValue((byte)0);
-
-                    b.Property<decimal>("ExchangeRate")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)")
-                        .HasDefaultValue(1m);
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -2490,8 +2110,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("smallint");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("PurchaseInvoiceId");
 
@@ -2576,6 +2194,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<long>("PermissionsMask")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -2642,9 +2265,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
 
@@ -2660,10 +2280,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint")
                         .HasDefaultValue((byte)0);
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<DateTime>("InvoiceDate")
                         .HasColumnType("date");
@@ -2723,8 +2339,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("CustomerId");
 
@@ -2806,147 +2420,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.ToTable("SalesInvoiceLines", (string)null);
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.SalesQuotation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("ConvertedToInvoiceId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
-                    b.Property<int>("CustomerId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<byte>("PaymentType")
-                        .HasColumnType("tinyint");
-
-                    b.Property<DateTime>("QuotationDate")
-                        .HasColumnType("date");
-
-                    b.Property<int>("QuotationNo")
-                        .HasColumnType("int");
-
-                    b.Property<string>("RejectionReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<byte>("Status")
-                        .HasColumnType("tinyint");
-
-                    b.Property<decimal>("SubTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TaxAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("TermsAndConditions")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("ValidUntil")
-                        .HasColumnType("date");
-
-                    b.Property<short>("WarehouseId")
-                        .HasColumnType("smallint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CurrencyId");
-
-                    b.HasIndex("CustomerId");
-
-                    b.HasIndex("QuotationNo")
-                        .IsUnique();
-
-                    b.HasIndex("WarehouseId");
-
-                    b.ToTable("SalesQuotations", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.SalesQuotationItem", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("DiscountAmount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("LineTotal")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("ProductId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ProductUnitId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("decimal(18,3)");
-
-                    b.Property<int>("SalesQuotationId")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId");
-
-                    b.HasIndex("ProductUnitId");
-
-                    b.HasIndex("SalesQuotationId");
-
-                    b.ToTable("SalesQuotationItems", (string)null);
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.SalesReturn", b =>
                 {
                     b.Property<int>("Id")
@@ -2968,15 +2441,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
                     b.Property<int>("CustomerId")
                         .HasColumnType("int");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -3042,8 +2508,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("smallint");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("CustomerId");
 
@@ -3240,7 +2704,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal?>("BaseNetTotal")
-                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("CancelledAt")
@@ -3254,13 +2717,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("int");
-
-                    b.Property<short>("CurrencyId")
-                        .HasColumnType("smallint");
-
-                    b.Property<decimal?>("ExchangeRate")
-                        .HasPrecision(18, 6)
-                        .HasColumnType("decimal(18,6)");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -3297,8 +2753,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CashBoxId");
-
-                    b.HasIndex("CurrencyId");
 
                     b.HasIndex("PaymentNo")
                         .IsUnique()
@@ -3576,9 +3030,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
-                    b.Property<bool>("IsSystemAdmin")
-                        .HasColumnType("bit");
-
                     b.Property<DateTime?>("LastLoginAt")
                         .HasColumnType("datetime2");
 
@@ -3597,6 +3048,11 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<long>("PermissionsMask")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -3610,36 +3066,10 @@ namespace SalesSystem.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EmployeeId");
-
                     b.HasIndex("UserName")
                         .IsUnique();
 
                     b.ToTable("Users", (string)null);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.UserBranch", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<short>("BranchId")
-                        .HasColumnType("smallint");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BranchId");
-
-                    b.HasIndex("UserId", "BranchId")
-                        .IsUnique();
-
-                    b.ToTable("UserBranches", (string)null);
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.UserPermission", b =>
@@ -3762,9 +3192,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("nvarchar(300)");
 
-                    b.Property<short>("BranchId")
-                        .HasColumnType("smallint");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -3797,8 +3224,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("BranchId");
 
                     b.ToTable("Warehouses", (string)null);
                 });
@@ -3964,12 +3389,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.JournalEntry", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Accounting.Entities.FiscalYear", "FiscalYear")
                         .WithMany()
                         .HasForeignKey("FiscalYearId")
@@ -3988,8 +3407,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ReversedByEntryId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Currency");
 
                     b.Navigation("FiscalYear");
 
@@ -4029,17 +3446,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Account");
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.ReceiptVoucher", b =>
@@ -4056,17 +3465,9 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Account");
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Accounting.Entities.SystemAccountMapping", b =>
@@ -4098,15 +3499,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Account");
-
-                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.CashBox", b =>
@@ -4117,35 +3510,7 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.Navigation("Account");
-
-                    b.Navigation("Currency");
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.CompanySettings", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", null)
-                        .WithMany()
-                        .HasForeignKey("DefaultCurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.CurrencyRate", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.Customer", b =>
@@ -4178,12 +3543,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -4191,8 +3550,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("Customer");
                 });
@@ -4216,35 +3573,11 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("SalesInvoice");
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Employee", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Accounting.Entities.Account", "Account")
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.Department", "Department")
-                        .WithMany()
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Account");
-
-                    b.Navigation("Department");
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.Expense", b =>
                 {
                     b.HasOne("SalesSystem.Domain.Entities.CashBox", "CashBox")
                         .WithMany()
                         .HasForeignKey("CashBoxId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -4255,8 +3588,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("ExpenseAccount");
                 });
@@ -4408,19 +3739,11 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.ProductPrice", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
                         .WithMany()
                         .HasForeignKey("ProductUnitId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Currency");
 
                     b.Navigation("ProductUnit");
                 });
@@ -4451,12 +3774,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
@@ -4475,8 +3792,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("Supplier");
 
@@ -4514,12 +3829,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.PurchaseReturn", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.PurchaseInvoice", "PurchaseInvoice")
                         .WithMany()
                         .HasForeignKey("PurchaseInvoiceId")
@@ -4536,8 +3845,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Currency");
 
                     b.Navigation("PurchaseInvoice");
 
@@ -4606,12 +3913,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -4630,8 +3931,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("Customer");
 
@@ -4667,68 +3966,8 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("SalesInvoice");
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.SalesQuotation", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.Customer", "Customer")
-                        .WithMany()
-                        .HasForeignKey("CustomerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.Warehouse", "Warehouse")
-                        .WithMany()
-                        .HasForeignKey("WarehouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Currency");
-
-                    b.Navigation("Customer");
-
-                    b.Navigation("Warehouse");
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.SalesQuotationItem", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Product", "Product")
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.ProductUnit", "ProductUnit")
-                        .WithMany()
-                        .HasForeignKey("ProductUnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.SalesQuotation", "SalesQuotation")
-                        .WithMany("Items")
-                        .HasForeignKey("SalesQuotationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Product");
-
-                    b.Navigation("ProductUnit");
-
-                    b.Navigation("SalesQuotation");
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.SalesReturn", b =>
                 {
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -4746,8 +3985,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("WarehouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Currency");
 
                     b.Navigation("Customer");
 
@@ -4804,12 +4041,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .HasForeignKey("CashBoxId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SalesSystem.Domain.Entities.Currency", "Currency")
-                        .WithMany()
-                        .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("SalesSystem.Domain.Entities.Supplier", "Supplier")
                         .WithMany()
                         .HasForeignKey("SupplierId")
@@ -4817,8 +4048,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CashBox");
-
-                    b.Navigation("Currency");
 
                     b.Navigation("Supplier");
                 });
@@ -4848,33 +4077,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.User", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Employee", null)
-                        .WithMany()
-                        .HasForeignKey("EmployeeId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.UserBranch", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SalesSystem.Domain.Entities.User", "User")
-                        .WithMany("UserBranches")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Branch");
 
                     b.Navigation("User");
                 });
@@ -4926,17 +4128,6 @@ namespace SalesSystem.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SalesSystem.Domain.Entities.Warehouse", b =>
-                {
-                    b.HasOne("SalesSystem.Domain.Entities.Branch", "Branch")
-                        .WithMany()
-                        .HasForeignKey("BranchId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Branch");
                 });
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.WarehouseStock", b =>
@@ -5074,11 +4265,6 @@ namespace SalesSystem.Infrastructure.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("SalesSystem.Domain.Entities.SalesQuotation", b =>
-                {
-                    b.Navigation("Items");
-                });
-
             modelBuilder.Entity("SalesSystem.Domain.Entities.SalesReturn", b =>
                 {
                     b.Navigation("Lines");
@@ -5091,8 +4277,6 @@ namespace SalesSystem.Infrastructure.Migrations
 
             modelBuilder.Entity("SalesSystem.Domain.Entities.User", b =>
                 {
-                    b.Navigation("UserBranches");
-
                     b.Navigation("UserRoles");
                 });
 

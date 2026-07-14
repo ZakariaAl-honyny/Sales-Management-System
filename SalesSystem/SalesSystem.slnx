@@ -10,5 +10,7 @@
   <Project Path="SalesSystem.Infrastructure/SalesSystem.Infrastructure.csproj" />
   <!-- <Project Path="Tests/SalesSystem.DesktopPWF.Tests/SalesSystem.DesktopPWF.Tests.csproj" /> -->
   <Project Path="SalesSystem.DesktopPWF/SalesSystem.DesktopPWF.csproj" />
+  <Project Path="SalesSystem.Desktop/SalesSystem.Desktop.csproj" />
+  <Project Path="SalesManagement/SalesManagement.csproj" />
   <!-- <Project Path="Tests/SalesSystem.E2ETests/SalesSystem.E2ETests.csproj" /> -->
 </Solution>
